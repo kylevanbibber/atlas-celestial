@@ -21,7 +21,7 @@ const DiscordSettings = () => {
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [channels, setChannels] = useState([]);
   console.log('DISCORD CLIENT ID:', process.env.REACT_APP_DISCORD_CLIENT_ID);
-
+  
   useEffect(() => {
     loadDiscordData();
   }, []);
@@ -254,77 +254,74 @@ const DiscordSettings = () => {
     </div>
 
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-    {guilds
-  .filter(g => !configuredGuilds.some(c => c.guild_id === g.id))
-  .map(guild => (
-    <div
-      key={guild.id}
-      style={{
-        padding: '12px',
-        border: '1px solid var(--border-color)',
-        borderRadius: '6px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        {guild.icon_url && (
-          <img
-            src={guild.icon_url}
-            alt={`${guild.name} icon`}
-            style={{ width: 24, height: 24, borderRadius: 4 }}
-          />
-        )}
-        <span>{guild.name}</span>
-      </div>
-      <a
-        href={`https://discord.com/oauth2/authorize?client_id=${process.env.REACT_APP_DISCORD_CLIENT_ID}&scope=bot&permissions=8&guild_id=${guild.id}`}
-        className="settings-button"
-      >
-        Add Bot
-      </a>
-    </div>
-  ))
-}
+      {guilds
+        .filter(g => !configuredGuilds.some(c => c.guild_id === g.id))
+        .map(guild => (
+          <div
+            key={guild.id}
+            style={{
+              padding: '12px',
+              border: '1px solid var(--border-color)',
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {guild.icon_url ? (
+                  <img src={guild.icon_url} alt={`${guild.name} icon`} style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
+                ) : (
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#5865f2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold' }}>
+                    {guild.name.charAt(0)}
+                  </div>
+                )}
+                <span>{guild.name}</span>
+            </div>
+            <a
+              href={`https://discord.com/oauth2/authorize?client_id=${process.env.REACT_APP_DISCORD_CLIENT_ID}&scope=bot&permissions=8&guild_id=${guild.id}`}
+              className="settings-button"
+            >
+              Add Bot
+            </a>
+          </div>
+        ))
+      }
 
-
-{configuredGuilds.map(cfg => {
-  const guild = guilds.find(g => g.id === cfg.guild_id);
-  return (
-    <div
-      key={`${cfg.guild_id}-${cfg.channel_id}`}
-      style={{
-        padding: '12px',
-        border: '1px solid var(--border-color)',
-        borderRadius: '6px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        {guild?.icon_url && (
-          <img
-            src={guild.icon_url}
-            alt={`${cfg.guild_name} icon`}
-            style={{ width: 24, height: 24, borderRadius: 4 }}
-          />
-        )}
-        <span>
-          {cfg.guild_name} — #{cfg.channel_name}
-        </span>
-      </div>
-      <button
-        onClick={() => handleRemoveGuild(cfg.guild_id, cfg.channel_id)}
-        className="settings-button-secondary"
-      >
-        <FaTrash />
-      </button>
-    </div>
-  );
-})}
-
+      {configuredGuilds.map(cfg => {
+        const fullGuild = guilds.find(g => g.id === cfg.guild_id);
+        return (
+        <div
+          key={`${cfg.guild_id}-${cfg.channel_id}`}
+          style={{
+            padding: '12px',
+            border: '1px solid var(--border-color)',
+            borderRadius: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {fullGuild && fullGuild.icon_url ? (
+                <img src={fullGuild.icon_url} alt={`${cfg.guild_name} icon`} style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
+              ) : (
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#5865f2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold' }}>
+                  {cfg.guild_name.charAt(0)}
+                </div>
+              )}
+              <span>
+                {cfg.guild_name} — #{cfg.channel_name}
+              </span>
+          </div>
+          <button
+            onClick={() => handleRemoveGuild(cfg.guild_id, cfg.channel_id)}
+            className="settings-button-secondary"
+          >
+            <FaTrash />
+          </button>
+        </div>
+      )})}
     </div>
   </div>
 )}
@@ -659,25 +656,35 @@ const GuildModal = ({ guilds, configuredGuilds, selectedGuild, selectedChannel, 
         <div className="settings-dialog-content">
           <div className="settings-row">
             <label>Select Server:</label>
-            <select 
-              value={selectedGuild?.id || ''} 
-              onChange={(e) => {
-                const guild = guilds.find(g => g.id === e.target.value);
-                onGuildSelect(guild);
-              }}
-              className="settings-row select"
-            >
-              <option value="">Choose a server...</option>
-              {availableGuilds.map(guild => (
-                <option key={guild.id} value={guild.id}>
-                  {guild.name}
-                </option>
-              ))}
-            </select>
+            <div className="guild-selection-list" style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
+                {availableGuilds.length > 0 ? availableGuilds.map(guild => (
+                    <div 
+                        key={guild.id}
+                        onClick={() => onGuildSelect(guild)}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '10px',
+                            cursor: 'pointer',
+                            backgroundColor: selectedGuild?.id === guild.id ? 'var(--button-primary-bg-hover)' : 'transparent',
+                            borderBottom: '1px solid var(--border-color)'
+                        }}
+                    >
+                        {guild.icon_url ? (
+                            <img src={guild.icon_url} alt="" style={{width: '32px', height: '32px', borderRadius: '50%', marginRight: '10px'}} />
+                        ) : (
+                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', marginRight: '10px', backgroundColor: '#5865f2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', fontSize: '14px' }}>
+                                {guild.name.charAt(0)}
+                            </div>
+                        )}
+                        <span>{guild.name}</span>
+                    </div>
+                )) : <div style={{padding: '20px', textAlign: 'center', color: 'var(--text-secondary)'}}>No available servers to configure.</div>}
+            </div>
           </div>
 
           {selectedGuild && (
-            <div className="settings-row">
+            <div className="settings-row" style={{ marginTop: '20px' }}>
               <label>Select Channel:</label>
               <select 
                 value={selectedChannel?.id || ''} 
@@ -696,17 +703,15 @@ const GuildModal = ({ guilds, configuredGuilds, selectedGuild, selectedChannel, 
               </select>
             </div>
           )}
+        </div>
 
-          {selectedGuild && selectedChannel && (
-            <div className="settings-dialog-actions">
-              <button onClick={onSubmit} className="settings-button">
-                Configure Server
-              </button>
-              <button onClick={onClose} className="settings-button-secondary">
-                Cancel
-              </button>
-            </div>
-          )}
+        <div className="settings-dialog-actions">
+          <button onClick={onClose} className="settings-button-secondary">
+            Cancel
+          </button>
+          <button onClick={onSubmit} className="settings-button" disabled={!selectedGuild || !selectedChannel}>
+            Configure Server
+          </button>
         </div>
       </div>
     </div>
