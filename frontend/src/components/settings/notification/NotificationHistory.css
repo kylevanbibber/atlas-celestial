@@ -1,0 +1,51 @@
+.settings-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.refresh-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.3s, opacity 0.3s;
+  color: var(--primary-color, #3e7bfa);
+}
+
+.refresh-button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.refresh-button:hover:not(:disabled) {
+  background-color: rgba(62, 123, 250, 0.1);
+}
+
+.refresh-button span {
+  margin-left: 4px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.icon-spin {
+  animation: spin 1s linear infinite;
+}
+
+.notification-loading, 
+.notification-error, 
+.notification-empty {
+  padding: 16px;
+  text-align: center;
+  color: #666;
+}
+
+.notification-error {
+  color: #d32f2f;
+} 

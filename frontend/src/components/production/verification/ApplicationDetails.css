@@ -1,0 +1,537 @@
+.application-details-container {
+  height: 100%;
+  overflow: auto;
+  padding: 65px 20px 20px 20px;
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.application-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.application-details-header h3 {
+  margin: 0;
+  color: var(--hover-color);
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-family: 'Avenir Next LT Pro', sans-serif;
+}
+
+.application-details-close-button {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 8px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+}
+
+.application-details-close-button:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-tertiary);
+  transform: scale(1.1);
+}
+
+.application-details-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Section styling */
+.application-details-section {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 15px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.2s ease;
+}
+
+.application-details-section:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.application-details-section h4 {
+  color: var(--hover-color);
+  margin: 0 0 12px 0;
+  font-weight: 700;
+  font-family: 'Avenir Next LT Pro', sans-serif;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-divider {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 20px 0;
+  opacity: 0.3;
+}
+
+/* Tables */
+.details-table,
+.contact-agent-table,
+.insureds-table,
+.medical-questions-table,
+.recruiting-table,
+.hierarchyTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 8px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.details-table th,
+.contact-agent-table th,
+.insureds-table th,
+.medical-questions-table th,
+.recruiting-table th,
+.hierarchyTable th {
+  background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+  color: var(--text-primary);
+  padding: 10px 8px;
+  text-align: left;
+  border-bottom: 2px solid var(--border-color);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.details-table td,
+.contact-agent-table td,
+.insureds-table td,
+.medical-questions-table td,
+.recruiting-table td,
+.hierarchyTable td {
+  padding: 8px 8px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--text-primary);
+  transition: background-color 0.2s ease;
+}
+
+.details-table tr:last-child td,
+.contact-agent-table tr:last-child td,
+.insureds-table tr:last-child td,
+.medical-questions-table tr:last-child td,
+.recruiting-table tr:last-child td,
+.hierarchyTable tr:last-child td {
+  border-bottom: none;
+}
+
+.details-table tr:hover td,
+.contact-agent-table tr:hover td,
+.insureds-table tr:hover td,
+.medical-questions-table tr:hover td,
+.recruiting-table tr:hover td,
+.hierarchyTable tr:hover td {
+  background-color: var(--bg-tertiary);
+}
+
+/* Insured rows */
+.insured-row {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 8px;
+  margin: 2px 0;
+}
+
+.insured-row:hover {
+  background-color: var(--bg-tertiary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.medical-questions-cell {
+  padding: 0 !important;
+}
+
+.medical-questions-table {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+}
+
+/* Status icons */
+.status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+
+.status-icon.verified {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-icon.discrepancy {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+/* Discrepancy styling */
+.discrepancy-row {
+  background: linear-gradient(135deg, #f8d7da, #f5c6cb) !important;
+  color: #721c24 !important;
+  border-left: 4px solid #dc3545;
+  animation: pulse-discrepancy 2s ease-in-out infinite;
+}
+
+@keyframes pulse-discrepancy {
+  0% {
+    box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(220, 53, 69, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+  }
+}
+
+[data-theme="dark"] .discrepancy-row {
+  background: linear-gradient(135deg, #5d1a1d, #721c24) !important;
+  color: #f5c6cb !important;
+  border-left: 4px solid #dc3545;
+}
+
+.contact-request-yes {
+  background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+  color: #721c24;
+  border-left: 3px solid #dc3545;
+  font-weight: 600;
+  padding: 8px 8px;
+  border-radius: 4px;
+  margin: 2px 0;
+}
+
+[data-theme="dark"] .contact-request-yes {
+  background: linear-gradient(135deg, #5d1a1d, #721c24);
+  color: #f5c6cb;
+  border-left: 4px solid #dc3545;
+}
+
+/* Verification status badges */
+.verification-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.verification-badge.verified {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.verification-badge.discrepancy {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+/* Loading state */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: var(--text-secondary);
+  font-size: 16px;
+  gap: 15px;
+}
+
+.loading-container::before {
+  content: '';
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color);
+  border-top: 3px solid var(--hover-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Documents section */
+.questionnaire-section {
+  margin-bottom: 12px;
+  padding: 12px;
+  background-color: var(--bg-tertiary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+}
+
+.questionnaire-section:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.questionnaire-section strong {
+  color: var(--text-primary);
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.questionnaire-section ul {
+  margin: 8px 0;
+  padding-left: 16px;
+  list-style: none;
+}
+
+.questionnaire-item {
+  margin-bottom: 6px;
+  color: var(--text-primary);
+  font-size: 11px;
+  position: relative;
+  padding-left: 16px;
+}
+
+.questionnaire-item::before {
+  content: '📋';
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.questionnaire-item a {
+  color: var(--hover-color);
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 1px solid transparent;
+  transition: border-bottom-color 0.2s ease;
+}
+
+.questionnaire-item a:hover {
+  border-bottom-color: var(--hover-color);
+}
+
+.email-instructions {
+  text-align: center;
+  margin-top: 25px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  padding: 20px;
+  background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary));
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.email-instructions a {
+  color: var(--hover-color);
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 1px solid transparent;
+  transition: border-bottom-color 0.2s ease;
+}
+
+.email-instructions a:hover {
+  border-bottom-color: var(--hover-color);
+}
+
+/* Mobile styles for bottom-sliding panel */
+@media (max-width: 767px) {
+  .application-details-container {
+    padding: 20px 12px 20px 12px;
+    height: 100%;
+    overflow-y: auto;
+  }
+  
+  .application-details-header {
+    position: relative;
+    background-color: var(--card-bg);
+    z-index: 10;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .application-details-header h3 {
+    font-size: 1.2rem;
+  }
+  
+  .application-details-close-button {
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+  }
+  
+  .application-details-section {
+    padding: 8px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+  }
+  
+  .application-details-section h4 {
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+    gap: 6px;
+  }
+  
+  .application-details-content {
+    gap: 12px;
+  }
+  
+  .details-table,
+  .contact-agent-table,
+  .insureds-table,
+  .medical-questions-table,
+  .recruiting-table,
+  .hierarchyTable {
+    font-size: 10px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+  }
+  
+  .details-table th,
+  .contact-agent-table th,
+  .insureds-table th,
+  .medical-questions-table th,
+  .recruiting-table th,
+  .hierarchyTable th {
+    padding: 6px 4px;
+    font-size: 9px;
+    line-height: 1.2;
+  }
+  
+  .details-table td,
+  .contact-agent-table td,
+  .insureds-table td,
+  .medical-questions-table td,
+  .recruiting-table td,
+  .hierarchyTable td {
+    padding: 6px 4px;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+  
+  .status-icon {
+    width: 16px;
+    height: 16px;
+    margin-right: 2px;
+  }
+  
+  .verification-badge {
+    padding: 1px 4px;
+    font-size: 8px;
+    border-radius: 3px;
+  }
+  
+  .questionnaire-section {
+    padding: 6px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+  
+  .questionnaire-section strong {
+    font-size: 10px;
+    margin-bottom: 4px;
+  }
+  
+  .questionnaire-section ul {
+    margin: 4px 0;
+    padding-left: 12px;
+  }
+  
+  .questionnaire-item {
+    font-size: 9px;
+    margin-bottom: 3px;
+    padding-left: 12px;
+  }
+  
+  .email-instructions {
+    padding: 8px;
+    margin-top: 10px;
+    border-radius: 6px;
+    font-size: 11px;
+  }
+  
+  .contact-request-yes {
+    padding: 4px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+  }
+}
+
+/* Tablet styles (768px - 1199px) */
+@media (max-width: 1199px) and (min-width: 768px) {
+  .application-details-container {
+    padding: 25px 18px 18px 18px;
+  }
+  
+  .application-details-section {
+    padding: 12px;
+    border-radius: 8px;
+  }
+  
+  .application-details-content {
+    gap: 18px;
+  }
+  
+  .details-table,
+  .contact-agent-table,
+  .insureds-table,
+  .medical-questions-table,
+  .recruiting-table,
+  .hierarchyTable {
+    font-size: 11px;
+    border-radius: 6px;
+  }
+  
+  .details-table th,
+  .contact-agent-table th,
+  .insureds-table th,
+  .medical-questions-table th,
+  .recruiting-table th,
+  .hierarchyTable th {
+    padding: 8px 6px;
+    font-size: 10px;
+  }
+  
+  .details-table td,
+  .contact-agent-table td,
+  .insureds-table td,
+  .medical-questions-table td,
+  .recruiting-table td,
+  .hierarchyTable td {
+    padding: 7px 6px;
+    font-size: 11px;
+  }
+} 

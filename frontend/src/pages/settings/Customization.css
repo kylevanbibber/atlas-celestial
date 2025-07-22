@@ -1,0 +1,412 @@
+/* 
+ * Team Customization Styles
+ * -------------------------
+ */
+
+.customization-container {
+  max-width: 900px;
+  padding: 20px;
+  margin: 0 auto;
+}
+
+.customization-description {
+  color: #666;
+  margin-bottom: 25px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.customization-form {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.customization-section {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.customization-section h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 18px;
+  color: #333;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+}
+
+/* Logo section */
+.logo-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.logo-preview-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-preview {
+  max-width: 100%;
+  max-height: 150px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px;
+  background-color: #f8f9fa;
+}
+
+.logo-upload-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 120px;
+  background-color: #f8f9fa;
+  border: 2px dashed #ddd;
+  border-radius: 6px;
+  color: #777;
+  font-size: 16px;
+}
+
+.logo-upload {
+  margin-top: 10px;
+}
+
+.file-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #fff;
+}
+
+.upload-instructions {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #666;
+}
+
+.remove-logo-button {
+  padding: 6px 12px;
+  background-color: #ff5c5c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.remove-logo-button:hover {
+  background-color: #e74c3c;
+}
+
+/* Color picker styles */
+.color-pickers {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.color-picker-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.color-input-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.color-picker {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.color-text-input {
+  flex: 1;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.color-preview {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid #ddd;
+}
+
+/* Form field styles */
+.customization-field {
+  margin-bottom: 20px;
+}
+
+.customization-field label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
+}
+
+.text-input, .css-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.css-textarea {
+  min-height: 120px;
+  font-family: monospace;
+  line-height: 1.4;
+}
+
+.field-help {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #666;
+}
+
+/* Preview section */
+.preview-section {
+  margin-top: 10px;
+}
+
+.style-preview {
+  margin-top: 15px;
+}
+
+/* Form actions */
+.form-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+.save-button, .reset-button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.save-button {
+  background-color: #007bff;
+  color: white;
+}
+
+.save-button:hover {
+  background-color: #0069d9;
+}
+
+.save-button:disabled {
+  background-color: #80bdff;
+  cursor: not-allowed;
+}
+
+.reset-button {
+  background-color: #f8f9fa;
+  color: #dc3545;
+  border: 1px solid #dc3545;
+}
+
+.reset-button:hover {
+  background-color: #f8d7da;
+}
+
+.reset-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Error and loading states */
+.error-message {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 12px 15px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  font-size: 18px;
+  color: #6c757d;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .color-pickers {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-actions {
+    flex-direction: column-reverse;
+    gap: 10px;
+  }
+  
+  .save-button, .reset-button {
+    width: 100%;
+  }
+}
+
+/* Add styling for the select dropdown */
+.select-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #fff;
+  color: #333;
+  font-size: 14px;
+  transition: border-color 0.2s;
+  margin-bottom: 8px;
+}
+
+.select-input:focus {
+  border-color: var(--primary-color, #007BFF);
+  outline: none;
+}
+
+.select-input option {
+  padding: 10px;
+}
+
+/* Font preview */
+.font-preview, .selected-font-preview {
+  margin: 15px 0;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.font-preview p {
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+
+.font-preview p:last-child {
+  margin-bottom: 0;
+}
+
+/* Font selector */
+.font-selector {
+  margin-bottom: 15px;
+}
+
+.font-option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.font-option {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.font-option:hover {
+  border-color: #007BFF;
+  background-color: #f0f7ff;
+}
+
+.font-option.selected {
+  border-color: #007BFF;
+  background-color: #e6f2ff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.font-sample {
+  font-size: 32px;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.font-name {
+  font-size: 13px;
+  color: #666;
+}
+
+/* Selected font preview */
+.selected-font-preview {
+  background-color: #f8f9fa;
+  border: 2px solid #007BFF;
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.current-font-label {
+  color: #007BFF;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.current-font-sample {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 15px;
+  border-left: 3px solid #e6f2ff;
+  padding-left: 15px;
+}
+
+.sample-text {
+  font-size: 18px;
+  color: #333;
+  line-height: 1.5;
+}
+
+.sample-alphabet {
+  font-size: 16px;
+  color: #555;
+  font-weight: 500;
+}
+
+.current-font-name {
+  color: #666;
+  font-size: 14px;
+  font-style: italic;
+  text-align: right;
+}
+
+.font-apply-info {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #007BFF;
+  font-style: italic;
+  border-top: 1px dashed #ccc;
+  padding-top: 8px;
+} 

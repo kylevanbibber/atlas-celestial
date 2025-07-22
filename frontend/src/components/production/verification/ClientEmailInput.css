@@ -1,0 +1,116 @@
+.client-email-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.email-handle-input {
+  margin-right: 8px;
+  padding: 5px;
+  border: 1px solid var(--input-border);
+  border-radius: 5px;
+  font-size: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: 'Calibri', sans-serif;
+  background-color: var(--input-bg);
+  color: var(--input-text);
+}
+
+.email-handle-input:focus {
+  outline: none;
+  border-color: var(--hover-color);
+}
+
+.email-at-symbol {
+  margin-right: 8px;
+  color: var(--text-primary);
+  font-family: 'Calibri', sans-serif;
+  font-size: 12px;
+}
+
+.email-website-container {
+  position: relative;
+  width: 150px;
+}
+
+.email-website-input {
+  margin-right: 8px;
+  width: 100%;
+  padding: 5px;
+  border: 1px solid var(--input-border);
+  border-radius: 5px;
+  font-size: 12px;
+  box-sizing: border-box;
+  font-family: 'Calibri', sans-serif;
+  background-color: var(--input-bg);
+  color: var(--input-text);
+}
+
+.email-website-input:focus {
+  outline: none;
+  border-color: var(--hover-color);
+}
+
+.email-hint {
+  position: absolute;
+  top: 6px;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  pointer-events: none;
+  font-size: 12px;
+  font-family: 'Calibri', sans-serif;
+}
+
+.email-domain-select {
+  padding: 6px;
+  font-size: 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 5px;
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  margin-left: 8px;
+  font-family: 'Calibri', sans-serif;
+}
+
+.email-domain-select:focus {
+  outline: none;
+  border-color: var(--hover-color);
+}
+
+.email-domain-select option {
+  background-color: var(--input-bg);
+  color: var(--input-text);
+}
+
+.email-hidden-span {
+  visibility: hidden;
+  position: absolute;
+  white-space: pre;
+  font-size: 12px;
+  font-family: 'Calibri', sans-serif;
+}
+
+/* Responsive design */
+@media (max-width: 600px) {
+  .client-email-container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  
+  .email-website-container {
+    width: 100%;
+  }
+  
+  .email-handle-input,
+  .email-website-input {
+    margin-right: 0;
+    margin-bottom: 8px;
+  }
+  
+  .email-domain-select {
+    margin-left: 0;
+    width: 100%;
+  }
+} 

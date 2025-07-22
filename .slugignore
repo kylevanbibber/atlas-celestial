@@ -1,0 +1,28 @@
+# Exclude node_modules (Heroku will install based on package.json)
+node_modules/
+
+# Exclude git-related files and submodules (including large pack files)
+.git/
+.gitmodules
+ariaslifenew/
+*.pack
+*.idx
+
+# Exclude development files and source (not needed in production)
+src/
+public/
+
+# Exclude documentation
+*.md
+README.md
+
+# Exclude development configuration files
+.eslintignore
+
+# Exclude development scripts
+extract.js
+
+# Exclude source maps and other large development files
+*.map
+*.js.map
+*.css.map 

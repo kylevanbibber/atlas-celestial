@@ -1,0 +1,116 @@
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 60px;
+  background-color: var(--sidebar-bg, #ffffff);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  padding: 0;
+  margin: 0;
+  display: none; /* Hidden by default, shown only on mobile */
+  justify-content: space-around;
+  align-items: center;
+}
+
+.bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  height: 100%;
+  padding: 8px 0;
+  transition: background-color 0.2s;
+  color: var(--sidebar-text, #333333);
+  cursor: pointer;
+}
+
+.bottom-nav-item:hover {
+  background-color: var(--sidebar-hover, #f0f0f0);
+}
+
+.bottom-nav-item.active {
+  color: var(--primary-color, #007BFF);
+  font-weight: 500;
+}
+
+.bottom-nav-item.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 3px;
+  background-color: var(--primary-color, #007BFF);
+  border-radius: 0 0 3px 3px;
+}
+
+.bottom-nav-item.settings-item {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.bottom-nav-item.settings-item.active {
+  background-color: rgba(var(--primary-color-rgb, 0, 123, 255), 0.1);
+}
+
+.bottom-nav-icon-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  width: 24px;
+  margin: 0 auto;
+}
+
+/* Warning dot style for bottom nav */
+.bottom-nav-warning-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 6px;
+  height: 6px;
+  background-color: #ff4d4f;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.bottom-nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.bottom-nav-label {
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Media Query for mobile devices */
+@media (max-width: 768px) {
+  .bottom-nav {
+    display: flex;
+  }
+  
+
+}
+
+/* Add safe area padding for iOS devices */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom);
+    height: calc(60px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Add CSS variable for RGB version of primary color */
+:root {
+  --primary-color-rgb: 0, 123, 255;
+} 

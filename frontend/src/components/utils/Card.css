@@ -1,0 +1,148 @@
+.custom-card {
+    flex: 1;
+    flex-basis: 250px;
+    max-width: 100%;
+    text-align: left;
+    padding: 10px;
+    position: relative;
+    box-sizing: border-box;
+    background-color: var(--card-bg);
+    border-radius: 10px;
+    box-shadow: 0 2px 4px var(--shadow-color);
+    transition: box-shadow 0.3s ease, background-color 0.3s ease;
+    margin: 10px;
+    border: 1px solid var(--border-color);
+  }
+  
+  .custom-card:hover {
+    box-shadow: 0 4px 8px var(--shadow-color);
+  }
+  
+  .custom-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .custom-card-header h5 {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--text-primary);
+    padding-top: 10px;
+    padding-left: 5px;
+  }
+  
+  .donut-container {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+  }
+  
+  .donut-chart {
+    width: 100%;
+    height: 100%;
+  }
+  
+  .donut-ring {
+    stroke-width: 3;
+  }
+  
+  .donut-segment {
+    stroke-width: 3;
+    transition: stroke-dasharray 0.5s;
+  }
+  
+  .custom-card-body {
+    margin-top: 50px;
+    text-align: center;
+  }
+  
+  .custom-value {
+    font-size: 2.2rem;
+    font-weight: bold;
+    margin: 5px 0;
+    color: var(--text-primary);
+  }
+  
+  .custom-subtext {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+
+  /* Card change/comparison text styles */
+  .card-change {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+  }
+
+  .card-change.positive {
+    color: #059669;
+    background-color: rgba(5, 150, 105, 0.1);
+  }
+
+  .card-change.negative {
+    color: #dc2626;
+    background-color: rgba(220, 38, 38, 0.1);
+  }
+
+  .card-change.neutral {
+    color: var(--text-secondary);
+    background-color: rgba(107, 114, 128, 0.1);
+  }
+
+  /* Dark theme adjustments for card change */
+  [data-theme="dark"] .card-change.positive {
+    color: #10b981;
+    background-color: rgba(16, 185, 129, 0.15);
+  }
+
+  [data-theme="dark"] .card-change.negative {
+    color: #ef4444;
+    background-color: rgba(239, 68, 68, 0.15);
+  }
+
+  [data-theme="dark"] .card-change.neutral {
+    color: var(--text-secondary);
+    background-color: rgba(156, 163, 175, 0.15);
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 710px) {
+    .custom-card {
+      width: 100%;
+      text-align: center;
+    }
+  
+    .custom-card-header {
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+  
+    .custom-card-header h5 {
+      font-size: 1.2rem;
+    }
+  
+    .custom-value {
+      font-size: 1.8rem;
+    }
+  
+    .custom-subtext {
+      font-size: 0.8rem;
+    }
+
+    .card-change {
+      font-size: 0.75rem;
+    }
+  
+    .donut-container {
+      position: static;
+      margin: 10px 0 0;
+    }
+  }
+  

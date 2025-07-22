@@ -1,0 +1,4 @@
+report_name,category_name,frequency,onedrive_url,subject,description,upload_date,priority,file_size,tags
+"VIP Client Weekly Report","VIPs","weekly","https://aagencies-my.sharepoint.com/:x:/g/personal/example.xlsx","Weekly VIP Report - Week 1","Weekly analysis of VIP client performance","2024-01-07","8","245 KB","vip,weekly,analysis"
+"Monthly Production Summary","Monthly Reports","monthly","https://sharepoint.company.com/sites/reports/production-jan.xlsx","Monthly Production Report","January production statistics","2024-01-31","7","567 KB","production,monthly"
+"Daily Activity Report","Daily Reports","daily","https://onedrive.live.com/edit.aspx?resid=daily-activity.xlsx","Daily Activity - Jan 15","Daily activity metrics","2024-01-15","5","123 KB","daily,activity"

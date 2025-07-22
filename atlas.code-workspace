@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../r3"
+		},
+		{
+			"path": "../aire/app"
+		},
+		{
+			"path": "../KyleTesting/KyleTesting"
+		},
+		{
+			"path": "../python"
+		}
+	],
+	"settings": {}
+}

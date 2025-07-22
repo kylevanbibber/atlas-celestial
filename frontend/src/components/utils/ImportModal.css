@@ -1,0 +1,99 @@
+.import-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.import-modal {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  width: 500px;
+  max-height: 80%;
+  overflow-y: auto;
+  position: relative;
+}
+
+.close-button {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.mapping-container {
+  margin-top: 20px;
+}
+
+.mapping-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.file-header {
+  width: 150px;
+  font-weight: bold;
+}
+
+.mapping-row select {
+  flex: 1;
+  padding: 4px;
+}
+
+.mapping-row select.matched {
+  border-color: green;
+  background-color: #e8f5e9;
+}
+
+.mapping-row select.unmatched {
+  border-color: #ccc;
+  background-color: #fff;
+}
+
+.submit-button {
+  margin-top: 20px;
+  padding: 8px 16px;
+  background: #3498db;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.duplicate-review {
+  margin-top: 20px;
+  border-top: 1px solid #ccc;
+  padding-top: 10px;
+}
+
+.duplicate-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  gap: 10px;
+}
+
+.assignment-container {
+  margin-bottom: 20px;
+}
+
+.assignment-container label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.assignment-container select {
+  width: 100%;
+  padding: 4px;
+} 

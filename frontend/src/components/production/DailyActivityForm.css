@@ -1,0 +1,704 @@
+/* DailyActivityForm.css */
+
+.daily-activity-report {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+.daily-activity-report h2 {
+  color: var(--text-primary);
+  margin-bottom: 20px;
+  font-weight: 700;
+}
+
+/* Controls container - holds navigation and period tabs above table */
+.controls-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 15px;
+  padding: 10px 0;
+  flex-wrap: wrap;
+}
+
+/* Navigation container - date navigation */
+.navigation-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ActionBar with right-aligned icons only */
+.daily-activity-report .action-bar .action-bar-content {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 20px;
+  width: 100%;
+}
+
+/* Right section - Action buttons (icons only) */
+.action-buttons-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
+/* Legacy support for old class names */
+.period-tabs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.period-tabs span,
+.period-tabs-center span {
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.period-tabs .selected,
+.period-tabs-center .selected {
+  background-color: var(--button-primary-bg);
+  color: var(--button-primary-text);
+}
+
+.period-tabs .unselected,
+.period-tabs-center .unselected {
+  background-color: transparent;
+  color: var(--text-secondary);
+}
+
+.period-tabs .unselected:hover,
+.period-tabs-center .unselected:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.period-tabs .separator,
+.period-tabs-center .separator {
+  color: var(--text-secondary);
+  cursor: default;
+  padding: 0 5px;
+}
+
+.period-tabs .separator:hover,
+.period-tabs-center .separator:hover {
+  background-color: transparent;
+  color: var(--text-secondary);
+}
+
+/* Export button styling */
+.export-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  font-size: 13px;
+  background-color: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
+  border: 1px solid var(--border-color);
+}
+
+.export-button:hover {
+  background-color: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  border-color: var(--button-primary-bg);
+}
+
+.export-button svg {
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.export-button:hover svg {
+  transform: scale(1.1);
+}
+
+/* Icon-only button variants */
+.export-button.icon-only {
+  padding: 4px;
+  gap: 0;
+  border-radius: 4px;
+}
+
+.weekly-totals-toggle.icon-only {
+  padding: 4px;
+  gap: 0;
+  border-radius: 4px;
+}
+
+/* Hide count display in ActionBar for Daily Activity */
+.daily-activity-report .action-bar .selected-count {
+  display: none;
+}
+
+/* ActionBar layout - left and right sections */
+.daily-activity-report .action-bar .action-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 0;
+}
+
+.action-buttons-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-buttons-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Submit button styling */
+.check-submit-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  background-color: #4caf50;
+  color: white;
+  border: 1px solid #4caf50;
+}
+
+.submit-button:hover:not(:disabled) {
+  background-color: #45a049;
+  border-color: #45a049;
+}
+
+.submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.submit-button svg {
+  transition: all 0.3s ease;
+}
+
+.submit-button:hover:not(:disabled) svg {
+  transform: scale(1.1);
+}
+
+/* Cancel button styling */
+.cancel-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  background-color: #ffebee;
+  color: #d32f2f;
+  border: 1px solid #ffcdd2;
+}
+
+.cancel-button:hover {
+  background-color: #ffcdd2;
+  border-color: #d32f2f;
+}
+
+.cancel-button svg {
+  transition: all 0.3s ease;
+}
+
+.cancel-button:hover svg {
+  transform: scale(1.1);
+}
+
+/* Dark mode adjustments for submit/cancel buttons */
+[data-theme="dark"] .submit-button {
+  background-color: #388e3c;
+  border-color: #388e3c;
+}
+
+[data-theme="dark"] .submit-button:hover:not(:disabled) {
+  background-color: #2e7d32;
+  border-color: #2e7d32;
+}
+
+[data-theme="dark"] .cancel-button {
+  background-color: rgba(244, 67, 54, 0.2);
+  color: #ff6b6b;
+  border-color: rgba(244, 67, 54, 0.3);
+}
+
+[data-theme="dark"] .cancel-button:hover {
+  background-color: rgba(244, 67, 54, 0.3);
+  border-color: #ff6b6b;
+}
+
+.nav-button {
+  background-color: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
+  border: 1px solid var(--border-color);
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  font-size: 13px;
+  min-width: 32px;
+}
+
+.nav-button:hover {
+  background-color: var(--button-primary-bg);
+  color: var(--button-primary-text);
+}
+
+.date-dropdown {
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  border: 1px solid var(--input-border);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  min-width: 180px;
+  max-width: 280px;
+}
+
+.date-dropdown:focus {
+  outline: none;
+  border-color: var(--button-primary-bg);
+  box-shadow: 0 0 0 2px rgba(0, 85, 140, 0.2);
+}
+
+/* Form actions styling */
+.form-actions {
+  margin-bottom: 20px;
+  min-height: 40px;
+}
+
+.primary-button {
+  background-color: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.3s ease;
+}
+
+.primary-button:hover:not(:disabled) {
+  background-color: var(--button-primary-hover);
+}
+
+.primary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.secondary-button {
+  background-color: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
+  border: 1px solid var(--border-color);
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.3s ease;
+}
+
+.secondary-button:hover {
+  background-color: var(--bg-tertiary);
+}
+
+
+
+/* Today row highlighting - will be applied via JavaScript/dynamic classes */
+.daily-activity-report .table tbody tr.today-row {
+  background-color: rgb(251, 207, 180) !important;
+  border: 2px solid rgb(247, 176, 131) !important;
+}
+
+.daily-activity-report .table tbody tr.today-row td {
+  background-color: rgb(251, 207, 180) !important;
+}
+
+
+
+/* Dark mode adjustments for today-row only */
+[data-theme="dark"] .daily-activity-report .table tbody tr.today-row {
+  background-color: rgba(200, 150, 100, 0.4) !important;
+  border: 2px solid #cc8866 !important;
+}
+
+[data-theme="dark"] .daily-activity-report .table tbody tr.today-row td {
+  background-color: rgba(200, 150, 100, 0.4) !important;
+}
+
+/* Warning styling for missing data dates */
+.daily-activity-report .date-cell-warning {
+  background-color: #ffebee !important;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+}
+
+.daily-activity-report .date-cell-warning strong {
+  color: #c62828 !important;
+}
+
+/* Dark mode adjustments for warning dates */
+[data-theme="dark"] .daily-activity-report .date-cell-warning {
+  background-color: rgba(244, 67, 54, 0.2) !important;
+}
+
+[data-theme="dark"] .daily-activity-report .date-cell-warning strong {
+  color: #ff6b6b !important;
+}
+
+/* Week-end row styling - lighter 3px bottom border for Monday rows in MTD/YTD */
+.daily-activity-report .table tbody tr.week-end-row {
+  border-bottom: 3px solid #aaaaaa !important;
+  box-shadow: 0 1px 0 rgba(102, 102, 102, 0.3) !important;
+  margin-bottom: 2px !important;
+}
+
+.daily-activity-report .table tbody tr.week-end-row td {
+  border-bottom: 3px solid #aaaaaa !important;
+  position: relative;
+}
+
+.daily-activity-report .table tbody tr.week-end-row td::after {
+  content: "";
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, #aaaaaa, rgba(102, 102, 102, 0.2));
+}
+
+/* Dark mode adjustments for week-end-row */
+[data-theme="dark"] .daily-activity-report .table tbody tr.week-end-row {
+  border-bottom: 3px solid #888888 !important;
+  box-shadow: 0 1px 0 rgba(136, 136, 136, 0.3) !important;
+}
+
+[data-theme="dark"] .daily-activity-report .table tbody tr.week-end-row td {
+  border-bottom: 3px solid #888888 !important;
+}
+
+[data-theme="dark"] .daily-activity-report .table tbody tr.week-end-row td::after {
+  background: linear-gradient(90deg, #888888, rgba(136, 136, 136, 0.2));
+}
+
+/* Weekly totals toggle styling */
+.weekly-totals-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.weekly-totals-toggle:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.weekly-totals-toggle.active {
+  color: var(--button-primary-bg);
+  background-color: rgba(0, 85, 140, 0.1);
+}
+
+.weekly-totals-toggle.active:hover {
+  background-color: rgba(0, 85, 140, 0.15);
+  color: var(--button-primary-bg);
+}
+
+.eye-icon {
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.weekly-totals-toggle:hover .eye-icon {
+  transform: scale(1.1);
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .weekly-totals-toggle.active {
+  color: #4A9FFF;
+  background-color: rgba(74, 159, 255, 0.15);
+}
+
+[data-theme="dark"] .weekly-totals-toggle.active:hover {
+  background-color: rgba(74, 159, 255, 0.2);
+  color: #4A9FFF;
+}
+
+/* Missing data warnings toggle styling */
+.missing-data-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.missing-data-toggle:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.missing-data-toggle.active {
+  color: #dc3545;
+  background-color: rgba(220, 53, 69, 0.1);
+}
+
+.missing-data-toggle.active:hover {
+  background-color: rgba(220, 53, 69, 0.15);
+  color: #dc3545;
+}
+
+.missing-data-toggle svg {
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.missing-data-toggle:hover svg {
+  transform: scale(1.1);
+}
+
+.missing-data-toggle.icon-only {
+  padding: 6px;
+  gap: 0;
+  border-radius: 4px;
+}
+
+/* Dark mode adjustments for missing data toggle */
+[data-theme="dark"] .missing-data-toggle.active {
+  color: #ff6b6b;
+  background-color: rgba(255, 107, 107, 0.15);
+}
+
+[data-theme="dark"] .missing-data-toggle.active:hover {
+  background-color: rgba(255, 107, 107, 0.2);
+  color: #ff6b6b;
+}
+
+/* Weekly total row styling */
+.daily-activity-report .table tbody tr.weekly-total-row {
+  background-color: rgba(0, 85, 140, 0.1) !important;
+  border-top: 2px solid rgba(0, 85, 140, 0.3) !important;
+  border-bottom: 2px solid rgba(0, 85, 140, 0.3) !important;
+  font-weight: 600 !important;
+}
+
+.daily-activity-report .table tbody tr.weekly-total-row td {
+  background-color: rgba(0, 85, 140, 0.1) !important;
+  font-weight: 600 !important;
+  font-style: italic;
+}
+
+/* Dark mode adjustments for weekly-total-row */
+[data-theme="dark"] .daily-activity-report .table tbody tr.weekly-total-row {
+  background-color: rgba(0, 85, 140, 0.2) !important;
+  border-top: 2px solid rgba(0, 85, 140, 0.4) !important;
+  border-bottom: 2px solid rgba(0, 85, 140, 0.4) !important;
+}
+
+[data-theme="dark"] .daily-activity-report .table tbody tr.weekly-total-row td {
+  background-color: rgba(0, 85, 140, 0.2) !important;
+}
+
+/* Week row highlighting when hovering over weekly total */
+.daily-activity-report .table tbody tr.week-row-highlighted {
+  background-color: rgba(255, 235, 59, 0.2) !important;
+  border-left: 3px solid rgba(255, 193, 7, 0.6) !important;
+  transition: all 0.2s ease !important;
+}
+
+.daily-activity-report .table tbody tr.week-row-highlighted td {
+  background-color: rgba(255, 235, 59, 0.2) !important;
+}
+
+/* Dark mode adjustments for week row highlighting */
+[data-theme="dark"] .daily-activity-report .table tbody tr.week-row-highlighted {
+  background-color: rgba(255, 193, 7, 0.15) !important;
+  border-left: 3px solid rgba(255, 193, 7, 0.5) !important;
+}
+
+[data-theme="dark"] .daily-activity-report .table tbody tr.week-row-highlighted td {
+  background-color: rgba(255, 193, 7, 0.15) !important;
+}
+
+/* Weekly total row hover state */
+.daily-activity-report .table tbody tr.weekly-total-row:hover {
+  background-color: rgba(0, 85, 140, 0.2) !important;
+  cursor: pointer;
+}
+
+.daily-activity-report .table tbody tr.weekly-total-row:hover td {
+  background-color: rgba(0, 85, 140, 0.2) !important;
+}
+
+/* Dark mode weekly total row hover */
+[data-theme="dark"] .daily-activity-report .table tbody tr.weekly-total-row:hover {
+  background-color: rgba(0, 85, 140, 0.3) !important;
+}
+
+[data-theme="dark"] .daily-activity-report .table tbody tr.weekly-total-row:hover td {
+  background-color: rgba(0, 85, 140, 0.3) !important;
+}
+
+/* ALP Column styling for actual/reported display */
+.alp-cell-container {
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.alp-actual-value {
+  font-weight: bold;
+  color: #0d6efd;
+  font-size: 13px;
+}
+
+.alp-reported-value {
+  color: #6c757d;
+  font-size: 10px;
+  margin-top: 1px;
+}
+
+.alp-tooltip {
+  position: relative;
+  cursor: help;
+}
+
+.alp-tooltip::after {
+  content: "Actual ALP (from weekly report) / Reported ALP";
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  z-index: 1000;
+}
+
+.alp-tooltip:hover::after {
+  opacity: 1;
+}
+
+/* Dark mode adjustments for ALP display */
+[data-theme="dark"] .alp-actual-value {
+  color: #4A9FFF;
+}
+
+[data-theme="dark"] .alp-reported-value {
+  color: #888888;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  /* Stack controls vertically on mobile */
+  .controls-container {
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+  }
+
+  .navigation-container {
+    order: 1;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .period-tabs {
+    order: 2;
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* Keep ActionBar icons on right even on mobile */
+  .daily-activity-report .action-bar .action-bar-content {
+    justify-content: flex-end;
+  }
+  
+  .action-buttons {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .date-dropdown {
+    min-width: 250px;
+  }
+  
+  .daily-activity-report .table {
+    font-size: 12px;
+  }
+  
+  .daily-activity-report .table th,
+  .daily-activity-report .table td {
+    padding: 6px 4px;
+  }
+  
+  .daily-activity-report .table input {
+    font-size: 12px;
+    padding: 2px;
+  }
+}
+
+@media (max-width: 480px) {
+  .daily-activity-report .table th,
+  .daily-activity-report .table td {
+    padding: 4px 2px;
+  }
+  
+  .daily-activity-report .table {
+    font-size: 11px;
+  }
+  
+  .nav-button {
+    padding: 6px 8px;
+    font-size: 12px;
+    min-width: 30px;
+  }
+} 

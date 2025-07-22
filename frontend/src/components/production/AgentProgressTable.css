@@ -1,0 +1,412 @@
+.agent-progress-table-container {
+  width: 100%;
+  max-width: 1200px;
+}
+
+/* Search bar styling with better spacing */
+.search-bar {
+  margin: 2rem 0;
+  padding: 1rem;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.search-bar .form-control {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  display: block;
+  padding: 12px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  font-size: 14px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-bar .form-control:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(var(--accent-color-rgb), 0.1);
+  outline: none;
+}
+
+/* Ensure tabs connect to table */
+.tabs-wrapper {
+  margin-bottom: 0;
+}
+
+.tab-content-modern {
+  border-radius: 0 0 8px 8px;
+  padding: 0;
+  min-height: auto;
+}
+
+/* Remove any margin from DataTable within tabs */
+.tab-content-modern .data-table-container {
+  margin-top: 0;
+}
+
+.tab-content-modern .data-table {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 15px 20px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.search-container {
+  flex: 1;
+  max-width: 300px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  font-size: 14px;
+}
+
+.mass-action-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mass-action-controls span {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.mass-action-button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mass-action-button.pass-button {
+  background-color: #28a745;
+  color: white;
+}
+
+.mass-action-button.fail-button {
+  background-color: #dc3545;
+  color: white;
+}
+
+.mass-action-button:hover {
+  opacity: 0.8;
+}
+
+.schedule-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: var(--sidebar-bg);
+  border-radius: 6px;
+}
+
+.schedule-controls input[type="date"],
+.schedule-controls input[type="time"] {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  font-size: 14px;
+}
+
+.schedule-button {
+  padding: 8px 16px;
+  background-color: var(--hover-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.schedule-button:hover {
+  background-color: var(--hover-color);
+  opacity: 0.8;
+}
+
+.schedule-button:disabled {
+  background-color: var(--border-color);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+}
+
+.table-container {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.progress-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: var(--card-bg);
+}
+
+.progress-table th {
+  background-color: var(--sidebar-bg);
+  color: var(--text-primary);
+  font-weight: 600;
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  user-select: none;
+}
+
+.progress-table th:hover {
+  background-color: var(--sidebar-hover);
+}
+
+.progress-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.progress-table tbody tr:hover {
+  background-color: var(--sidebar-hover);
+}
+
+.progress-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.progress-bar-small {
+  width: 100px;
+  height: 8px;
+  background-color: var(--border-color);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar-fill-small {
+  height: 100%;
+  background-color: var(--hover-color);
+  transition: width 0.3s ease;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.status-badge.passed {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-badge.pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.action-button {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-button.pass-button {
+  background-color: #28a745;
+  color: white;
+}
+
+.action-button.fail-button {
+  background-color: #dc3545;
+  color: white;
+}
+
+.action-button.confirm-button {
+  background-color: var(--hover-color);
+  color: white;
+}
+
+.action-button.cancel-button {
+  background-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+.action-button:hover {
+  opacity: 0.8;
+}
+
+.action-confirm {
+  display: flex;
+  gap: 6px;
+}
+
+.confirmation-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: var(--card-bg);
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  border: 1px solid var(--border-color);
+}
+
+.modal-content h3 {
+  margin: 0 0 12px 0;
+  color: var(--text-primary);
+  font-size: 18px;
+}
+
+.modal-content p {
+  margin: 0 0 20px 0;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.confirm-button {
+  padding: 8px 16px;
+  background-color: var(--hover-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.confirm-button:hover {
+  background-color: var(--hover-color);
+  opacity: 0.8;
+}
+
+.cancel-button {
+  padding: 8px 16px;
+  background-color: var(--border-color);
+  color: var(--text-secondary);
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cancel-button:hover {
+  background-color: var(--sidebar-hover);
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: var(--text-secondary);
+  font-size: 16px;
+}
+
+@media (max-width: 768px) {
+  .table-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: stretch;
+  }
+  
+  .search-container {
+    max-width: none;
+  }
+  
+  .mass-action-controls {
+    justify-content: space-between;
+  }
+  
+  .schedule-controls {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .schedule-controls input[type="date"],
+  .schedule-controls input[type="time"] {
+    width: 100%;
+  }
+  
+  .progress-table {
+    font-size: 14px;
+  }
+  
+  .progress-table th,
+  .progress-table td {
+    padding: 8px;
+  }
+  
+  .progress-bar-small {
+    width: 80px;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .modal-content {
+    margin: 20px;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+} 

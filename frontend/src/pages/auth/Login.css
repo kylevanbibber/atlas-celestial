@@ -1,0 +1,112 @@
+/* Login Form General Styles */
+.login-container {
+    display: flex;
+    height: 100vh;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .login-card {
+    display: flex;
+    flex-direction: row;
+    width: 90%;
+    max-width: 900px;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px var(--shadow-color);
+    transition: box-shadow 0.3s ease;
+    border: 1px solid var(--border-color);
+  }
+  
+  .login-card:hover {
+    box-shadow: 0 8px 24px var(--shadow-color);
+  }
+  
+  .login-card .left-side {
+    flex: 1;
+    background: linear-gradient(135deg, #d7d7d7cc, #00548ca9); /* Gradient background */
+    padding: 40px;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border-radius: 16px 0 0 16px;
+  }
+
+.login-links a {
+  display: block;
+  text-align: center;
+  margin: 10px 0;
+  font-size: 12px;
+  color: var(--hover-color);
+}
+
+.login-links a:hover {
+  text-decoration: underline;
+}
+  
+  .login-card .left-side h2 {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    color: #fff;
+  }
+  
+  .login-card .left-side p {
+    font-size: 1rem;
+    color: #fff;
+  }
+  
+  .login-card .right-side {
+    flex: 1;
+    padding: 40px;
+    background: var(--bg-primary);
+    border-radius: 0 16px 16px 0;
+  }
+  
+  .login-card .right-side h2 {
+    font-size: 1.8rem;
+    margin-bottom: 20px;
+    color: var(--text-primary);
+  }
+
+  /* Form elements in login */
+  .login-form .form-group label {
+    color: var(--text-primary);
+  }
+
+  .login-form .form-group input {
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    border: 1px solid var(--input-border);
+  }
+
+  /* Modal Styles */
+  .globe-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.4);
+    z-index: 9999;
+  }
+  
+  .globe-loading-animation {
+    width: 50px;
+    height: 50px;
+  }
+  
+  @media (max-width: 600px) {
+    .login-card {
+      flex-direction: column;
+    }
+    .login-card .left-side {
+      border-radius: 16px 16px 0 0; /* Rounded top corners */
+    }
+    .login-card .right-side {
+      border-radius: 0 0 16px 16px; /* Rounded bottom corners */
+    }
+  }
+  

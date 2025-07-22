@@ -1,0 +1,176 @@
+/* src/components/utils/ContextMenu.css */
+.context-menu {
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 4px 15px var(--shadow-color);
+    min-width: 150px;
+    z-index: 1000;
+    overflow: hidden;
+    position: absolute;
+    border: 1px solid var(--border-color);
+}
+
+/* For dropdown menus at the top of the page (like header) */
+.context-menu.dropdown {
+    position: absolute;
+    top: 43px;
+    right: 8px;
+    max-height: 60vh;
+    min-width: 250px;
+}
+
+/* For hamburger menu */
+.context-menu.hamburger-menu {
+    position: absolute;
+}
+
+.menu-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-primary);
+    transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+}
+
+.menu-item:hover {
+    background-color: var(--sidebar-hover);
+}
+
+.menu-item:not(:last-child) {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.menu-icon {
+    margin-right: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+.menu-item.menu-item-logout {
+    color: #d32f2f;
+}
+
+.menu-item.menu-item-impersonating {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    font-weight: 500;
+}
+
+.menu-item.menu-item-impersonating:hover {
+    background: linear-gradient(135deg, #d97706, #b45309);
+}
+
+.context-menu-search {
+    padding: 12px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--sidebar-hover);
+}
+
+.context-menu-search-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 14px;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    transition: all 0.2s;
+}
+
+.context-menu-search-input:focus {
+    outline: none;
+    border-color: var(--primary-color, #3b82f6);
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.1);
+}
+
+.context-menu-search-input::placeholder {
+    color: var(--text-secondary);
+}
+
+.context-menu-items {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.context-menu-items.with-search {
+    max-height: 250px;
+}
+
+.context-menu-items::-webkit-scrollbar {
+    width: 6px;
+}
+
+.context-menu-items::-webkit-scrollbar-track {
+    background: var(--card-bg);
+}
+
+.context-menu-items::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.context-menu-items::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+.menu-item.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.menu-item.disabled:hover {
+    background-color: transparent;
+}
+
+.menu-item.menu-item-hint {
+    background: var(--sidebar-hover);
+    font-style: italic;
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 8px 15px;
+}
+
+.menu-item.menu-item-hint:hover {
+    background: var(--sidebar-hover);
+}
+
+/* Role filter buttons */
+.context-menu-role-filters {
+    display: flex;
+    gap: 4px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.role-filter-btn {
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    color: var(--text-primary);
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.role-filter-btn:hover {
+    background: var(--sidebar-hover);
+    border-color: var(--primary-color, #3b82f6);
+}
+
+.role-filter-btn.active {
+    background: var(--primary-color, #3b82f6);
+    color: white;
+    border-color: var(--primary-color, #3b82f6);
+}
+
+.role-filter-btn.active:hover {
+    background: var(--primary-dark, #2563eb);
+    border-color: var(--primary-dark, #2563eb);
+}
+  

@@ -1,0 +1,545 @@
+/* Theme Variables - Ensure these are defined in root or parent component */
+.leaderboard-page {
+    width: 100%;
+    
+    /* Light/Dark mode color variables (should be defined globally) */
+    --primary-text: var(--primary-text, #ffffff);
+    --badge-text-color: var(--badge-text-color, #ffffff);
+    --neutral-color: var(--neutral-color, #6b7280);
+    --success-background: var(--success-background, rgba(16, 185, 129, 0.1));
+    --danger-background: var(--danger-background, rgba(239, 68, 68, 0.1));
+    --info-background: var(--info-background, rgba(139, 92, 246, 0.1));
+    --neutral-background: var(--neutral-background, rgba(107, 114, 128, 0.1));
+    --box-shadow: var(--box-shadow, 0 2px 4px rgba(0, 0, 0, 0.1));
+    --focus-shadow: var(--focus-shadow, 0 0 0 2px rgba(79, 70, 229, 0.25));
+    --text-shadow: var(--text-shadow, 0 1px 2px rgba(0, 0, 0, 0.2));
+    --badge-shadow: var(--badge-shadow, 0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+/* Filter Controls */
+.leaderboard-filters {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+    background: var(--surface-color);
+    border-radius: 8px;
+    box-shadow: var(--box-shadow);
+}
+
+.leaderboard-filters-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.leaderboard-filters-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.experience-filter-container,
+.tabs-filter-container,
+.toggle-container,
+.filter-button-container,
+.december-toggle-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tabs-filter-container {
+    justify-content: center;
+}
+
+.december-toggle-container {
+    justify-content: center;
+}
+
+.experience-filter-container span,
+.tabs-filter-container span,
+.toggle-container span,
+.december-toggle-container span {
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+    user-select: none;
+}
+
+.experience-filter-container .selected,
+.tabs-filter-container .selected,
+.toggle-container .selected,
+.december-toggle-container .selected {
+    background-color: transparent;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.experience-filter-container .unselected,
+.tabs-filter-container .unselected,
+.toggle-container .unselected,
+.december-toggle-container .unselected {
+    background-color: transparent;
+    color: var(--text-secondary);
+}
+
+.experience-filter-container .unselected:hover,
+.tabs-filter-container .unselected:hover,
+.toggle-container .unselected:hover,
+.december-toggle-container .unselected:hover {
+    background-color: var(--background-hover);
+    color: var(--text-primary);
+}
+
+.separator {
+    color: var(--border-color);
+    font-weight: normal;
+    cursor: default !important;
+    padding: 0 !important;
+    background: transparent !important;
+}
+
+.separator:hover {
+    color: var(--border-color) !important;
+    background: transparent !important;
+}
+
+/* Date Selection */
+.date-select-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 15px;
+    gap: 10px;
+}
+
+.arrow-change-button {
+    background: var(--primary-color);
+    color: var(--primary-text);
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.arrow-change-button:hover {
+    background: var(--primary-dark);
+}
+
+.arrow-change-button:disabled {
+    background: var(--background-disabled);
+    color: var(--text-disabled);
+    cursor: not-allowed;
+}
+
+.date-select {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--surface-color);
+    color: var(--text-primary);
+    font-size: 14px;
+    min-width: 150px;
+}
+
+.date-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: var(--focus-shadow);
+}
+
+/* Filter Dropdowns */
+.filter-dropdown-container {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+}
+
+.filter-select {
+    min-width: 200px;
+    flex: 1;
+    max-width: 250px;
+}
+
+/* Leaderboards Layout */
+.leaderboards-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: 600px;
+}
+
+.leaderboard-main-row {
+    display: flex;
+    width: 100%;
+}
+
+.main-leaderboard {
+    width: 100%;
+    min-height: 500px;
+}
+
+.leaderboard-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    min-height: 400px;
+}
+
+/* Mobile Responsive */
+@media (max-width: 1200px) {
+    .leaderboards-container {
+        gap: 15px;
+    }
+    
+    .leaderboard-row {
+        gap: 15px;
+        min-height: 350px;
+    }
+}
+
+@media (max-width: 1024px) {
+    .leaderboard-filters-left {
+        gap: 15px;
+    }
+    
+    .leaderboard-filters-right {
+        gap: 15px;
+    }
+}
+
+@media (max-width: 768px) {    
+    .leaderboard-filters {
+        flex-direction: column;
+        gap: 15px;
+        padding: 15px;
+    }
+    
+    .leaderboard-filters-left,
+    .leaderboard-filters-right {
+        flex-direction: column;
+        gap: 15px;
+        width: 100%;
+    }
+    
+    .experience-filter-container,
+    .tabs-filter-container,
+    .toggle-container,
+    .filter-button-container,
+    .december-toggle-container {
+        justify-content: center;
+        width: 100%;
+    }
+    
+    .filter-dropdown-container {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .filter-select {
+        min-width: 100%;
+        max-width: 100%;
+    }
+    
+    .leaderboard-row {
+        grid-template-columns: 1fr;
+        min-height: 300px;
+    }
+    
+    .main-leaderboard {
+        min-height: 400px;
+    }
+}
+
+@media (max-width: 480px) {
+    .leaderboard-filters-left,
+    .leaderboard-filters-right {
+        gap: 10px;
+    }
+    
+    .experience-filter-container span,
+    .tabs-filter-container span,
+    .toggle-container span,
+    .december-toggle-container span {
+        padding: 6px 8px;
+        font-size: 14px;
+    }
+    
+    .date-select {
+        min-width: 120px;
+        font-size: 13px;
+    }
+    
+    .arrow-change-button {
+        padding: 6px 10px;
+        font-size: 14px;
+    }
+}
+
+/* Theme-aware styles - handled by CSS custom properties */
+
+/* Animation for smooth transitions */
+.leaderboard-page * {
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+
+/* Focus styles for accessibility */
+.experience-filter-container span:focus,
+.tabs-filter-container span:focus,
+.toggle-container span:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* Loading state styles */
+.leaderboard-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+    color: var(--text-secondary);
+}
+
+/* Error state styles */
+.leaderboard-error {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+    color: var(--danger-color);
+    text-align: center;
+    padding: 20px;
+}
+
+.leaderboard-error h3 {
+    margin-bottom: 10px;
+}
+
+.leaderboard-error p {
+    margin-bottom: 15px;
+    color: var(--text-secondary);
+}
+
+/* Achievement and Movement Indicators */
+.leaderboard-page .achievement-badge {
+    background: linear-gradient(135deg, var(--custom-achievement-color, #6b7280), var(--custom-achievement-color, #6b7280));
+    color: #ffffff;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    white-space: nowrap;
+    margin-top: 4px;
+    display: inline-block;
+}
+
+.leaderboard-page .rank-movement-indicator {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 8px;
+    white-space: nowrap;
+    margin-left: 4px;
+}
+
+.leaderboard-page .rank-movement-indicator[data-direction="up"] {
+    color: #ffffff;
+    background-color: #10b981;
+}
+
+.leaderboard-page .rank-movement-indicator[data-direction="down"] {
+    color: #ffffff;
+    background-color: #ef4444;
+}
+
+.leaderboard-page .rank-movement-indicator[data-direction="new"] {
+    color: #ffffff;
+    background-color: #6366f1;
+}
+
+.leaderboard-page .rank-movement-indicator[data-direction="same"] {
+    color: #ffffff;
+    background-color: #6b7280;
+}
+
+/* Achievement color variations - matching More Report colors exactly */
+.leaderboard-page .achievement-badge[style*="--custom-achievement-color: #ff6b35"] {
+    background: linear-gradient(135deg, #ff6b35, #f12711);
+    color: #ffffff;
+}
+
+.leaderboard-page .achievement-badge[style*="--custom-achievement-color: #ffd700"] {
+    background: linear-gradient(135deg, #ffd700, #ffed4e);
+    color: #1a1a1a;
+}
+
+.leaderboard-page .achievement-badge[style*="--custom-achievement-color: #00d4aa"] {
+    background: linear-gradient(135deg, #00d4aa, #007cf0);
+    color: #ffffff;
+}
+
+.leaderboard-page .achievement-badge[style*="--custom-achievement-color: #6366f1"] {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #ffffff;
+}
+
+.leaderboard-page .achievement-badge[style*="--custom-achievement-color: #10b981"] {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #ffffff;
+}
+
+.leaderboard-page .achievement-badge[style*="--custom-achievement-color: #8b5cf6"] {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    color: #ffffff;
+}
+
+.leaderboard-page .achievement-badge[style*="--custom-achievement-color: #dc2626"] {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    color: #ffffff;
+}
+
+.leaderboard-page .achievement-badge[style*="--custom-achievement-color: #7c2d12"] {
+    background: linear-gradient(135deg, #7c2d12, #991b1b);
+    color: #ffffff;
+}
+
+.leaderboard-page .achievement-badge[style*="--custom-achievement-color: #6b7280"] {
+    background: linear-gradient(135deg, #6b7280, #4b5563);
+    color: #ffffff;
+}
+
+/* Enhanced leaderboard styling for achievements */
+.leaderboard-page .leaderboard.detailed .item-indicators {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-end;
+    margin-top: 6px;
+}
+
+.leaderboard-page .leaderboard.detailed .item-achievement {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+/* Ensure React Select dropdowns appear above other elements */
+.filter-select .css-1pahdxg-control {
+    border-color: var(--border-color);
+    box-shadow: none;
+    min-height: 38px;
+    background-color: var(--surface-color);
+}
+
+.filter-select .css-1pahdxg-control:hover {
+    border-color: var(--primary-color);
+}
+
+.filter-select .css-1pahdxg-control--is-focused {
+    border-color: var(--primary-color);
+    box-shadow: var(--focus-shadow);
+}
+
+.filter-select .css-1okebmr-indicatorSeparator {
+    background-color: var(--border-color);
+}
+
+.filter-select .css-tlfecz-indicatorContainer {
+    color: var(--text-secondary);
+}
+
+.filter-select .css-tlfecz-indicatorContainer:hover {
+    color: var(--text-primary);
+} 
+
+/* Filter button specific styling */
+.filter-button-container {
+    margin-left: 12px;
+    position: relative;
+}
+
+.filter-button-container .filter-menu {
+    display: flex;
+    align-items: center;
+}
+
+/* Ensure filter dropdown doesn't go off-screen and aligns with button's right edge */
+.filter-button-container .filter-menu-content.bottom {
+    right: 0 !important;
+    left: auto !important;
+    transform: translateX(0) !important;
+    margin-top: 4px;
+}
+
+.filter-button-container button {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--surface-color);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.filter-button-container button:hover {
+    background: var(--primary-color);
+    color: var(--primary-text);
+    border-color: var(--primary-color);
+}
+
+.leaderboard-filter-content {
+    padding: 16px;
+    min-width: 280px;
+    max-width: 300px;
+    text-align: center;
+}
+
+.leaderboard-filter-content .filter-group {
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.leaderboard-filter-content .filter-group:last-of-type {
+    margin-bottom: 0;
+}
+
+.leaderboard-filter-content .filter-group-label {
+    font-weight: 500;
+    margin-bottom: 8px;
+    display: block;
+    color: var(--text-primary);
+    font-size: 14px;
+    text-align: center;
+}
+
+.leaderboard-filter-content .filter-select-small {
+    width: 100%;
+    max-width: 240px;
+}
+
+.leaderboard-filter-content .filter-actions {
+    text-align: center;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+}

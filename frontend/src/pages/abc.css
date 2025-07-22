@@ -1,0 +1,1767 @@
+/* Scorecard.css - Atlas Frontend Scorecard Styles */
+
+/* ========== EXISTING ATLAS STYLES (PRESERVED) ========== */
+
+/* Scorecard Container */
+.scorecard-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    background: var(--bg-primary);
+    border-radius: 8px;
+    min-height: 100vh;
+  }
+  
+  .scorecard-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+  
+  .scorecard-header h2 {
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    font-size: 1.8rem;
+    font-weight: 600;
+  }
+  
+  .scorecard-header p {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    margin: 0;
+  }
+  
+  /* Controls Section */
+  .scorecard-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--card-bg);
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    margin-bottom: 1.5rem;
+  }
+  
+  /* MGA/RGA Dropdown */
+  .mga-dropdown,
+  .rga-dropdown {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+  
+  .mga-dropdown label,
+  .rga-dropdown label {
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+  
+  .mga-dropdown select,
+  .rga-dropdown select {
+    padding: 0.5rem;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    background: var(--input-bg);
+    color: var(--input-text);
+    font-size: 0.9rem;
+    min-width: 200px;
+    transition: border-color 0.2s ease;
+  }
+  
+  .mga-dropdown select:hover,
+  .rga-dropdown select:hover {
+    border-color: var(--hover-color);
+  }
+  
+  .mga-dropdown select:focus,
+  .rga-dropdown select:focus {
+    outline: none;
+    border-color: var(--hover-color);
+    box-shadow: 0 0 0 2px rgba(0, 119, 204, 0.2);
+  }
+  
+  /* Year Navigation */
+  .year-navigation {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+  
+  .year-nav-btn {
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+  }
+  
+  .year-nav-btn:hover {
+    background: var(--color-primary-dark);
+    transform: translateY(-1px);
+  }
+  
+  .year-nav-btn:active {
+    transform: translateY(0);
+  }
+  
+  .current-year {
+    font-weight: 600;
+    color: var(--color-text-primary);
+    font-size: 1.1rem;
+    padding: 0 var(--spacing-md);
+    border-radius: var(--radius-sm);
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+  
+  /* ALP Level Tabs */
+  .alp-tabs {
+    display: flex;
+    gap: var(--spacing-xs);
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 2px;
+  }
+  
+  .alp-tabs input[type="radio"] {
+    display: none;
+  }
+  
+  .alp-tabs label {
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+    transition: all 0.2s ease;
+    user-select: none;
+  }
+  
+  .alp-tabs input[type="radio"]:checked + label {
+    background: var(--color-primary);
+    color: white;
+    font-weight: 500;
+  }
+  
+  .alp-tabs label:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text-primary);
+  }
+  
+  .alp-tabs input[type="radio"]:checked + label:hover {
+    background: var(--color-primary-dark);
+    color: white;
+  }
+  
+  /* Export Button */
+  .export-btn {
+    background: var(--color-success);
+    color: white;
+    border: none;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+  }
+  
+  .export-btn:hover {
+    background: var(--color-success-dark);
+    transform: translateY(-1px);
+  }
+  
+  .export-btn:active {
+    transform: translateY(0);
+  }
+  
+  /* Table Container */
+  .scorecard-table-container,
+  .scorecard-sga-container,
+  .scorecard-rga-container {
+    width: 100%;
+  }
+  
+  .scorecard-tables {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xl);
+  }
+  
+  .scorecard-section {
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-lg);
+    border: 1px solid var(--color-border);
+  }
+  
+  .scorecard-section h3 {
+    margin: 0 0 var(--spacing-md) 0;
+    color: var(--color-text-primary);
+    font-size: 1.3rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+  
+  /* Data Table Customization */
+  .scorecard-data-table {
+    width: 100%;
+    overflow-x: auto;
+  }
+  
+  .scorecard-data-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  
+  .scorecard-data-table th {
+    background: var(--color-primary);
+    color: white;
+    padding: var(--spacing-sm);
+    text-align: center;
+    font-weight: 600;
+    border: 1px solid var(--color-primary-dark);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  
+  .scorecard-data-table td {
+    padding: var(--spacing-sm);
+    text-align: center;
+    border: 1px solid var(--color-border);
+    background: var(--color-background);
+    transition: background-color 0.2s ease;
+  }
+  
+  .scorecard-data-table tr:hover td {
+    background: var(--color-surface-hover);
+  }
+  
+  /* Quarter and Year Total Columns */
+  .quarter-column {
+    background: var(--color-warning-light) !important;
+    font-weight: 600;
+    border-left: 2px solid var(--color-warning) !important;
+    border-right: 2px solid var(--color-warning) !important;
+  }
+  
+  .year-total-column {
+    background: var(--color-success-light) !important;
+    font-weight: 700;
+    border-left: 3px solid var(--color-success) !important;
+    border-right: 3px solid var(--color-success) !important;
+  }
+  
+  /* Summary Statistics */
+  .scorecard-summary {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+    flex-wrap: wrap;
+  }
+  
+  .summary-item {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--spacing-md);
+    flex: 1;
+    min-width: 200px;
+    text-align: center;
+  }
+  
+  .summary-label {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-xs);
+    font-weight: 500;
+  }
+  
+  .summary-value {
+    display: block;
+    font-size: 1.5rem;
+    color: var(--color-text-primary);
+    font-weight: 700;
+  }
+  
+  /* Loading States */
+  .scorecard-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    gap: var(--spacing-md);
+  }
+  
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--color-border);
+    border-top: 4px solid var(--color-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  .scorecard-loading p {
+    color: var(--color-text-secondary);
+    font-size: 1rem;
+    margin: 0;
+  }
+  
+  /* Error States */
+  .scorecard-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    gap: var(--spacing-md);
+    background: var(--color-error-light);
+    border: 1px solid var(--color-error);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-lg);
+    text-align: center;
+  }
+  
+  .scorecard-error p {
+    color: var(--color-error-dark);
+    font-size: 1rem;
+    margin: 0;
+    font-weight: 500;
+  }
+  
+  .scorecard-error button {
+    background: var(--color-error);
+    color: white;
+    border: none;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+  }
+  
+  .scorecard-error button:hover {
+    background: var(--color-error-dark);
+  }
+  
+  /* Responsive Design */
+  @media (max-width: 1200px) {
+    .scorecard-controls {
+      flex-direction: column;
+      align-items: stretch;
+      gap: var(--spacing-md);
+    }
+    
+    .year-navigation {
+      justify-content: center;
+    }
+    
+    .mga-dropdown,
+    .rga-dropdown {
+      justify-content: center;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .scorecard-container {
+      padding: var(--spacing-md);
+    }
+    
+    .scorecard-controls {
+      padding: var(--spacing-sm);
+    }
+    
+    .mga-dropdown select,
+    .rga-dropdown select {
+      min-width: 150px;
+      font-size: 0.8rem;
+    }
+    
+    .year-nav-btn {
+      padding: var(--spacing-xs) var(--spacing-sm);
+      font-size: 0.8rem;
+    }
+    
+    .current-year {
+      font-size: 1rem;
+      padding: var(--spacing-xs) var(--spacing-sm);
+    }
+    
+    .scorecard-data-table {
+      font-size: 0.8rem;
+    }
+    
+    .scorecard-data-table th,
+    .scorecard-data-table td {
+      padding: var(--spacing-xs);
+    }
+    
+    .summary-item {
+      min-width: 150px;
+    }
+    
+    .summary-value {
+      font-size: 1.2rem;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .scorecard-summary {
+      flex-direction: column;
+    }
+    
+    .summary-item {
+      min-width: 100%;
+    }
+    
+    .alp-tabs {
+      width: 100%;
+      justify-content: center;
+    }
+    
+    .alp-tabs label {
+      flex: 1;
+      text-align: center;
+    }
+  }
+  
+  /* Dark Mode Support */
+  [data-theme="dark"] .scorecard-container {
+    background: var(--bg-primary);
+  }
+  
+  [data-theme="dark"] .scorecard-controls {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+  }
+  
+  [data-theme="dark"] .scorecard-section {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+  }
+  
+  [data-theme="dark"] .mga-dropdown select,
+  [data-theme="dark"] .rga-dropdown select {
+    background: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--input-text);
+  }
+  
+  [data-theme="dark"] .current-year {
+    background: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--text-primary);
+  }
+  
+  [data-theme="dark"] .scorecard-data-table td {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+  }
+  
+  [data-theme="dark"] .scorecard-data-table tr:hover td {
+    background: var(--sidebar-hover);
+  }
+  
+  [data-theme="dark"] .summary-item {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+  }
+  
+  /* ========== NEW ATLAS SCORECARD STYLES (UNIQUE PREFIXES) ========== */
+  
+  /* Main atlas scorecard container */
+  .atlas-scorecard {
+    margin-top: 20px;
+    font-family: Arial, sans-serif;
+  }
+  
+  /* Atlas scorecard loading state */
+  .atlas-scorecard-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    gap: 1rem;
+    color: var(--text-secondary);
+  }
+  
+  
+  
+  /* ========== ATLAS SCORECARD CONTROLS AND OTHER STYLES ========== */
+  
+  /* Atlas scorecard controls */
+  .atlas-scorecard-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: center;
+    justify-content: space-between;
+    margin: 20px 0;
+    padding: 15px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+  }
+  
+  .atlas-scorecard-mga-dropdown {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .atlas-scorecard-mga-dropdown label {
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+  
+  .atlas-scorecard-mga-dropdown select {
+    padding: 8px 12px;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    background: var(--input-bg);
+    color: var(--input-text);
+    font-size: 14px;
+    min-width: 200px;
+  }
+  
+  /* Atlas scorecard year navigation */
+  .atlas-scorecard-year-navigation {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .atlas-scorecard-year-nav-btn {
+    background: var(--button-primary-bg);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    min-width: 40px;
+  }
+  
+  .atlas-scorecard-year-nav-btn:hover:not(:disabled) {
+    background: var(--hover-color);
+    transform: translateY(-1px);
+  }
+  
+  .atlas-scorecard-year-nav-btn:active {
+    transform: translateY(0);
+  }
+  
+  .atlas-scorecard-year-nav-btn:disabled {
+    background: var(--border-color);
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  
+  .atlas-scorecard-year-display {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 16px;
+    padding: 8px 16px;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    min-width: 120px;
+    text-align: center;
+  }
+  
+  /* Atlas scorecard containers */
+  .atlas-scorecard-table-container,
+  .atlas-scorecard-sga-container,
+  .atlas-scorecard-rga-container {
+    width: 100%;
+  }
+  
+  .atlas-scorecard-tables {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xl, 2rem);
+  }
+  
+  .atlas-scorecard-section {
+    background: var(--card-bg);
+    border-radius: 8px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+  }
+  
+  .atlas-scorecard-section h3 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-size: 1.3rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  /* Atlas scorecard data table wrapper */
+  .atlas-scorecard-data-table {
+    width: 100%;
+    overflow-x: auto;
+  }
+  
+  /* Atlas scorecard RGA dropdown */
+  .atlas-scorecard-rga-dropdown {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .atlas-scorecard-rga-dropdown label {
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+  
+  .atlas-scorecard-rga-dropdown select {
+    padding: 8px 12px;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    background: var(--input-bg);
+    color: var(--input-text);
+    font-size: 14px;
+    min-width: 200px;
+  }
+  
+  /* Atlas scorecard summary */
+  .atlas-scorecard-summary {
+    display: flex;
+    gap: var(--spacing-md, 1rem);
+    margin-bottom: var(--spacing-lg, 1.5rem);
+    flex-wrap: wrap;
+  }
+  
+  /* Atlas scorecard table specific containers */
+  .atlas-scorecard-breakdown-table,
+  .atlas-scorecard-rga-table,
+  .atlas-scorecard-breakdown-tables {
+    margin-top: var(--spacing-lg, 1.5rem);
+  }
+  
+  .atlas-scorecard-breakdown-table h3,
+  .atlas-scorecard-rga-table h3 {
+    margin-bottom: var(--spacing-md, 1rem);
+    color: var(--color-text-primary, #333);
+    font-size: 1.2rem;
+    font-weight: 600;
+  }
+  
+  .atlas-scorecard-breakdown-tables {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xl, 2rem);
+  }
+  
+  .atlas-scorecard-table-section {
+    background: var(--color-surface, #f8f9fa);
+    border-radius: var(--radius-md, 8px);
+    padding: var(--spacing-lg, 1.5rem);
+    border: 1px solid var(--color-border, #e1e5e9);
+  }
+  
+  .atlas-scorecard-table-section h4 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-size: 1.3rem;
+    font-weight: 600;
+    text-align: center;
+  }
+  
+  /* Atlas scorecard tabs */
+  .atlas-scorecard-tabs {
+    display: flex;
+    gap: 5px;
+    margin: 20px 15px;
+    padding: 5px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+  }
+  
+  .atlas-scorecard-tabs input[type="radio"] {
+    display: none;
+  }
+  
+  .atlas-scorecard-tabs label {
+    padding: 10px 20px;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    user-select: none;
+  }
+  
+  .atlas-scorecard-tabs input[type="radio"]:checked + label {
+    background: var(--button-primary-bg);
+    color: white;
+    font-weight: 500;
+  }
+  
+  .atlas-scorecard-tabs label:hover {
+    background: var(--sidebar-hover);
+    color: var(--text-primary);
+  }
+  
+  .atlas-scorecard-tabs input[type="radio"]:checked + label:hover {
+    background: var(--hover-color);
+    color: white;
+  }
+  
+  /* Atlas scorecard table styles */
+  .atlas-scorecard-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-family: Arial, sans-serif;
+    box-shadow: none;
+    border-collapse: separate;
+    border-spacing: 2px;
+  }
+  
+  .atlas-scorecard-table th, 
+  .atlas-scorecard-table td {
+    border: 1px solid #7a7a7a;
+    padding: 4px;
+    text-align: left;
+  }
+  
+  .atlas-scorecard-table th {
+    background-color: #00558c;
+    color: white;
+    font-weight: bold;
+    font-size: 10px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-align: center;
+    position: sticky;
+    z-index: 2;
+    border: 1px solid transparent;
+  }
+  
+  .atlas-scorecard-table .atlas-scorecard-second-column {
+    left: 50px;
+    z-index: 2;
+  }
+  
+  .atlas-scorecard-table .atlas-scorecard-day-header {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+  }
+  
+  .atlas-scorecard-table .atlas-scorecard-first-row {
+    top: 0;
+    z-index: 4;
+  }
+  
+  .atlas-scorecard-table .atlas-scorecard-second-row {
+    top: 20px;
+    z-index: 5;
+  }
+  
+  .atlas-scorecard-table td {
+    border: 2px solid #d1d5db;
+    padding: 3px;
+    border-radius: 0.375rem;
+    text-align: center;
+    background-color: #fff;
+    font-size: 10px;
+  }
+  
+  .atlas-scorecard-table input {
+    width: 100%;
+    border: none;
+    background-color: transparent;
+    text-align: center;
+  }
+  
+  .atlas-scorecard-table .atlas-scorecard-totals-row td {
+    background-color: #f0f0f0;
+    font-weight: bold;
+    text-align: center;
+    color: #333;
+  }
+  
+  .atlas-scorecard-table .atlas-scorecard-first-column {
+    position: sticky;
+    left: 0;
+    background-color: #C3D4D2;
+    color: white;
+    font-weight: bold;
+    border-radius: 0;
+    border: none;
+    z-index: 1;
+    white-space: nowrap;
+  }
+  
+  .atlas-scorecard-table button {
+    background-color: white;
+    border: none;
+    cursor: pointer;
+    margin-left: 2px;
+    border-radius: 4px;
+  }
+  
+  .atlas-scorecard-table .atlas-scorecard-quarter-column {
+    background-color: #b5d0ea;
+    font-weight: bold;
+  }
+  
+  .atlas-scorecard-table .atlas-scorecard-year-total-column {
+    background-color: #f4eb8c;
+  }
+  
+  .atlas-scorecard-table .atlas-scorecard-growth-row td {
+    background-color: #e9f5d6;
+    font-weight: bold;
+    text-align: center;
+  }
+  
+  /* Moved to top of file - see GROWTH AND PERCENTAGE COLOR STYLING section */
+  
+  /* Atlas scorecard tooltip */
+  .atlas-scorecard-tooltip {
+    position: absolute;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 8px;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+  }
+  
+  .atlas-scorecard-table td.atlas-scorecard-has-data {
+    position: relative;
+    cursor: pointer;
+  }
+  
+  .atlas-scorecard-table td.atlas-scorecard-has-data::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    border-top: 10px solid rgb(147, 147, 147);
+    border-top-left-radius: 5px;
+    border-right: 10px solid transparent;
+  }
+  
+  /* Atlas scorecard SGA view */
+  .atlas-scorecard-sga-view {
+    margin-top: 20px;
+  }
+  
+  /* Atlas scorecard bar graphs */
+  .atlas-scorecard-bargraph-container {
+    margin-top: 30px;
+    padding: 20px;
+    background: var(--color-surface, #f8f9fa);
+    border-radius: 8px;
+    border: 1px solid var(--color-border, #e1e5e9);
+  }
+  
+  .atlas-scorecard-bargraph-container h2 {
+    color: var(--color-text-primary, #333);
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  
+  .atlas-scorecard-bargraph {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+  }
+  
+  .atlas-scorecard-bargraph h3 {
+    color: var(--color-text-primary, #333);
+    margin-bottom: 15px;
+    text-align: center;
+  }
+  
+  /* Responsive design for atlas scorecard */
+  @media (max-width: 768px) {
+    .atlas-scorecard-table td, 
+    .atlas-scorecard-table th {
+      font-size: 10px;
+    }
+    
+    .atlas-scorecard-table .atlas-scorecard-first-column {
+      font-size: 10px;
+    }
+    
+    .atlas-scorecard-tabs {
+      flex-direction: column;
+      gap: 5px;
+    }
+    
+    .atlas-scorecard-tabs label {
+      text-align: center;
+    }
+    
+    .atlas-scorecard-controls {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 15px;
+    }
+    
+    .atlas-scorecard-mga-dropdown,
+    .atlas-scorecard-rga-dropdown {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .atlas-scorecard-mga-dropdown select,
+    .atlas-scorecard-rga-dropdown select {
+      min-width: 100%;
+    }
+    
+    .atlas-scorecard-year-navigation {
+      justify-content: center;
+    }
+    
+    .atlas-scorecard-year-nav-btn {
+      padding: 6px 10px;
+      font-size: 14px;
+    }
+    
+    .atlas-scorecard-year-display {
+      font-size: 14px;
+      padding: 6px 12px;
+      min-width: 100px;
+    }
+    
+    .atlas-scorecard-bargraph {
+      gap: 20px;
+    }
+    
+    .atlas-scorecard-breakdown-tables {
+      gap: var(--spacing-lg, 1.5rem);
+    }
+    
+    .atlas-scorecard-table-section {
+      padding: var(--spacing-md, 1rem);
+    }
+    
+    .atlas-scorecard-table-section h4 {
+      font-size: 1.1rem;
+    }
+  }
+  
+  /* ========== CUSTOM STYLED TABLE ========== */
+  
+  /* Custom styled table container */
+  .atlas-scorecard-custom-table-container {
+    margin: 20px 0;
+    border-radius: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    background: white;
+    min-width: 100%;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: #2E5F7E #E6F3FF;
+  }
+  
+  /* Webkit scrollbar styling */
+  .atlas-scorecard-custom-table-container::-webkit-scrollbar {
+    height: 8px;
+  }
+  
+  .atlas-scorecard-custom-table-container::-webkit-scrollbar-track {
+    background: #E6F3FF;
+    border-radius: 4px;
+  }
+  
+  .atlas-scorecard-custom-table-container::-webkit-scrollbar-thumb {
+    background: #2E5F7E;
+    border-radius: 4px;
+  }
+  
+  .atlas-scorecard-custom-table-container::-webkit-scrollbar-thumb:hover {
+    background: #1e4a61;
+  }
+  
+  /* Custom table styling */
+  .atlas-scorecard-custom-table {
+    width: 100%;
+    min-width: 1000px;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    font-size: 13px;
+  }
+  
+  /* Header row styling */
+  .atlas-scorecard-custom-table thead tr {
+    background: #2E5F7E;
+    color: white;
+  }
+  
+  .atlas-scorecard-custom-table thead th {
+    padding: 12px 8px;
+    text-align: center;
+    font-weight: 600;
+    border-right: 1px solid #1e4a61;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  
+  .atlas-scorecard-custom-table thead th:last-child {
+    border-right: none;
+  }
+  
+  /* Body row styling */
+  .atlas-scorecard-custom-table tbody tr {
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  
+  .atlas-scorecard-custom-table tbody tr:nth-child(even) {
+    background: #f9fafb;
+  }
+  
+  .atlas-scorecard-custom-table tbody tr:hover {
+    background: #f3f4f6;
+  }
+  
+  /* Standard cell styling */
+  .atlas-scorecard-custom-table tbody td {
+    padding: 10px 8px;
+    text-align: center;
+    border-right: 1px solid #e5e7eb;
+    font-size: 13px;
+  }
+  
+  .atlas-scorecard-custom-table tbody td:last-child {
+    border-right: none;
+  }
+  
+  /* Metric column (first column) styling */
+  .atlas-scorecard-custom-table tbody td.atlas-scorecard-metric-cell {
+    background: #2E5F7E;
+    color: white;
+    font-weight: 600;
+    text-align: left;
+    padding-left: 12px;
+  }
+  
+  /* Year column (second column) styling */
+  .atlas-scorecard-custom-table tbody td.atlas-scorecard-year-cell {
+    background: #2E5F7E;
+    color: white;
+    font-weight: 500;
+    text-align: center;
+  }
+  
+  /* Quarter columns styling */
+  .atlas-scorecard-custom-table thead th.atlas-scorecard-quarter-header,
+  .atlas-scorecard-custom-table tbody td.atlas-scorecard-quarter-cell {
+    background: #E6F3FF;
+    color: #1f2937;
+  }
+  
+  .atlas-scorecard-custom-table thead th.atlas-scorecard-quarter-header {
+    background: #B8D4EA;
+    color: #1f2937;
+    font-weight: 700;
+  }
+  
+  /* YTD column styling */
+  .atlas-scorecard-custom-table thead th.atlas-scorecard-ytd-header {
+    background: #F59E0B;
+    color: white;
+    font-weight: 700;
+  }
+  
+  .atlas-scorecard-custom-table tbody td.atlas-scorecard-ytd-cell {
+    background: #FEF3C7;
+    color: #92400e;
+    font-weight: 600;
+  }
+  
+  /* Growth row styling */
+  .atlas-scorecard-custom-table tbody tr.atlas-scorecard-growth-row {
+    background: #f0f9ff;
+  }
+  
+  .atlas-scorecard-custom-table tbody tr.atlas-scorecard-growth-row:hover {
+    background: #e0f2fe;
+  }
+  
+  /* Percentage row styling */
+  .atlas-scorecard-custom-table tbody tr.atlas-scorecard-percentage-row {
+    background: #fefce8;
+  }
+  
+  .atlas-scorecard-custom-table tbody tr.atlas-scorecard-percentage-row:hover {
+    background: #fef9e7;
+  }
+  
+  /* Spacing between separate metric tables */
+  .atlas-scorecard-section {
+    margin-bottom: 30px;
+  }
+  
+  .atlas-scorecard-section h4 {
+    margin: 20px 0 10px 0;
+    color: #2E5F7E;
+    font-size: 16px;
+    font-weight: 600;
+    border-bottom: 2px solid #E6F3FF;
+    padding-bottom: 5px;
+  }
+  
+  /* Responsive design */
+  @media (max-width: 768px) {
+    .atlas-scorecard-custom-table {
+      font-size: 11px;
+      min-width: 800px;
+    }
+    
+    .atlas-scorecard-custom-table thead th,
+    .atlas-scorecard-custom-table tbody td {
+      padding: 6px 4px;
+    }
+  
+    .atlas-scorecard-section {
+      margin-bottom: 20px;
+    }
+  
+    .atlas-scorecard-section h4 {
+      font-size: 14px;
+    }
+  
+    .atlas-scorecard-custom-table-container {
+      margin: 15px 0;
+    }
+  
+    /* Show scrollbar hint on mobile */
+    .atlas-scorecard-custom-table-container::-webkit-scrollbar {
+      height: 6px;
+    }
+  } 
+  
+  /* ========== GROWTH AND PERCENTAGE COLOR STYLING ========== */
+  
+  /* Positive growth/percentage - green color (matches Card.css positive style) */
+  .atlas-scorecard-growth-positive {
+    color: #059669 !important;
+    font-weight: bold;
+  }
+  
+  .atlas-scorecard-growth-negative {
+    color: #dc2626 !important;
+    font-weight: bold;
+  }
+  
+  /* Neutral growth/percentage - default color */
+  .atlas-scorecard-growth-neutral {
+    color: var(--text-secondary) !important;
+    font-weight: bold;
+  }
+  
+  /* Dark theme adjustments for growth/percentage colors (matches Card.css) */
+  [data-theme="dark"] .atlas-scorecard-growth-positive {
+    color: #10b981 !important;
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-growth-negative {
+    color: #ef4444 !important;
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-growth-neutral {
+    color: var(--text-secondary) !important;
+  }
+  
+  /* ========== ENHANCED DARK MODE SUPPORT ========== */
+  
+  /* Atlas scorecard containers - dark mode */
+  [data-theme="dark"] .atlas-scorecard {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-controls {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-section {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-section h3,
+  [data-theme="dark"] .atlas-scorecard-section h4 {
+    color: var(--text-primary);
+  }
+  
+  /* Atlas scorecard dropdowns - dark mode */
+  [data-theme="dark"] .atlas-scorecard-mga-dropdown select,
+  [data-theme="dark"] .atlas-scorecard-rga-dropdown select {
+    background: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--input-text);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-mga-dropdown label,
+  [data-theme="dark"] .atlas-scorecard-rga-dropdown label {
+    color: var(--text-primary);
+  }
+  
+  /* Atlas scorecard year display - dark mode */
+  [data-theme="dark"] .atlas-scorecard-year-display {
+    background: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--text-primary);
+  }
+  
+  /* Atlas scorecard tabs - dark mode */
+  [data-theme="dark"] .atlas-scorecard-tabs {
+    background: var(--input-bg);
+    border-color: var(--border-color);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-tabs label {
+    color: var(--text-secondary);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-tabs label:hover {
+    background: var(--sidebar-hover);
+    color: var(--text-primary);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-tabs input[type="radio"]:checked + label {
+    background: var(--button-primary-bg);
+    color: white;
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-tabs input[type="radio"]:checked + label:hover {
+    background: var(--hover-color);
+  }
+  
+  /* Atlas scorecard custom table - dark mode */
+  [data-theme="dark"] .atlas-scorecard-custom-table-container {
+    background: var(--card-bg);
+    box-shadow: 0 2px 8px var(--shadow-color);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-custom-table thead tr {
+    background: var(--button-primary-bg);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-custom-table thead th {
+    border-right-color: var(--border-color);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-custom-table tbody tr {
+    background: var(--card-bg);
+    border-bottom-color: var(--border-color);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-custom-table tbody tr:nth-child(even) {
+    background: var(--bg-secondary);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-custom-table tbody tr:hover {
+    background: var(--sidebar-hover);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-custom-table tbody td {
+    border-right-color: var(--border-color);
+    color: var(--text-primary);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-custom-table tbody td.atlas-scorecard-metric-cell,
+  [data-theme="dark"] .atlas-scorecard-custom-table tbody td.atlas-scorecard-year-cell {
+    background: var(--button-primary-bg);
+    color: white;
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-custom-table thead th.atlas-scorecard-quarter-header,
+  [data-theme="dark"] .atlas-scorecard-custom-table tbody td.atlas-scorecard-quarter-cell {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-custom-table thead th.atlas-scorecard-ytd-header {
+    background: #d97706;
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-custom-table tbody td.atlas-scorecard-ytd-cell {
+    background: #92400e;
+    color: #fef3c7;
+  }
+  
+  /* Atlas scorecard growth and percentage rows - dark mode */
+  [data-theme="dark"] .atlas-scorecard-custom-table tbody tr.atlas-scorecard-growth-row {
+    background: var(--bg-tertiary);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-custom-table tbody tr.atlas-scorecard-growth-row:hover {
+    background: var(--sidebar-hover);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-custom-table tbody tr.atlas-scorecard-percentage-row {
+    background: var(--bg-tertiary);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-custom-table tbody tr.atlas-scorecard-percentage-row:hover {
+    background: var(--sidebar-hover);
+  }
+  
+  /* Atlas scorecard loading and error states - dark mode */
+  [data-theme="dark"] .atlas-scorecard-loading {
+    color: var(--text-secondary);
+  }
+  
+  [data-theme="dark"] .scorecard-error {
+    background: rgba(220, 38, 38, 0.2);
+    border-color: #dc2626;
+    color: var(--text-primary);
+  }
+  
+  [data-theme="dark"] .scorecard-error p {
+    color: #fca5a5;
+  }
+  
+  [data-theme="dark"] .scorecard-error button {
+    background: #dc2626;
+  }
+  
+  [data-theme="dark"] .scorecard-error button:hover {
+    background: #b91c1c;
+  }
+  
+  /* Atlas scorecard bargraph container - dark mode */
+  [data-theme="dark"] .atlas-scorecard-bargraph-container {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-bargraph-container h2,
+  [data-theme="dark"] .atlas-scorecard-bargraph h3 {
+    color: var(--text-primary);
+  }
+  
+  /* Atlas scorecard scrollbar - dark mode */
+  [data-theme="dark"] .atlas-scorecard-custom-table-container::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-custom-table-container::-webkit-scrollbar-thumb {
+    background: var(--border-color-secondary);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-custom-table-container::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+  }
+  
+  /* ========== VISIBILITY TOGGLE BUTTON STYLES ========== */
+  
+  /* Visibility toggle container */
+  .atlas-scorecard-visibility-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  /* Toggle button */
+  .atlas-scorecard-toggle-btn {
+    background: var(--button-primary-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 36px;
+  }
+  
+  .atlas-scorecard-toggle-btn:hover {
+    background: var(--hover-color);
+    border-color: var(--button-primary-bg);
+    transform: translateY(-1px);
+  }
+  
+  .atlas-scorecard-toggle-btn:active {
+    transform: translateY(0);
+  }
+  
+  .atlas-scorecard-toggle-btn.active {
+    background: var(--button-primary-bg);
+    border-color: var(--button-primary-bg);
+    box-shadow: 0 2px 4px var(--shadow-color);
+  }
+  
+  /* Toggle label */
+  .atlas-scorecard-toggle-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  
+  /* Dark mode styles for toggle */
+  [data-theme="dark"] .atlas-scorecard-toggle-btn {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--border-color-secondary);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-toggle-btn:hover {
+    background: var(--hover-color);
+    border-color: var(--button-primary-bg);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-toggle-btn.active {
+    background: var(--button-primary-bg);
+    border-color: var(--button-primary-bg);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-toggle-label {
+    color: var(--text-secondary);
+  }
+  
+  /* ========== CHART VIEW STYLES ========== */
+  
+  /* Chart container styling */
+  .atlas-scorecard-chart-container {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+  }
+  
+  .atlas-scorecard-chart-container h5 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-align: center;
+  }
+  
+  /* Chart responsive container */
+  .atlas-scorecard-chart-container .recharts-responsive-container {
+    background: var(--bg-primary);
+    border-radius: 6px;
+    padding: 0.5rem;
+  }
+  
+  /* Chart grid and axis styling */
+  .atlas-scorecard-chart-container .recharts-cartesian-grid line {
+    stroke: var(--border-color);
+    opacity: 0.5;
+  }
+  
+  .atlas-scorecard-chart-container .recharts-xAxis text,
+  .atlas-scorecard-chart-container .recharts-yAxis text {
+    fill: var(--text-secondary);
+    font-size: 12px;
+  }
+  
+  .atlas-scorecard-chart-container .recharts-legend-wrapper {
+    margin-top: 1rem;
+  }
+  
+  .atlas-scorecard-chart-container .recharts-legend-item-text {
+    color: var(--text-primary) !important;
+  }
+  
+  /* Tooltip styling */
+  .atlas-scorecard-chart-container .recharts-tooltip-wrapper {
+    background: var(--card-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 6px !important;
+    box-shadow: 0 4px 6px var(--shadow-color) !important;
+  }
+  
+  .atlas-scorecard-chart-container .recharts-tooltip-label {
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+  }
+  
+  .atlas-scorecard-chart-container .recharts-tooltip-item {
+    color: var(--text-primary) !important;
+  }
+  
+  /* Dark mode chart styles */
+  [data-theme="dark"] .atlas-scorecard-chart-container {
+    background: var(--bg-secondary);
+    border-color: var(--border-color-secondary);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-chart-container .recharts-responsive-container {
+    background: var(--bg-primary);
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-chart-container .recharts-cartesian-grid line {
+    stroke: var(--border-color-secondary);
+    opacity: 0.3;
+  }
+  
+  [data-theme="dark"] .atlas-scorecard-chart-container .recharts-xAxis text,
+  [data-theme="dark"] .atlas-scorecard-chart-container .recharts-yAxis text {
+    fill: var(--text-secondary);
+  }
+  
+  /* ========== BREAKDOWN TABLES DARK MODE STYLES ========== */
+  
+  /* Dark mode styles for breakdown table containers */
+  [data-theme="dark"] .atlas-scorecard-breakdown-table,
+  [data-theme="dark"] .atlas-scorecard-rga-table,
+  [data-theme="dark"] .atlas-scorecard-breakdown-tables {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+  
+  /* Dark mode styles for breakdown table headings */
+  [data-theme="dark"] .atlas-scorecard-breakdown-table h3,
+  [data-theme="dark"] .atlas-scorecard-rga-table h3,
+  [data-theme="dark"] .atlas-scorecard-breakdown-tables h3 {
+    color: var(--text-primary);
+  }
+  
+  /* Dark mode styles for table sections within breakdown tables */
+  [data-theme="dark"] .atlas-scorecard-table-section {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+  }
+  
+  /* Dark mode styles for table section headings */
+  [data-theme="dark"] .atlas-scorecard-table-section h4 {
+    color: var(--text-primary);
+  }
+  
+  /* ========== VIEW TOGGLES CONTAINER STYLES ========== */
+  
+  /* Container for view mode and future months toggles */
+  .atlas-scorecard-view-toggles {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  
+  /* Responsive layout for toggles */
+  @media (max-width: 768px) {
+    .atlas-scorecard-view-toggles {
+      flex-direction: column;
+      gap: 0.5rem;
+      align-items: flex-start;
+    }
+  }
+  
+  /* ========== MISSING CLASSES FOR SCORECARD TABLE ========== */
+  
+  /* Arrow change button for year navigation */
+  .arrow-change-button {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s ease;
+  }
+  
+  .arrow-change-button:hover {
+    background: var(--primary-color-hover);
+  }
+  
+  .arrow-change-button:disabled {
+    background: var(--disabled-color);
+    cursor: not-allowed;
+  }
+  
+  /* View toggle buttons */
+  .view-toggle {
+    display: flex;
+    gap: 0.5rem;
+    margin: 1rem 0;
+  }
+  
+  .view-toggle button {
+    background: var(--secondary-color);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+  }
+  
+  .view-toggle button:hover {
+    background: var(--secondary-color-hover);
+  }
+  
+  .view-toggle button.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+  }
+  
+  /* Management breakdown section */
+  .management-breakdown {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+  }
+  
+  .management-breakdown h5 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+  
+  /* Insured button styling */
+  .insured-button {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-bottom: 1rem;
+    transition: background-color 0.2s ease;
+  }
+  
+  .insured-button:hover {
+    background: var(--primary-color-hover);
+  }
+  
+  /* Details view container */
+  .details-view {
+    margin-top: 1rem;
+  }
+  
+  /* Hierarchy table styling */
+  .hierarchyTable {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    background: var(--card-bg);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  
+  .hierarchyTable th,
+  .hierarchyTable td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .hierarchyTable th {
+    background: var(--bg-secondary);
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  
+  .hierarchyTable td {
+    color: var(--text-primary);
+  }
+  
+  .hierarchyTable tr:hover {
+    background: var(--hover-color);
+  }
+  
+  /* Dark mode styles for missing classes */
+  [data-theme="dark"] .arrow-change-button {
+    background: var(--primary-color);
+  }
+  
+  [data-theme="dark"] .arrow-change-button:hover {
+    background: var(--primary-color-hover);
+  }
+  
+  [data-theme="dark"] .view-toggle button {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+  }
+  
+  [data-theme="dark"] .view-toggle button:hover {
+    background: var(--hover-color);
+  }
+  
+  [data-theme="dark"] .view-toggle button.active {
+    background: var(--primary-color);
+    color: white;
+  }
+  
+  [data-theme="dark"] .management-breakdown {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+  }
+  
+  [data-theme="dark"] .management-breakdown h5 {
+    color: var(--text-primary);
+  }
+  
+  [data-theme="dark"] .hierarchyTable {
+    background: var(--card-bg);
+  }
+  
+  [data-theme="dark"] .hierarchyTable th {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+  
+  [data-theme="dark"] .hierarchyTable td {
+    color: var(--text-primary);
+  }
+  
+  [data-theme="dark"] .hierarchyTable tr:hover {
+    background: var(--hover-color);
+  } 
+  
+  

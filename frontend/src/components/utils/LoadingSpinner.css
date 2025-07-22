@@ -1,0 +1,193 @@
+/* Standardized Loading Spinner Styles */
+
+/* Base spinner animation - consistent across the entire app */
+@keyframes atlas-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Base spinner styles */
+.loading-spinner {
+  animation: atlas-spin 0.8s linear infinite;
+  display: inline-block;
+}
+
+/* Container styles */
+.loading-spinner-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+/* Size variants */
+.loading-spinner-sm {
+  font-size: 0.875rem; /* 14px */
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.loading-spinner-md {
+  font-size: 1.125rem; /* 18px */
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.loading-spinner-lg {
+  font-size: 1.5rem; /* 24px */
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.loading-spinner-xl {
+  font-size: 2rem; /* 32px */
+  width: 2rem;
+  height: 2rem;
+}
+
+/* Color variants */
+.loading-spinner-primary {
+  color: var(--accent-color, #007bff);
+}
+
+.loading-spinner-secondary {
+  color: var(--text-secondary, #6c757d);
+}
+
+.loading-spinner-muted {
+  color: var(--text-muted, #999);
+}
+
+.loading-spinner-white {
+  color: #ffffff;
+}
+
+/* Text styles */
+.loading-spinner-text {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-align: center;
+  margin-top: 0.25rem;
+}
+
+/* Inline spinner - minimal spacing */
+.loading-spinner-inline {
+  margin: 0 0.25rem;
+  vertical-align: middle;
+}
+
+/* Button spinner - fits inside buttons */
+.loading-spinner-button {
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
+
+/* Overlay styles */
+.loading-spinner-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(var(--bg-primary-rgb, 255, 255, 255), 0.8);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  border-radius: inherit;
+}
+
+/* Full screen overlay */
+.loading-spinner-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(var(--bg-primary-rgb, 255, 255, 255), 0.9);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.loading-spinner-fullscreen .loading-spinner-text {
+  font-size: 1rem;
+  margin-top: 1rem;
+}
+
+/* Dark theme support */
+[data-theme="dark"] .loading-spinner-overlay {
+  background-color: rgba(var(--bg-primary-rgb, 18, 18, 18), 0.8);
+}
+
+[data-theme="dark"] .loading-spinner-fullscreen {
+  background-color: rgba(var(--bg-primary-rgb, 18, 18, 18), 0.9);
+}
+
+/* Accessibility - Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner {
+    animation-duration: 2s;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .loading-spinner-primary {
+    color: var(--text-primary);
+  }
+  
+  .loading-spinner-secondary {
+    color: var(--text-primary);
+  }
+}
+
+/* Focus styles for accessibility */
+.loading-spinner-container:focus {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Specific component integrations */
+.data-table .loading-spinner-container {
+  padding: 2rem 1rem;
+}
+
+.modal .loading-spinner-container {
+  padding: 1.5rem;
+}
+
+/* Legacy compatibility - for components that expect .spinner class */
+.spinner {
+  animation: atlas-spin 0.8s linear infinite !important;
+}
+
+/* Loading states for common patterns */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.loading-state .loading-spinner {
+  margin-bottom: 1rem;
+}
+
+.loading-state p {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.875rem;
+} 

@@ -1,0 +1,39 @@
+.verification-details-container {
+  height: 100%;
+  overflow: auto;
+  padding: 65px 20px 20px 20px;
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.verification-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.verification-details-title {
+  margin: 0;
+  color: var(--hover-color);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.verification-details-close-button {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.2s ease;
+}
+
+.verification-details-close-button:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-tertiary);
+} 

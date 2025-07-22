@@ -1,0 +1,50 @@
+.hierarchy-view-selector {
+  margin-bottom: 20px;
+}
+
+.view-toggle-container {
+  display: flex;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 5px;
+  width: fit-content;
+  border: 1px solid #dee2e6;
+}
+
+.view-toggle-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #6c757d;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.view-toggle-button:hover {
+  background-color: #e9ecef;
+  color: #495057;
+}
+
+.view-toggle-button.active {
+  background-color: #fff;
+  color: #007bff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Make sure it's responsive */
+@media (max-width: 576px) {
+  .view-toggle-button {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+  }
+  
+  .view-toggle-container {
+    width: 100%;
+    justify-content: center;
+  }
+} 

@@ -1,0 +1,22 @@
+/* Apply font throughout entire app */
+html, body, #root, #root * {
+  font-family: var(--font-family, 'Avenir Next LT Pro', 'Avenir Next', Avenir, 'Segoe UI', sans-serif);
+}
+
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Only code elements should use monospace fonts */
+code, pre, .code, .monospace {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+/* Improve font rendering */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}

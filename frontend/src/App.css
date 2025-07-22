@@ -1,0 +1,538 @@
+/* App.css */
+
+/* Import fonts and base resets */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap');
+
+/* Theme Variables - Light Mode (default) */
+:root {
+  --bg-primary: #ffffff28;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #eaeaea;
+  --text-primary: #333333;
+  --text-secondary: #6c757d;
+  --border-color: #e0e0e0;
+  --border-color-secondary: #929292;
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #333333;
+  --sidebar-hover: #f0f0f0;
+  --header-bg: #ffffff;
+  --card-bg: #ffffff;
+  --card-border: #e0e0e0;
+  --button-primary-bg: #00558c;
+  --button-primary-text: white;
+  --button-secondary-bg: #6c757d;
+  --button-secondary-text: white;
+  --input-bg: #ffffff;
+  --input-border: #ccc;
+  --input-text: #333333;
+  --hover-color: #00558c;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Dark Mode Theme Variables */
+[data-theme="dark"] {
+  --bg-primary: #121212ec;
+  --bg-secondary: #1e1e1e;
+  --bg-tertiary: #242424;
+  --text-primary: #f0f0f0;
+  --text-secondary: #aaaaaa;
+  --border-color: #333333;
+  --border-color-secondary: #929292;
+  --sidebar-bg: #1e1e1e;
+  --sidebar-text: #f0f0f0;
+  --sidebar-hover: #333333;
+  --header-bg: #1e1e1e;
+  --card-bg: #242424;
+  --card-border: #333333;
+  --button-primary-bg: #0077cc;
+  --button-primary-text: white;
+  --button-secondary-bg: #555555;
+  --button-secondary-text: white;
+  --input-bg: #333333;
+  --input-border: #555555;
+  --input-text: #f0f0f0;
+  --hover-color: #4da3ff;
+  --shadow-color: rgba(0, 0, 0, 0.4);
+}
+
+* {
+  font-family: 'Avenir Next LT Pro', sans-serif;
+  font-weight: 400; 
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6, .bold {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Global links */
+a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+a:hover {
+  color: var(--hover-color);
+}
+
+/* App Background */
+.app-background {
+  background: var(--bg-secondary);
+  background-size: cover;
+  background-position: center;
+  height: 100vh;
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1; /* Ensures it stays behind the content */
+}
+
+/* Special Background for Login */
+.auth-background {
+  background: url('./img/globe_bg_watermark_blue.png') no-repeat center center fixed;
+  background-position: center; /* Center the image */
+  background-repeat: no-repeat; /* Prevent the image from repeating */
+  height: 100vh;
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+}
+
+/* Other pages can have their background color or styles here */
+.page-background {
+  background-color: var(--bg-primary);
+}
+
+/* App container and layout */
+.app-container {
+  background: url('./img/globe_bg_watermark_blue.png') no-repeat center center fixed;
+  background-size: 155%;
+  background-position-x: top;
+  width: 100%;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+[data-theme="dark"] .app-container {
+  background-image: url('./img/globe_bg_watermark_dark.png');
+}
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  margin-left: 45px;
+  overflow: hidden;
+  transition: margin-left 0.3s ease-in-out;
+  margin-top: 60px; /* Exactly match header height */
+  background-color: var(--bg-primary);
+}
+
+.page-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+  border-top-left-radius: 10px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid #d0d0d0;
+}
+
+.app-container.expanded .main-content {
+  margin-left: 120px;
+}
+
+.app-container.expanded .header {
+  left: 120px;
+  width: calc(100% - 150px);
+}
+
+/* Buttons (global) */
+button {
+  background-color: var(--button-primary-bg);
+  border: 2px solid var(--button-primary-bg);
+  color: var(--button-primary-text);
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+.primary-button {
+  background-color: var(--button-primary-bg);
+  border: 2px solid var(--button-primary-bg);
+  color: var(--button-primary-text);
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.primary-button:hover {
+  opacity: 0.9;
+}
+
+.secondary-button {
+  background-color: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+}
+
+.secondary-button:hover {
+  opacity: 0.9;
+}
+
+/* Responsive logo styles */
+.responsive-logo {
+  width: 100%;
+  max-width: 200px;
+  height: auto;
+}
+
+@media (min-width: 768px) {
+  .responsive-logo {
+    max-width: 250px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .responsive-logo {
+    max-width: 300px;
+  }
+}
+
+.logo-xs {
+  width: 25px;
+  height: auto;
+  border-radius: 5px;
+}
+
+.logo-small {
+  width: 35px;
+  height: auto;
+  border-radius: 5px;
+}
+
+.logo-medium {
+  width: 150px;
+  height: auto;
+}
+
+.logo-large {
+  width: 300px;
+  height: auto;
+}
+
+/* ---------------------------
+   Default Form Style Classes
+   --------------------------- */
+
+/* Form container */
+form {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Form row as a flex container */
+.form-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+/* Form group container */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  margin-bottom: 15px;
+  width: 100%;
+}
+
+/* Form group label */
+.form-group label {
+  margin-bottom: 5px;
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+}
+
+/* Input and select fields */
+.form-group input,
+.form-group select {
+  padding: 6px 8px;
+  border: 2px solid var(--input-border);
+  border-radius: 4px;
+  font-size: .65rem;
+  transition: border-color 0.2s ease-in-out;
+  width: 100%;
+  background-color: var(--input-bg);
+  color: var(--input-text);
+}
+
+/* Focus styles */
+.form-group input:focus,
+.form-group select:focus {
+  border-color: var(--hover-color);
+  outline: none;
+  box-shadow: 0 0 5px var(--shadow-color);
+  transition: box-shadow 0.1s ease-in-out;
+}
+
+/* Field size classes */
+.form-group.small-field {
+  flex: 1;
+}
+
+.form-group.medium-field {
+  flex: 1.5;
+}
+
+.form-group.large-field {
+  flex: 2;
+}
+/* Half-width fields */
+.half-width {
+  flex: 1;
+}
+
+/* Form actions (button container) */
+.form-actions {
+  margin-top: 20px;
+}
+
+.form-actions button {
+  margin-right: 10px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.form-actions button[type="button"] {
+  background-color: #ccc;
+  color: #333;
+}
+
+/* Error and message texts */
+.error {
+  color: #d9534f;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.message {
+  color: #5cb85c;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+/* Default card container rules (for unexpanded state) */
+.card-container {
+  display: grid;
+  grid-gap: 10px;
+  width: 100%;
+  grid-template-columns: 1fr; /* Mobile: one card per row */
+}
+
+@media (min-width: 501px) {
+  .card-container {
+    grid-template-columns: repeat(2, 1fr); /* Medium screens: two cards per row */
+  }
+}
+
+@media (min-width: 1200px) {
+  .card-container {
+    grid-template-columns: repeat(4, 1fr); /* Large screens: four cards per row */
+  }
+}
+
+/* When the sidebar is expanded, adjust the layout */
+.app-container.expanded .card-container {
+  grid-template-columns: 1fr; /* default for mobile */
+}
+
+@media (min-width: 650px) {
+  .app-container.expanded .card-container {
+    grid-template-columns: repeat(2, 1fr); /* medium screens */
+  }
+}
+
+@media (min-width: 1300px) {
+  .app-container.expanded .card-container {
+    grid-template-columns: repeat(4, 1fr); /* large screens: reduced from 4 to 3 columns */
+  }
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    padding-bottom: 60px; /* Space for bottom navigation */
+  }
+  
+  .main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  
+  .header {
+    left: 0 !important;
+    width: 100% !important;
+  }
+  
+  /* Remove side margins/padding on mobile */
+  .page-content {
+    padding-left: 0px;
+    padding-right: 0px;
+  }
+  
+  /* Reduce padding for content areas on mobile */
+  .padded-content {
+    padding: 10px;
+  }
+  
+  /* Remove padding completely for settings page on mobile */
+  .settings-content .padded-content {
+    padding: 0;
+  }
+  
+  .padded-content-sm {
+    padding: 5px;
+  }
+  
+  .padded-content-lg {
+    padding: 15px;
+  }
+}
+
+/* Utility class for adding padding to page content */
+.padded-content {
+  padding: 20px;
+}
+
+.padded-content-sm {
+  padding: 10px;
+}
+
+.padded-content-lg {
+  padding: 30px;
+}
+
+/* Ensure font is consistently applied throughout the app */
+.app-container,
+.app-container * {
+  font-family: inherit;
+}
+
+/* Dashboard styles */
+.dashboard-container {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.dashboard-cards-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.dashboard-card {
+  transition: all 0.3s ease;
+}
+
+/* Mobile styles for dashboard and header */
+@media (max-width: 768px) {
+  /* Card adjustments for mobile */
+  .dashboard-card {
+    margin-bottom: 10px !important;
+  }
+  
+  /* Make card contents more compact on mobile */
+  .card-title {
+    font-size: 14px !important;
+    margin-bottom: 5px !important;
+  }
+  
+  .card-value {
+    font-size: 18px !important;
+  }
+  
+  .card-subtext {
+    font-size: 12px !important;
+  }
+  
+  /* Fix card grid on very small screens */
+  @media (max-width: 350px) {
+    .card-container {
+      grid-gap: 8px;
+    }
+  }
+  
+  /* Header logo for mobile */
+  .header-left {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    position: relative;
+    width: 100%;
+  }
+  
+  .header-logo {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+  }
+  
+  .header-title {
+    left: 50% !important;
+    width: 60%;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+}
+
+.user-count-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  font-size: 0.75rem;
+  padding: 2px;
+  border: 1px solid var(--border-color-secondary);
+}
+
+.role-badge.role-RGA {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 0.85rem;
+  color: white;
+} 
