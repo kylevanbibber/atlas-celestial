@@ -527,12 +527,25 @@ router.post('/', verifyToken, isAdmin, async (req, res) => {
     
     // If this is a direct notification to a user, send push notification
     if (user_id) {
+      // Send push notification
       sendPushNotification(user_id, {
         id: insertedId,
         title,
         message,
         link_url
       }).catch(err => console.error('Error sending push notification:', err));
+
+      // Send WebSocket notification for real-time updates
+      if (global.notificationManager) {
+        global.notificationManager.notifyUser(user_id, {
+          id: insertedId,
+          title,
+          message,
+          type,
+          link_url,
+          created_at: new Date().toISOString()
+        });
+      }
     } 
     // If this is a group notification, send to all users in the group
     else if (target_group) {
@@ -542,12 +555,25 @@ router.post('/', verifyToken, isAdmin, async (req, res) => {
       );
       
       for (const user of groupUsers) {
+        // Send push notification
         sendPushNotification(user.user_id, {
           id: insertedId,
           title,
           message,
           link_url
         }).catch(err => console.error(`Error sending push notification to user ${user.user_id}:`, err));
+
+        // Send WebSocket notification for real-time updates
+        if (global.notificationManager) {
+          global.notificationManager.notifyUser(user.user_id, {
+            id: insertedId,
+            title,
+            message,
+            type,
+            link_url,
+            created_at: new Date().toISOString()
+          });
+        }
       }
     }
     // If global notification, send push to all users with a push subscription
@@ -755,6 +781,18 @@ router.post('/test', verifyToken, async (req, res) => {
       message,
       link_url
     });
+
+    // 3. Send WebSocket notification for real-time updates
+    if (global.notificationManager) {
+      global.notificationManager.notifyUser(userId, {
+        id: notificationId,
+        title,
+        message,
+        type,
+        link_url,
+        created_at: new Date().toISOString()
+      });
+    }
 
     res.json({ success: true });
   } catch (error) {
@@ -1792,5 +1830,6 @@ router.patch('/scheduled/:id/status', async (req, res) => {
     res.status(500).json({ error: 'Failed to update scheduled notification status' });
   }
 });
+
 
 module.exports = router; 

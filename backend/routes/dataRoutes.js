@@ -309,6 +309,32 @@ router.get('/monthly-alp-by-mga', async (req, res) => {
     }
 });
 
+// New endpoint for SGA users to get all ALP data
+router.get('/monthly-alp-all', async (req, res) => {
+    try {
+        // Query to get all rows from Monthly_ALP
+        const queryStr = `
+            SELECT * FROM Monthly_ALP 
+            ORDER BY LagnName, month
+        `;
+
+        const results = await query(queryStr);
+
+        // Directly return all results
+        return res.status(200).json({
+            success: true,
+            data: results,
+        });
+    } catch (error) {
+        console.error('Error fetching all data from Monthly_ALP:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error while fetching all data from Monthly_ALP',
+            error: error.message,
+        });
+    }
+});
+
 // Route to get Total_Hires from amore_data where MGA matches the specified value
 router.get('/total-hires', async (req, res) => {
     const { value } = req.query;
@@ -347,19 +373,21 @@ router.get('/subagent-alp', async (req, res) => {
     }
 
     try {
-        // Query to fetch all rows where the conditions are met, cleaning LVL_1_GROSS
+        // Query to fetch data from the new sub_agent table
         const queryStr = `
-            SELECT *
-            FROM Weekly_ALP
-            WHERE (MGA_Name = ? OR LagnName = ?)
-              AND CAST(
-                  REPLACE(REPLACE(REPLACE(REPLACE(LVL_1_GROSS, '$', ''), ',', ''), '(', '-'), ')', '') 
-                  AS DECIMAL(10, 2)
-              ) > 0
+            SELECT 
+                date,
+                MGA,
+                count,
+                post_six,
+                first_six
+            FROM sub_agent 
+            WHERE MGA = ?
+            ORDER BY date ASC
         `;
 
         // Execute the query with the provided value
-        const results = await query(queryStr, [value, value]);
+        const results = await query(queryStr, [value]);
 
         // Return the results
         return res.status(200).json({
@@ -367,10 +395,10 @@ router.get('/subagent-alp', async (req, res) => {
             data: results,
         });
     } catch (error) {
-        console.error('Error fetching data from Monthly_ALP:', error);
+        console.error('Error fetching data from sub_agent:', error);
         res.status(500).json({
             success: false,
-            message: 'Internal server error while fetching data from Monthly_ALP',
+            message: 'Internal server error while fetching data from sub_agent',
             error: error.message,
         });
     }
@@ -589,20 +617,21 @@ router.get('/subagent-alp-sga', async (req, res) => {
     }
 
     try {
-        // Query to fetch rows where the REPORT column equals "Weekly Recap"
-        // and the cleaned LVL_1_GROSS value is greater than 0.
+        // Query to fetch data from the new sub_agent table for SGA (ARIAS ORGANIZATION)
         const queryStr = `
-            SELECT *
-            FROM Weekly_ALP
-            WHERE REPORT = "Weekly Recap"
-              AND CAST(
-                  REPLACE(REPLACE(REPLACE(REPLACE(LVL_1_GROSS, '$', ''), ',', ''), '(', '-'), ')', '')
-                  AS DECIMAL(10, 2)
-              ) > 0
+            SELECT 
+                date,
+                MGA,
+                count,
+                post_six,
+                first_six
+            FROM sub_agent 
+            WHERE MGA = 'ARIAS ORGANIZATION'
+            ORDER BY date ASC
         `;
 
-        // Execute the query (the value parameter is still available if needed in the future)
-        const results = await query(queryStr, [value]);
+        // Execute the query
+        const results = await query(queryStr);
 
         // Return the results
         return res.status(200).json({
@@ -610,10 +639,10 @@ router.get('/subagent-alp-sga', async (req, res) => {
             data: results,
         });
     } catch (error) {
-        console.error('Error fetching data from Weekly_ALP:', error);
+        console.error('Error fetching data from sub_agent:', error);
         res.status(500).json({
             success: false,
-            message: 'Internal server error while fetching data from Weekly_ALP',
+            message: 'Internal server error while fetching data from sub_agent',
             error: error.message,
         });
     }
@@ -627,19 +656,21 @@ router.get('/subagent-alp-mga', async (req, res) => {
     }
 
     try {
-        // Query to fetch all rows where the conditions are met, cleaning LVL_1_GROSS
+        // Query to fetch data from the new sub_agent table for MGA
         const queryStr = `
-            SELECT *
-            FROM Monthly_ALP
-            WHERE REPORT = "MONTH RECAP"
-              AND CAST(
-                  REPLACE(REPLACE(REPLACE(REPLACE(LVL_3_NET, '$', ''), ',', ''), '(', '-'), ')', '') 
-                  AS DECIMAL(10, 2)
-              ) > 0
+            SELECT 
+                date,
+                MGA,
+                count,
+                post_six,
+                first_six
+            FROM sub_agent 
+            WHERE MGA = ?
+            ORDER BY date ASC
         `;
 
         // Execute the query with the provided value
-        const results = await query(queryStr, [value, value]);
+        const results = await query(queryStr, [value]);
 
         // Return the results
         return res.status(200).json({
@@ -647,10 +678,10 @@ router.get('/subagent-alp-mga', async (req, res) => {
             data: results,
         });
     } catch (error) {
-        console.error('Error fetching data from Monthly_ALP:', error);
+        console.error('Error fetching data from sub_agent:', error);
         res.status(500).json({
             success: false,
-            message: 'Internal server error while fetching data from Monthly_ALP',
+            message: 'Internal server error while fetching data from sub_agent',
             error: error.message,
         });
     }
@@ -827,9 +858,10 @@ router.get('/get-unique-mgas', async (req, res) => {
             SELECT DISTINCT 
                 lagnname,
                 rga,
-                tree 
+                tree,
+                Active,
+                hide
             FROM MGAs
-            WHERE Active = 'y' AND hide = 'n'
         `;
         
         const results = await query(queryStr);
@@ -837,7 +869,7 @@ router.get('/get-unique-mgas', async (req, res) => {
         if (!results.length) {
             return res.status(404).json({
                 success: false,
-                message: 'No active MGAs found.',
+                message: 'No MGAs found.',
             });
         }
 
@@ -859,10 +891,15 @@ router.get('/get-unique-mgas', async (req, res) => {
 router.get('/get-rga-hierarchy', async (req, res) => {
     try {
         const queryStr = `
-            SELECT id, lagnname, clname, email, managerActive, Active, mga, sa, ga, rga
-            FROM activeusers 
-            WHERE clname IN ('RGA', 'MGA') AND Active = 'y'
-            ORDER BY clname, lagnname
+            SELECT DISTINCT 
+                lagnname,
+                rga,
+                tree,
+                'MGA' as clname,
+                Active,
+                hide
+            FROM MGAs
+            ORDER BY lagnname
         `;
         
         const results = await query(queryStr);
@@ -885,9 +922,14 @@ router.get('/get-rga-hierarchy', async (req, res) => {
 router.get('/get-all-mgas', async (req, res) => {
     try {
         const queryStr = `
-            SELECT id, lagnname, clname, email, managerActive, Active, mga, sa, ga, rga
-            FROM activeusers 
-            WHERE clname = 'MGA' AND Active = 'y'
+            SELECT DISTINCT 
+                lagnname,
+                rga,
+                tree,
+                'MGA' as clname,
+                Active,
+                hide
+            FROM MGAs
             ORDER BY lagnname
         `;
         

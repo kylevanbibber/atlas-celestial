@@ -43,14 +43,14 @@ const NotificationToggle = ({
           <label className="switch">
             <input 
               type="checkbox" 
-              checked={pushEnabled || hasDbSubscription}
+              checked={pushEnabled}
               onChange={onToggle}
               disabled={permission === 'denied' || isSubscribing}
             />
             <span className="slider"></span>
           </label>
           <span className="switch-label">
-            {isSubscribing ? 'Updating...' : (pushEnabled || hasDbSubscription ? 'On' : 'Off')}
+            {isSubscribing ? 'Updating...' : (pushEnabled ? 'On' : 'Off')}
           </span>
         </div>
       </div>
@@ -64,6 +64,8 @@ const NotificationToggle = ({
         )}
         {getStatusMessage()}
       </div>
+
+
 
     </>
   );

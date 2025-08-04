@@ -528,6 +528,21 @@
     border: 1px solid var(--border-color);
   }
   
+  /* Left side controls */
+  .atlas-scorecard-controls-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  
+  /* Right-aligned button group */
+  .atlas-scorecard-controls-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+  
   .atlas-scorecard-mga-dropdown {
     display: flex;
     align-items: center;
@@ -1596,26 +1611,52 @@
   
   /* ========== MISSING CLASSES FOR SCORECARD TABLE ========== */
   
-  /* Arrow change button for year navigation */
-  .arrow-change-button {
-    background: var(--primary-color);
-    color: white;
+  /* Scorecard tabs styling */
+  .scorecard .tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 20px;
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: 6px;
+    padding: 4px;
+  }
+  
+  .scorecard .tabs input[type="radio"] {
+    display: none;
+  }
+  
+  .scorecard .tabs label {
+    flex: 1;
+    padding: 10px 20px;
+    background: transparent;
     border: none;
-    padding: 0.5rem 1rem;
     border-radius: 4px;
     cursor: pointer;
     font-size: 14px;
-    transition: background-color 0.2s ease;
+    color: var(--text-secondary, #666);
+    transition: all 0.2s ease;
+    user-select: none;
+    text-align: center;
+    font-weight: 500;
   }
   
-  .arrow-change-button:hover {
-    background: var(--primary-color-hover);
+  .scorecard .tabs input[type="radio"]:checked + label {
+    background: var(--button-primary-bg, #007BFF);
+    color: white;
+    font-weight: 600;
   }
   
-  .arrow-change-button:disabled {
-    background: var(--disabled-color);
-    cursor: not-allowed;
+  .scorecard .tabs label:hover {
+    background: var(--sidebar-hover, #f5f5f5);
+    color: var(--text-primary, #333);
   }
+  
+  .scorecard .tabs input[type="radio"]:checked + label:hover {
+    background: var(--hover-color, #0056b3);
+    color: white;
+  }
+ 
   
   /* View toggle buttons */
   .view-toggle {
@@ -1763,5 +1804,196 @@
   [data-theme="dark"] .hierarchyTable tr:hover {
     background: var(--hover-color);
   } 
+
+  /* Hidden MGA Toggle Button */
+  .atlas-scorecard-hidden-toggle {
+    display: flex;
+    align-items: center;
+    margin-left: 1rem;
+  }
+
+  .hidden-mga-toggle-btn {
+    background: none;
+    border: 1px solid var(--border-color, #d1d5db);
+    color: var(--text-secondary, #666);
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .hidden-mga-toggle-btn:hover {
+    background-color: var(--sidebar-hover, #f5f5f5);
+    color: var(--hover-color, #4a6cf7);
+    border-color: var(--hover-color, #4a6cf7);
+  }
+
+  .hidden-mga-toggle-btn.active {
+    background-color: var(--hover-color, #4a6cf7);
+    color: white;
+    border-color: var(--hover-color, #4a6cf7);
+  }
+
+  .hidden-mga-toggle-btn.active:hover {
+    background-color: var(--primary-color-hover, #3a5bc7);
+    border-color: var(--primary-color-hover, #3a5bc7);
+  }
+
+  /* Controls section layout */
+  .atlas-scorecard-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: 6px;
+  }
+
+  /* Left side controls */
+  .atlas-scorecard-controls-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  /* Right side controls */
+  .atlas-scorecard-controls-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  /* Inactive MGA Toggle Button */
+  .atlas-scorecard-inactive-toggle {
+    display: flex;
+    align-items: center;
+  }
+
+  .inactive-mga-toggle-btn {
+    background: none;
+    border: 1px solid var(--border-color, #d1d5db);
+    color: var(--text-secondary, #666);
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .inactive-mga-toggle-btn:hover {
+    background-color: var(--sidebar-hover, #f5f5f5);
+    color: var(--hover-color, #4a6cf7);
+    border-color: var(--hover-color, #4a6cf7);
+  }
+
+  .inactive-mga-toggle-btn.active {
+    background-color: var(--hover-color, #4a6cf7);
+    color: white;
+    border-color: var(--hover-color, #4a6cf7);
+  }
+
+  .inactive-mga-toggle-btn.active:hover {
+    background-color: var(--primary-color-hover, #3a5bc7);
+    border-color: var(--primary-color-hover, #3a5bc7);
+  }
+
+  /* Inactive MGAs row styling */
+  .atlas-scorecard-inactive-row {
+    background-color: #fff3cd !important;
+    font-style: italic;
+    color: #856404;
+  }
+
+    .atlas-scorecard-inactive-row td {
+    border-top: 2px solid #ffeaa7;
+    border-bottom: 2px solid #ffeaa7;
+  }
+
+  /* Future Months Toggle Button */
+  .atlas-scorecard-future-months-toggle {
+    display: flex;
+    align-items: center;
+  }
+
+  .future-months-toggle-btn {
+    background: none;
+    border: 1px solid var(--border-color, #d1d5db);
+    color: var(--text-secondary, #666);
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .future-months-toggle-btn:hover {
+    background-color: var(--sidebar-hover, #f5f5f5);
+    color: var(--hover-color, #4a6cf7);
+    border-color: var(--hover-color, #4a6cf7);
+  }
+
+  .future-months-toggle-btn.active {
+    background-color: var(--hover-color, #4a6cf7);
+    color: white;
+    border-color: var(--hover-color, #4a6cf7);
+  }
+
+  .future-months-toggle-btn.active:hover {
+    background-color: var(--primary-color-hover, #3a5bc7);
+    border-color: var(--primary-color-hover, #3a5bc7);
+  }
+
+  /* Quarters Toggle Button */
+  .atlas-scorecard-quarters-toggle {
+    display: flex;
+    align-items: center;
+  }
+
+  .quarters-toggle-btn {
+    background: none;
+    border: 1px solid var(--border-color, #d1d5db);
+    color: var(--text-secondary, #666);
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .quarters-toggle-btn:hover {
+    background-color: var(--sidebar-hover, #f5f5f5);
+    color: var(--hover-color, #4a6cf7);
+    border-color: var(--hover-color, #4a6cf7);
+  }
+
+  .quarters-toggle-btn.show,
+  .quarters-toggle-btn.hide,
+  .quarters-toggle-btn.only {
+    background-color: var(--hover-color, #4a6cf7);
+    color: white;
+    border-color: var(--hover-color, #4a6cf7);
+  }
+
+  .quarters-toggle-btn.show:hover,
+  .quarters-toggle-btn.hide:hover,
+  .quarters-toggle-btn.only:hover {
+    background-color: var(--primary-color-hover, #3a5bc7);
+    border-color: var(--primary-color-hover, #3a5bc7);
+  }
   
-  
+      

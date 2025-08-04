@@ -73,13 +73,20 @@ const DataTable = ({
   stickyTop = 0, // top offset for sticky positioning
   pageScrollSticky = false, // true = stick to page scroll, false = stick to table scroll
   onRowHover = null, // callback for row hover events
-  onRowClick = null // callback for row click events
+  onRowClick = null, // callback for row click events
+  // Expandable row props
+  enableRowExpansion = false, // enable expandable rows functionality
+  expandableRows = {}, // object mapping row IDs to boolean (which rows can be expanded)
+  renderExpandedRow = null, // function to render expanded content: (row) => JSX
+  onRowExpansionChange = null, // callback when row expansion state changes: (rowId, isExpanded) => void
+  expandedRowsInitial = {} // initial expanded state: {rowId: boolean}
 }) => {
   const [editingCell, setEditingCell] = useState(null);
   const [editedData, setEditedData] = useState({});
   const [localData, setLocalData] = useState(data);
   const [contextMenu, setContextMenu] = useState(null);
   const [selectedRows, setSelectedRows] = useState({});
+  const [expandedRows, setExpandedRows] = useState(expandedRowsInitial);
   const [activeFilters, setActiveFilters] = useState({
     // Role filters
     ...filterOptions.roleFilters.reduce((acc, role) => ({ ...acc, [role]: true }), {}),
@@ -891,11 +898,29 @@ const DataTable = ({
                     customClassName,
                     isSticky ? "sticky-row" : ""
                   ].filter(Boolean).join(" ");
+
+                  // Check if this row can be expanded
+                  const canExpand = enableRowExpansion && expandableRows[row.original.id];
+                  const isExpanded = expandedRows[row.original.id] || false;
+
+                  const toggleRowExpansion = () => {
+                    const newExpanded = !isExpanded;
+                    setExpandedRows(prev => ({
+                      ...prev,
+                      [row.original.id]: newExpanded
+                    }));
+                    if (onRowExpansionChange) {
+                      onRowExpansionChange(row.original.id, newExpanded);
+                    }
+                  };
                   
-                  return (
+                  const rowElements = [];
+                  
+                  // Main row
+                  rowElements.push(
                     <tr
                       {...row.getRowProps()}
-                      key={rowIndex}
+                      key={`main-${rowIndex}`}
                       className={className}
                       style={{ cursor: onRowClick ? 'pointer' : 'default' }}
                       onClick={(e) => {
@@ -904,8 +929,9 @@ const DataTable = ({
                           // Check if the click is on a cell that shouldn't trigger row click
                           const isSelectCell = e.target.closest('input[type="checkbox"]');
                           const isDropdownCell = e.target.closest('select');
+                          const isExpandButton = e.target.closest('.expand-button');
                           
-                          if (!isSelectCell && !isDropdownCell) {
+                          if (!isSelectCell && !isDropdownCell && !isExpandButton) {
                             onRowClick(row.original);
                           }
                         }
@@ -938,6 +964,7 @@ const DataTable = ({
                           (c) => c.accessor === cell.column.id
                         );
                         const isEditingCell = editingCell?.id === row.original.id && editingCell?.field === cell.column.id;
+                        
                         return (
                           <td
                             {...cell.getCellProps()}
@@ -979,12 +1006,45 @@ const DataTable = ({
                               )
                             }
                           >
+                            {/* Add expand button to first column if row is expandable */}
+                            {columnIndex === 0 && canExpand && (
+                              <button
+                                className="expand-button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleRowExpansion();
+                                }}
+                                style={{
+                                  marginRight: '8px',
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                  color: '#666'
+                                }}
+                              >
+                                {isExpanded ? '▼' : '▶'}
+                              </button>
+                            )}
                             {renderCell(cell, row)}
                           </td>
                         );
                       })}
                     </tr>
                   );
+
+                  // Expanded row content
+                  if (canExpand && isExpanded && renderExpandedRow) {
+                    rowElements.push(
+                      <tr key={`expanded-${rowIndex}`} className="expanded-row">
+                        <td colSpan={columns.length} className="expanded-cell">
+                          {renderExpandedRow(row.original)}
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return rowElements;
                 })}
                 
                 {/* Render bottom totals row */}
@@ -1013,8 +1073,12 @@ const DataTable = ({
           {/* ---------- CONTEXT MENUS ---------- */}
           {contextMenu && (
             <ContextMenu
-              x={contextMenu.x}
-              y={contextMenu.y}
+              style={{
+                position: 'fixed',
+                top: contextMenu.y,
+                left: contextMenu.x,
+                zIndex: 1000
+              }}
               options={contextMenu.options}
               onClose={() => setContextMenu(null)}
             />

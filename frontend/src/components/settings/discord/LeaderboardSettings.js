@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaPlus, FaTrash, FaEdit, FaServer, FaHashtag, FaCopy, FaPlay } from 'react-icons/fa';
-import api from '../../api';
+import api from '../../../api';
 
 const LeaderboardSettings = ({ leaderboards, setLeaderboards, configuredGuilds, availableManagers, userRole }) => {
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);

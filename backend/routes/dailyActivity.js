@@ -223,6 +223,127 @@ router.post("/update", async (req, res) => {
     }
 });
 
+// PUT /api/dailyActivity - Update a single field in Daily_Activity
+router.put("/", async (req, res) => {
+    const { reportDate, ...updateFields } = req.body;
+    
+    console.log(`[DAILY-ACTIVITY-API] 📝 PUT request:`, { reportDate, updateFields });
+
+    if (!reportDate) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'reportDate is required' 
+        });
+    }
+
+    try {
+        // Get user info from the request (assuming it's available from middleware)
+        const userId = req.user?.id || req.body.userId;
+        
+        if (!userId) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'User ID is required' 
+            });
+        }
+
+        // Get user details from activeusers table
+        const userQuery = `SELECT lagnname, esid, MGA, rga, SA, GA FROM activeusers WHERE id = ?`;
+        const userResult = await query(userQuery, [userId]);
+        
+        if (!userResult || userResult.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'User not found' 
+            });
+        }
+        
+        const user = userResult[0];
+        console.log(`[DAILY-ACTIVITY-API] 👤 User details:`, user);
+
+        // Check if record exists
+        const existingQuery = `SELECT * FROM Daily_Activity WHERE agent = ? AND reportDate = ?`;
+        const existingRecord = await query(existingQuery, [user.lagnname, reportDate]);
+
+        if (existingRecord && existingRecord.length > 0) {
+            // Update existing record
+            const existing = existingRecord[0];
+            
+            // Build dynamic update query
+            const fields = Object.keys(updateFields);
+            const values = Object.values(updateFields);
+            
+            if (fields.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'No fields to update'
+                });
+            }
+            
+            const setClause = fields.map(field => `${field} = ?`).join(', ');
+            const updateQuery = `UPDATE Daily_Activity SET ${setClause} WHERE reportDate = ? AND agent = ?`;
+            
+            await query(updateQuery, [...values, reportDate, user.lagnname]);
+            
+            console.log(`[DAILY-ACTIVITY-API] ✅ Updated fields: ${fields.join(', ')} for agent: ${user.lagnname}`);
+            
+            res.status(200).json({ 
+                success: true, 
+                message: 'Daily activity updated successfully',
+                updatedFields: fields
+            });
+        } else {
+            // Create new record with all required fields
+            console.log(`[DAILY-ACTIVITY-API] ➕ Creating new record for agent: ${user.lagnname} on ${reportDate}`);
+            
+            const insertQuery = `
+                INSERT INTO Daily_Activity (
+                    reportDate, esid, MGA, Work, rga, agent, SA, GA, userId,
+                    calls, appts, sits, sales, alp, refs, refAppt, refSit, refSale, refAlp
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            
+            const insertValues = [
+                reportDate,
+                user.esid,
+                user.MGA,
+                new Date().toISOString().split('T')[0], // Work = current date
+                user.rga,
+                user.lagnname,
+                user.SA,
+                user.GA,
+                userId,
+                updateFields.calls || 0,
+                updateFields.appts || 0,
+                updateFields.sits || 0,
+                updateFields.sales || 0,
+                updateFields.alp || 0,
+                updateFields.refs || 0,
+                updateFields.refAppt || 0,
+                updateFields.refSit || 0,
+                updateFields.refSale || 0,
+                updateFields.refAlp || 0
+            ];
+            
+            await query(insertQuery, insertValues);
+            
+            console.log(`[DAILY-ACTIVITY-API] ✅ Created new record with fields: ${Object.keys(updateFields).join(', ')}`);
+            
+            res.status(200).json({ 
+                success: true, 
+                message: 'Daily activity created successfully',
+                createdFields: Object.keys(updateFields)
+            });
+        }
+    } catch (error) {
+        console.error(`[DAILY-ACTIVITY-API] ❌ Error updating daily activity:`, error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error updating daily activity data' 
+        });
+    }
+});
+
 // GET /api/dailyActivity/agent/:agent/:date - Get specific daily activity for agent and date
 router.get("/agent/:agent/:date", async (req, res) => {
     const { agent, date } = req.params;

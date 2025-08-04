@@ -1,6 +1,6 @@
 // src/components/utils/Sidebar.jsx
 import React, { useState, useRef, useContext } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { sidebarNavItems } from "../../context/sidebarNavItems";
 import getSidebarNavItems from "../../context/sidebarNavItems";
 import { useTeamStyles } from "../../context/TeamStyleContext";
@@ -13,6 +13,7 @@ import Logo from "../Layout/Logo";
 
 const Sidebar = ({ isExpanded, setIsExpanded }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { teamName } = useTeamStyles();
   const { hasWarning: licenseWarning } = useLicenseWarning();
   const { user, hasPermission } = useAuth();
@@ -21,10 +22,14 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
   // Check if user is admin using the hasPermission function
   const isAdmin = hasPermission('admin');
   
-
+  // Get teamRole from user object (available for admin users)
+  const teamRole = user?.teamRole || null;
+  
+  // Skip license warning for teamRole = "app" users
+  const shouldShowLicenseWarning = teamRole !== "app" ? licenseWarning : false;
   
   // Get sidebar items with warning indicators based on license status
-  const navItems = getSidebarNavItems(licenseWarning, isAdmin, unreadCount);
+  const navItems = getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole);
   
   // Track which item (if any) currently shows its submenu
   const [submenuVisible, setSubmenuVisible] = useState(null);
@@ -47,6 +52,11 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
     navigate("/dashboard");
   };
 
+  // Check if a nav item is active
+  const isActive = (path) => {
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  };
+
   // We remove immediate onMouseLeave so that the submenu can be interacted with.
   // The ContextMenuPortal component will handle its own mouse events to close.
 
@@ -64,7 +74,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
       {navItems.map((item) => (
         <div
           key={item.name}
-          className="sidebar-item"
+          className={`sidebar-item ${isActive(item.path) ? 'active' : ''}`}
           onMouseEnter={(e) => handleItemMouseEnter(e, item)}
           onClick={() => {
             // Always navigate to the item's path when clicked

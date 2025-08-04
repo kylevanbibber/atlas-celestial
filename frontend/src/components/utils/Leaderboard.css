@@ -1037,6 +1037,18 @@
   font-weight: 500;
 }
 
+.user-role-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  background-color: var(--primary-color, #3b82f6);
+  color: var(--primary-text, #ffffff);
+}
+
 /* Sub-item name structure */
 .sub-name-info {
   display: flex;
@@ -1066,6 +1078,136 @@
   font-size: 0.7rem;
   color: var(--text-secondary, #6b7280);
   font-weight: 400;
+}
+
+/* Current user highlighting */
+.leaderboard-item.current-user {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-left: 4px solid #f59e0b;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+  transform: translateY(-1px);
+}
+
+.leaderboard-item.current-user:hover {
+  background: linear-gradient(135deg, #fef3c7 0%, #fbbf24 100%);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.3);
+}
+
+/* Removed the person emoji - just using the color highlighting */
+
+/* Header controls */
+.leaderboard-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.scroll-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scroll-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 32px;
+  height: 32px;
+  opacity: 1;
+  transform: scale(1);
+}
+
+.scroll-button:hover {
+  transform: translateY(-1px) scale(1.05);
+}
+
+.scroll-button:active {
+  transform: translateY(0) scale(1);
+}
+
+/* Fade in/out animation for buttons */
+.scroll-button {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Removed duplicate scroll-button rules - using the enhanced version above */
+
+.scroll-button.scroll-to-user {
+  color: #f59e0b;
+}
+
+.scroll-button.scroll-to-user:hover {
+  color: #d97706;
+}
+
+.scroll-button.scroll-to-top {
+  color: var(--text-secondary, #6b7280);
+}
+
+.scroll-button.scroll-to-top:hover {
+  color: var(--text-primary, #1f2937);
+}
+
+.scroll-icon {
+  font-size: 0.875rem;
+}
+
+.scroll-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Mobile responsive for scroll buttons */
+@media (max-width: 480px) {
+  .leaderboard-header-controls {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+  
+  .scroll-controls {
+    gap: 6px;
+  }
+  
+  .scroll-button {
+    padding: 6px;
+    min-width: 28px;
+    height: 28px;
+  }
+  
+  .scroll-icon {
+    font-size: 0.875rem;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 640px) {
+  .scroll-button {
+    padding: 7px;
+    min-width: 30px;
+    height: 30px;
+  }
+  
+  .scroll-icon {
+    font-size: 0.9rem;
+  }
 }
 
 /* End of mobile responsive styles */

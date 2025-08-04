@@ -314,7 +314,9 @@ const LeaderboardPage = () => {
         // High performer badge based on value - only for main "all" leaderboard
         if (key === 'all') {
             const value = item.value || 0;
-            if (value > 25000) {
+            // Set different thresholds based on report type
+            const highPerformerThreshold = reportType === 'YTD Recap' ? 500000 : 25000;
+            if (value > highPerformerThreshold) {
                 achievements.push('🏆 High Performer');
             }
         }
@@ -327,7 +329,7 @@ const LeaderboardPage = () => {
         if (!item?.rankChange) return null;
         
         if (item.rankChange === "NEW") {
-            return "🆕 NEW";
+            return null; // Remove NEW indicators
         } else if (item.rankChange && item.rankChange !== 0) {
             const arrow = item.rankChange > 0 ? "▲" : "▼";
             return `${arrow}${Math.abs(item.rankChange)}`;
@@ -574,6 +576,7 @@ const LeaderboardPage = () => {
                     profile_picture: row.profpic,
                     clname: row.clname,
                     mga: row.MGA_NAME,
+                    mgaLastName: getMgalastName(row.MGA_NAME, row.LagnName),
                     esid: row.esid,
                     start: row.start,
                     // Handle both reportdate (Weekly_ALP) and month (Monthly_ALP)
@@ -627,6 +630,23 @@ const LeaderboardPage = () => {
             minimumFractionDigits: 0,
             maximumFractionDigits: 0
         }).format(value);
+    };
+
+    // Extract last name from MGA field (format: "LAST FIRST MIDDLE SUFFIX")
+    // If MGA is blank, use the agent's last name (also in "LAST FIRST MIDDLE SUFFIX" format)
+    const getMgalastName = (mgaName, agentName) => {
+        if (mgaName && typeof mgaName === 'string' && mgaName.trim()) {
+            const parts = mgaName.trim().split(/\s+/);
+            return parts[0] || ''; // Return first part (LAST name)
+        }
+        
+        // If MGA is blank, use agent's last name (first part of LagnName)
+        if (agentName && typeof agentName === 'string') {
+            const parts = agentName.trim().split(/\s+/);
+            return parts[0] || ''; // Return first part (LAST name)
+        }
+        
+        return '';
     };
 
     // Handle date navigation
@@ -1004,6 +1024,8 @@ const LeaderboardPage = () => {
                         showProfilePicture={true}
                         profilePictureField="profile_picture"
                         showLevelBadge={true}
+                        showMGA={true}
+                        hierarchyLevel="all"
                         formatMovementIndicator={formatMovementIndicator}
                         formatAchievementBadge={formatAchievementBadge}
                         achievementColors={achievementColors}
@@ -1024,6 +1046,8 @@ const LeaderboardPage = () => {
                         showProfilePicture={true}
                         profilePictureField="profile_picture"
                         showLevelBadge={true}
+                        showMGA={true}
+                        hierarchyLevel="sa"
                         formatMovementIndicator={formatMovementIndicator}
                         formatAchievementBadge={formatAchievementBadge}
                         achievementColors={achievementColors}
@@ -1039,6 +1063,8 @@ const LeaderboardPage = () => {
                         showProfilePicture={true}
                         profilePictureField="profile_picture"
                         showLevelBadge={true}
+                        showMGA={true}
+                        hierarchyLevel="ga"
                         formatMovementIndicator={formatMovementIndicator}
                         formatAchievementBadge={formatAchievementBadge}
                         achievementColors={achievementColors}
@@ -1057,6 +1083,8 @@ const LeaderboardPage = () => {
                         showProfilePicture={true}
                         profilePictureField="profile_picture"
                         showLevelBadge={true}
+                        showMGA={true}
+                        hierarchyLevel="mga"
                         formatMovementIndicator={formatMovementIndicator}
                         formatAchievementBadge={formatAchievementBadge}
                         achievementColors={achievementColors}
@@ -1072,6 +1100,8 @@ const LeaderboardPage = () => {
                         showProfilePicture={true}
                         profilePictureField="profile_picture"
                         showLevelBadge={true}
+                        showMGA={true}
+                        hierarchyLevel="rga"
                         formatMovementIndicator={formatMovementIndicator}
                         formatAchievementBadge={formatAchievementBadge}
                         achievementColors={achievementColors}

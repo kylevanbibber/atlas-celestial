@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../../context/AuthContext';
 import api from '../../../api';
 import './ApplicationDetails.css';
 
@@ -50,12 +51,24 @@ const CrossIcon = () => (
 );
 
 function ApplicationDetails({ row, data, onClose, parseInsuredInfo, isDiscrepancyTab, isQueuedTab }) {
+    const { user } = useAuth();
     const [selectedInsuredIndex, setSelectedInsuredIndex] = useState(null);
     const [clientData, setClientData] = useState(null);
     const [loading, setLoading] = useState(true);
     
     // Use row prop if provided, otherwise use data prop (from RightDetails)
     const verificationData = row || data;
+    
+    // Check if user is admin with teamRole="app" - show copy button
+    const isAppAdmin = user?.Role === 'Admin' && user?.teamRole === 'app';
+    
+    // Debug logging for app admin detection
+    console.log('🏭 ApplicationDetails: Debug info', {
+        userRole: user?.Role,
+        teamRole: user?.teamRole,
+        isAppAdmin,
+        clientName: verificationData?.client_name
+    });
 
     const pdfMapping = {
         medications: '/pdfs/MedicalInfoSheet.pdf',
@@ -70,22 +83,23 @@ function ApplicationDetails({ row, data, onClose, parseInsuredInfo, isDiscrepanc
     };
 
     const medicalDiscrepancyMessages = {
-        medications: { message: "Provide list of medications on", pdf: ['/pdfs/MedicalInfoSheet.pdf'] },
-        er_visit: { message: "Provide details of overnight hospital stay on", pdf: ['/pdfs/MedicalInfoSheet.pdf'] },
-        high_blood_pressure: { message: "Complete", pdf: ['/pdfs/HighBloodPressureQ.pdf'] },
-        diabetes: { message: "Complete", pdf: ['/pdfs/DiabeticQ.pdf'] },
-        cancer: { message: "Complete", pdf: ['/pdfs/CancerTumorQ.pdf'] },
-        arrested: { message: "Complete", pdf: ['/pdfs/ArrestQ.pdf'] },
-        dui: { message: "Complete", pdf: ['/pdfs/AlcoholUseQ.pdf', '/pdfs/DrugQ.pdf', '/pdfs/ArrestQ.pdf'] },
-        anxiety_depression: { message: "Complete", pdf: ['/pdfs/DepressionQ.pdf'] },
-        heart_issues: { message: "Complete", pdf: ['/pdfs/HeartCirculatoryQ.pdf'] },
-        senior_rejected: { message: "Was rejected for life with AIL", pdf: [] },
-        heart_lung: { message: "Address Heart/Lung question discrepancy", pdf: [] },
-        cirrhosis: { message: "Address Cirrhosis, Alzheimer's, ALS, dementia discrepancy", pdf: [] },
-        amputation: { message: "Address Amputation question discrepancy", pdf: [] },
-        cancer_senior: { message: "Address Cancer question discrepancy", pdf: [] },
-        oxygen: { message: "Address Oxygen question discrepancy", pdf: [] },
-        bedridden: { message: "Address bedridden or nursing home residency discrepancy", pdf: [] }
+        medications: "Needs medications listed on medical info sheet",
+        er_visit: "Needs details of overnight hospital stay on medical info sheet", 
+        high_blood_pressure: "Needs High Blood Pressure Questionnaire",
+        diabetes: "Needs Diabetes Questionnaire",
+        cancer: "Needs Cancer Questionnaire",
+        arrested: "Needs Arrest Questionnaire",
+        dui: "Needs Alcohol Use, Drug, and Arrest Questionnaires",
+        anxiety_depression: "Needs Depression Questionnaire",
+        heart_issues: "Needs Heart/Circulatory Questionnaire",
+        senior_rejected: "Was rejected for life with AIL",
+        heart_lung: "Heart/Lung question discrepancy",
+        cirrhosis: "Cirrhosis, Alzheimer's, ALS, dementia discrepancy",
+        amputation: "Amputation question discrepancy",
+        cancer_senior: "Cancer question discrepancy",
+        oxygen: "Oxygen question discrepancy",
+        chronic_illness: "Needs Chronic Illness details on medical info sheet",
+        bedridden: "Address bedridden or nursing home residency discrepancy"
     };
 
     useEffect(() => {
@@ -222,42 +236,128 @@ function ApplicationDetails({ row, data, onClose, parseInsuredInfo, isDiscrepanc
             return { discrepancies, requiredPdfs };
         }
 
-        const insureds = { Primary: verificationData.primary_info, Spouse: verificationData.spouse_info, Child1: verificationData.child1_info };
+        // Medical questions to check (same as old ApplicationDetails.js)
+        const medicalKeys = [
+            'amputation', 'anxiety_depression', 'cancer', 'cancer_senior', 'chronic_illness',
+            'cirrhosis', 'diabetes', 'dui', 'er_visit', 'heart_issues', 'heart_lung',
+            'high_blood_pressure', 'medications', 'oxygen', 'senior_rejected'
+        ];
 
+        // Get all insureds (same as old ApplicationDetails.js)
+        const insureds = {
+            Primary: verificationData.primary_info,
+            Spouse: verificationData.spouse_info,
+            Child1: verificationData.child1_info,
+            Child2: verificationData.child2_info,
+            Child3: verificationData.child3_info,
+            Child4: verificationData.child4_info,
+            Child5: verificationData.child5_info,
+            Child6: verificationData.child6_info,
+            Child7: verificationData.child7_info,
+            Child8: verificationData.child8_info,
+            Child9: verificationData.child9_info,
+        };
+
+        // Check each insured for discrepancies (same logic as old ApplicationDetails.js)
         for (const [insuredType, insuredInfo] of Object.entries(insureds)) {
             if (insuredInfo && insuredInfo !== 'n/a') {
                 const [insuredName] = insuredInfo.split(',');
-
                 const insuredDiscrepanciesList = [];
-                const insuredRequiredPdfs = new Set();
 
-                Object.keys(medicalDiscrepancyMessages).forEach((key) => {
-                    const agentAnswer = verificationData[`${key}_answer`];
-                    const clientAnswer = clientData?.[key];
+                medicalKeys.forEach((key) => {
+                    const agentAnswer = verificationData[`${key}_answer`] || 'n';
+                    const clientAnswer = clientData[key] || 'n';
 
-                    if (
-                        agentAnswer !== clientAnswer &&
-                        clientAnswer &&
-                        insuredName &&
-                        clientAnswer.includes(`yes(${insuredName.toLowerCase()})`)
-                    ) {
-                        const message = `${medicalDiscrepancyMessages[key].message}: Agent said ${agentAnswer === 'n' ? 'No' : 'Yes'}, Client said Yes.`;
+                    // Extract insured names from answers for comparison with data cleaning (same as old app)
+                    const agentInsureds = agentAnswer.toLowerCase().includes('yes(')
+                        ? (agentAnswer.match(/\(([^)]+)\)/) || [])[1]?.split(',').map(name => {
+                            // Clean up duplicate names and formatting issues
+                            const cleanedName = name.trim().toLowerCase();
+                            // Remove duplicate words (like "Douglas Shope Shope" -> "Douglas Shope")
+                            const words = cleanedName.split(' ');
+                            const uniqueWords = words.filter((word, index) => words.indexOf(word) === index);
+                            return uniqueWords.join(' ');
+                        }) || []
+                        : [];
 
+                    const clientInsureds = clientAnswer.toLowerCase().includes('yes(')
+                        ? (clientAnswer.match(/\(([^)]+)\)/) || [])[1]?.split(',').map(name => name.trim().toLowerCase()) || []
+                        : [];
+
+                    // Simple discrepancy check (same as old ApplicationDetails.js):
+                    // Agent says "No" (doesn't include insured) AND Client lists this insured
+                    const isDiscrepancy = !agentInsureds.includes(insuredName.toLowerCase()) &&
+                        clientInsureds.includes(insuredName.toLowerCase());
+
+                    if (isDiscrepancy) {
+                        const message = `${medicalDiscrepancyMessages[key] || key}: Agent said No, Client said Yes`;
                         insuredDiscrepanciesList.push(message);
-
-                        // Add PDFs to insuredRequiredPdfs
-                        medicalDiscrepancyMessages[key].pdf.forEach((pdfPath) => insuredRequiredPdfs.add(pdfPath));
                     }
                 });
 
                 if (insuredDiscrepanciesList.length > 0) {
                     discrepancies[insuredName] = insuredDiscrepanciesList;
-                    requiredPdfs[insuredName] = Array.from(insuredRequiredPdfs);
                 }
             }
         }
 
+        // Check other fields for discrepancies - these go under "General"
+        const generalDiscrepancies = [];
+        
+        if (clientData.account_verification === 'n') {
+            generalDiscrepancies.push('Account verification failed');
+        }
+        
+        if (clientData.application_verification === 'n') {
+            generalDiscrepancies.push('Application verification failed');
+        }
+        
+        if (clientData.agent_contact_request && clientData.agent_contact_request.toLowerCase() !== 'no') {
+            generalDiscrepancies.push('Agent contact request present');
+        }
+        
+        if (verificationData.agent_ip === clientData.client_ip) {
+            generalDiscrepancies.push('IP addresses match between agent and client');
+        }
+
+        // Add general discrepancies if any exist
+        if (generalDiscrepancies.length > 0) {
+            discrepancies['General'] = generalDiscrepancies;
+        }
+
+        // Convert Sets to Arrays for required PDFs
+        Object.keys(requiredPdfs).forEach(key => {
+            requiredPdfs[key] = Array.from(requiredPdfs[key]);
+        });
+
         return { discrepancies, requiredPdfs };
+    };
+
+    // Function to get discrepancy data in a format suitable for copying
+    const getDiscrepancyDataForCopy = () => {
+        const { discrepancies } = getDiscrepancyData();
+        const discrepancyText = [];
+
+        Object.entries(discrepancies).forEach(([insuredName, messages]) => {
+            discrepancyText.push(`${insuredName}:`);
+            messages.forEach(message => {
+                discrepancyText.push(`  - ${message}`);
+            });
+        });
+
+        return discrepancyText;
+    };
+
+    // Copy button click handler for app admins
+    const handleCopyClick = () => {
+        const discrepancyText = getDiscrepancyDataForCopy();
+        if (discrepancyText.length > 0) {
+            const fullText = `Discrepancies for ${verificationData.client_name}:\n${discrepancyText.join('\n')}`;
+            navigator.clipboard.writeText(fullText);
+            alert(`Copied: Discrepancies for ${verificationData.client_name}`);
+        } else {
+            alert('No discrepancies to copy');
+        }
     };
 
     const renderRequiredDocuments = () => {
@@ -279,7 +379,8 @@ function ApplicationDetails({ row, data, onClose, parseInsuredInfo, isDiscrepanc
                                 <ul>
                                     {pdfList.map((pdfPath, index) => {
                                         const pdfFileName = pdfPath.split('/').pop(); // Extract file name from path
-                                        const instructionText = medicalDiscrepancyMessages[pdfFileName.replace('.pdf', '')] || '';
+                                        const pdfKey = pdfFileName.replace('.pdf', '').replace(/Q$/, '').toLowerCase();
+        const instructionText = medicalDiscrepancyMessages[pdfKey] || '';
 
                                         return (
                                             <li key={index} style={{ display: 'flex', alignItems: 'center' }}>
@@ -455,17 +556,29 @@ function ApplicationDetails({ row, data, onClose, parseInsuredInfo, isDiscrepanc
             const agentAnswer = verificationRow[`${key}_answer`] || 'n';
             const clientAnswer = clientData?.[key] || 'n';
 
-            // Split client and agent answers into lists of insureds if they contain "yes(insureds)"
+            // Extract insured names from answers for comparison with data cleaning
             const clientInsureds = clientAnswer.toLowerCase().includes('yes(')
                 ? clientAnswer.match(/\(([^)]+)\)/)[1].split(',').map(name => name.trim().toLowerCase())
                 : [];
 
             const agentInsureds = agentAnswer.toLowerCase().includes('yes(')
-                ? agentAnswer.match(/\(([^)]+)\)/)[1].split(',').map(name => name.trim().toLowerCase())
+                ? agentAnswer.match(/\(([^)]+)\)/)[1].split(',').map(name => {
+                    // Clean up duplicate names and formatting issues
+                    const cleanedName = name.trim().toLowerCase();
+                    // Remove duplicate words (like "Douglas Shope Shope" -> "Douglas Shope")
+                    const words = cleanedName.split(' ');
+                    const uniqueWords = words.filter((word, index) => words.indexOf(word) === index);
+                    return uniqueWords.join(' ');
+                })
                 : [];
 
-            // Check if any insured in clientInsureds matches the current insuredName
-            return agentAnswer === 'n' && clientInsureds.includes(insuredName.toLowerCase());
+            // Discrepancy exists if:
+            // 1. Agent said "No" and client said "Yes" (simple case)
+            // 2. OR Agent said "No" and client specifically listed this insured
+            return agentAnswer === 'n' && (
+                clientAnswer.toLowerCase() === 'y' || 
+                clientInsureds.includes(insuredName.toLowerCase())
+            );
         });
     };
 
@@ -516,6 +629,43 @@ function ApplicationDetails({ row, data, onClose, parseInsuredInfo, isDiscrepanc
             )}
 
             <div className="application-details-content">
+                {/* Copy button for app admins - placed above Agent Information */}
+                {isAppAdmin && (() => {
+                    const { discrepancies } = getDiscrepancyData();
+                    const hasDiscrepancies = Object.keys(discrepancies).length > 0;
+                    
+                    // Show copy button if there are discrepancies OR if this came from discrepancy table
+                    const shouldShowCopyButton = hasDiscrepancies || isDiscrepancyTab;
+                    
+                    console.log('🏭 Copy button check:', { 
+                        isAppAdmin, 
+                        hasDiscrepancies, 
+                        isDiscrepancyTab,
+                        shouldShowCopyButton,
+                        discrepancies 
+                    });
+                    
+                    return shouldShowCopyButton ? (
+                        <div style={{ textAlign: 'right', marginBottom: '15px' }}>
+                            <button 
+                                onClick={handleCopyClick}
+                                style={{
+                                    padding: '8px 12px',
+                                    backgroundColor: '#00558c',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: 'bold'
+                                }}
+                            >
+                                Copy Notes
+                            </button>
+                        </div>
+                    ) : null;
+                })()}
+
                 {/* Agent Information Section */}
                 <div className="application-details-section">
                     <h4>
@@ -543,6 +693,38 @@ function ApplicationDetails({ row, data, onClose, parseInsuredInfo, isDiscrepanc
                         </tbody>
                     </table>
                 </div>
+
+                {/* IP Address Comparison Section - Important for App Admins */}
+                {isAppAdmin && clientData && (
+                    <div className="application-details-section">
+                        <h4>
+                            <span>🌐</span>
+                            IP Address Comparison
+                        </h4>
+                        <table className='details-table'>
+                            <thead>
+                                <tr>
+                                    <th>Agent IP</th>
+                                    <th>Client IP</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style={verificationData.agent_ip === clientData.client_ip ? { backgroundColor: 'lightcoral' } : {}}>
+                                    <td>{verificationData.agent_ip}</td>
+                                    <td>{clientData.client_ip || 'No client IP'}</td>
+                                    <td>
+                                        {verificationData.agent_ip === clientData.client_ip ? (
+                                            <span style={{ color: 'red', fontWeight: 'bold' }}>⚠️ MATCH (Suspicious)</span>
+                                        ) : (
+                                            <span style={{ color: 'green' }}>✓ Different (Normal)</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                )}
 
                 {/* Client Verification Section */}
                 {clientData && (

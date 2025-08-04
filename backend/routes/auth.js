@@ -125,7 +125,7 @@ router.get("/profile", verifyToken, async (req, res) => {
     }
     
     const user = await query(
-      'SELECT id, lagnname, email, phone, profpic, header_pic, clname, Role, screen_name, esid, mga, agtnum, bio FROM activeusers WHERE id = ? AND Active = "y"',
+      'SELECT id, lagnname, email, phone, profpic, header_pic, clname, Role, screen_name, esid, mga, agtnum, bio, teamRole FROM activeusers WHERE id = ? AND Active = "y"',
       [userId]
     );
     
@@ -152,7 +152,8 @@ router.get("/profile", verifyToken, async (req, res) => {
       esid: user[0].esid || '',
       mga: user[0].mga || '',
       agtnum: user[0].agtnum || '',
-      bio: user[0].bio || ''
+      bio: user[0].bio || '',
+      teamRole: user[0].teamRole || ''
     });
   } catch (error) {
     console.error("Error fetching user profile:", error);
@@ -167,148 +168,371 @@ router.post("/newlogin", async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    // Find all active users
-    const allUsers = await query('SELECT * FROM activeusers WHERE Active = "y"');
+    console.log('[Auth] Starting login process for username:', username);
 
-    // Filter to find the matching users
-    const matchingUsers = allUsers.filter(user => {
-      const parts = user.lagnname.split(" ").filter(Boolean); // Splitting by space, filtering empty strings
-      const lastName = parts[0]; // Assume the last name is the first part
+    // Check both tables simultaneously
+    const [regularUsers, adminUsers] = await Promise.all([
+      // Check regular users table (now includes teamRole)
+      query('SELECT *, teamRole FROM activeusers WHERE Active = "y"'),
+      // Check admin users table
+      query('SELECT * FROM admin_logins WHERE Username = ?', [username])
+    ]);
+
+    console.log('[Auth] Database query results:', {
+      regularUsersFound: regularUsers.length,
+      adminUsersFound: adminUsers.length,
+      username: username
+    });
+
+    // Check regular users first
+    const matchingRegularUsers = regularUsers.filter(user => {
+      const parts = user.lagnname.split(" ").filter(Boolean);
+      const lastName = parts[0];
       const firstNameInitial = parts.length > 1 ? parts[1].charAt(0) : "";
       const constructedUsername = `${firstNameInitial}${lastName}`.toLowerCase();
       return constructedUsername === username.toLowerCase();
     });
 
-    if (matchingUsers.length === 0) {
-      return res.status(404).send({ success: false, message: "User not found or not active." });
-    }
+    console.log('[Auth] Regular user matching results:', {
+      totalRegularUsers: regularUsers.length,
+      matchingRegularUsers: matchingRegularUsers.length
+    });
 
-    // Check if passwords match for any of the matching users
-    const validUser = await Promise.all(
-      matchingUsers.map(async (user) => {
-        if (user.Password && user.Password !== "default") {
-          const isMatch = await bcrypt.compare(password, user.Password);
-          return isMatch ? user : null;
-        } else {
-          return password.toUpperCase() === user.agtnum.toUpperCase() ? user : null;
-        }
-      })
-    ).then(users => users.find(user => user !== null));
-
-    if (!validUser) {
-      return res.status(401).send({ success: false, message: "Incorrect password." });
-    }
-
-    if (parseInt(validUser.redeemed) === 1) {
-      // Log the user information for debugging
-      console.log('[Auth] User logging in:', {
-        userId: validUser.id,
-        name: validUser.lagnname,
-        role: validUser.Role,
-        clname: validUser.clname
-      });
+    // Try to authenticate as regular user first
+    if (matchingRegularUsers.length > 0) {
+      console.log('[Auth] Found matching regular users, attempting authentication');
       
-      // Create a comprehensive token payload with all necessary user information
-      const tokenPayload = {
-        userId: validUser.id,           // Primary identifier
-        id: validUser.id,               // For backward compatibility
-        clname: validUser.clname,       // Role for permission checks
-        lagnname: validUser.lagnname,   // User's name
-        email: validUser.email || null,
-        profpic: validUser.profpic || null,
-        headerPic: validUser.header_pic || null,
-        Role: validUser.Role || null,   // Preserve original Role case (Admin vs admin)
-        // Add timestamp for when the token was issued
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 86400 // 24 hours from now
-      };
+      const validRegularUser = await Promise.all(
+        matchingRegularUsers.map(async (user) => {
+          if (user.Password && user.Password !== "default") {
+            const isMatch = await bcrypt.compare(password, user.Password);
+            return isMatch ? user : null;
+          } else {
+            return password.toUpperCase() === user.agtnum.toUpperCase() ? user : null;
+          }
+        })
+      ).then(users => users.find(user => user !== null));
 
-      // Log the token payload for debugging
-      console.log('[Auth] Token payload:', {
-        userId: tokenPayload.userId,
-        role: tokenPayload.Role,
-        clname: tokenPayload.clname,
-        exp: new Date(tokenPayload.exp * 1000).toISOString()
-      });
-
-      // Sign the token with the comprehensive payload
-      const token = jwt.sign(tokenPayload, process.env.JWT_SECRET);
-
-      // Insert the token into the user_tokens table
-      await query("INSERT INTO user_tokens (userId, userToken, valid) VALUES (?, ?, 'y')", [validUser.id, token]);
-
-      // Set token as a cookie
-      res.cookie("auth_token", token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "Lax",
-        domain: ".ariaslife.com",
-        maxAge: 24 * 60 * 60 * 1000,
-      });
-
-      // Check if user is an RGA or MGA and fetch additional data if needed
-      if (validUser.clname === "RGA" || validUser.clname === "MGA") {
-        const mgaRgaData = await query("SELECT * FROM MGA_RGA WHERE Name = ?", [validUser.lagnname]);
-        return res.status(200).send({
-          success: true,
-          message: "Login successful",
-          token: token,
-          userId: validUser.id,
-          clname: validUser.clname,
-          agnName: validUser.lagnname,
-          mgaRgaData: mgaRgaData[0] || null,
-          email: validUser.email || null,
-          phone: validUser.phone || null,
-          screenName: validUser.screen_name || null,
-          esid: validUser.esid || null,
-          mga: validUser.mga || null,
-          profpic: validUser.profpic || null,
-          profilePic: validUser.profpic || null,
-          headerPic: validUser.header_pic || null,
-          header_pic: validUser.header_pic || null,
-          agtnum: validUser.agtnum || null,
-          Role: validUser.Role || null,
+      if (validRegularUser) {
+        console.log('[Auth] ✅ Regular user authentication successful:', {
+          userId: validRegularUser.id,
+          name: validRegularUser.lagnname,
+          role: validRegularUser.Role,
+          clname: validRegularUser.clname
         });
-      } else {
-        return res.status(200).send({
-          success: true,
-          message: "Login successful",
-          token: token,
-          clname: validUser.clname,
-          userId: validUser.id,
-          agnName: validUser.lagnname,
-          email: validUser.email || null,
-          phone: validUser.phone || null,
-          screenName: validUser.screen_name || null,
-          esid: validUser.esid || null,
-          mga: validUser.mga || null,
-          profpic: validUser.profpic || null,
-          profilePic: validUser.profpic || null,
-          headerPic: validUser.header_pic || null,
-          header_pic: validUser.header_pic || null,
-          agtnum: validUser.agtnum || null,
-          Role: validUser.Role || null,
+
+        if (parseInt(validRegularUser.redeemed) === 1) {
+          // Create token payload for regular user (now includes teamRole from activeusers)
+          const tokenPayload = {
+            userId: validRegularUser.id,
+            id: validRegularUser.id,
+            clname: validRegularUser.clname,
+            lagnname: validRegularUser.lagnname,
+            email: validRegularUser.email || null,
+            profpic: validRegularUser.profpic || null,
+            headerPic: validRegularUser.header_pic || null,
+            Role: validRegularUser.Role || null,
+            teamRole: validRegularUser.teamRole || null,
+            iat: Math.floor(Date.now() / 1000),
+            exp: Math.floor(Date.now() / 1000) + 86400
+          };
+
+          const token = jwt.sign(tokenPayload, process.env.JWT_SECRET);
+          await query("INSERT INTO user_tokens (userId, userToken, valid) VALUES (?, ?, 'y')", [validRegularUser.id, token]);
+
+          res.cookie("auth_token", token, {
+            httpOnly: true,
+            secure: true,
+            sameSite: "Lax",
+            domain: ".ariaslife.com",
+            maxAge: 24 * 60 * 60 * 1000,
+          });
+
+          // Check if user is an RGA or MGA and fetch additional data if needed
+          if (validRegularUser.clname === "RGA" || validRegularUser.clname === "MGA") {
+            const mgaRgaData = await query("SELECT * FROM MGA_RGA WHERE Name = ?", [validRegularUser.lagnname]);
+            return res.status(200).send({
+              success: true,
+              message: "Login successful",
+              token: token,
+              userId: validRegularUser.id,
+              clname: validRegularUser.clname,
+              agnName: validRegularUser.lagnname,
+              mgaRgaData: mgaRgaData[0] || null,
+              email: validRegularUser.email || null,
+              phone: validRegularUser.phone || null,
+              screenName: validRegularUser.screen_name || null,
+              esid: validRegularUser.esid || null,
+              mga: validRegularUser.mga || null,
+              profpic: validRegularUser.profpic || null,
+              profilePic: validRegularUser.profpic || null,
+              headerPic: validRegularUser.header_pic || null,
+              header_pic: validRegularUser.header_pic || null,
+              agtnum: validRegularUser.agtnum || null,
+              Role: validRegularUser.Role || null,
+              teamRole: validRegularUser.teamRole || null,
+            });
+          } else {
+            return res.status(200).send({
+              success: true,
+              message: "Login successful",
+              token: token,
+              clname: validRegularUser.clname,
+              userId: validRegularUser.id,
+              agnName: validRegularUser.lagnname,
+              email: validRegularUser.email || null,
+              phone: validRegularUser.phone || null,
+              screenName: validRegularUser.screen_name || null,
+              esid: validRegularUser.esid || null,
+              mga: validRegularUser.mga || null,
+              profpic: validRegularUser.profpic || null,
+              profilePic: validRegularUser.profpic || null,
+              headerPic: validRegularUser.header_pic || null,
+              header_pic: validRegularUser.header_pic || null,
+              agtnum: validRegularUser.agtnum || null,
+              Role: validRegularUser.Role || null,
+              teamRole: validRegularUser.teamRole || null,
+            });
+          }
+        } else {
+          // Redirect to account setup if not redeemed
+          console.log('[Auth] ⚠️ Regular user needs account setup');
+          return res.status(200).send({
+            success: true,
+            message: "Please complete account setup",
+            redirectUrl: "/setup.html",
+            lagnname: validRegularUser.lagnname,
+            esid: validRegularUser.esid,
+            email: validRegularUser.email || null,
+            phone: validRegularUser.phone || null,
+            screenName: validRegularUser.screen_name || null,
+            id: validRegularUser.id,
+            agtnum: validRegularUser.agtnum || null,
+            Role: validRegularUser.Role || null,
+            teamRole: validRegularUser.teamRole || null,
+          });
+        }
+      }
+    }
+
+    // If no valid regular user found, try admin authentication
+    if (adminUsers.length > 0) {
+      console.log('[Auth] Found admin user, attempting admin authentication');
+      
+      const admin = adminUsers[0];
+      
+      if (!admin.Password) {
+        console.log('[Auth] ❌ Admin authentication failed: No password set');
+        return res.status(401).send({ 
+          success: false, 
+          message: "Admin account is not properly configured. Please contact system administrator.",
+          errorType: "PASSWORD_NOT_SET",
+          details: "The admin account exists but has no password configured."
         });
       }
-    } else {
-      // Redirect to account setup if not redeemed
-      return res.status(200).send({
-        success: true,
-        message: "Please complete account setup",
-        redirectUrl: "/setup.html",
-        lagnname: validUser.lagnname,
-        esid: validUser.esid,
-        email: validUser.email || null,
-        phone: validUser.phone || null,
-        screenName: validUser.screen_name || null,
-        id: validUser.id,
-        agtnum: validUser.agtnum || null,
-        Role: validUser.Role || null,
+
+      // Verify admin password - since passwords are stored as plain text
+      console.log('[Auth] Admin password verification:', {
+        providedPassword: password,
+        storedPassword: admin.Password,
+        passwordLength: admin.Password.length
+      });
+      
+      // Direct string comparison for plain text passwords
+      const isAdminPasswordValid = (password === admin.Password);
+      
+      if (isAdminPasswordValid) {
+        console.log('[Auth] ✅ Admin user authentication successful:', {
+          userId: admin.id,
+          username: admin.Username,
+          adminLevel: admin.Admin_Level,
+          agency: admin.Agency
+        });
+
+        // Create token payload for admin user
+        const adminTokenPayload = {
+          userId: admin.id,
+          id: admin.id,
+          username: admin.Username,
+          Role: 'Admin',
+          adminLevel: admin.Admin_Level,
+          agency: admin.Agency,
+          teamRole: admin.teamRole,
+          iat: Math.floor(Date.now() / 1000),
+          exp: Math.floor(Date.now() / 1000) + 86400
+        };
+
+        const adminToken = jwt.sign(adminTokenPayload, process.env.JWT_SECRET);
+        await query("INSERT INTO user_tokens (userId, userToken, valid) VALUES (?, ?, 'y')", [admin.id, adminToken]);
+
+        res.cookie("auth_token", adminToken, {
+          httpOnly: true,
+          secure: true,
+          sameSite: "Lax",
+          domain: ".ariaslife.com",
+          maxAge: 24 * 60 * 60 * 1000,
+        });
+
+        // Return admin-specific response structure
+        return res.status(200).send({
+          success: true,
+          message: "Login successful",
+          token: adminToken,
+          userId: admin.id,
+          id: admin.id,
+          email: admin.Email || null,
+          screenName: admin.Screen_Name || null,
+          adminLevel: admin.Admin_Level || null,
+          agency: admin.Agency || null,
+          teamRole: admin.teamRole || null,
+          Role: 'Admin',
+          username: admin.Username,
+        });
+      } else {
+        console.log('[Auth] ❌ Admin authentication failed: Invalid password');
+        return res.status(401).send({ 
+          success: false, 
+          message: "Incorrect password. Please try again.",
+          errorType: "INVALID_PASSWORD",
+          details: "The password provided does not match the admin account."
+        });
+      }
+    }
+
+    // If we get here, no valid user was found in either table
+    console.log('[Auth] ❌ Authentication failed: User not found in either table');
+    return res.status(404).send({ 
+      success: false, 
+      message: "Username not found. Please check your credentials.",
+      errorType: "USERNAME_NOT_FOUND",
+      details: "The provided username does not exist in our system."
+    });
+
+  } catch (error) {
+    console.error("❌ Login Error:", error);
+    return res.status(500).send({ 
+      success: false, 
+      message: "An error occurred during login. Please try again.",
+      errorType: "LOGIN_ERROR",
+      details: "Server error during login process."
+    });
+  }
+});
+
+/* ----------------------
+   Admin Login Route
+------------------------- */
+router.post("/adminlogin", async (req, res) => {
+  const { username, password } = req.body;
+
+  try {
+    console.log('[AdminAuth] Starting admin login process for username:', username);
+
+    // Check admin_logins table
+    const adminUsers = await query('SELECT * FROM admin_logins WHERE Username = ?', [username]);
+    
+    console.log('[AdminAuth] Database query results:', {
+      adminUsersFound: adminUsers.length,
+      username: username
+    });
+
+    if (adminUsers.length === 0) {
+      console.log('[AdminAuth] ❌ Admin authentication failed: Username not found');
+      return res.status(404).send({ 
+        success: false, 
+        message: "Username not found. Please check your credentials.",
+        errorType: "USERNAME_NOT_FOUND"
       });
     }
+
+    const admin = adminUsers[0];
+    
+    if (!admin.Password) {
+      console.log('[AdminAuth] ❌ Admin authentication failed: No password set');
+      return res.status(401).send({ 
+        success: false, 
+        message: "Admin account is not properly configured. Please contact system administrator.",
+        errorType: "PASSWORD_NOT_SET"
+      });
+    }
+
+    // Verify admin password - since passwords are stored as plain text
+    console.log('[AdminAuth] Admin password verification for user:', username);
+    
+    // Direct string comparison for plain text passwords
+    const isAdminPasswordValid = (password === admin.Password);
+    
+    if (!isAdminPasswordValid) {
+      console.log('[AdminAuth] ❌ Admin authentication failed: Invalid password');
+      return res.status(401).send({ 
+        success: false, 
+        message: "Incorrect password. Please try again.",
+        errorType: "INVALID_PASSWORD"
+      });
+    }
+
+    console.log('[AdminAuth] ✅ Admin user authentication successful:', {
+      userId: admin.id,
+      username: admin.Username,
+      adminLevel: admin.Admin_Level,
+      agency: admin.Agency,
+      teamRole: admin.teamRole
+    });
+
+    // Create token payload for admin user (excluding password)
+    const adminTokenPayload = {
+      userId: admin.id,
+      id: admin.id,
+      username: admin.Username,
+      email: admin.Email,
+      screenName: admin.Screen_Name,
+      adminLevel: admin.Admin_Level,
+      agency: admin.Agency,
+      teamRole: admin.teamRole,
+      Role: 'Admin',
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 86400 // 24 hours
+    };
+
+    const adminToken = jwt.sign(adminTokenPayload, process.env.JWT_SECRET);
+    
+    // Store token in database
+    await query("INSERT INTO user_tokens (userId, userToken, valid) VALUES (?, ?, 'y')", [admin.id, adminToken]);
+
+    // Set cookie
+    res.cookie("auth_token", adminToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "Lax",
+      domain: ".ariaslife.com",
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    });
+
+    // Return admin-specific response structure (all columns except password)
+    return res.status(200).send({
+      success: true,
+      message: "Admin login successful",
+      token: adminToken,
+      user: {
+        id: admin.id,
+        userId: admin.id,
+        username: admin.Username,
+        email: admin.Email || null,
+        screenName: admin.Screen_Name || null,
+        adminLevel: admin.Admin_Level || null,
+        agency: admin.Agency || null,
+        teamRole: admin.teamRole || null,
+        Role: 'Admin'
+      }
+    });
+
   } catch (error) {
-    console.error("Login Error:", error);
-    return res.status(500).send({ success: false, message: "An error occurred during login." });
+    console.error("❌ Admin Login Error:", error);
+    return res.status(500).send({ 
+      success: false, 
+      message: "An error occurred during admin login. Please try again.",
+      errorType: "LOGIN_ERROR"
+    });
   }
 });
 
@@ -465,7 +689,7 @@ router.post("/searchByUserId", async (req, res) => {
   try {
     console.log('[searchByUserId] Querying activeusers for user data');
     const userResult = await query(
-      `SELECT lagnname, clname FROM activeusers WHERE id = ? AND Active = 'y' LIMIT 1`,
+      `SELECT lagnname, clname, teamRole FROM activeusers WHERE id = ? AND Active = 'y' LIMIT 1`,
       [userId]
     );
     console.log('[searchByUserId] User query result:', userResult);
@@ -515,6 +739,7 @@ router.post("/searchByUserId", async (req, res) => {
             au.profpic,
             au.phone,
             au.esid,
+            au.teamRole,
             COALESCE(main_ui.email, '') AS email, 
             au.sa, 
             COALESCE(sa_ui.email, '') AS sa_email, 
@@ -591,6 +816,7 @@ router.post("/searchByUserId", async (req, res) => {
             au.profpic,
             au.phone,
             au.esid,
+            au.teamRole,
             COALESCE(main_ui.email, '') AS email, 
             au.sa, 
             COALESCE(sa_ui.email, '') AS sa_email, 
@@ -1071,7 +1297,7 @@ router.post("/upload-profile-picture", verifyToken, upload.single('image'), asyn
     
     // Get updated user data to return
     const user = await query(
-      'SELECT id, lagnname, email, phone, profpic, clname, Role FROM activeusers WHERE id = ?',
+      'SELECT id, lagnname, email, phone, profpic, clname, Role, teamRole FROM activeusers WHERE id = ?',
       [userId]
     );
     
@@ -1089,6 +1315,7 @@ router.post("/upload-profile-picture", verifyToken, upload.single('image'), asyn
       profpic: imageUrl,
       headerPic: user[0].header_pic || null,
       Role: user[0].Role || null,
+      teamRole: user[0].teamRole || null,
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + 86400
     };
@@ -1129,7 +1356,7 @@ router.post("/remove-profile-picture", verifyToken, async (req, res) => {
     
     // Get updated user data
     const user = await query(
-      'SELECT id, lagnname, email, phone, profpic, clname, Role FROM activeusers WHERE id = ?',
+      'SELECT id, lagnname, email, phone, profpic, clname, Role, teamRole FROM activeusers WHERE id = ?',
       [userId]
     );
     
@@ -1147,6 +1374,7 @@ router.post("/remove-profile-picture", verifyToken, async (req, res) => {
       profpic: null,
       headerPic: null,
       Role: user[0].Role || null,
+      teamRole: user[0].teamRole || null,
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + 86400
     };
@@ -1324,7 +1552,7 @@ router.post("/upload-header-image", verifyToken, upload.single('image'), async (
     
     // Get updated user data to return
     const user = await query(
-      'SELECT id, lagnname, email, phone, profpic, header_pic, clname, Role FROM activeusers WHERE id = ?',
+      'SELECT id, lagnname, email, phone, profpic, header_pic, clname, Role, teamRole FROM activeusers WHERE id = ?',
       [userId]
     );
     
@@ -1365,7 +1593,7 @@ router.post("/remove-header-image", verifyToken, async (req, res) => {
     
     // Get updated user data
     const user = await query(
-      'SELECT id, lagnname, email, phone, profpic, header_pic, clname, Role FROM activeusers WHERE id = ?',
+      'SELECT id, lagnname, email, phone, profpic, header_pic, clname, Role, teamRole FROM activeusers WHERE id = ?',
       [userId]
     );
     
@@ -1445,7 +1673,7 @@ router.post("/update-profile-info", verifyToken, async (req, res) => {
     
     // Get updated user data
     const user = await query(
-      'SELECT id, lagnname, email, phone, screen_name, bio, profpic, header_pic, clname, Role FROM activeusers WHERE id = ?',
+      'SELECT id, lagnname, email, phone, screen_name, bio, profpic, header_pic, clname, Role, teamRole FROM activeusers WHERE id = ?',
       [userId]
     );
     
@@ -1478,7 +1706,7 @@ router.get("/profile-info/:userId", verifyToken, async (req, res) => {
     
     // Get user data
     const user = await query(
-      'SELECT id, lagnname, email, phone, screen_name, bio, profpic, header_pic, clname, Role FROM activeusers WHERE id = ?',
+      'SELECT id, lagnname, email, phone, screen_name, bio, profpic, header_pic, clname, Role, teamRole FROM activeusers WHERE id = ?',
       [userId]
     );
     
@@ -1837,7 +2065,7 @@ router.put("/profile", verifyToken, upload.fields([
     
     // Get updated user data
     const user = await query(
-      'SELECT id, lagnname, email, phone, screen_name, bio, profpic, header_pic, clname, Role FROM activeusers WHERE id = ?',
+      'SELECT id, lagnname, email, phone, screen_name, bio, profpic, header_pic, clname, Role, teamRole FROM activeusers WHERE id = ?',
       [userId]
     );
     
@@ -1859,6 +2087,7 @@ router.put("/profile", verifyToken, upload.fields([
         profpic: profilePicUrl || user[0].profpic || null,
         headerPic: headerPicUrl || user[0].header_pic || null,
         Role: user[0].Role || null,
+        teamRole: user[0].teamRole || null,
         iat: Math.floor(Date.now() / 1000),
         exp: Math.floor(Date.now() / 1000) + 86400
       };

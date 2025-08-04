@@ -96,7 +96,17 @@ router.post('/', async (req, res) => {
 // Route to fetch all data from the verify table except for status 'Not at Threshold'
 router.get('/all', async (req, res) => {
     try {
-        const queryText = "SELECT * FROM verify WHERE status != 'Not at Threshold' ORDER BY created_at DESC";
+        const { archive } = req.query;
+        let queryText;
+        
+        if (archive === 'true') {
+            // Show archived records
+            queryText = "SELECT * FROM verify WHERE status != 'Not at Threshold' AND archive = 'y' ORDER BY created_at DESC";
+        } else {
+            // Show non-archived records (default behavior)
+            queryText = "SELECT * FROM verify WHERE status != 'Not at Threshold' AND (archive IS NULL OR archive != 'y') ORDER BY created_at DESC";
+        }
+        
         const results = await db.query(queryText);
 
         if (results.length > 0) {
@@ -228,7 +238,27 @@ router.post('/verifyclient', async (req, res) => {
 // Route to fetch all data from the verify_client table
 router.get('/verifyclient/all', async (req, res) => {
     try {
-        const queryText = 'SELECT * FROM verify_client ORDER BY submission_date DESC';
+        const { archive } = req.query;
+        let queryText;
+        
+        if (archive === 'true') {
+            // Show client responses for archived applications
+            queryText = `
+                SELECT vc.* FROM verify_client vc 
+                JOIN verify v ON vc.application_id = v.application_id 
+                WHERE v.archive = 'y' 
+                ORDER BY vc.submission_date DESC
+            `;
+        } else {
+            // Show client responses for non-archived applications (default behavior)
+            queryText = `
+                SELECT vc.* FROM verify_client vc 
+                JOIN verify v ON vc.application_id = v.application_id 
+                WHERE (v.archive IS NULL OR v.archive != 'y') 
+                ORDER BY vc.submission_date DESC
+            `;
+        }
+        
         const results = await db.query(queryText);
 
         if (results.length > 0) {
@@ -364,6 +394,202 @@ router.post('/searchByUserId', async (req, res) => {
         });
     } catch (error) {
         console.error('Error searching agents by user ID:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+});
+
+// Route to send emails to all queued applications (Send Early functionality)
+router.post('/send-queued', async (req, res) => {
+    try {
+        const query = `
+            SELECT application_id, client_email, agent_email, agent_name, url, client_phoneNumber
+            FROM verify
+            WHERE status = 'Queued'
+        `;
+
+        const results = await db.query(query);
+
+        if (results.length === 0) {
+            return res.status(200).json({ success: true, message: 'No queued applications to send.' });
+        }
+
+        // Setup nodemailer transporter
+        const nodemailer = require('nodemailer');
+        const axios = require('axios');
+        
+        const transporter = nodemailer.createTransporter({
+            host: 'mail.ariaslife.com',
+            port: 465,
+            secure: true,
+            auth: {
+                user: 'noreply@ariaslife.com',
+                pass: 'Ariaslife123!'
+            },
+            tls: {
+                rejectUnauthorized: false
+            }
+        });
+
+        let successCount = 0;
+        let failCount = 0;
+
+        // Process each queued application
+        for (const row of results) {
+            try {
+                const mailOptions = {
+                    from: 'noreply@ariaslife.com',
+                    to: row.client_email,
+                    subject: 'Welcome to Globe Life - AIL/NIL Arias Organization',
+                    html: `
+                        <p>Thank you for choosing us to protect you and your family.</p>
+                        <p>Please use this <a href="${row.url}">link</a> to verify your application information.</p>
+                        <p>This checklist is required to move forward with the application process.</p>
+                        <p>If you have any questions, please reach out to your agent.</p>
+                    `
+                };
+
+                // Send email
+                await transporter.sendMail(mailOptions);
+
+                // Send SMS if phone number exists
+                if (row.client_phoneNumber) {
+                    const cleanedPhoneNumber = row.client_phoneNumber.replace(/\D/g, '');
+                    const formattedPhoneNumber = `1${cleanedPhoneNumber}`;
+
+                    const smsPayload = {
+                        phones: formattedPhoneNumber,
+                        text: `Please review your American Income Life application survey: ${row.url}`
+                    };
+
+                    const smsOptions = {
+                        headers: {
+                            'Authorization': 'Basic ' + Buffer.from('kylevanbibber:KhOgOwCHQVhUMXR2h37tV3HTZym2pb').toString('base64'),
+                            'Content-Type': 'application/json'
+                        }
+                    };
+
+                    try {
+                        await axios.post('https://rest.textmagic.com/api/v2/messages', smsPayload, smsOptions);
+                    } catch (smsError) {
+                        console.error(`SMS failed for ${row.application_id}:`, smsError.message);
+                    }
+                }
+
+                // Update status to 'Sent'
+                const updateQuery = `UPDATE verify SET status = 'Sent' WHERE application_id = ?`;
+                await db.query(updateQuery, [row.application_id]);
+
+                successCount++;
+            } catch (error) {
+                console.error(`Failed to send for ${row.application_id}:`, error);
+                failCount++;
+            }
+        }
+
+        res.status(200).json({ 
+            success: true, 
+            message: `Processed ${results.length} applications. Success: ${successCount}, Failed: ${failCount}` 
+        });
+    } catch (error) {
+        console.error('Error in send-queued:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+});
+
+// Route to resend email/SMS for a specific application
+router.post('/resend', async (req, res) => {
+    const { application_id } = req.body;
+
+    if (!application_id) {
+        return res.status(400).json({ success: false, message: 'Application ID is required' });
+    }
+
+    try {
+        // Fetch application data
+        const query = `
+            SELECT client_email, agent_email, agent_name, url, client_phoneNumber, resend_count
+            FROM verify
+            WHERE application_id = ?
+        `;
+
+        const results = await db.query(query, [application_id]);
+
+        if (results.length === 0) {
+            return res.status(404).json({ success: false, message: 'Application not found' });
+        }
+
+        const { client_email, agent_email, agent_name, url, client_phoneNumber, resend_count } = results[0];
+
+        // Setup nodemailer transporter
+        const nodemailer = require('nodemailer');
+        const axios = require('axios');
+        
+        const transporter = nodemailer.createTransporter({
+            host: 'mail.ariaslife.com',
+            port: 465,
+            secure: true,
+            auth: {
+                user: 'noreply@ariaslife.com',
+                pass: 'Ariaslife123!'
+            },
+            tls: {
+                rejectUnauthorized: false
+            }
+        });
+
+        const mailOptions = {
+            from: 'noreply@ariaslife.com',
+            to: client_email,
+            subject: 'Welcome to Globe Life - AIL Division',
+            html: `
+                <p>Thank you for choosing us to protect you and your family.</p>
+                <p>Please use this <a href="${url}">link</a> to verify your application information.</p>
+                <p>This checklist is required to move forward with the application process.</p>
+                <p>If you have any questions, please reach out to your agent.</p>
+            `
+        };
+
+        // Send email
+        await transporter.sendMail(mailOptions);
+
+        // Send SMS if phone number exists
+        if (client_phoneNumber) {
+            const cleanedPhoneNumber = client_phoneNumber.replace(/\D/g, '');
+            const formattedPhoneNumber = `1${cleanedPhoneNumber}`;
+
+            const smsPayload = {
+                phones: formattedPhoneNumber,
+                text: `Please review your American Income Life application survey: ${url}`
+            };
+
+            const smsOptions = {
+                headers: {
+                    'Authorization': 'Basic ' + Buffer.from('kylevanbibber:KhOgOwCHQVhUMXR2h37tV3HTZym2pb').toString('base64'),
+                    'Content-Type': 'application/json'
+                }
+            };
+
+            try {
+                await axios.post('https://rest.textmagic.com/api/v2/messages', smsPayload, smsOptions);
+            } catch (smsError) {
+                console.error('SMS error:', smsError.message);
+            }
+        }
+
+        // Update resend count and status
+        const updateQuery = `
+            UPDATE verify 
+            SET resend_count = ?, status = 'Resent by Staff', resent_time = NOW() 
+            WHERE application_id = ?
+        `;
+        await db.query(updateQuery, [(resend_count || 0) + 1, application_id]);
+
+        res.status(200).json({ 
+            success: true, 
+            message: `Email and SMS resent to ${client_email}` 
+        });
+    } catch (error) {
+        console.error('Error in resend:', error);
         res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });

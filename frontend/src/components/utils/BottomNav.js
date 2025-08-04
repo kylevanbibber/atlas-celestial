@@ -21,18 +21,23 @@ const BottomNav = () => {
   // Check if user is admin
   const isAdmin = user?.isAdmin || false;
   
-  // Get nav items with warning status
-  const allNavItems = getSidebarNavItems(licenseWarning, isAdmin, unreadCount);
+  // Get teamRole from user object
+  const teamRole = user?.teamRole || null;
   
-  // Check if settings has a warning
-  const settingsItem = allNavItems.find(item => item.name === "Settings");
+  // Skip license warning for teamRole = "app" users
+  const shouldShowLicenseWarning = teamRole !== "app" ? licenseWarning : false;
+  
+  // Get nav items with warning status
+  const allNavItems = getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole);
+  
+  // Check if settings has a warning (check both "Settings" and "Utilities" names)
+  const settingsItem = allNavItems.find(item => item.name === "Settings" || item.name === "Utilities");
   const settingsHasWarning = settingsItem && settingsItem.hasWarning;
   
-  // Filter items to only show main navigation items (max 4 for mobile)
+  // Filter items to show all main navigation items
   // Include items that have a main path, even if they have submenus
   const navItems = allNavItems
-    .filter(item => item.path && item.name !== "Settings") // Include items with paths, exclude settings since we'll add it separately
-    .slice(0, 4);
+    .filter(item => item.path && item.name !== "Settings" && item.name !== "Utilities"); // Include items with paths, exclude settings/utilities since we'll add it separately
   
   // Handle navigation
   const handleNavClick = (path) => {
@@ -61,7 +66,7 @@ const BottomNav = () => {
         </div>
       ))}
       
-      {/* Always show settings in the bottom nav */}
+      {/* Always show settings/utilities in the bottom nav */}
       <div
         className={`bottom-nav-item settings-item ${isActive("/settings") || isActive("/team-customization") ? "active" : ""}`}
         onClick={() => handleNavClick("/settings")}
@@ -70,7 +75,7 @@ const BottomNav = () => {
           <FiSettings />
           {settingsHasWarning && <span className="bottom-nav-warning-dot"></span>}
         </div>
-        <div className="bottom-nav-label">Settings</div>
+        <div className="bottom-nav-label">{user?.Role === 'Admin' && user?.teamRole === 'app' ? "Utilities" : "Settings"}</div>
       </div>
     </div>
   );

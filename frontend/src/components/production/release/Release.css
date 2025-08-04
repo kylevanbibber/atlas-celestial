@@ -1,0 +1,134 @@
+.release-container {
+  width: 100%;
+  max-width: 1200px;
+}
+
+/* Release tabs styling - matching Scorecard tabs */
+.release .tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 6px;
+  padding: 4px;
+}
+
+.release .tabs input[type="radio"] {
+  display: none;
+}
+
+.release .tabs label {
+  flex: 1;
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-secondary, #666);
+  transition: all 0.2s ease;
+  user-select: none;
+  text-align: center;
+  font-weight: 500;
+}
+
+.release .tabs input[type="radio"]:checked + label {
+  background: var(--button-primary-bg, #007BFF);
+  color: white;
+  font-weight: 600;
+}
+
+.release .tabs label:hover {
+  background: var(--sidebar-hover, #f5f5f5);
+  color: var(--text-primary, #333);
+}
+
+.release .tabs input[type="radio"]:checked + label:hover {
+  background: var(--hover-color, #0056b3);
+  color: white;
+}
+
+/* Dark theme support for release tabs */
+[data-theme="dark"] .release .tabs {
+  background: var(--card-bg, #1f2937);
+  border-color: var(--border-color, #374151);
+}
+
+[data-theme="dark"] .release .tabs label {
+  color: var(--text-secondary, #9ca3af);
+}
+
+[data-theme="dark"] .release .tabs label:hover {
+  background: var(--sidebar-hover, #374151);
+  color: var(--text-primary, #f9fafb);
+}
+
+[data-theme="dark"] .release .tabs input[type="radio"]:checked + label {
+  background: var(--button-primary-bg, #3b82f6);
+  color: white;
+}
+
+[data-theme="dark"] .release .tabs input[type="radio"]:checked + label:hover {
+  background: var(--hover-color, #2563eb);
+  color: white;
+}
+
+.release-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.release-view-toggle {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.release-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.release-radio-label input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--hover-color);
+}
+
+.release-content {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .release-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
+  }
+  
+  .release-view-toggle {
+    gap: 15px;
+  }
+  
+  .release-radio-label {
+    font-size: 13px;
+  }
+  
+  /* Mobile responsive tabs */
+  .release .tabs {
+    margin-bottom: 15px;
+  }
+  
+  .release .tabs label {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+} 

@@ -350,4 +350,230 @@
   color: var(--text-muted);
 }
   
+  /* Expandable rows styles */
+.expand-button {
+  margin-right: 8px !important;
+  background: none !important;
+  border: none !important;
+  cursor: pointer !important;
+  font-size: 12px !important;
+  color: #666 !important;
+  padding: 2px 4px !important;
+  border-radius: 2px !important;
+  transition: background-color 0.2s ease;
+}
+
+.expand-button:hover {
+  background-color: #f0f0f0 !important;
+  color: #333 !important;
+}
+
+.expanded-row {
+  background-color: #f9f9f9;
+}
+
+.expanded-cell {
+  padding: 12px !important;
+  border-top: none !important;
+  background-color: #f9f9f9;
+}
+
+.expanded-content {
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 16px;
+  margin: 8px 0;
+}
+
+.discord-sales-container {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.discord-sales-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.discord-sales-title {
+  font-weight: bold;
+  color: #333;
+  margin: 0;
+}
+
+.discord-sales-count {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.discord-sale-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  background-color: white;
+  transition: box-shadow 0.2s ease;
+}
+
+.discord-sale-item:hover {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.discord-sale-info {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.discord-sale-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.discord-sale-label {
+  font-size: 10px;
+  color: #666;
+  font-weight: bold;
+  margin-bottom: 2px;
+  text-transform: uppercase;
+}
+
+.discord-sale-value {
+  font-size: 12px;
+  color: #333;
+  font-weight: bold;
+}
+
+.discord-sale-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: 12px;
+}
+
+.discord-sale-edit-btn,
+.discord-sale-delete-btn {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: bold;
+  transition: background-color 0.2s ease;
+}
+
+.discord-sale-edit-btn {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.discord-sale-edit-btn:hover {
+  background-color: #bbdefb;
+}
+
+.discord-sale-delete-btn {
+  background-color: #ffebee;
+  color: #d32f2f;
+}
+
+.discord-sale-delete-btn:hover {
+  background-color: #ffcdd2;
+}
+
+.discord-sale-timestamp {
+  font-size: 10px;
+  color: #888;
+  margin-top: 4px;
+}
+
+.discord-sale-image-link {
+  color: #1976d2;
+  text-decoration: none;
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.discord-sale-image-link:hover {
+  text-decoration: underline;
+}
+
+.no-discord-sales {
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  padding: 16px;
+}
+
+.discord-sales-total {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  font-weight: bold;
+  color: #333;
+}
+
+.lead-type-badge {
+  background-color: #f5f5f5;
+  color: #666;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+  
+  /* Manual Addition Row Styles */
+.manual-addition-item {
+  background-color: #f8f9fa;
+  border: 2px dashed #007bff;
+  border-radius: 8px;
+  margin-top: 10px;
+}
+
+.manual-addition-header {
+  text-align: center;
+  margin-bottom: 8px;
+  padding: 4px;
+  background-color: #e3f2fd;
+  border-radius: 4px;
+}
+
+.manual-addition-header h5 {
+  margin: 0;
+  color: #1976d2;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.manual-addition-item .discord-sale-info {
+  background-color: transparent;
+}
+
+.manual-addition-item .discord-sale-field .discord-sale-label {
+  color: #f57c00;
+  font-weight: bold;
+}
+
+.manual-addition-item .discord-sale-field .discord-sale-value {
+  color: #f57c00;
+  font-weight: bold;
+}
+
+/* Mobile responsiveness */
+  
   

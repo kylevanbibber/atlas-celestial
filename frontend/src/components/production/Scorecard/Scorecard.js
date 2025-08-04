@@ -2,13 +2,17 @@ import React, { useState } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import ScorecardTable from './ScorecardTable';
 import ScorecardSGAView from './ScorecardSGAView';
-import ScorecardRGAView from './ScorecardRGAView'; // Import the RGA view component
 import './Scorecard.css';
 
 const Scorecard = () => {
   // Get user data from auth context
   const { user } = useAuth();
-  const userRole = user?.clname?.toUpperCase();
+  
+  // Check if user is admin with teamRole="app" - treat as SGA
+  const isAppAdmin = user?.Role === 'Admin' && user?.teamRole === 'app';
+  
+  // Use SGA role for app admins, otherwise use actual clname
+  const userRole = isAppAdmin ? 'SGA' : user?.clname?.toUpperCase();
   
   const allowedRoles = ["MGA", "RGA", "SGA"];
   const showTabs = allowedRoles.includes(userRole);
@@ -16,7 +20,6 @@ const Scorecard = () => {
   
   return (
     <div className="scorecard">
-      <h4 style={{ marginLeft: '15px' }}>Scorecard</h4>
       {showTabs && (
         <div className="tabs">
           <input
@@ -28,15 +31,7 @@ const Scorecard = () => {
             onChange={() => setView('mga')}
           />
           <label htmlFor="mga">MGA</label>
-          <input
-            type="radio"
-            id="rga"
-            name="view_type"
-            value="rga"
-            checked={view === 'rga'}
-            onChange={() => setView('rga')}
-          />
-          <label htmlFor="rga">RGA</label>
+
           <input
             type="radio"
             id="breakdown"
@@ -51,8 +46,7 @@ const Scorecard = () => {
       {showTabs ? (
         view === 'mga' ? (
           <ScorecardTable />
-        ) : view === 'rga' ? (
-          <ScorecardRGAView /> // Render the RGA view component
+
         ) : (
           <ScorecardSGAView />
         )

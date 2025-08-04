@@ -18,17 +18,17 @@ router.get("/daily", (req, res) => {
   });
 });
 
-// GET /api/alp/daily/sum - Retrieve sum of refAlp and alp for a given date or date range
+// GET /api/alp/daily/sum - Retrieve sum of refAlp, alp, and refs for a given date or date range
 router.get("/daily/sum", (req, res) => {
   const { date, startDate, endDate } = req.query;
   let query = "";
   let params = [];
   
   if (date) {
-    query = "SELECT SUM(refAlp) AS totalRefAlp, SUM(alp) AS totalAlp FROM Daily_Activity WHERE reportDate = ?";
+    query = "SELECT SUM(refAlp) AS totalRefAlp, SUM(alp) AS totalAlp, SUM(refs) AS totalRefs, COUNT(DISTINCT agent) AS agentCount FROM Daily_Activity WHERE reportDate = ?";
     params = [date];
   } else if (startDate && endDate) {
-    query = "SELECT SUM(refAlp) AS totalRefAlp, SUM(alp) AS totalAlp FROM Daily_Activity WHERE reportDate BETWEEN ? AND ?";
+    query = "SELECT SUM(refAlp) AS totalRefAlp, SUM(alp) AS totalAlp, SUM(refs) AS totalRefs, COUNT(DISTINCT agent) AS agentCount FROM Daily_Activity WHERE reportDate BETWEEN ? AND ?";
     params = [startDate, endDate];
   } else {
     return res.status(400).json({ error: "Please provide either a 'date' or both 'startDate' and 'endDate'" });
@@ -40,6 +40,48 @@ router.get("/daily/sum", (req, res) => {
       return res.status(500).json({ error: "Database error" });
     }
     res.json(results[0]);
+  });
+});
+
+// GET /api/alp/ref-sales - Retrieve ref sales from refvalidation table for a given month
+router.get("/ref-sales", (req, res) => {
+  const { month, year, lagnName } = req.query;
+  
+  if (!month || !year) {
+    return res.status(400).json({ error: "Please provide both 'month' and 'year' parameters" });
+  }
+
+  // Format month to ensure it's 2 digits
+  const formattedMonth = month.toString().padStart(2, '0');
+  const startDate = `${year}-${formattedMonth}-01`;
+  
+  // Calculate end date (last day of the month)
+  const lastDay = new Date(year, month, 0).getDate();
+  const endDate = `${year}-${formattedMonth}-${String(lastDay).padStart(2, '0')}`;
+
+  let query = `
+    SELECT COUNT(*) AS totalRefSales 
+    FROM refvalidation 
+    WHERE true_ref = 'Y' 
+    AND DATE(created_at) >= ? AND DATE(created_at) <= ?
+  `;
+  
+  let params = [startDate, endDate];
+  
+  // If lagnName is provided, filter by lagnname or mga
+  if (lagnName) {
+    query += ` AND (lagnname = ? OR mga = ?)`;
+    params.push(lagnName, lagnName);
+  }
+
+  pool.query(query, params, (err, results) => {
+    if (err) {
+      console.error("Error fetching ref sales data:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    
+    const totalRefSales = results[0].totalRefSales || 0;
+    res.json({ totalRefSales });
   });
 });
 
@@ -1585,6 +1627,286 @@ router.get("/hires-raw", async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching raw hires data',
+            error: error.message,
+        });
+    }
+});
+
+// MGA Dashboard Endpoints
+
+// GET /api/alp/mga/weekly-ytd - Get YTD data from Weekly_ALP for MGA dashboard
+router.get("/mga/weekly-ytd", async (req, res) => {
+    try {
+        const { lagnName } = req.query;
+        
+        if (!lagnName) {
+            return res.status(400).json({ error: "lagnName parameter is required" });
+        }
+        
+        // Get the max reportdate where REPORT = 'YTD Recap' for the specific MGA
+        const query = `
+            SELECT *
+            FROM Weekly_ALP 
+            WHERE LagnName = ? 
+            AND REPORT = 'YTD Recap' 
+            AND reportdate = (
+                SELECT MAX(reportdate) 
+                FROM Weekly_ALP 
+                WHERE LagnName = ? 
+                AND REPORT = 'YTD Recap'
+            )
+        `;
+        
+        const { query: dbQuery } = require('../db');
+        const results = await dbQuery(query, [lagnName, lagnName]);
+        
+        res.json({
+            success: true,
+            data: results
+        });
+        
+    } catch (error) {
+        console.error(`[GET /mga/weekly-ytd] Error: ${error.message}`);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error while fetching MGA Weekly_ALP YTD data',
+            error: error.message,
+        });
+    }
+});
+
+// GET /api/alp/mga/monthly-alp - Get Monthly_ALP data for MGA dashboard
+router.get("/mga/monthly-alp", async (req, res) => {
+    try {
+        const { lagnName, month } = req.query;
+        
+        console.log(`🔍 [MGA Monthly ALP] Request params:`, { lagnName, month });
+        
+        if (!lagnName) {
+            return res.status(400).json({ error: "lagnName parameter is required" });
+        }
+        
+        // First, get all rows for the agent (with or without month filter)
+        let baseQuery = `
+            SELECT *
+            FROM Monthly_ALP 
+            WHERE LagnName = ?
+        `;
+        
+        let params = [lagnName];
+        
+        // If specific month is requested (mm/yyyy format)
+        if (month) {
+            baseQuery += ` AND month = ?`;
+            params.push(month);
+            console.log(`🔍 [MGA Monthly ALP] Filtering by specific month: ${month}`);
+        }
+        
+        baseQuery += ` ORDER BY month DESC, CL_Name DESC`;
+        
+        console.log(`🔍 [MGA Monthly ALP] Base query:`, baseQuery);
+        console.log(`🔍 [MGA Monthly ALP] Query params:`, params);
+        
+        const { query: dbQuery } = require('../db');
+        const allResults = await dbQuery(baseQuery, params);
+        
+        console.log(`🔍 [MGA Monthly ALP] All results count: ${allResults.length}`);
+        console.log(`🔍 [MGA Monthly ALP] All results:`, allResults.slice(0, 5));
+        
+        // Group by month and prefer MGA records when multiple exist
+        const groupedByMonth = {};
+        allResults.forEach(row => {
+            const monthKey = row.month;
+            if (!groupedByMonth[monthKey]) {
+                groupedByMonth[monthKey] = [];
+            }
+            groupedByMonth[monthKey].push(row);
+        });
+        
+        // For each month, prefer MGA record if multiple exist, otherwise take the single record
+        const finalResults = [];
+        Object.keys(groupedByMonth).forEach(monthKey => {
+            const monthRecords = groupedByMonth[monthKey];
+            if (monthRecords.length === 1) {
+                // Only one record for this month, use it regardless of CL_Name
+                finalResults.push(monthRecords[0]);
+                console.log(`🔍 [MGA Monthly ALP] Single record for ${monthKey}: CL_Name=${monthRecords[0].CL_Name}`);
+            } else {
+                // Multiple records, prefer MGA
+                const mgaRecord = monthRecords.find(r => r.CL_Name === 'MGA');
+                if (mgaRecord) {
+                    finalResults.push(mgaRecord);
+                    console.log(`🔍 [MGA Monthly ALP] Multiple records for ${monthKey}, using MGA record`);
+                } else {
+                    // No MGA record, take the first one
+                    finalResults.push(monthRecords[0]);
+                    console.log(`🔍 [MGA Monthly ALP] Multiple records for ${monthKey}, no MGA found, using: CL_Name=${monthRecords[0].CL_Name}`);
+                }
+            }
+        });
+        
+        // Sort final results by month descending
+        finalResults.sort((a, b) => {
+            if (a.month > b.month) return -1;
+            if (a.month < b.month) return 1;
+            return 0;
+        });
+        
+        console.log(`🔍 [MGA Monthly ALP] Final results count: ${finalResults.length}`);
+        console.log(`🔍 [MGA Monthly ALP] Final results:`, finalResults.slice(0, 3));
+        
+        res.json({
+            success: true,
+            data: finalResults
+        });
+        
+    } catch (error) {
+        console.error(`[GET /mga/monthly-alp] Error: ${error.message}`);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error while fetching MGA Monthly_ALP data',
+            error: error.message,
+        });
+    }
+});
+
+// GET /api/alp/mga/associates - Get Associates data filtered by MGA (same table as SGA)
+router.get("/mga/associates", async (req, res) => {
+    try {
+        const { lagnName } = req.query;
+        
+        if (!lagnName) {
+            return res.status(400).json({ error: "lagnName parameter is required" });
+        }
+        
+        const query = `
+            SELECT *
+            FROM associates 
+            WHERE MGA = ?
+            ORDER BY PRODDATE DESC
+        `;
+        
+        const { query: dbQuery } = require('../db');
+        const results = await dbQuery(query, [lagnName]);
+        
+        res.json({
+            success: true,
+            data: results
+        });
+        
+    } catch (error) {
+        console.error(`[GET /mga/associates] Error: ${error.message}`);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error while fetching MGA Associates data',
+            error: error.message,
+        });
+    }
+});
+
+// GET /api/alp/mga/vips - Get VIPs data filtered by MGA (from VIPs table)
+router.get("/mga/vips", async (req, res) => {
+    try {
+        const { lagnName } = req.query;
+        
+        if (!lagnName) {
+            return res.status(400).json({ error: "lagnName parameter is required" });
+        }
+        
+        const query = `
+            SELECT *
+            FROM VIPs 
+            WHERE mga = ?
+            ORDER BY vip_month DESC
+        `;
+        
+        const { query: dbQuery } = require('../db');
+        const results = await dbQuery(query, [lagnName]);
+        
+        res.json({
+            success: true,
+            data: results
+        });
+        
+    } catch (error) {
+        console.error(`[GET /mga/vips] Error: ${error.message}`);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error while fetching MGA VIPs data',
+            error: error.message,
+        });
+    }
+});
+
+// GET /api/alp/mga/hires - Get Hires data from amore_data where MGA matches
+router.get("/mga/hires", async (req, res) => {
+    try {
+        const { lagnName } = req.query;
+        
+        if (!lagnName) {
+            return res.status(400).json({ error: "lagnName parameter is required" });
+        }
+        
+        const query = `
+            SELECT *
+            FROM amore_data 
+            WHERE MGA = ?
+            ORDER BY MORE_Date DESC
+        `;
+        
+        const { query: dbQuery } = require('../db');
+        const results = await dbQuery(query, [lagnName]);
+        
+        res.json({
+            success: true,
+            data: results
+        });
+        
+    } catch (error) {
+        console.error(`[GET /mga/hires] Error: ${error.message}`);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error while fetching MGA Hires data',
+            error: error.message,
+        });
+    }
+});
+
+// GET /api/alp/mga/daily-activity - Get Daily_Activity data filtered by MGA or agent
+router.get("/mga/daily-activity", async (req, res) => {
+    try {
+        const { lagnName, startDate, endDate } = req.query;
+        
+        if (!lagnName) {
+            return res.status(400).json({ error: "lagnName parameter is required" });
+        }
+        
+        let query = `
+            SELECT SUM(refAlp) AS totalRefAlp, SUM(alp) AS totalAlp, SUM(refs) AS totalRefs, COUNT(DISTINCT agent) AS agentCount
+            FROM Daily_Activity 
+            WHERE (MGA = ? OR agent = ?)
+        `;
+        
+        let params = [lagnName, lagnName];
+        
+        if (startDate && endDate) {
+            query += ` AND reportDate BETWEEN ? AND ?`;
+            params.push(startDate, endDate);
+        } else if (startDate) {
+            query += ` AND reportDate = ?`;
+            params.push(startDate);
+        }
+        
+        const { query: dbQuery } = require('../db');
+        const results = await dbQuery(query, params);
+        
+        res.json(results[0] || { totalRefAlp: 0, totalAlp: 0, totalRefs: 0, agentCount: 0 });
+        
+    } catch (error) {
+        console.error(`[GET /mga/daily-activity] Error: ${error.message}`);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error while fetching MGA Daily_Activity data',
             error: error.message,
         });
     }

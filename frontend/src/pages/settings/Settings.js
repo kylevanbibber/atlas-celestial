@@ -8,27 +8,54 @@ import './Settings.css';
 import SettingsSidebar from '../../components/settings/SettingsSidebar';
 import AccountSettings from '../../components/settings/AccountSettings';
 import CustomizeSettings from '../../components/settings/CustomizeSettings';
-import DiscordSettings from '../../components/settings/DiscordSettings';
+import DiscordSettings from '../../components/settings/discord/DiscordSettings';
 import HierarchyViewSelector from '../../components/settings/HierarchyViewSelector';
 import LicenseSettings from '../../components/settings/LicenseSettings';
-import NotificationSettings from '../../components/settings/NotificationSettings';
+import AdminLicensing from '../../components/admin/AdminLicensing';
+import NotificationSettings from '../../components/settings/notification/NotificationSettings';
 import { useLicenseWarning } from '../../context/LicenseWarningContext';
+import { useAuth } from '../../context/AuthContext';
 
 // Main Settings page component
 const Settings = () => {
-  const [activeSection, setActiveSection] = useState('account');
   const navigate = useNavigate();
   const location = useLocation();
   const { hasWarning: licenseWarning } = useLicenseWarning();
+  const { user } = useAuth();
+  
+  // Check if user is admin with teamRole="app" - hide account and customize options
+  const isAppAdmin = user?.Role === 'Admin' && user?.teamRole === 'app';
+  
+  // Debug logging for app admin detection
+  console.log('🏭 Settings: User permissions check', {
+    userRole: user?.Role,
+    teamRole: user?.teamRole,
+    isAppAdmin,
+    availableSettings: isAppAdmin ? 'Limited (no account/customize/discord)' : 'Full access'
+  });
+  
+  // Default section based on user type
+  const defaultSection = isAppAdmin ? 'hierarchy' : 'account';
+  
+  const [activeSection, setActiveSection] = useState(defaultSection);
   
   // Parse the section from URL if available
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const section = params.get('section');
-    if (section && ['account', 'customize', 'hierarchy', 'licensing', 'notifications', 'discord'].includes(section)) {
+    
+    // Define valid sections based on user type
+    const validSections = isAppAdmin 
+      ? ['hierarchy', 'licensing', 'notifications'] // Exclude account, customize, and discord for app admins
+      : ['account', 'customize', 'hierarchy', 'licensing', 'notifications', 'discord'];
+    
+    if (section && validSections.includes(section)) {
       setActiveSection(section);
+    } else if (!section) {
+      // Set default section if no section in URL
+      setActiveSection(defaultSection);
     }
-  }, [location]);
+  }, [location, isAppAdmin, defaultSection]);
   
   // Update URL when section changes
   const handleSectionChange = (section) => {
@@ -36,8 +63,8 @@ const Settings = () => {
     navigate(`/settings?section=${section}`, { replace: true });
   };
   
-  // Settings navigation items
-  const settingsItems = [
+  // Settings navigation items (filtered based on user type)
+  const allSettingsItems = [
     { id: 'account', label: 'Account', icon: <FiUser /> },
     { id: 'hierarchy', label: 'Hierarchy', icon: <FiUsers /> },
     { id: 'customize', label: 'Customize', icon: <FiPenTool /> },
@@ -45,6 +72,11 @@ const Settings = () => {
     { id: 'discord', label: 'Discord', icon: <FaDiscord /> },
     { id: 'licensing', label: 'Licensing', icon: <FiFileText /> },
   ];
+  
+  // Filter out account, customize, and discord options for app admins
+  const settingsItems = isAppAdmin 
+    ? allSettingsItems.filter(item => !['account', 'customize', 'discord'].includes(item.id))
+    : allSettingsItems;
   
   // Items that need warning indicators
   const warningItems = licenseWarning ? ['licensing'] : [];
@@ -61,11 +93,11 @@ const Settings = () => {
       case 'discord':
         return <DiscordSettings />;
       case 'licensing':
-        return <LicenseSettings />;
+        return isAppAdmin ? <AdminLicensing /> : <LicenseSettings />;
       case 'notifications':
         return <NotificationSettings />;
       default:
-        return <AccountSettings />;
+        return isAppAdmin ? <HierarchyViewSelector /> : <AccountSettings />;
     }
   };
   

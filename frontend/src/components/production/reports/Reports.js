@@ -14,8 +14,13 @@ import {
   FiMinimize2,
   FiX,
   FiChevronDown,
-  FiFileText
+  FiFileText,
+  FiTrendingUp,
+  FiUsers,
+  FiFolder
 } from 'react-icons/fi';
+import { BsHandshake, BsFiletypeXlsx, BsCloudCheck } from 'react-icons/bs';
+import { FaHandshake, FaStar } from 'react-icons/fa';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';

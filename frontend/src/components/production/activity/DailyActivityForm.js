@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useContext } from "react";
-import DataTable from "../utils/DataTable";
-import ActionBar from "../utils/ActionBar";
-import api from "../../api";
-import { AuthContext } from "../../context/AuthContext";
+import DataTable from "../../utils/DataTable";
+import ActionBar from "../../utils/ActionBar";
+import DiscordSalesExpanded from "./DiscordSalesExpanded";
+import api from "../../../api";
+import { AuthContext } from "../../../context/AuthContext";
 import "./DailyActivityForm.css";
 
 const DailyActivityForm = () => {
@@ -13,6 +14,8 @@ const DailyActivityForm = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [activityData, setActivityData] = useState({});
   const [actualAlpData, setActualAlpData] = useState({});
+  const [discordSalesData, setDiscordSalesData] = useState({});
+  const [discordVsManualBreakdown, setDiscordVsManualBreakdown] = useState({});
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editedRows, setEditedRows] = useState({});
@@ -20,6 +23,8 @@ const DailyActivityForm = () => {
   const [showWeeklyTotals, setShowWeeklyTotals] = useState(false);
   const [showMissingDataWarnings, setShowMissingDataWarnings] = useState(true);
   const [hoveredWeekKey, setHoveredWeekKey] = useState(null);
+  const [expandableRows, setExpandableRows] = useState({});
+  const [expandedRows, setExpandedRows] = useState({});
 
 
   // Define columns for DataTable
@@ -100,17 +105,28 @@ const DailyActivityForm = () => {
         pattern: "[0-9]*\\.?[0-9]*",
         inputMode: "decimal"
       },
-      Cell: ({ value, row }) => {
+      Cell: ({ value, row, isEditing, updateCell }) => {
         const reportDate = row.original.reportDate;
         const reportedAlp = value;
         const isWeeklyTotal = row.original.isWeeklyTotal;
         
+        // If cell is being edited, render input field
+        if (isEditing) {
+          return (
+            <input
+              type="number"
+              value={reportedAlp || ''}
+              onChange={(e) => updateCell(row.original.id, 'alp', e.target.value)}
+              style={{ width: '100%', border: 'none', outline: 'none', background: 'transparent' }}
+              autoFocus
+              step="0.01"
+            />
+          );
+        }
+        
         // Only show actual ALP data for weekly total rows
         if (isWeeklyTotal) {
           const weekKey = row.original.weekKey;
-          
-          // Debug logging for weekly total ALP cell rendering
-
           
           // Look for actual ALP data for the specific week using the new structure
           let actualAlp = null;
@@ -118,7 +134,6 @@ const DailyActivityForm = () => {
           // Check if we have actual ALP data for this specific week
           if (actualAlpData?.byWeek?.[weekKey]) {
             actualAlp = actualAlpData.byWeek[weekKey].actualAlp;
-          } else {
           }
           
           // If we have actual ALP data for the week, show "actual/reported"
@@ -133,6 +148,42 @@ const DailyActivityForm = () => {
                 </div>
               </div>
             );
+          }
+        } else {
+          // For daily rows, check if there are Discord sales for this date
+          const hasDiscordSales = discordSalesData[reportDate] && discordSalesData[reportDate].length > 0;
+          
+          // If there are Discord sales, show the breakdown as a tooltip but still allow editing
+          if (hasDiscordSales) {
+            const breakdown = discordVsManualBreakdown[reportDate];
+            
+            if (breakdown && (breakdown.manual_alp > 0 || breakdown.discord_alp > 0)) {
+              const hasManual = breakdown.manual_alp > 0;
+              const hasDiscord = breakdown.discord_alp > 0;
+              
+              // Show breakdown as tooltip but return null to allow editing
+              if (hasDiscord && hasManual) {
+                return (
+                  <div 
+                    className="alp-editable-with-tooltip" 
+                    title={`Discord: $${breakdown.discord_alp}, Manual: $${breakdown.manual_alp}, Total: $${breakdown.total_alp}`}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {reportedAlp || ''}
+                  </div>
+                );
+              } else if (hasDiscord && !hasManual) {
+                return (
+                  <div 
+                    className="alp-editable-with-tooltip" 
+                    title={`All from Discord sales: $${breakdown.discord_alp}`}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {reportedAlp || ''}
+                  </div>
+                );
+              }
+            }
           }
         }
         
@@ -201,6 +252,8 @@ const DailyActivityForm = () => {
     if (dateRows.length > 0) {
       fetchData();
       fetchActualAlpData();
+      fetchDiscordSalesData();
+      fetchDiscordVsManualBreakdown();
     }
   }, [dateRows]);
 
@@ -209,7 +262,7 @@ const DailyActivityForm = () => {
   useEffect(() => {
     // Transform data for DataTable (main data transformation)
     transformDataForTable();
-  }, [dateRows, activityData, actualAlpData, editedRows, showWeeklyTotals, selectedRange, showMissingDataWarnings]);
+  }, [dateRows, activityData, actualAlpData, discordSalesData, discordVsManualBreakdown, editedRows, showWeeklyTotals, selectedRange, showMissingDataWarnings]);
 
   useEffect(() => {
     // Update row class names only when hover state changes (lightweight operation)
@@ -223,7 +276,34 @@ const DailyActivityForm = () => {
     return <div>Loading user data...</div>;
   }
 
+  // Log component render state
+  console.log(`[DAILY-ACTIVITY-RENDER] 🎬 DailyActivityForm rendering:`, {
+    selectedRange,
+    dateRowsLength: dateRows.length,
+    activityDataKeys: Object.keys(activityData).length,
+    discordSalesDataKeys: Object.keys(discordSalesData).length,
+    discordVsManualBreakdownKeys: Object.keys(discordVsManualBreakdown).length,
+    expandableRowsKeys: Object.keys(expandableRows).length,
+    tableDataLength: tableData.length,
+    loading,
+    authLoading,
+    userLoaded: !!user,
+    userId: user?.id,
+    userName: user?.lagnname
+  });
+
   const transformDataForTable = () => {
+    console.log(`[TRANSFORM-DATA] 🔄 Starting transformDataForTable`);
+    console.log(`[TRANSFORM-DATA] Input state:`, {
+      dateRowsLength: dateRows.length,
+      activityDataKeys: Object.keys(activityData).length,
+      discordSalesDataKeys: Object.keys(discordSalesData).length,
+      expandableRowsKeys: Object.keys(expandableRows).length,
+      editedRowsKeys: Object.keys(editedRows).length,
+      showWeeklyTotals,
+      selectedRange
+    });
+
     // Helper function to get Monday of the week for any date
     const getMondayOfWeek = (dateStr) => {
       const date = new Date(dateStr + 'T00:00:00');
@@ -253,7 +333,9 @@ const DailyActivityForm = () => {
     };
 
     // First, create all daily rows with optimized data checking
-    const dailyRows = dateRows.map((date) => {
+    console.log(`[TRANSFORM-DATA] 📅 Creating daily rows for ${dateRows.length} dates`);
+    
+    const dailyRows = dateRows.map((date, index) => {
       const row = activityData[date] || {};
       const editedRow = editedRows[date] || {};
       
@@ -281,6 +363,23 @@ const DailyActivityForm = () => {
       // Helper function to get field value efficiently
       const getFieldValue = (field) => editedRow[field] !== undefined ? editedRow[field] : (row[field] || '');
 
+      // Check if this date has Discord sales
+      const hasDiscordSales = discordSalesData[date] && discordSalesData[date].length > 0;
+      const discordSalesCount = hasDiscordSales ? discordSalesData[date].length : 0;
+
+      if (index < 5) { // Log first 5 rows for debugging
+        console.log(`[TRANSFORM-DATA] Row ${index + 1} (${date}):`, {
+          hasData,
+          hasNoData,
+          hasDiscordSales,
+          discordSalesCount,
+          expandable: expandableRows[date] || false,
+          alp: getFieldValue('alp'),
+          sales: getFieldValue('sales'),
+          refs: getFieldValue('refs')
+        });
+      }
+
       return {
         id: date,
         dayOfWeek,
@@ -304,8 +403,16 @@ const DailyActivityForm = () => {
 
     let transformedData = [...dailyRows];
 
+    console.log(`[TRANSFORM-DATA] 📊 Created ${dailyRows.length} daily rows`);
+    console.log(`[TRANSFORM-DATA] Discord sales summary:`, 
+      Object.keys(discordSalesData).map(date => `${date}: ${discordSalesData[date].length} sales`)
+    );
+    console.log(`[TRANSFORM-DATA] Expandable rows:`, Object.keys(expandableRows));
+
     // If weekly totals are enabled, group by weeks and insert total rows
     if (showWeeklyTotals && (selectedRange === "month" || selectedRange === "ytd")) {
+      console.log(`[TRANSFORM-DATA] 📈 Processing weekly totals for ${selectedRange} view`);
+      
       const finalData = [];
       const weekGroups = {};
 
@@ -321,6 +428,7 @@ const DailyActivityForm = () => {
       // Process weeks in order (newest first to match our data order)
       const weekKeys = Object.keys(weekGroups).sort((a, b) => new Date(b) - new Date(a));
       
+      console.log(`[TRANSFORM-DATA] 🗓️ Processing ${weekKeys.length} weeks`);
       
       weekKeys.forEach((weekKey, weekIndex) => {
         const weekRows = weekGroups[weekKey];
@@ -386,9 +494,18 @@ const DailyActivityForm = () => {
       });
 
       transformedData = finalData;
+      console.log(`[TRANSFORM-DATA] ✅ Weekly totals processed - final data length: ${finalData.length}`);
     }
 
-        setTableData(transformedData);
+    console.log(`[TRANSFORM-DATA] 🎯 Final transformed data summary:`, {
+      totalRows: transformedData.length,
+      weeklyTotalRows: transformedData.filter(row => row.isWeeklyTotal).length,
+      dailyRows: transformedData.filter(row => !row.isWeeklyTotal).length,
+      expandableRowCount: Object.keys(expandableRows).length
+    });
+
+    setTableData(transformedData);
+    console.log(`[TRANSFORM-DATA] ✅ Table data updated`);
   };
 
   const updateRowClassNames = () => {
@@ -684,51 +801,271 @@ const DailyActivityForm = () => {
     }
   };
 
-  const handleCellUpdate = async (id, field, value) => {
-    // Don't allow editing of weekly total rows
-    if (id.startsWith('week-total-')) {
+  const fetchDiscordSalesData = async () => {
+    console.log(`[DISCORD-SALES-FRONTEND] 🚀 Starting fetchDiscordSalesData`);
+    
+    if (dateRows.length === 0) {
+      console.log(`[DISCORD-SALES-FRONTEND] ⏭️ Skipping fetch - no dateRows available`);
       return;
     }
-    
-    const reportDate = id; // The row ID is the report date
-    
-    // Validate input - only allow numbers and decimals
-    if (value !== "" && !/^\d*\.?\d*$/.test(value)) {
-      console.warn(`Invalid input rejected: "${value}" - only numbers and decimals allowed`);
-      return; // Reject invalid input
-    }
-    
-    // Parse the numeric value
-    const numericValue = value === "" ? "" : parseFloat(value) || 0;
-    
-    // Get current row data (combining existing data with edits)
-    const currentRowData = {
-      ...(activityData[reportDate] || {}),
-      ...(editedRows[reportDate] || {}),
-      [field]: numericValue
-    };
-    
-    // Validation: Sales cannot exceed Sits
-    if (field === 'sales' || field === 'sits') {
-      const sits = field === 'sits' ? numericValue : (currentRowData.sits || 0);
-      const sales = field === 'sales' ? numericValue : (currentRowData.sales || 0);
+
+    const startDate = dateRows[dateRows.length - 1]; // Oldest date
+    const endDate = dateRows[0]; // Newest date
+
+    console.log(`[DISCORD-SALES-FRONTEND] 📅 Date range: ${startDate} to ${endDate}`);
+    console.log(`[DISCORD-SALES-FRONTEND] 📋 Total dateRows: ${dateRows.length}`);
+    console.log(`[DISCORD-SALES-FRONTEND] 👤 Current user:`, { 
+      userId: user?.userId, 
+      lagnname: user?.lagnname,
+      id: user?.id 
+    });
+
+    const requestUrl = `/discord/sales/user-sales?startDate=${startDate}&endDate=${endDate}`;
+    console.log(`[DISCORD-SALES-FRONTEND] 📡 Making API request to: ${requestUrl}`);
+
+    try {
+      // For testing, pass userId as query param (using fallback user ID 21)
+      const testUserId = user?.userId || user?.id || 21;
+      const requestUrlWithUserId = `${requestUrl}&userId=${testUserId}`;
+      const response = await api.get(requestUrlWithUserId);
+      console.log(`[DISCORD-SALES-FRONTEND] 📥 Raw API response:`, {
+        status: response.status,
+        success: response.data?.success,
+        dataLength: response.data?.data?.length,
+        dataType: Array.isArray(response.data?.data) ? 'array' : typeof response.data?.data,
+        testUserId,
+        finalUrl: requestUrlWithUserId
+      });
+
+      const result = response.data;
+
+      if (!result.success) {
+        console.log(`[DISCORD-SALES-FRONTEND] ❌ API returned success: false`);
+        console.log(`[DISCORD-SALES-FRONTEND] Message: ${result.message}`);
+        setDiscordSalesData({});
+        setExpandableRows({});
+        return;
+      }
+
+      if (!Array.isArray(result.data)) {
+        console.log(`[DISCORD-SALES-FRONTEND] ❌ API data is not an array:`, typeof result.data);
+        console.log(`[DISCORD-SALES-FRONTEND] Actual data:`, result.data);
+        setDiscordSalesData({});
+        setExpandableRows({});
+        return;
+      }
+
+      console.log(`[DISCORD-SALES-FRONTEND] ✅ Valid data received - ${result.data.length} records`);
+
+      if (result.data.length > 0) {
+        console.log(`[DISCORD-SALES-FRONTEND] 🔍 Sample record:`, {
+          id: result.data[0].id,
+          sale_date: result.data[0].sale_date,
+          alp: result.data[0].alp,
+          refs: result.data[0].refs,
+          lead_type: result.data[0].lead_type,
+          ts: result.data[0].ts,
+          lagnname: result.data[0].lagnname
+        });
+      }
+
+      // Group Discord sales data by sale_date
+      const mappedDiscordSalesData = {};
+      const newExpandableRows = {};
       
-      if (sales > sits && sits > 0) {
-        console.warn(`Sales (${sales}) cannot exceed Sits (${sits})`);
-        alert(`Sales (${sales}) cannot exceed Sits (${sits}). Please adjust your values.`);
-        return; // Reject the update
+      console.log(`[DISCORD-SALES-FRONTEND] 🔄 Processing ${result.data.length} sales records...`);
+      
+      result.data.forEach((sale, index) => {
+        console.log(`[DISCORD-SALES-FRONTEND] Processing record ${index + 1}:`, {
+          id: sale.id,
+          sale_date: sale.sale_date,
+          alp: sale.alp,
+          refs: sale.refs,
+          lead_type: sale.lead_type
+        });
+
+        if (sale.sale_date) {
+          const formattedDate = sale.sale_date; // Already in YYYY-MM-DD format from DB
+          
+          if (!mappedDiscordSalesData[formattedDate]) {
+            mappedDiscordSalesData[formattedDate] = [];
+            console.log(`[DISCORD-SALES-FRONTEND] 📅 Created new date group for: ${formattedDate}`);
+          }
+          
+          mappedDiscordSalesData[formattedDate].push(sale);
+          newExpandableRows[formattedDate] = true; // Mark this date as expandable
+          
+          console.log(`[DISCORD-SALES-FRONTEND] ➕ Added sale to date ${formattedDate} (now has ${mappedDiscordSalesData[formattedDate].length} sales)`);
+        } else {
+          console.log(`[DISCORD-SALES-FRONTEND] ⚠️ Sale record missing sale_date:`, sale);
+        }
+      });
+
+      console.log(`[DISCORD-SALES-FRONTEND] 📊 Final mapping summary:`);
+      Object.keys(mappedDiscordSalesData).forEach(date => {
+        console.log(`[DISCORD-SALES-FRONTEND]   ${date}: ${mappedDiscordSalesData[date].length} sales`);
+      });
+
+      console.log(`[DISCORD-SALES-FRONTEND] 🎯 Expandable rows:`, Object.keys(newExpandableRows));
+
+      setDiscordSalesData(mappedDiscordSalesData);
+      setExpandableRows(newExpandableRows);
+      
+      console.log(`[DISCORD-SALES-FRONTEND] ✅ State updated successfully`);
+      
+    } catch (error) {
+      console.error(`[DISCORD-SALES-FRONTEND] ❌ Error fetching Discord sales data:`, error);
+      console.error(`[DISCORD-SALES-FRONTEND] Error name:`, error.name);
+      console.error(`[DISCORD-SALES-FRONTEND] Error message:`, error.message);
+      if (error.response) {
+        console.error(`[DISCORD-SALES-FRONTEND] Response status:`, error.response.status);
+        console.error(`[DISCORD-SALES-FRONTEND] Response data:`, error.response.data);
+        console.error(`[DISCORD-SALES-FRONTEND] Response headers:`, error.response.headers);
+      }
+      if (error.request) {
+        console.error(`[DISCORD-SALES-FRONTEND] Request details:`, error.request);
+      }
+      setDiscordSalesData({});
+      setExpandableRows({});
+    }
+  };
+
+  const fetchDiscordVsManualBreakdown = async () => {
+    console.log(`[DISCORD-BREAKDOWN-FRONTEND] 🚀 Starting fetchDiscordVsManualBreakdown`);
+    
+    if (dateRows.length === 0) {
+      console.log(`[DISCORD-BREAKDOWN-FRONTEND] ⏭️ Skipping fetch - no dateRows available`);
+      return;
+    }
+
+    const startDate = dateRows[dateRows.length - 1]; // Oldest date
+    const endDate = dateRows[0]; // Newest date
+
+    console.log(`[DISCORD-BREAKDOWN-FRONTEND] 📅 Date range: ${startDate} to ${endDate}`);
+
+    try {
+      const testUserId = user?.userId || user?.id || 21;
+      const requestUrl = `/discord/sales/breakdown?startDate=${startDate}&endDate=${endDate}&userId=${testUserId}`;
+      const response = await api.get(requestUrl);
+      
+      console.log(`[DISCORD-BREAKDOWN-FRONTEND] 📥 Raw breakdown response:`, {
+        status: response.status,
+        success: response.data?.success,
+        dataLength: response.data?.data?.length,
+        testUserId
+      });
+
+      const result = response.data;
+
+      if (!result.success) {
+        console.log(`[DISCORD-BREAKDOWN-FRONTEND] ❌ API returned success: false`);
+        setDiscordVsManualBreakdown({});
+        return;
+      }
+
+      if (!Array.isArray(result.data)) {
+        console.log(`[DISCORD-BREAKDOWN-FRONTEND] ❌ API data is not an array:`, typeof result.data);
+        setDiscordVsManualBreakdown({});
+        return;
+      }
+
+      console.log(`[DISCORD-BREAKDOWN-FRONTEND] ✅ Valid breakdown data received - ${result.data.length} records`);
+
+      // Map the breakdown data by date
+      const mappedBreakdownData = {};
+      result.data.forEach(breakdown => {
+        if (breakdown.date) {
+          mappedBreakdownData[breakdown.date] = breakdown;
+          console.log(`[DISCORD-BREAKDOWN-FRONTEND] 📊 ${breakdown.date}: Discord=${breakdown.discord_alp}, Manual=${breakdown.manual_alp}, Unaccounted=${breakdown.unaccounted_alp}`);
+        }
+      });
+
+      setDiscordVsManualBreakdown(mappedBreakdownData);
+      console.log(`[DISCORD-BREAKDOWN-FRONTEND] ✅ Breakdown state updated successfully`);
+      
+    } catch (error) {
+      console.error(`[DISCORD-BREAKDOWN-FRONTEND] ❌ Error fetching breakdown data:`, error);
+      setDiscordVsManualBreakdown({});
+    }
+  };
+
+  const handleCellUpdate = async (id, field, value) => {
+    const reportDate = id; // id is the reportDate for daily rows
+    const numericValue = value === '' ? null : parseFloat(value) || 0;
+    
+    console.log(`[DAILY-ACTIVITY] 📝 Cell update: ${reportDate} ${field} = ${value} (numeric: ${numericValue})`);
+
+    // Check if this date has Discord sales - if so, redirect user to expanded view
+    if (['sales', 'alp', 'refs'].includes(field)) {
+      const hasDiscordSales = discordSalesData[reportDate] && discordSalesData[reportDate].length > 0;
+      
+      if (hasDiscordSales) {
+        alert(`This date has Discord sales tracked. Please use the expandable row (▶) to view Discord sales and edit manual additions.`);
+        return;
       }
     }
-    
-    // Update edited rows state only - no auto-save
-    setEditedRows(prev => ({
+
+    // Handle checkbox fields
+    if (typeof value === 'boolean') {
+      setActivityData(prev => ({
+        ...prev,
+        [reportDate]: {
+          ...prev[reportDate],
+          [field]: value
+        }
+      }));
+
+      try {
+        const response = await api.put('/dailyActivity', {
+          reportDate,
+          [field]: value
+        });
+        
+        if (response.data.success) {
+          console.log(`[DAILY-ACTIVITY] ✅ Updated checkbox ${field}: ${value}`);
+        }
+      } catch (error) {
+        console.error(`[DAILY-ACTIVITY] ❌ Error updating checkbox ${field}:`, error);
+      }
+      return;
+    }
+
+    // Handle regular numeric fields (only for dates without Discord sales)
+    setActivityData(prev => ({
       ...prev,
       [reportDate]: {
         ...prev[reportDate],
-        reportDate,
         [field]: numericValue
       }
     }));
+
+    setEditedRows(prev => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        [field]: value
+      }
+    }));
+
+    try {
+      const response = await api.put('/dailyActivity', {
+        reportDate,
+        [field]: numericValue
+      });
+      
+      if (response.data.success) {
+        console.log(`[DAILY-ACTIVITY] ✅ Updated ${field}: ${numericValue}`);
+        
+        // If this was a sales/alp/refs update, refresh breakdown data
+        if (['sales', 'alp', 'refs'].includes(field)) {
+          setTimeout(() => {
+            fetchDiscordVsManualBreakdown();
+          }, 500);
+        }
+      }
+    } catch (error) {
+      console.error(`[DAILY-ACTIVITY] ❌ Error updating ${field}:`, error);
+    }
   };
 
   const handleSubmit = async () => {
@@ -776,6 +1113,169 @@ const DailyActivityForm = () => {
 
   const handleCancel = () => {
     setEditedRows({});
+  };
+
+  // Discord sales handlers
+  const handleDiscordSalesUpdate = (saleId, updatedData) => {
+    setDiscordSalesData(prev => {
+      const newData = { ...prev };
+      
+      // Find and update the sale in the appropriate date group
+      Object.keys(newData).forEach(date => {
+        const salesForDate = newData[date];
+        const saleIndex = salesForDate.findIndex(sale => sale.id === saleId);
+        
+        if (saleIndex !== -1) {
+          newData[date][saleIndex] = {
+            ...salesForDate[saleIndex],
+            ...updatedData
+          };
+          
+          // Recalculate daily totals for this date
+          recalculateDailyTotals(date, newData[date]);
+        }
+      });
+      
+      return newData;
+    });
+
+    // Refresh both the main Daily Activity data and breakdown data to pick up backend changes
+    setTimeout(() => {
+      fetchData();
+      fetchDiscordVsManualBreakdown();
+    }, 1000); // Small delay to allow backend processing
+  };
+
+  const handleDiscordSalesDelete = (saleId) => {
+    setDiscordSalesData(prev => {
+      const newData = { ...prev };
+      let deletedFromDate = null;
+      
+      // Find and remove the sale from the appropriate date group
+      Object.keys(newData).forEach(date => {
+        const originalLength = newData[date].length;
+        newData[date] = newData[date].filter(sale => sale.id !== saleId);
+        
+        // If a sale was actually removed, recalculate totals
+        if (newData[date].length < originalLength) {
+          deletedFromDate = date;
+          recalculateDailyTotals(date, newData[date]);
+        }
+        
+        // If no sales left for this date, remove expandable row capability
+        if (newData[date].length === 0) {
+          delete newData[date];
+          setExpandableRows(prevExpandable => {
+            const newExpandable = { ...prevExpandable };
+            delete newExpandable[date];
+            return newExpandable;
+          });
+        }
+      });
+      
+      return newData;
+    });
+
+    // Refresh both the main Daily Activity data and breakdown data to pick up backend changes
+    setTimeout(() => {
+      fetchData();
+      fetchDiscordVsManualBreakdown();
+    }, 1000); // Small delay to allow backend processing
+  };
+
+  // Handle manual addition updates
+  const handleManualAdditionUpdate = async (date, manualData) => {
+    try {
+      console.log(`[DAILY-ACTIVITY] 📝 Manual addition update for ${date}:`, manualData);
+      
+      // Get current breakdown for this date
+      const breakdown = discordVsManualBreakdown[date];
+      if (!breakdown) {
+        console.error(`[DAILY-ACTIVITY] ❌ No breakdown data found for ${date}`);
+        return;
+      }
+      
+      // Calculate new totals: Discord + Manual
+      const discordAlp = breakdown.discord_alp || 0;
+      const discordRefs = breakdown.discord_refs || 0;
+      const newTotalAlp = discordAlp + (parseFloat(manualData.alp) || 0);
+      const newTotalRefs = discordRefs + (parseInt(manualData.refs) || 0);
+      
+      console.log(`[DAILY-ACTIVITY] 🔄 Updating totals: Discord ALP=${discordAlp} + Manual ALP=${manualData.alp} = Total=${newTotalAlp}`);
+      
+      // Update the Daily_Activity record
+      const response = await api.put('/dailyActivity', {
+        reportDate: date,
+        alp: newTotalAlp,
+        refs: newTotalRefs
+      });
+      
+      if (response.data.success) {
+        console.log(`[DAILY-ACTIVITY] ✅ Updated manual amounts successfully`);
+        
+        // Refresh both main data and breakdown data
+        setTimeout(() => {
+          fetchData();
+          fetchDiscordVsManualBreakdown();
+        }, 500);
+      } else {
+        throw new Error(response.data.message || 'Failed to update manual amounts');
+      }
+    } catch (error) {
+      console.error(`[DAILY-ACTIVITY] ❌ Error updating manual amounts:`, error);
+      throw error;
+    }
+  };
+
+  const recalculateDailyTotals = (date, salesForDate) => {
+    // Calculate totals from Discord sales
+    const discordTotals = salesForDate.reduce((acc, sale) => {
+      acc.sales += 1;
+      acc.alp += parseFloat(sale.alp) || 0;
+      acc.refs += parseInt(sale.refs) || 0;
+      return acc;
+    }, { sales: 0, alp: 0, refs: 0 });
+
+    // Update the activity data if Discord totals are higher than current values
+    setActivityData(prev => {
+      const currentData = prev[date] || {};
+      const shouldUpdate = 
+        discordTotals.sales > (currentData.sales || 0) ||
+        discordTotals.alp > (currentData.alp || 0) ||
+        discordTotals.refs > (currentData.refs || 0);
+
+      if (shouldUpdate) {
+        return {
+          ...prev,
+          [date]: {
+            ...currentData,
+            sales: Math.max(discordTotals.sales, currentData.sales || 0),
+            alp: Math.max(discordTotals.alp, currentData.alp || 0),
+            refs: Math.max(discordTotals.refs, currentData.refs || 0),
+            reportDate: date
+          }
+        };
+      }
+      
+      return prev;
+    });
+  };
+
+  const renderExpandedRow = (rowData) => {
+    const date = rowData.reportDate;
+    const salesForDate = discordSalesData[date] || [];
+    const breakdownForDate = discordVsManualBreakdown[date] || {};
+    
+    return (
+      <DiscordSalesExpanded
+        salesData={salesForDate}
+        onSalesUpdate={handleDiscordSalesUpdate}
+        onSalesDelete={handleDiscordSalesDelete}
+        dateString={date}
+        breakdownData={breakdownForDate}
+        onManualUpdate={(manualData) => handleManualAdditionUpdate(date, manualData)}
+      />
+    );
   };
 
   // Hover handlers for weekly total rows
@@ -908,7 +1408,6 @@ const DailyActivityForm = () => {
     <div className="daily-activity-report">
       <div className="padded-content">
         
-
 
         {/* Navigation and Period Selection - Above Table */}
         <div className="controls-container">
@@ -1166,26 +1665,44 @@ const DailyActivityForm = () => {
             <p>Loading data...</p>
           </div>
         ) : (
-          <DataTable
-            key={`datatable-${showMissingDataWarnings}`} // Force re-render when toggle changes
-            columns={columns}
-            data={tableData}
-            onCellUpdate={handleCellUpdate}
-            disablePagination={true}
-            highlightRowOnEdit={true}
-            showActionBar={false}
-            disableCellEditing={false}
-            showTotals={true}
-            totalsPosition="top"
-            totalsColumns={['calls', 'appts', 'sits', 'sales', 'alp', 'refs', 'refAppt', 'refSit', 'refSale', 'refAlp']}
-            totalsLabel="Totals"
-            totalsLabelColumn="displayDate"
-            rowClassNames={rowClassNames}
-            stickyHeader={true}
-            stickyTop={0}
-            pageScrollSticky={true}
-            onRowHover={handleWeeklyTotalHover}
-          />
+          (() => {
+            // Log DataTable props before rendering
+            console.log(`[DATATABLE-RENDER] 🎯 Rendering DataTable with props:`, {
+              enableRowExpansion: true,
+              expandableRowsCount: Object.keys(expandableRows).length,
+              expandableRowKeys: Object.keys(expandableRows),
+              tableDataLength: tableData.length,
+              hasRenderExpandedRow: typeof renderExpandedRow === 'function',
+              discordSalesDataKeys: Object.keys(discordSalesData)
+            });
+
+            return (
+              <DataTable
+                key={`datatable-${showMissingDataWarnings}`} // Force re-render when toggle changes
+                columns={columns}
+                data={tableData}
+                onCellUpdate={handleCellUpdate}
+                disablePagination={true}
+                highlightRowOnEdit={true}
+                showActionBar={false}
+                disableCellEditing={false}
+                showTotals={true}
+                totalsPosition="top"
+                totalsColumns={['calls', 'appts', 'sits', 'sales', 'alp', 'refs', 'refAppt', 'refSit', 'refSale', 'refAlp']}
+                totalsLabel="Totals"
+                totalsLabelColumn="displayDate"
+                rowClassNames={rowClassNames}
+                stickyHeader={true}
+                stickyTop={0}
+                pageScrollSticky={true}
+                onRowHover={handleWeeklyTotalHover}
+                enableRowExpansion={true}
+                expandableRows={expandableRows}
+                renderExpandedRow={renderExpandedRow}
+                expandedRowsInitial={{}}
+              />
+            );
+          })()
         )}
       </div>
     </div>

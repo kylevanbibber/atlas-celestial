@@ -173,4 +173,54 @@
     background: var(--primary-dark, #2563eb);
     border-color: var(--primary-dark, #2563eb);
 }
+
+/* Archive menu item styling */
+.menu-item-archive {
+    color: #f59e0b;
+}
+
+.menu-item-archive:hover {
+    background-color: rgba(245, 158, 11, 0.1);
+    color: #d97706;
+}
+
+/* Unarchive menu item styling */
+.menu-item-unarchive {
+    color: #10b981;
+}
+
+.menu-item-unarchive:hover {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: #059669;
+}
+
+/* Send Early menu item styling */
+.menu-item-send-early {
+    color: #3b82f6;
+}
+
+.menu-item-send-early:hover {
+    background-color: rgba(59, 130, 246, 0.1);
+    color: #2563eb;
+}
+
+/* Resend menu item styling */
+.menu-item-resend {
+    color: #8b5cf6;
+}
+
+.menu-item-resend:hover {
+    background-color: rgba(139, 92, 246, 0.1);
+    color: #7c3aed;
+}
+
+/* Copy Details menu item styling */
+.menu-item-copy {
+    color: #06b6d4;
+}
+
+.menu-item-copy:hover {
+    background-color: rgba(6, 182, 212, 0.1);
+    color: #0891b2;
+}
   

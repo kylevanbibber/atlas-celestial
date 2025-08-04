@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaPlus, FaTrash, FaEdit, FaClock, FaServer, FaHashtag, FaCopy } from 'react-icons/fa';
-import api from '../../api';
+import api from '../../../api';
 
 const ReminderSettings = ({ reminders, setReminders, configuredGuilds }) => {
   const [showReminderModal, setShowReminderModal] = useState(false);
@@ -25,18 +25,206 @@ const ReminderSettings = ({ reminders, setReminders, configuredGuilds }) => {
   };
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    <div style={{
+      maxWidth: '100%',
+      padding: '0 8px'
+    }}>
+      <style>{`
+        @media (max-width: 768px) {
+          .reminder-header {
+            flex-direction: column;
+            gap: 16px;
+            align-items: stretch;
+            margin-bottom: 24px;
+          }
+          
+          .reminder-header h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0;
+          }
+          
+          .reminder-header button {
+            width: 100%;
+            height: 48px;
+            font-size: 16px;
+            font-weight: 500;
+            border-radius: 8px;
+          }
+          
+          .reminder-card {
+            flex-direction: column;
+            gap: 20px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+          }
+          
+          .reminder-info {
+            gap: 16px;
+          }
+          
+          .reminder-server-info {
+            background: var(--bg-secondary, #f8f9fa);
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 8px;
+          }
+          
+          .reminder-schedule-info {
+            background: var(--bg-secondary, #f8f9fa);
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 12px;
+          }
+          
+          .reminder-message {
+            background: var(--bg-tertiary, #ffffff);
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            font-size: 15px;
+            line-height: 1.5;
+          }
+          
+          .reminder-actions {
+            flex-direction: row;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+          }
+          
+          .reminder-actions button {
+            flex: 1;
+            min-width: 80px;
+            height: 44px;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+          }
+          
+          .reminder-status-badge {
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          
+          .reminder-schedule-text {
+            font-family: 'Courier New', monospace;
+            background: var(--primary-color, #007BFF);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+          }
+        }
+        
+        @media (max-width: 480px) {
+          .reminder-header {
+            padding: 0 4px;
+          }
+          
+          .reminder-card {
+            padding: 16px;
+            margin-bottom: 12px;
+          }
+          
+          .reminder-server-info {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 12px;
+          }
+          
+          .reminder-schedule-info {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 12px;
+          }
+          
+          .reminder-actions {
+            gap: 6px;
+          }
+          
+          .reminder-actions button {
+            min-width: 70px;
+            height: 40px;
+            font-size: 13px;
+          }
+        }
+        
+        @media (max-width: 360px) {
+          .reminder-actions {
+            flex-direction: column;
+            gap: 8px;
+          }
+          
+          .reminder-actions button {
+            width: 100%;
+            min-width: auto;
+          }
+        }
+      `}</style>
+      
+      <div className="reminder-header" style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: '20px',
+        gap: '12px'
+      }}>
         <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Scheduled Reminders</h3>
-        <button onClick={() => setShowReminderModal(true)} className="settings-button">
-          <FaPlus /> Add Reminder
+        <button onClick={() => setShowReminderModal(true)} className="settings-button" style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          height: '40px',
+          fontSize: '14px'
+        }}>
+          <FaPlus size={14} /> Add Reminder
         </button>
       </div>
 
       {reminders.length === 0 ? (
-        <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic', padding: '40px' }}>
-          No reminders configured yet.
-        </p>
+        <div style={{ 
+          textAlign: 'center', 
+          color: 'var(--text-secondary)', 
+          fontStyle: 'italic', 
+          padding: '60px 20px',
+          fontSize: '16px',
+          lineHeight: '1.5'
+        }}>
+          <div style={{ marginBottom: '20px' }}>
+            <FaClock size={64} style={{ opacity: 0.4, color: 'var(--text-secondary)' }} />
+          </div>
+          <div style={{ 
+            fontSize: '18px', 
+            fontWeight: '500',
+            marginBottom: '8px',
+            color: 'var(--text-primary)'
+          }}>
+            No reminders configured yet
+          </div>
+          <div style={{ 
+            fontSize: '14px', 
+            marginTop: '8px',
+            opacity: 0.8
+          }}>
+            Create your first reminder to get started with automated messaging.
+          </div>
+        </div>
       ) : (
         <div>
           {reminders.map((reminder) => (
@@ -549,35 +737,7 @@ const ReminderItem = ({ reminder, onUpdate, configuredGuilds }) => {
     }
   };
 
-  // Determine the reminder status badge
-  let statusBadge;
-  if (isOneTimePast()) {
-    statusBadge = (
-      <span style={{
-        padding: '2px 8px',
-        borderRadius: '12px',
-        fontSize: '12px',
-        fontWeight: '500',
-        background: 'var(--info-bg, #d1ecf1)',
-        color: 'var(--info-color, #0c5460)'
-      }}>
-        Sent
-      </span>
-    );
-  } else {
-    statusBadge = (
-      <span style={{
-        padding: '2px 8px',
-        borderRadius: '12px',
-        fontSize: '12px',
-        fontWeight: '500',
-        background: reminder.is_active ? 'var(--success-bg, #d4edda)' : 'var(--error-bg, #f8d7da)',
-        color: reminder.is_active ? 'var(--success-color, #155724)' : 'var(--error-color, #721c24)'
-      }}>
-        {reminder.is_active ? 'Active' : 'Inactive'}
-      </span>
-    );
-  }
+
 
   const handleDuplicate = async () => {
     try {
@@ -618,18 +778,25 @@ const ReminderItem = ({ reminder, onUpdate, configuredGuilds }) => {
   };
 
   return (
-    <div style={{
+    <div className="reminder-card" style={{
       display: 'flex',
       justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: '15px',
-      marginBottom: '10px',
-      background: 'var(--bg-secondary)',
-      borderRadius: '6px',
-      border: '1px solid var(--border-color)'
+      alignItems: 'flex-start',
+      padding: '16px',
+      marginBottom: '12px',
+      background: 'var(--card-bg, #ffffff)',
+      borderRadius: '8px',
+      border: '1px solid var(--border-color)',
+      gap: '12px'
     }}>
       {editing ? (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '12px',
+          width: '100%'
+        }}>
           <div className="settings-row">
             <label>Server:</label>
             <select 
@@ -720,53 +887,84 @@ const ReminderItem = ({ reminder, onUpdate, configuredGuilds }) => {
             Active
           </label>
           
-          <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-            <button onClick={handleUpdate} className="settings-button">Save</button>
-            <button onClick={() => setEditing(false)} className="settings-button-secondary">Cancel</button>
+          <div style={{ 
+            display: 'flex', 
+            gap: '8px', 
+            marginTop: '12px',
+            flexWrap: 'wrap'
+          }}>
+            <button onClick={handleUpdate} className="settings-button" style={{
+              flex: '1 1 auto',
+              minWidth: '120px',
+              height: '40px',
+              fontSize: '14px'
+            }}>
+              Save
+            </button>
+            <button onClick={() => setEditing(false)} className="settings-button-secondary" style={{
+              flex: '1 1 auto',
+              minWidth: '120px',
+              height: '40px',
+              fontSize: '14px'
+            }}>
+              Cancel
+            </button>
           </div>
         </div>
       ) : (
         <>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: 1 }}>
+          <div className="reminder-info" style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '8px', 
+            flex: 1,
+            minWidth: 0
+          }}>
             {/* Server and channel info */}
-            <div style={{ 
+            <div className="reminder-server-info" style={{ 
               display: 'flex', 
               alignItems: 'center', 
               gap: '8px',
-              fontSize: '0.85em',
-              marginBottom: '5px',
-              color: 'var(--text-secondary)'
+              fontSize: '14px',
+              marginBottom: '4px',
+              color: 'var(--text-secondary)',
+              flexWrap: 'wrap'
             }}>
-              <FaServer style={{ fontSize: '0.9em' }} />
-              <span>{reminder.guild_name || 'Unknown Server'}</span>
-              <FaHashtag style={{ fontSize: '0.9em' }} />
+              <FaServer size={14} />
+              <span style={{ fontWeight: '500' }}>{reminder.guild_name || 'Unknown Server'}</span>
+              <FaHashtag size={14} />
               <span>{reminder.channel_name || 'Unknown Channel'}</span>
             </div>
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <FaClock style={{ color: 'var(--text-secondary)' }} />
-              <span style={{ 
-                fontFamily: 'Courier New, monospace', 
-                background: 'var(--bg-tertiary)', 
-                padding: '2px 6px', 
-                borderRadius: '3px', 
-                fontSize: '13px' 
-              }}>
+            <div className="reminder-schedule-info" style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '10px',
+              flexWrap: 'wrap'
+            }}>
+              <FaClock size={14} style={{ color: 'var(--text-secondary)' }} />
+              <span className="reminder-schedule-text">
                 {formatCronExpression(reminder.cron_expr)}
               </span>
-              {statusBadge}
+              <span className="reminder-status-badge" style={{
+                background: isOneTimePast() ? 'var(--info-bg, #d1ecf1)' : 
+                  reminder.is_active ? 'var(--success-bg, #d4edda)' : 'var(--error-bg, #f8d7da)',
+                color: isOneTimePast() ? 'var(--info-color, #0c5460)' : 
+                  reminder.is_active ? 'var(--success-color, #155724)' : 'var(--error-color, #721c24)'
+              }}>
+                {isOneTimePast() ? 'Sent' : (reminder.is_active ? 'Active' : 'Inactive')}
+              </span>
             </div>
-            <div style={{ 
-              padding: '8px 10px',
-              background: 'var(--bg-tertiary)',
-              borderRadius: '4px',
-              fontSize: '14px',
-              whiteSpace: 'pre-wrap'
-            }}>
+            <div className="reminder-message">
               {reminder.message}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="reminder-actions" style={{ 
+            display: 'flex', 
+            gap: '8px',
+            flexWrap: 'wrap',
+            flexShrink: 0
+          }}>
             <button 
               onClick={handleTestReminder} 
               className="settings-button-secondary"
@@ -780,21 +978,21 @@ const ReminderItem = ({ reminder, onUpdate, configuredGuilds }) => {
               className="settings-button-secondary"
               title="Duplicate reminder"
             >
-              <FaCopy />
+              <FaCopy size={12} />
             </button>
             <button 
               onClick={() => setEditing(true)} 
               className="settings-button-secondary"
               title="Edit reminder"
             >
-              <FaEdit />
+              <FaEdit size={12} />
             </button>
             <button 
               onClick={handleDelete} 
               className="settings-button-secondary"
               title="Delete reminder"
             >
-              <FaTrash />
+              <FaTrash size={12} />
             </button>
           </div>
         </>

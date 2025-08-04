@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaDiscord, FaPlus, FaTrash, FaEdit, FaClock, FaTrophy, FaServer, FaHashtag, FaCopy } from 'react-icons/fa';
-import { useAuth } from '../../context/AuthContext';
-import api from '../../api';
+import { useAuth } from '../../../context/AuthContext';
+import api from '../../../api';
 import ServerSettings from './ServerSettings';
 import ReminderSettings from './ReminderSettings';
 import LeaderboardSettings from './LeaderboardSettings';
@@ -15,7 +15,6 @@ const DiscordSettings = () => {
   const [availableManagers, setAvailableManagers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('servers');
-  const [syncingBot, setSyncingBot] = useState(false);
   const [rateLimitStatus, setRateLimitStatus] = useState(null);
 
   // Form states
@@ -87,28 +86,7 @@ try {
     }
   };
 
-  // Trigger bot synchronization (admin only)
-  const handleSyncBot = async () => {
-    if (!user || user.Role !== 'Admin') {
-      alert('Only administrators can trigger bot synchronization.');
-      return;
-    }
-    
-    try {
-      setSyncingBot(true);
-      await api.post('/discord/bot/sync');
-      
-      // Reload Discord data to get updated status
-      await loadDiscordData();
-      
-      alert('Bot synchronization completed successfully.');
-      setSyncingBot(false);
-    } catch (error) {
-      console.error('Error triggering bot synchronization:', error);
-      alert('Failed to trigger bot synchronization.');
-      setSyncingBot(false);
-    }
-  };
+  // Removed sync bot functionality - no longer needed
 
   if (loading) {
     return (
@@ -129,16 +107,6 @@ try {
         <div className="settings-card-title">
           <FaDiscord style={{ marginRight: '10px', color: '#5865f2' }} />
           Discord Integration
-          {user && user.Role === 'Admin' && (
-            <button 
-              onClick={handleSyncBot} 
-              className="settings-button-secondary"
-              style={{ marginLeft: 'auto', fontSize: '0.8em' }}
-              disabled={syncingBot}
-            >
-              {syncingBot ? 'Syncing...' : 'Sync Bot Status'}
-            </button>
-          )}
         </div>
 
         {rateLimitStatus && (

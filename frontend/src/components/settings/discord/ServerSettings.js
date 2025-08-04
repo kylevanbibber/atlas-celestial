@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaPlus, FaTrash, FaServer } from 'react-icons/fa';
-import api from '../../api';
+import api from '../../../api';
 
 const ServerSettings = ({ 
   discordStatus, 
@@ -11,6 +11,7 @@ const ServerSettings = ({
   const [configuredGuilds, setConfiguredGuilds] = useState([]);
   const [botGuildIds, setBotGuildIds] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [discordError, setDiscordError] = useState(null);
   
   // Modal states
   const [showGuildModal, setShowGuildModal] = useState(false);
@@ -27,6 +28,7 @@ const ServerSettings = ({
   const loadServerData = async () => {
     try {
       setLoading(true);
+      setDiscordError(null);
       
       // Load user's Discord servers with caching
       const guildsRes = await api.getCached('/discord/guilds');
@@ -41,6 +43,18 @@ const ServerSettings = ({
       setConfiguredGuilds(configuredRes.data.guilds);
     } catch (error) {
       console.error('Error loading server data:', error);
+      
+      // Handle specific Discord authentication errors
+      if (error.response?.status === 401) {
+        const errorMessage = error.response?.data?.error || 'Discord not linked';
+        if (errorMessage.includes('Discord not linked') || errorMessage.includes('token expired') || errorMessage.includes('token invalid')) {
+          // Set empty state for guilds since Discord isn't linked
+          setGuilds([]);
+          setBotGuildIds([]);
+          // Keep configured guilds as they might exist from previous linking
+          setDiscordError('Your Discord account is not linked. Please link your Discord account in the Discord Settings section to manage servers.');
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -364,45 +378,198 @@ const ServerSettings = ({
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+      <div style={{ 
+        textAlign: 'center', 
+        padding: '40px 20px', 
+        color: 'var(--text-secondary)',
+        fontSize: '16px',
+        lineHeight: '1.5'
+      }}>
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '3px solid var(--border-color)',
+            borderTop: '3px solid var(--primary-color, #007BFF)',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 16px'
+          }}></div>
+        </div>
         Loading server settings...
       </div>
     );
   }
 
   return (
-    <div>
+    <div style={{
+      maxWidth: '100%',
+      padding: '0 4px'
+    }}>
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        
+        @media (max-width: 768px) {
+          .server-settings-container {
+            padding: 0 8px;
+          }
+          
+          .server-card {
+            margin-bottom: 16px;
+          }
+          
+          .server-actions {
+            flex-direction: column;
+            gap: 8px;
+          }
+          
+          .server-actions button {
+            width: 100%;
+            min-width: auto;
+          }
+        }
+        
+        @media (max-width: 480px) {
+          .server-settings-container {
+            padding: 0 4px;
+          }
+          
+          .server-info {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+          }
+          
+          .server-icon {
+            align-self: center;
+          }
+        }
+      `}</style>
+      {/* Discord Error Message */}
+      {discordError && (
+        <div style={{
+          padding: '16px',
+          marginBottom: '24px',
+          backgroundColor: 'var(--alert-bg, #fff3cd)',
+          border: '1px solid var(--alert-border, #ffeaa7)',
+          borderRadius: '8px',
+          color: 'var(--alert-text, #856404)',
+          fontSize: '14px',
+          lineHeight: '1.5'
+        }}>
+          <div style={{ 
+            fontWeight: '600', 
+            marginBottom: '8px',
+            fontSize: '16px'
+          }}>
+            Discord Connection Required
+          </div>
+          <div>{discordError}</div>
+        </div>
+      )}
+
       <div style={{ marginBottom: '24px' }}>
         <h3 style={{ marginBottom: '12px', color: 'var(--text-primary)' }}>Available Servers</h3>
         {guilds.filter(g => !configuredGuilds.some(c => c.guild_id === g.id)).map(guild => (
-          <div key={guild.id} style={{
-            display: 'flex', alignItems: 'center', gap: '12px', padding: '12px',
-            border: '1px solid var(--border-color)', borderRadius: '6px', marginBottom: '8px'
+          <div key={guild.id} className="server-card" style={{
+            display: 'flex', 
+            flexDirection: 'column',
+            gap: '12px', 
+            padding: '16px',
+            border: '1px solid var(--border-color)', 
+            borderRadius: '8px', 
+            marginBottom: '12px',
+            backgroundColor: 'var(--card-bg, #ffffff)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-              {guild.icon_url ? (
-                <img src={guild.icon_url} alt={`${guild.name} icon`} style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
-              ) : (
-                <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#5865f2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold' }}>
-                  {guild.name.charAt(0)}
+            {/* Server Info Row */}
+            <div className="server-info" style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px', 
+              flex: 1,
+              minHeight: '48px'
+            }}>
+                              {guild.icon_url ? (
+                  <img src={guild.icon_url} alt={`${guild.name} icon`} className="server-icon" style={{ 
+                    width: '48px', 
+                    height: '48px', 
+                    borderRadius: '50%',
+                    flexShrink: 0
+                  }} />
+                ) : (
+                  <div className="server-icon" style={{ 
+                    width: '48px', 
+                    height: '48px', 
+                    borderRadius: '50%', 
+                    backgroundColor: '#5865f2', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    color: 'white', 
+                    fontWeight: 'bold',
+                    fontSize: '18px',
+                    flexShrink: 0
+                  }}>
+                    {guild.name.charAt(0)}
+                  </div>
+                )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ 
+                  fontSize: '16px', 
+                  fontWeight: '600', 
+                  color: 'var(--text-primary)',
+                  marginBottom: '4px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {guild.name}
                 </div>
-              )}
-              <span>{guild.name}</span>
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            
+            {/* Action Buttons Row */}
+            <div className="server-actions" style={{ 
+              display: 'flex', 
+              gap: '8px',
+              flexWrap: 'wrap'
+            }}>
               <button
                 onClick={() => handleAddBotAndConfigure(guild)}
                 className="settings-button"
                 title="Add bot to server and add to team servers"
+                style={{
+                  flex: '1 1 auto',
+                  minWidth: '120px',
+                  height: '40px',
+                  fontSize: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
               >
-                <FaPlus /> Add Bot
+                <FaPlus size={14} /> Add Bot
               </button>
               <button
                 onClick={() => handleConfigureGuildInline(guild)}
                 className="settings-button-secondary"
                 title="Add to team servers without adding bot"
+                style={{
+                  flex: '1 1 auto',
+                  minWidth: '120px',
+                  height: '40px',
+                  fontSize: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
               >
-                <FaServer /> Add to Team Servers
+                <FaServer size={14} /> Add to Team
               </button>
             </div>
           </div>
@@ -416,53 +583,152 @@ const ServerSettings = ({
           const isBotInServer = botGuildIds.includes(cfg.guild_id) || cfg.bot_added;
           
           return (
-            <div key={`${cfg.guild_id}-${cfg.channel_id || 'noChannel'}`} style={{
-              display: 'flex', alignItems: 'center', gap: '12px', padding: '12px',
-              border: '1px solid var(--border-color)', borderRadius: '6px', marginBottom: '8px'
+            <div key={`${cfg.guild_id}-${cfg.channel_id || 'noChannel'}`} className="server-card" style={{
+              display: 'flex', 
+              flexDirection: 'column',
+              gap: '12px', 
+              padding: '16px',
+              border: '1px solid var(--border-color)', 
+              borderRadius: '8px', 
+              marginBottom: '12px',
+              backgroundColor: 'var(--card-bg, #ffffff)'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+              {/* Server Info Row */}
+              <div className="server-info" style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '12px', 
+                flex: 1,
+                minHeight: '48px'
+              }}>
                 {fullGuild.icon_url ? (
-                  <img src={fullGuild.icon_url} alt={`${cfg.guild_name} icon`} style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
+                  <img src={fullGuild.icon_url} alt={`${cfg.guild_name} icon`} className="server-icon" style={{ 
+                    width: '48px', 
+                    height: '48px', 
+                    borderRadius: '50%',
+                    flexShrink: 0
+                  }} />
                 ) : (
-                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#5865f2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold' }}>
+                  <div className="server-icon" style={{ 
+                    width: '48px', 
+                    height: '48px', 
+                    borderRadius: '50%', 
+                    backgroundColor: '#5865f2', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    color: 'white', 
+                    fontWeight: 'bold',
+                    fontSize: '18px',
+                    flexShrink: 0
+                  }}>
                     {cfg.guild_name.charAt(0)}
                   </div>
                 )}
-                <div>
-                  <div>{cfg.guild_name}</div>
-                  {cfg.channel_id && <div style={{ fontSize: '0.9em', color: 'var(--text-secondary)' }}>#{cfg.channel_name}</div>}
-                  <div style={{ fontSize: '0.8em', color: isBotInServer ? 'var(--success-color, #155724)' : 'var(--text-secondary)' }}>
-                    {loading ? 'Checking...' : (isBotInServer ? 'Bot Added' : 'Bot Not Added')}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ 
+                    fontSize: '16px', 
+                    fontWeight: '600', 
+                    color: 'var(--text-primary)',
+                    marginBottom: '4px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {cfg.guild_name}
+                  </div>
+                  {cfg.channel_id && (
+                    <div style={{ 
+                      fontSize: '14px', 
+                      color: 'var(--text-secondary)',
+                      marginBottom: '2px'
+                    }}>
+                      #{cfg.channel_name}
+                    </div>
+                  )}
+                  <div style={{ 
+                    fontSize: '12px', 
+                    color: isBotInServer ? 'var(--success-color, #155724)' : 'var(--text-secondary)',
+                    fontWeight: isBotInServer ? '600' : '400'
+                  }}>
+                    {loading ? 'Checking...' : (isBotInServer ? '✓ Bot Added' : '✗ Bot Not Added')}
                   </div>
                 </div>
               </div>
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              {/* Primary Server Toggle */}
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                padding: '8px 0',
+                borderTop: '1px solid var(--border-color)',
+                borderBottom: '1px solid var(--border-color)'
+              }}>
+                <label style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer'
+                }}>
                   <input
                     type="checkbox"
                     checked={!!cfg.is_primary}
                     onChange={() => handleTogglePrimary(cfg)}
-                  /> Primary Server
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      cursor: 'pointer'
+                    }}
+                  /> 
+                  Primary Server
                 </label>
               </div>
               
-              <div style={{ display: 'flex', gap: '8px' }}>
+              {/* Action Buttons Row */}
+              <div className="server-actions" style={{ 
+                display: 'flex', 
+                gap: '8px',
+                flexWrap: 'wrap'
+              }}>
                 {isBotInServer ? (
                   <button
                     onClick={() => handleRemoveBot(cfg.guild_id)}
                     className="settings-button-secondary"
                     title="Remove bot from server but keep in team servers"
+                    style={{
+                      flex: '1 1 auto',
+                      minWidth: '120px',
+                      height: '40px',
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px'
+                    }}
                   >
-                    <FaTrash /> Remove Bot Only
+                    <FaTrash size={14} /> Remove Bot
                   </button>
                 ) : (
                   <button
                     onClick={() => handleAddBot({id: cfg.guild_id})}
                     className="settings-button"
                     title="Add bot to server"
+                    style={{
+                      flex: '1 1 auto',
+                      minWidth: '120px',
+                      height: '40px',
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px'
+                    }}
                   >
-                    <FaPlus /> Add Bot
+                    <FaPlus size={14} /> Add Bot
                   </button>
                 )}
                 
@@ -470,8 +736,18 @@ const ServerSettings = ({
                   onClick={() => handleRemoveConfig(cfg)}
                   className="settings-button-secondary"
                   title="Remove server from team servers"
+                  style={{
+                    flex: '1 1 auto',
+                    minWidth: '120px',
+                    height: '40px',
+                    fontSize: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
                 >
-                  <FaTrash /> Remove Server
+                  <FaTrash size={14} /> Remove Server
                 </button>
               </div>
             </div>

@@ -1265,7 +1265,7 @@ const MoreReport = ({ onBack }) => {
                 const { rankChange } = item.indicators;
                 
                 if (rankChange === "NEW") {
-                  return "🆕 NEW";
+                  return null; // Remove NEW indicators
                 } else if (rankChange && rankChange !== 0) {
                   const arrow = rankChange > 0 ? "▲" : "▼";
                   return `${arrow}${Math.abs(rankChange)}`;

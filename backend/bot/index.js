@@ -5,7 +5,14 @@ const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v9');
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const cron = require('node-cron');
+const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 const db = require('../db');
+
+// Imgur API client ID (same as in upload.js)
+const IMGUR_CLIENT_ID = 'd08c81e700c9978';
 
 const client = new Client({
   intents: [
@@ -64,6 +71,11 @@ const commands = [
            { name: 'Free Will Kit', value: 'free_will_kit' },
            { name: 'Other', value: 'other' }
          )
+    )
+    .addAttachmentOption(opt =>
+      opt.setName('image')
+         .setDescription('Optional image of the close (receipt, screenshot, etc.)')
+         .setRequired(false)
     )
 ].map(cmd => cmd.toJSON());
 
@@ -216,6 +228,11 @@ async function crossPostSale(saleData, originalChannelId) {
             embed.addFields({ name: 'Details', value: saleData.details });
           }
 
+          // Add image if available
+          if (saleData.image_url) {
+            embed.setImage(saleData.image_url);
+          }
+
           await discordChannel.send({ embeds: [embed] });
         }
       } catch (error) {
@@ -289,6 +306,170 @@ async function syncBotPresenceWithDatabase() {
   }
 }
 
+/**
+ * Upload a Discord attachment to Imgur
+ * @param {string} attachmentUrl - The Discord attachment URL
+ * @param {string} filename - The filename to use
+ * @returns {Promise<{url: string, deleteHash: string}>}
+ */
+async function uploadDiscordAttachmentToImgur(attachmentUrl, filename) {
+  try {
+    console.log(`[BOT] Uploading Discord attachment to Imgur: ${attachmentUrl}`);
+    
+    // Download the attachment from Discord
+    const response = await axios.get(attachmentUrl, {
+      responseType: 'arraybuffer',
+      headers: {
+        'User-Agent': 'DiscordBot (Atlas Bot)'
+      }
+    });
+    
+    // Create a temporary file
+    const tempDir = os.tmpdir();
+    const tempPath = path.join(tempDir, filename);
+    
+    // Write the file
+    fs.writeFileSync(tempPath, response.data);
+    
+    // Create form data for Imgur upload
+    const FormData = require('form-data');
+    const formData = new FormData();
+    formData.append('image', fs.createReadStream(tempPath));
+    
+    // Upload to Imgur
+    const imgurResponse = await axios.post('https://api.imgur.com/3/image', formData, {
+      headers: {
+        ...formData.getHeaders(),
+        'Authorization': `Client-ID ${IMGUR_CLIENT_ID}`
+      }
+    });
+    
+    // Clean up temp file
+    fs.unlinkSync(tempPath);
+    
+    if (imgurResponse.data.success) {
+      console.log(`[BOT] Successfully uploaded to Imgur: ${imgurResponse.data.data.link}`);
+      return {
+        url: imgurResponse.data.data.link,
+        deleteHash: imgurResponse.data.data.deletehash
+      };
+    } else {
+      throw new Error(imgurResponse.data.data.error || 'Imgur upload failed');
+    }
+    
+  } catch (error) {
+    console.error('[BOT] Error uploading Discord attachment to Imgur:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update Daily_Activity table with aggregated Discord sales data
+ * @param {number} userId - The user ID
+ * @param {string} saleDate - The sale date in YYYY-MM-DD format
+ */
+async function updateDailyActivityFromDiscordSales(userId, saleDate) {
+  try {
+    console.log(`[BOT] 📊 Updating Daily_Activity for user ${userId} on ${saleDate}`);
+
+    // Get user details from activeusers
+    const userDetails = await db.query(
+      'SELECT lagnname, esid, MGA, SA, GA FROM activeusers WHERE id = ?',
+      [userId]
+    );
+
+    if (!userDetails || userDetails.length === 0) {
+      console.error(`[BOT] ❌ User ${userId} not found in activeusers table`);
+      return;
+    }
+
+    const user = userDetails[0];
+    console.log(`[BOT] 👤 User details:`, { 
+      lagnname: user.lagnname, 
+      esid: user.esid, 
+      MGA: user.MGA, 
+      SA: user.SA, 
+      GA: user.GA 
+    });
+
+    // Aggregate Discord sales for this user and date
+    const salesAggregation = await db.query(`
+      SELECT 
+        COUNT(*) as total_sales,
+        SUM(alp) as total_alp,
+        SUM(refs) as total_refs
+      FROM discord_sales 
+      WHERE user_id = ? AND DATE(ts) = ?
+    `, [userId, saleDate]);
+
+    const salesData = salesAggregation[0];
+    console.log(`[BOT] 📈 Discord sales aggregation for ${saleDate}:`, salesData);
+
+    // Check if Daily_Activity record exists for this date and user
+    const existingRecord = await db.query(
+      'SELECT * FROM Daily_Activity WHERE agent = ? AND reportDate = ?',
+      [user.lagnname, saleDate]
+    );
+
+    if (existingRecord && existingRecord.length > 0) {
+      // Update existing record - only update if Discord sales are higher
+      console.log(`[BOT] 🔄 Updating existing Daily_Activity record for ${saleDate}`);
+      
+      const existing = existingRecord[0];
+      const newSales = Math.max(salesData.total_sales || 0, existing.sales || 0);
+      const newAlp = Math.max(salesData.total_alp || 0, existing.alp || 0);
+      const newRefs = Math.max(salesData.total_refs || 0, existing.refs || 0);
+
+      await db.query(`
+        UPDATE Daily_Activity 
+        SET 
+          sales = ?,
+          alp = ?,
+          refs = ?
+        WHERE agent = ? AND reportDate = ?
+      `, [newSales, newAlp, newRefs, user.lagnname, saleDate]);
+
+      console.log(`[BOT] ✅ Updated Daily_Activity: sales=${newSales}, alp=${newAlp}, refs=${newRefs}`);
+    } else {
+      // Create new record
+      console.log(`[BOT] ➕ Creating new Daily_Activity record for ${saleDate}`);
+
+      await db.query(`
+        INSERT INTO Daily_Activity (
+          reportDate,
+          esid,
+          MGA,
+          Work,
+          sales,
+          alp,
+          refs,
+          agent,
+          SA,
+          GA,
+          userId
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        saleDate,           // reportDate
+        user.esid,          // esid
+        user.MGA,           // MGA
+        saleDate,           // Work (use same date)
+        salesData.total_sales || 0,  // sales
+        salesData.total_alp || 0,    // alp
+        salesData.total_refs || 0,   // refs
+        user.lagnname,      // agent
+        user.SA,            // SA
+        user.GA,            // GA
+        userId              // userId
+      ]);
+
+      console.log(`[BOT] ✅ Created new Daily_Activity record: sales=${salesData.total_sales}, alp=${salesData.total_alp}, refs=${salesData.total_refs}`);
+    }
+
+  } catch (error) {
+    console.error(`[BOT] ❌ Error updating Daily_Activity:`, error);
+  }
+}
+
 client.once('ready', async () => {
   console.log(`Discord bot logged in as ${client.user.tag} and is ready!`);
   console.log(`Bot is ready: ${client.isReady()}`);
@@ -346,6 +527,7 @@ async function handleCloseCommand(interaction) {
   const alp = interaction.options.getNumber('alp');
   const refs = interaction.options.getInteger('refs');
   const leadType = interaction.options.getString('lead_type');
+  const attachment = interaction.options.getAttachment('image');
   const discordUserId = interaction.user.id;
   const guildId = interaction.guild?.id;
 
@@ -367,10 +549,46 @@ async function handleCloseCommand(interaction) {
     }
 
     const user = userResult[0];
+    let imageUrl = null;
+
+    // Process image if provided
+    if (attachment) {
+      try {
+        // Validate file type
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+        if (!allowedTypes.includes(attachment.contentType)) {
+          await interaction.editReply({
+            content: '❌ **Invalid Image Type**\n\nPlease upload a valid image file (JPEG, PNG, GIF, or WebP).'
+          });
+          return;
+        }
+
+        // Validate file size (max 10MB for Imgur)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (attachment.size > maxSize) {
+          await interaction.editReply({
+            content: '❌ **File Too Large**\n\nPlease upload an image smaller than 10MB.'
+          });
+          return;
+        }
+
+        // Upload to Imgur
+        const uploadResult = await uploadDiscordAttachmentToImgur(
+          attachment.url, 
+          attachment.name || 'discord_attachment.jpg'
+        );
+        imageUrl = uploadResult.url;
+        
+      } catch (error) {
+        console.error('Error processing image:', error);
+        // Continue without the image - don't show error to user since we're continuing
+        imageUrl = null;
+      }
+    }
 
     const insertQuery = `
-      INSERT INTO discord_sales (discord_user, guild_id, alp, refs, lead_type, user_id)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO discord_sales (discord_user, guild_id, alp, refs, lead_type, image_url, user_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
 
     await db.query(insertQuery, [
@@ -379,8 +597,15 @@ async function handleCloseCommand(interaction) {
       alp,
       refs,
       leadType,
+      imageUrl,
       user.id
     ]);
+
+    console.log(`Close recorded: User ${user.lagnname} (${discordUserId}) - ALP: $${alp}, Refs: ${refs}, Lead Type: ${leadType}${imageUrl ? ', Image: ' + imageUrl : ''}`);
+
+    // Update Daily_Activity table with the new sale
+    const saleDate = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
+    await updateDailyActivityFromDiscordSales(user.id, saleDate);
 
     // Get today's total for this user
     const today = new Date();
@@ -401,11 +626,17 @@ async function handleCloseCommand(interaction) {
 
     const leadTypeDisplay = leadType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 
-    await interaction.editReply({
-      content: `✅ **Close Recorded Successfully!**\n\n**Agent:** ${user.lagnname}\n**ALP:** $${alp.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n**Refs:** ${refs}\n**Lead Type:** ${leadTypeDisplay}\n**Time:** ${new Date().toLocaleString()}\n\n📊 **Today's Totals:**\n**Total ALP:** $${totals.total_alp.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n**Total Refs:** ${totals.total_refs}\n**Total Closes:** ${totals.total_closes}`
-    });
+    let responseContent = `✅ **Close Recorded Successfully!**\n\n**Agent:** ${user.lagnname}\n**ALP:** $${alp.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n**Refs:** ${refs}\n**Lead Type:** ${leadTypeDisplay}\n**Time:** ${new Date().toLocaleString()}`;
 
-    console.log(`Close recorded: User ${user.lagnname} (${discordUserId}) - ALP: $${alp}, Refs: ${refs}, Lead Type: ${leadType}`);
+    if (imageUrl) {
+      responseContent += `\n📷 **Image:** [View Receipt](${imageUrl})`;
+    }
+
+    responseContent += `\n\n📊 **Today's Totals:**\n**Total ALP:** $${totals.total_alp.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n**Total Refs:** ${totals.total_refs}\n**Total Closes:** ${totals.total_closes}`;
+
+    await interaction.editReply({
+      content: responseContent
+    });
 
   } catch (error) {
     console.error('Error recording close:', error);

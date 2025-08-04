@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { FaLock, FaLockOpen, FaDownload, FaCheckCircle, FaTimesCircle } from "react-icons/fa";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../../context/AuthContext";
 import RoleplayModal from "./RoleplayModal";
 import { useProgress } from "./ProgressContext";
-import api from "../../api";
-import DataTable from "../utils/DataTable";
-import LoadingSpinner, { InlineSpinner, ButtonSpinner, PageSpinner } from "../utils/LoadingSpinner";
+import api from "../../../api";
+import DataTable from "../../utils/DataTable";
+import LoadingSpinner, { InlineSpinner, ButtonSpinner, PageSpinner } from "../../utils/LoadingSpinner";
 import "./Checklist.css";
 
 const Checklist = () => {
@@ -31,6 +31,9 @@ const Checklist = () => {
   const { user } = useAuth();
   const userId = user?.userId;
   const userRole = user?.clname;
+  
+  // Check if user is admin with teamRole="app" - should have admin access
+  const isAppAdmin = user?.Role === 'Admin' && user?.teamRole === 'app';
 
   const roleplayContent = {
     "entrance_start": (
@@ -700,8 +703,8 @@ const Checklist = () => {
         setIsLoading(true);
         let response;
         
-        if (userRole === "Admin") {
-          // Admin can see all unreleased users
+        if (userRole === "Admin" || isAppAdmin) {
+          // Admin and app admin can see all unreleased users
           response = await api.get("/release/get-unreleased-users-checklist");
         } else {
           // For managers (RGA, MGA, SGA), fetch their agents using the correct endpoint
@@ -1063,7 +1066,7 @@ const handleAgentSelection = async (event) => {
           <div style={{ marginBottom: '10px', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
             {remainingItems} item{remainingItems !== 1 ? 's' : ''} remaining
           </div>
-        ) : (userRole === "AGT" || (["SA", "GA", "MGA", "RGA"].includes(userRole) && selectedAgent)) ? (
+        ) : (userRole === "AGT" || (["SA", "GA", "MGA", "RGA"].includes(userRole) && selectedAgent) || (isAppAdmin && selectedAgent)) ? (
           <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}>
             {totalRowsThisWeek < 24 ? (
               onReleaseList ? (

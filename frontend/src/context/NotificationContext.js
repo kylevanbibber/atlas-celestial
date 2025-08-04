@@ -14,7 +14,11 @@ const NotificationContext = createContext({
   dismissNotification: () => {},
   subscribeToPushNotifications: () => {},
   unsubscribeFromPushNotifications: () => {},
-  pushEnabled: false
+  pushEnabled: false,
+  wsConnected: false,
+  wsError: null,
+  isReconnecting: false,
+  reconnectAttempts: 0
 });
 
 // Function to convert the base64 VAPID key to a Uint8Array
@@ -177,9 +181,36 @@ const NotificationProvider = ({ children }) => {
       }
 
       console.log('Getting service worker registration...');
-      // Get registration from a registered service worker
-      const registration = await navigator.serviceWorker.ready;
-      console.log('Service worker registration:', registration);
+      console.log('Service worker state:', navigator.serviceWorker.controller?.state);
+      console.log('Available registrations:', await navigator.serviceWorker.getRegistrations());
+      
+      // Get registration from a registered service worker with timeout
+      let registration;
+      try {
+        console.log('Waiting for service worker to be ready...');
+        
+        // Create a timeout promise
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Service worker ready timeout after 10 seconds')), 10000)
+        );
+        
+        // Race between service worker ready and timeout
+        registration = await Promise.race([
+          navigator.serviceWorker.ready,
+          timeoutPromise
+        ]);
+        
+        console.log('Service worker registration:', registration);
+        console.log('Service worker active state:', registration.active?.state);
+        
+        if (!registration.active) {
+          throw new Error('Service worker is not active');
+        }
+        
+      } catch (error) {
+        console.error('Error getting service worker ready:', error);
+        throw new Error('Service worker failed to become ready: ' + error.message);
+      }
       
       // Get the existing subscription if available
       console.log('Checking for existing push subscription...');
@@ -281,47 +312,231 @@ const NotificationProvider = ({ children }) => {
     }
   }, [isAuthenticated, user]);
 
+  // WebSocket connection state
+  const [wsConnection, setWsConnection] = useState(null);
+  const [wsConnected, setWsConnected] = useState(false);
+  const [wsError, setWsError] = useState(null);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+
+  // Note: WebSocket connection logic is now inline in useEffect to avoid dependency loops
+
   // Fetch notifications on mount and when auth state changes
   useEffect(() => {
     if (isAuthenticated && token) {
       // Initial fetch
       fetchNotifications();
       
-      // Setup polling to periodically check for new notifications (every 1 minute)
-      const intervalId = setInterval(() => {
-        fetchNotifications();
-      }, 60000);
+      // Connect to WebSocket for real-time updates with a small delay to prevent resource exhaustion
+      const wsTimeout = setTimeout(() => {
+        if (!wsConnected && !isReconnecting && isAuthenticated && token && reconnectAttempts === 0) {
+          // Inline WebSocket connection to avoid dependency loops
+          try {
+            // Close any existing connection first
+            if (wsConnection && wsConnection.readyState !== WebSocket.CLOSED) {
+              wsConnection.close();
+            }
+
+            // Create WebSocket connection
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsHost = window.location.hostname;
+            const wsPort = process.env.NODE_ENV === 'production' ? window.location.port : '5001';
+            const wsUrl = `${wsProtocol}//${wsHost}:${wsPort}/ws/notifications`;
+            
+            console.log('Connecting to WebSocket:', wsUrl);
+            setIsReconnecting(true);
+            const ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+              console.log('🔗 WebSocket connected for notifications');
+              setWsConnected(true);
+              setWsError(null);
+              setReconnectAttempts(0);
+              setIsReconnecting(false);
+              
+              // Send authentication
+              console.log('🔐 Sending WebSocket authentication...');
+              ws.send(JSON.stringify({ 
+                type: 'auth', 
+                token: token 
+              }));
+            };
+
+            ws.onmessage = (event) => {
+              try {
+                console.log('🔔 WebSocket message received:', event.data);
+                const data = JSON.parse(event.data);
+                console.log('🔔 Parsed WebSocket data:', data);
+                
+                if (data.type === 'auth_success') {
+                  console.log('✅ WebSocket authentication successful');
+                } else if (data.type === 'auth_error') {
+                  console.error('❌ WebSocket authentication failed:', data.message);
+                  setWsError('Authentication failed');
+                  ws.close();
+                } else if (data.type === 'notification') {
+                  console.log('🔔 Received real-time notification:', data.notification);
+                  console.log('🔄 Calling fetchNotifications() to update UI...');
+                  fetchNotifications().then(() => {
+                    console.log('✅ fetchNotifications() completed successfully');
+                  }).catch(err => {
+                    console.error('❌ fetchNotifications() failed:', err);
+                  });
+                } else if (data.type === 'ping') {
+                  console.log('🏓 Responding to ping');
+                  ws.send(JSON.stringify({ type: 'pong' }));
+
+                } else {
+                  console.log('❓ Unknown WebSocket message type:', data.type);
+                }
+              } catch (error) {
+                console.error('❌ Error parsing WebSocket message:', error);
+              }
+            };
+
+            ws.onclose = (event) => {
+              console.log('WebSocket disconnected', event.code, event.reason);
+              setWsConnected(false);
+              setIsReconnecting(false);
+              
+              // Only attempt to reconnect if still authenticated and not intentional close
+              if (event.code !== 1000 && isAuthenticated && reconnectAttempts < 5) {
+                const backoffDelay = Math.min(2000 * Math.pow(2, reconnectAttempts), 10000);
+                console.log(`Will attempt to reconnect WebSocket in ${backoffDelay/1000} seconds... (attempt ${reconnectAttempts + 1}/5)`);
+                
+                setTimeout(() => {
+                  setReconnectAttempts(prev => prev + 1);
+                }, backoffDelay);
+              } else if (reconnectAttempts >= 5) {
+                console.log('Max reconnection attempts reached. Stopping reconnection.');
+                setWsError('Connection failed after multiple attempts');
+                setIsReconnecting(false);
+              }
+            };
+
+            ws.onerror = (error) => {
+              console.error('WebSocket error:', error);
+              setWsConnected(false);
+              setWsError('Connection error');
+              setIsReconnecting(false);
+            };
+
+            setWsConnection(ws);
+          } catch (error) {
+            console.error('Failed to connect WebSocket:', error);
+            setWsError('Failed to connect');
+            setIsReconnecting(false);
+          }
+        }
+      }, 1000); // 1 second delay
       
-      return () => clearInterval(intervalId);
+      // Fallback polling (only if WebSocket fails or for redundancy)
+      const fallbackInterval = setInterval(() => {
+        if (!wsConnected) {
+          console.log('WebSocket not connected, using fallback polling');
+          fetchNotifications();
+        }
+      }, 120000); // Every 2 minutes as fallback
+      
+      return () => {
+        clearTimeout(wsTimeout);
+        clearInterval(fallbackInterval);
+      };
     }
-  }, [isAuthenticated, token, fetchNotifications]);
+  }, [isAuthenticated, token, reconnectAttempts]); // Added reconnectAttempts dependency for reconnection logic
+
+  // Separate effect for handling WebSocket cleanup on logout
+  useEffect(() => {
+    if (!isAuthenticated && wsConnection) {
+      console.log('User logged out, disconnecting WebSocket');
+      wsConnection.close(1000, 'User logout');
+      setWsConnection(null);
+      setWsConnected(false);
+      setReconnectAttempts(0);
+      setIsReconnecting(false);
+    }
+  }, [isAuthenticated, wsConnection]);
+
+  // Handle reconnection attempts
+  useEffect(() => {
+    if (reconnectAttempts > 0 && reconnectAttempts < 5 && isAuthenticated && !wsConnected && !isReconnecting) {
+      console.log(`Triggering reconnection attempt ${reconnectAttempts}`);
+      // Trigger the main connection effect to retry
+      const retryTimeout = setTimeout(() => {
+        if (isAuthenticated && !wsConnected && !isReconnecting) {
+          // Reset to trigger the main useEffect
+          setReconnectAttempts(0);
+        }
+      }, 100);
+      
+      return () => clearTimeout(retryTimeout);
+    }
+  }, [reconnectAttempts, isAuthenticated, wsConnected, isReconnecting]);
 
   // Setup service worker for push notifications
   useEffect(() => {
     if (!isAuthenticated || !user?.userId) return;
 
-    // Check if the browser supports service workers and push notifications
-    if ('serviceWorker' in navigator && 'PushManager' in window) {
-      // Register service worker for push notifications
-      navigator.serviceWorker.register('/service-worker.js')
-        .then(async registration => {
-          console.log('Service worker registered:', registration);
-          
-          // Check for existing push subscription
-          try {
-            const subscription = await registration.pushManager.getSubscription();
-            console.log('Found existing push subscription:', subscription);
-            if (subscription) {
-              setPushSubscription(subscription);
+    // Helper function to handle service worker registration
+    async function handleServiceWorkerRegistration(registration) {
+      console.log('✅ Service worker registered successfully:', registration);
+      console.log('🔧 Registration state:', registration.installing, registration.waiting, registration.active);
+      
+      // Wait for service worker to become active if it's installing
+      if (registration.installing) {
+        console.log('🔧 Service worker is installing, waiting for activation...');
+        await new Promise((resolve) => {
+          registration.installing.addEventListener('statechange', function() {
+            console.log('🔧 Service worker state changed to:', this.state);
+            if (this.state === 'activated') {
+              resolve();
             }
-          } catch (err) {
-            console.error('Error checking push subscription:', err);
-          }
-        })
-        .catch(error => {
-          console.error('Service worker registration failed:', error);
+          });
         });
+      }
+      
+      // Check for existing push subscription
+      try {
+        const subscription = await registration.pushManager.getSubscription();
+        console.log('🔔 Found existing push subscription:', subscription);
+        if (subscription) {
+          setPushSubscription(subscription);
+        }
+      } catch (err) {
+        console.error('❌ Error checking push subscription:', err);
+      }
     }
+
+    // Async function to setup service worker
+    async function setupServiceWorker() {
+      // Check if the browser supports service workers and push notifications
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        console.log('🔧 Setting up service worker...');
+        
+        try {
+          // Check if service worker is already registered
+          const existingRegistration = await navigator.serviceWorker.getRegistration('/service-worker.js');
+          if (existingRegistration) {
+            console.log('🔧 Service worker already registered:', existingRegistration);
+            // Use existing registration
+            await handleServiceWorkerRegistration(existingRegistration);
+            return;
+          }
+          
+          // Register service worker for push notifications
+          console.log('🔧 Registering new service worker...');
+          const registration = await navigator.serviceWorker.register('/service-worker.js');
+          await handleServiceWorkerRegistration(registration);
+          
+        } catch (error) {
+          console.error('❌ Service worker setup failed:', error);
+        }
+      } else {
+        console.warn('⚠️ Service Worker or Push Manager not supported');
+      }
+    }
+
+    setupServiceWorker();
     
     // Cleanup function to unsubscribe when component unmounts or user logs out
     return () => {
@@ -380,6 +595,10 @@ const NotificationProvider = ({ children }) => {
     checkSubscriptionSync();
   }, [vapidPublicKey, isAuthenticated, subscribeToPushNotifications]);
 
+
+
+
+
   const value = {
     notifications,
     unreadCount,
@@ -391,7 +610,11 @@ const NotificationProvider = ({ children }) => {
     dismissNotification,
     subscribeToPushNotifications,
     unsubscribeFromPushNotifications,
-    pushEnabled: !!pushSubscription
+    pushEnabled: !!pushSubscription,
+    wsConnected,
+    wsError,
+    isReconnecting,
+    reconnectAttempts
   };
 
   return (

@@ -3,13 +3,84 @@ import api from "../../../api";
 import { useAuth } from "../../../context/AuthContext";
 import "../../../pages/abc.css";
 import Placeholder from "../../utils/Placeholder";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+// Custom star point plugin
+const starPointPlugin = {
+  id: 'starPoint',
+  beforeDraw: (chart) => {
+    const ctx = chart.ctx;
+    chart.data.datasets.forEach((dataset, datasetIndex) => {
+      if (dataset.starPoints) {
+        const meta = chart.getDatasetMeta(datasetIndex);
+        meta.data.forEach((point, index) => {
+          if (dataset.starPoints[index]) {
+            const value = dataset.data[index];
+            if (value !== null && value !== undefined) {
+              const x = point.x;
+              const y = point.y;
+              
+              // Draw star emoji
+              ctx.save();
+              ctx.font = '16px Arial';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('⭐', x, y);
+              ctx.restore();
+            }
+          }
+        });
+      }
+    });
+  }
+};
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
+
+// Register custom star point plugin
+ChartJS.register(starPointPlugin);
 
 const Scorecard = memo(() => {
   // Get user data from auth context
   const { user } = useAuth();
   const userId = user?.userId;
-  const userRole = user?.clname?.toUpperCase();
-  const agnName = user?.lagnname; // Using lagnname as agent name
+  
+  // Check if user is admin with teamRole="app" - treat as SGA
+  const isAppAdmin = user?.Role === 'Admin' && user?.teamRole === 'app';
+  
+  // Use SGA role for app admins, otherwise use actual clname
+  const userRole = isAppAdmin ? 'SGA' : user?.clname?.toUpperCase();
+  
+  // Use "ARIAS SIMON A" as lagnname for app admins, otherwise use actual lagnname
+  const agnName = isAppAdmin ? 'ARIAS SIMON A' : user?.lagnname; // Using lagnname as agent name
+  
+  // Log for debugging app admin data fetching
+  if (isAppAdmin) {
+    console.log('🏭 ScorecardTable: App admin detected, using SGA role and ARIAS SIMON A as lagnname', {
+      userRole,
+      agnName,
+      userId: user?.userId
+    });
+  }
 
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 const [lastYear, setLastYear] = useState(currentYear - 1);
@@ -82,6 +153,9 @@ const getMonthYear = useCallback((dateStr) => {
   , [userRole]);
   
   const [selectedAlpTab, setSelectedAlpTab] = useState(defaultAlpTab);
+  const [showFutureMonths, setShowFutureMonths] = useState(true);
+  const [quartersMode, setQuartersMode] = useState('show'); // 'show', 'hide', 'only'
+  const [viewMode, setViewMode] = useState('table'); // 'table', 'graph'
   const [rawAlpData, setRawAlpData] = useState([]);
   
   const showAriasOrganization = useMemo(() => 
@@ -175,7 +249,8 @@ const getMonthYear = useCallback((dateStr) => {
     "Dec",
     "Q4 ",
     "YTD ",
-  ], []);
+    `${currentYear - 1}`,
+  ], [currentYear]);
 
   const monthLabels = useMemo(() => [
     "Jan", "Feb", "Mar",  // index 0,1,2
@@ -188,6 +263,9 @@ const getMonthYear = useCallback((dateStr) => {
 
   // Memoize data processing functions
   const groupByMonthAndYear = useCallback((data, dateField) => {
+    if (!Array.isArray(data) || data.length === 0) {
+      return {};
+    }
     return data.reduce((acc, item) => {
       const date = new Date(item[dateField]);
       const month = date.getUTCMonth();
@@ -201,6 +279,9 @@ const getMonthYear = useCallback((dateStr) => {
   }, []);
   
   const groupTotalHiresByMonthAndYear = useCallback((data, dateField) => {
+    if (!Array.isArray(data) || data.length === 0) {
+      return {};
+    }
     return data.reduce((acc, row) => {
       const date = new Date(row[dateField]);
       const month = date.getMonth();
@@ -211,26 +292,35 @@ const getMonthYear = useCallback((dateStr) => {
     }, {});
   }, []);
   
-  const calculateQuarterSums = useCallback((monthlyData) => {
+  const calculateQuarterSums = useCallback((monthlyData, previousYearData = null) => {
     const q1 = monthlyData.slice(0, 3).reduce((sum, value) => sum + value, 0);
     const q2 = monthlyData.slice(3, 6).reduce((sum, value) => sum + value, 0);
     const q3 = monthlyData.slice(6, 9).reduce((sum, value) => sum + value, 0);
     const q4 = monthlyData.slice(9, 12).reduce((sum, value) => sum + value, 0);
     const total = q1 + q2 + q3 + q4;
+    
+    // Calculate previous year sum if data is provided (this means we're calculating for the previous year row)
+    const prevYearSum = previousYearData ? previousYearData.reduce((sum, value) => sum + value, 0) : 0;
 
-    return [...monthlyData.slice(0, 3), q1, ...monthlyData.slice(3, 6), q2, ...monthlyData.slice(6, 9), q3, ...monthlyData.slice(9, 12), q4, total];
+    return [...monthlyData.slice(0, 3), q1, ...monthlyData.slice(3, 6), q2, ...monthlyData.slice(6, 9), q3, ...monthlyData.slice(9, 12), q4, total, prevYearSum];
   }, []);
 
-  const calculateQuarterAverages = useCallback((monthlyData) => {
-    const q1 = Math.round(monthlyData.slice(0, 3).reduce((sum, value) => sum + value, 0) / 3);
-    const q2 = Math.round(monthlyData.slice(3, 6).reduce((sum, value) => sum + value, 0) / 3);
-    const q3 = Math.round(monthlyData.slice(6, 9).reduce((sum, value) => sum + value, 0) / 3);
-    const q4 = Math.round(monthlyData.slice(9, 12).reduce((sum, value) => sum + value, 0) / 3);
-    // Exclude current month from YTD calculation
+  const calculateQuarterAverages = useCallback((monthlyData, previousYearData = null) => {
+    // Use the last month of each quarter for quarter values
+    const q1 = monthlyData[2]; // March (index 2)
+    const q2 = monthlyData[5]; // June (index 5)
+    const q3 = monthlyData[8]; // September (index 8)
+    const q4 = monthlyData[11]; // December (index 11)
+    
+    // For YTD: use the current month from last year and this year
     const today = new Date();
     const currentMonth = today.getMonth(); // 0-indexed (0 = January, 11 = December)
-    const monthsToInclude = currentMonth === 0 ? 0 : currentMonth; // If January, include 0 months (no YTD for current year), otherwise exclude current month
-    const ytd = monthsToInclude === 0 ? 0 : Math.round(monthlyData.slice(0, monthsToInclude).reduce((sum, value) => sum + value, 0) / monthsToInclude);
+    const lastMonthIndex = currentMonth === 0 ? 0 : currentMonth - 1; // If January, use January (0), otherwise use previous month
+    const ytd = monthlyData[lastMonthIndex] || 0;
+    
+    // Calculate previous year value: use the same month as current year YTD for proper comparison
+    const prevYearValue = previousYearData ? previousYearData[lastMonthIndex] || 0 : 0;
+    
     return [
       ...monthlyData.slice(0, 3).map((v) => Math.round(v)),
       q1,
@@ -241,6 +331,7 @@ const getMonthYear = useCallback((dateStr) => {
       ...monthlyData.slice(9, 12).map((v) => Math.round(v)),
       q4,
       ytd,
+      prevYearValue,
     ];
   }, []);
 
@@ -322,13 +413,27 @@ const getMonthYear = useCallback((dateStr) => {
       );
 
       roles.forEach(role => {
-        const count = maxRows.filter(row => row.clname === role).length;
+        let count = 0;
+        if (role === "MGA") {
+          // For MGA count: include both MGA and RGA (since RGAs function as MGAs)
+          count = maxRows.filter(row => row.clname === "MGA" || row.clname === "RGA").length;
+        } else {
+          // For other roles: count only exact matches
+          count = maxRows.filter(row => row.clname === role).length;
+        }
         if (!result[role][year]) result[role][year] = Array(12).fill(0);
         result[role][year][month] = count;
       });
 
-      // Total count for this month: count rows with any of the allowed roles.
-      const totalCount = maxRows.filter(row => roles.includes(row.clname)).length;
+      // Total count for this month: count unique individuals with any of the allowed roles
+      // Use a Set to avoid double-counting RGAs who appear as both MGA and RGA
+      const uniqueIndividuals = new Set();
+      maxRows.forEach(row => {
+        if (roles.includes(row.clname) && row.lagnname) {
+          uniqueIndividuals.add(row.lagnname);
+        }
+      });
+      const totalCount = uniqueIndividuals.size;
       if (!result.total[year]) result.total[year] = Array(12).fill(0);
       result.total[year][month] = totalCount;
     });
@@ -415,11 +520,75 @@ const getMonthYear = useCallback((dateStr) => {
             count: group.agents.length,
           }));
         } else {
+          monthlyAveragesByYear[year] = 0;
+          weeklyDetails[year][m] = [];
+        }
+      }
+    });
+    return { monthlyAveragesByYear, weeklyDetails };
+  }, []);
+
+  const processSubAgentDataFromDatabase = useCallback((data) => {
+    const monthlyAveragesByYear = {};
+    const weeklyDetails = {};
+
+    // Group data by year and month
+    const groupedByYearMonth = {};
+    
+    data.forEach((row) => {
+      if (!row.date) return;
+      
+      // Parse the date string and ensure it's treated as local date, not UTC
+      const [yearStr, monthStr, dayStr] = row.date.split('-');
+      const year = parseInt(yearStr, 10);
+      const month = parseInt(monthStr, 10) - 1; // Convert to 0-indexed
+      
+      if (!groupedByYearMonth[year]) {
+        groupedByYearMonth[year] = {};
+      }
+      if (!groupedByYearMonth[year][month]) {
+        groupedByYearMonth[year][month] = [];
+      }
+      
+      groupedByYearMonth[year][month].push({
+        count: row.count || 0,
+        post_six: row.post_six || 0,
+        first_six: row.first_six || 0,
+        date: row.date
+      });
+    });
+
+    // Calculate monthly averages and weekly details
+    Object.keys(groupedByYearMonth).forEach((yearKey) => {
+      const year = parseInt(yearKey, 10);
+      monthlyAveragesByYear[year] = Array(12).fill(0);
+      weeklyDetails[year] = {};
+      
+      for (let m = 0; m < 12; m++) {
+        if (groupedByYearMonth[year] && groupedByYearMonth[year][m]) {
+          const monthData = groupedByYearMonth[year][m];
+          const totalCount = monthData.reduce((sum, week) => sum + week.count, 0);
+          const weeksInMonth = monthData.length;
+          
+          // Calculate average for the month
+          const average = weeksInMonth > 0 ? totalCount / weeksInMonth : 0;
+          monthlyAveragesByYear[year][m] = average;
+          
+          // Create weekly details
+          weeklyDetails[year][m] = monthData.map((week) => ({
+            startDate: new Date(week.date + 'T00:00:00'),
+            endDate: new Date(week.date + 'T00:00:00'),
+            count: week.count,
+            post_six: week.post_six,
+            first_six: week.first_six
+          }));
+        } else {
           monthlyAveragesByYear[year][m] = 0;
           weeklyDetails[year][m] = [];
         }
       }
     });
+    
     return { monthlyAveragesByYear, weeklyDetails };
   }, []);
   
@@ -603,7 +772,7 @@ const getMonthYear = useCallback((dateStr) => {
           );
           requests.push(
             api.get(
-              `/dataroutes/subagent-alp?value=${effectiveAgnName}`
+              `/production-reports/submitting-agent-count?year=${currentYear}`
             )
           );
           requests.push(
@@ -633,7 +802,7 @@ const getMonthYear = useCallback((dateStr) => {
         );
         setHiresData(hiresGrouped);
   
-        const { monthlyAveragesByYear, weeklyDetails } = processSubmittingAgentCount(
+        const { monthlyAveragesByYear, weeklyDetails } = processSubAgentDataFromDatabase(
           responses[4]?.data?.data || []
         );
         setSubAgentData(monthlyAveragesByYear);
@@ -663,8 +832,8 @@ if (queryRole !== "AGT") {
   // Get the response data from the subagent endpoint.
   const subagentResponseData = responses[4]?.data?.data || [];
 
-  // Process the subagent data using processSubmittingAgentCount for consistency.
-  const { monthlyAveragesByYear, weeklyDetails: nonSgaWeeklyDetails } = processSubmittingAgentCount(
+  // Process the subagent data using processSubAgentDataFromDatabase for consistency.
+  const { monthlyAveragesByYear, weeklyDetails: nonSgaWeeklyDetails } = processSubAgentDataFromDatabase(
     subagentResponseData
   );
   setSubAgentData(monthlyAveragesByYear);
@@ -690,18 +859,28 @@ if (!useSgaEndpoints && queryRole !== "AGT") {
     } finally {
       setLoading(false);
     }
-  }, [agnName, userRole, selectedMga, effectiveAgnName, queryRole, rawAlpData, selectedAlpTab, rawMgmtHistoryData, processAlpData, groupTotalHiresByMonthAndYear, processSubmittingAgentCount, processManagementHistoryDataByRole]);
+  }, [agnName, userRole, selectedMga, effectiveAgnName, queryRole, rawAlpData, selectedAlpTab, rawMgmtHistoryData, processAlpData, groupTotalHiresByMonthAndYear, processSubAgentDataFromDatabase, processManagementHistoryDataByRole, currentYear]);
   const filterAgentHistoryData = useCallback((data, effectiveName, userRole) => {
     const lowerEffectiveName = effectiveName.toLowerCase();
-    if (userRole === "MGA" || userRole === "RGA") {
+    if (userRole === "MGA") {
       return data.filter(item => {
-        // Check if the effective name appears in either the 'mga' or 'rga' columns.
+        // For MGA users, check if the effective name appears in the 'mga' column
         const mgaMatch =
           item.mga && item.mga.toLowerCase().includes(lowerEffectiveName);
         return mgaMatch;
       });
+    } else if (userRole === "RGA") {
+      return data.filter(item => {
+        // For RGA users, check if the effective name appears in either the 'mga' or 'rga' columns
+        // This allows RGAs to see both their own data and MGAs under them
+        const mgaMatch =
+          item.mga && item.mga.toLowerCase().includes(lowerEffectiveName);
+        const rgaMatch =
+          item.rga && item.rga.toLowerCase().includes(lowerEffectiveName);
+        return mgaMatch || rgaMatch;
+      });
     } else if (userRole === "SA") {
-      // For example, if the user is SA, filter based on the 'sa' column.
+      // For SA users, filter based on the 'sa' column.
       return data.filter(
         item => item.sa && item.sa.toLowerCase().includes(lowerEffectiveName)
       );
@@ -856,6 +1035,304 @@ if (!useSgaEndpoints && queryRole !== "AGT") {
     }
   }, [agnName, userRole]); 
   
+  // Helper function to check if a month is in the future
+  const isMonthInFuture = useCallback((year, monthIndex) => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+    
+    return (year > currentYear) || (year === currentYear && monthIndex > currentMonth);
+  }, []);
+
+  // Helper function to check if a month index in the months array represents a future month
+  const isMonthIndexFuture = useCallback((index) => {
+    // Skip quarter columns (3, 7, 11, 15), YTD column (16), and previous year column (17)
+    if ([3, 7, 11, 15, 16, 17].includes(index)) {
+      return false; // Always show these columns
+    }
+    
+    // Map index to actual month (0-11)
+    let actualMonth;
+    if (index < 3) actualMonth = index; // Jan, Feb, Mar
+    else if (index < 7) actualMonth = index - 1; // Apr, May, Jun (skip Q1)
+    else if (index < 11) actualMonth = index - 2; // Jul, Aug, Sep (skip Q1, Q2)
+    else actualMonth = index - 3; // Oct, Nov, Dec (skip Q1, Q2, Q3)
+    
+    return isMonthInFuture(currentYear, actualMonth);
+  }, [currentYear, isMonthInFuture]);
+
+  // Helper function for single management table column indices (no previous year column)
+  const isMgmtColumnIndexFuture = useCallback((index) => {
+    // Skip quarter columns (3, 7, 11, 15) and YTD column (16)
+    if ([3, 7, 11, 15, 16].includes(index)) {
+      return false; // Always show these columns
+    }
+    
+    // Map index to actual month (0-11) for single management table
+    let actualMonth;
+    if (index < 3) actualMonth = index; // Jan, Feb, Mar
+    else if (index < 7) actualMonth = index - 1; // Apr, May, Jun (skip Q1)
+    else if (index < 11) actualMonth = index - 2; // Jul, Aug, Sep (skip Q1, Q2)
+    else actualMonth = index - 3; // Oct, Nov, Dec (skip Q1, Q2, Q3)
+    
+    return isMonthInFuture(currentYear, actualMonth);
+  }, [currentYear, isMonthInFuture]);
+
+  // Helper function to check if a column index is a quarter column
+  const isQuarterColumn = useCallback((index) => {
+    return [3, 7, 11, 15].includes(index);
+  }, []);
+
+  // Helper function for single management table quarter columns
+  const isMgmtQuarterColumn = useCallback((index) => {
+    return [3, 7, 11, 15].includes(index);
+  }, []);
+
+  // Helper function to determine if a column should be shown based on quarters mode
+  const shouldShowColumn = useCallback((index, isQuarter, isFuture) => {
+    // Handle quarters mode
+    if (quartersMode === 'hide' && isQuarter) {
+      return false; // Hide quarters
+    }
+    if (quartersMode === 'only') {
+      // Only show quarters, YTD, and previous year columns
+      if (!isQuarter && ![16, 17].includes(index)) {
+        return false; // Hide non-quarter columns (except YTD and previous year)
+      }
+    }
+    
+    // Handle future months (existing logic)
+    if (!showFutureMonths && isFuture) {
+      return false;
+    }
+    
+    return true;
+  }, [quartersMode, showFutureMonths]);
+
+  // Helper function for single management table column visibility
+  const shouldShowMgmtColumn = useCallback((index, isQuarter, isFuture) => {
+    // Handle quarters mode
+    if (quartersMode === 'hide' && isQuarter) {
+      return false; // Hide quarters
+    }
+    if (quartersMode === 'only') {
+      // Only show quarters and YTD columns (no previous year in mgmt tables)
+      if (!isQuarter && index !== 16) {
+        return false; // Hide non-quarter columns (except YTD)
+      }
+    }
+    
+    // Handle future months (existing logic)
+    if (!showFutureMonths && isFuture) {
+      return false;
+    }
+    
+    return true;
+  }, [quartersMode, showFutureMonths]);
+
+  // Animated Line Graph Component using Chart.js
+  const LineGraph = ({ title, currentYearData, previousYearData, isCurrency = false }) => {
+    
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    
+    // Ensure data is always an array with 12 months
+    const safeCurrentYearData = Array.isArray(currentYearData) ? currentYearData : Array(12).fill(0);
+    const safePreviousYearData = Array.isArray(previousYearData) ? previousYearData : Array(12).fill(0);
+    
+    // Pad arrays to ensure they have 12 months
+    while (safeCurrentYearData.length < 12) safeCurrentYearData.push(0);
+    while (safePreviousYearData.length < 12) safePreviousYearData.push(0);
+    
+    // Find record values (highest in all data for this metric)
+    const allDataPoints = [...safeCurrentYearData, ...safePreviousYearData];
+    const maxValue = Math.max(...allDataPoints.filter(v => v > 0));
+    
+    // Create star point arrays - true for records, false for others
+    const currentYearStarPoints = safeCurrentYearData.map((value, index) => 
+      index <= currentMonth && value === maxValue && value > 0
+    );
+    const previousYearStarPoints = safePreviousYearData.map(value => 
+      value === maxValue && value > 0
+    );
+    
+    // Create point sizes arrays - hide points where we'll draw stars
+    const currentYearPointSizes = safeCurrentYearData.map((value, index) => 
+      index <= currentMonth && value === maxValue && value > 0 ? 0 : 4
+    );
+    const previousYearPointSizes = safePreviousYearData.map(value => 
+      value === maxValue && value > 0 ? 0 : 4
+    );
+    
+    // Create datasets for Chart.js
+    const data = {
+      labels: months,
+      datasets: [
+        {
+          label: `${previousYear}`,
+          data: safePreviousYearData,
+          borderColor: '#94a3b8',
+          backgroundColor: '#94a3b8',
+          borderWidth: 2,
+          borderDash: [5, 5],
+          pointBackgroundColor: '#94a3b8',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2,
+          pointRadius: previousYearPointSizes,
+          pointHoverRadius: previousYearPointSizes.map(size => size + 2),
+          starPoints: previousYearStarPoints,
+          tension: 0.3,
+        },
+        {
+          label: `${currentYear}`,
+          data: safeCurrentYearData.map((value, index) => 
+            index <= currentMonth ? value : null
+          ),
+          borderColor: '#3b82f6',
+          backgroundColor: '#3b82f6',
+          borderWidth: 3,
+          pointBackgroundColor: '#3b82f6',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2,
+          pointRadius: currentYearPointSizes.map((size, index) => 
+            index <= currentMonth ? size : 0
+          ),
+          pointHoverRadius: currentYearPointSizes.map((size, index) => 
+            index <= currentMonth ? size + 2 : 0
+          ),
+          starPoints: currentYearStarPoints.map((isStar, index) => 
+            index <= currentMonth ? isStar : false
+          ),
+          tension: 0.3,
+          spanGaps: false,
+        },
+        // Future months as grayed out points
+        {
+          label: 'Future',
+          data: safeCurrentYearData.map((value, index) => 
+            index > currentMonth ? 0 : null
+          ),
+          borderColor: 'transparent',
+          backgroundColor: '#e5e7eb',
+          pointBackgroundColor: '#e5e7eb',
+          pointBorderColor: 'transparent',
+          pointRadius: 3,
+          showLine: false,
+          spanGaps: false,
+        }
+      ]
+    };
+    
+    const options = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            filter: (legendItem) => legendItem.text !== 'Future'
+          }
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label: function(context) {
+              const label = context.dataset.label || '';
+              const value = context.parsed.y;
+              if (context.datasetIndex === 2) return null; // Hide future points tooltip
+              
+              let formattedValue;
+              if (isCurrency) {
+                formattedValue = new Intl.NumberFormat('en-US', {
+                  style: 'currency',
+                  currency: 'USD',
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                }).format(value);
+              } else {
+                formattedValue = value.toLocaleString();
+              }
+              
+              // Check if this is a record value
+              const isRecord = value === maxValue && value > 0;
+              const recordText = isRecord ? ' ⭐ RECORD!' : '';
+              
+              return `${label}: ${formattedValue}${recordText}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            color: '#e0e0e0'
+          },
+          ticks: {
+            color: function(context) {
+              const index = context.index;
+              return index > currentMonth ? '#ccc' : '#666';
+            }
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: '#e0e0e0'
+          },
+          ticks: {
+            color: '#666',
+            callback: function(value) {
+              if (isCurrency) {
+                return new Intl.NumberFormat('en-US', {
+                  style: 'currency',
+                  currency: 'USD',
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                }).format(value);
+              }
+              return value.toLocaleString();
+            }
+          }
+        }
+      },
+      animation: {
+        duration: 2500,
+        easing: 'easeInOutQuart',
+        delay: (context) => {
+          // Animate points first, then lines
+          if (context.type === 'point') {
+            return context.dataIndex * 150; // Stagger point animations
+          }
+          return 1800; // Lines animate after points
+        }
+      },
+      animations: {
+        radius: {
+          duration: 400,
+          easing: 'linear',
+          loop: (context) => context.active
+        }
+      },
+      interaction: {
+        mode: 'nearest',
+        axis: 'x',
+        intersect: false
+      }
+    };
+    
+    return (
+      <div className="atlas-scorecard-section">
+        <h5>{title}</h5>
+        <div className="atlas-scorecard-graph-container" style={{ height: '350px', padding: '20px' }}>
+          <Line data={data} options={options} />
+        </div>
+      </div>
+    );
+  };
+  
   if (loading) return <Placeholder/>;
   if (error) return <div>Error: {error}</div>;
 
@@ -928,14 +1405,24 @@ if (!useSgaEndpoints && queryRole !== "AGT") {
               <thead>
                 <tr>
                   <th>Year</th>
-                  {columns.map((col, i) => (
-                    <th
-                      key={i}
-                      className={i === columns.length - 1 ? "atlas-scorecard-ytd-header" : i % 4 === 3 ? "atlas-scorecard-quarter-header" : ""}
-                    >
-                      {col}
-                    </th>
-                  ))}
+                  {columns.map((col, i) => {
+                    const isQuarter = isMgmtQuarterColumn(i);
+                    const isFuture = isMgmtColumnIndexFuture(i);
+                    
+                    // Check if column should be shown based on quarters mode and future months toggle
+                    if (!shouldShowMgmtColumn(i, isQuarter, isFuture)) {
+                      return null;
+                    }
+                    
+                    return (
+                      <th
+                        key={i}
+                        className={i === columns.length - 1 ? "atlas-scorecard-ytd-header" : i % 4 === 3 ? "atlas-scorecard-quarter-header" : ""}
+                      >
+                        {col}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
@@ -943,12 +1430,20 @@ if (!useSgaEndpoints && queryRole !== "AGT") {
                 <tr>
                   <td>{previousYear}</td>
                   {prevValues.map((val, idx) => {
+                    const isQuarter = isMgmtQuarterColumn(idx);
+                    const isFuture = isMgmtColumnIndexFuture(idx);
+                    
+                    // Check if column should be shown based on quarters mode and future months toggle
+                    if (!shouldShowMgmtColumn(idx, isQuarter, isFuture)) {
+                      return null;
+                    }
+                    
                     // Only month cells (not quarter or YTD) should be clickable.
                     const actualMonth = convertTableIndexToActualMonth(idx);
                     return (
                       <td
                         key={idx}
-                        className={idx === prevValues.length - 1 ? "atlas-scorecard-ytd-cell" : idx % 4 === 3 ? "atlas-scorecard-quarter-cell" : ""}
+                        className={idx === prevValues.length - 1 ? "atlas-scorecard-prev-year-cell" : idx === prevValues.length - 2 ? "atlas-scorecard-ytd-cell" : idx % 4 === 3 ? "atlas-scorecard-quarter-cell" : ""}
                         onClick={() => {
                           if (actualMonth !== null) {
                             handleMgmtCellClick(roleKey, previousYear, idx);
@@ -966,39 +1461,73 @@ if (!useSgaEndpoints && queryRole !== "AGT") {
                 <tr>
                   <td>{currentYear}</td>
                   {currValues.map((val, idx) => {
+                    const isQuarter = isMgmtQuarterColumn(idx);
+                    const isFuture = isMgmtColumnIndexFuture(idx);
+                    
+                    // Check if column should be shown based on quarters mode and future months toggle
+                    if (!shouldShowMgmtColumn(idx, isQuarter, isFuture)) {
+                      return null;
+                    }
+                    
                     const actualMonth = convertTableIndexToActualMonth(idx);
+                    const isFutureMonth = actualMonth !== null && isMonthInFuture(currentYear, actualMonth);
+                    
                     return (
                       <td
                         key={idx}
-                        className={idx === currValues.length - 1 ? "atlas-scorecard-ytd-cell" : idx % 4 === 3 ? "atlas-scorecard-quarter-cell" : ""}
+                        className={idx === currValues.length - 1 ? "atlas-scorecard-prev-year-cell" : idx === currValues.length - 2 ? "atlas-scorecard-ytd-cell" : idx % 4 === 3 ? "atlas-scorecard-quarter-cell" : ""}
                         onClick={() => {
-                          if (actualMonth !== null) {
+                          if (actualMonth !== null && !isFutureMonth) {
                             handleMgmtCellClick(roleKey, currentYear, idx);
                           }
                         }}
-                        title={actualMonth !== null ? "Click to view breakdown" : ""}
-                        style={{ cursor: actualMonth !== null ? "pointer" : "default" }}
+                        title={actualMonth !== null && !isFutureMonth ? "Click to view breakdown" : ""}
+                        style={{ cursor: actualMonth !== null && !isFutureMonth ? "pointer" : "default" }}
                       >
-                        {numberFormatter(val)}
+                        {isFutureMonth ? "—" : numberFormatter(val)}
                       </td>
                     );
                   })}
                 </tr>
                 <tr className="atlas-scorecard-growth-row">
                   <td>Growth</td>
-                  {growthData.map(({ value, className }, idx) => (
-                    <td key={idx} className={className}>
-                      {numberFormatter(value)}
-                    </td>
-                  ))}
+                  {growthData.map(({ value, className }, idx) => {
+                    const isQuarter = isMgmtQuarterColumn(idx);
+                    const isFuture = isMgmtColumnIndexFuture(idx);
+                    
+                    // Check if column should be shown based on quarters mode and future months toggle
+                    if (!shouldShowMgmtColumn(idx, isQuarter, isFuture)) {
+                      return null;
+                    }
+                    
+                    const actualMonth = convertTableIndexToActualMonth(idx);
+                    const isFutureMonth = actualMonth !== null && isMonthInFuture(currentYear, actualMonth);
+                    return (
+                      <td key={idx} className={className}>
+                        {isFutureMonth ? "—" : numberFormatter(value)}
+                      </td>
+                    );
+                  })}
                 </tr>
                 <tr className="atlas-scorecard-percentage-row">
                   <td>%</td>
-                  {percentGrowthData.map((data, idx) => (
-                    <td key={idx} className={data.className}>
-                      {data.value === "N/A" ? "N/A" : `${data.value.toFixed(1)}%`}
-                    </td>
-                  ))}
+                  {percentGrowthData.map((data, idx) => {
+                    const isQuarter = isMgmtQuarterColumn(idx);
+                    const isFuture = isMgmtColumnIndexFuture(idx);
+                    
+                    // Check if column should be shown based on quarters mode and future months toggle
+                    if (!shouldShowMgmtColumn(idx, isQuarter, isFuture)) {
+                      return null;
+                    }
+                    
+                    const actualMonth = convertTableIndexToActualMonth(idx);
+                    const isFutureMonth = actualMonth !== null && isMonthInFuture(currentYear, actualMonth);
+                    return (
+                      <td key={idx} className={data.className}>
+                        {isFutureMonth ? "—" : (data.value === "N/A" ? "N/A" : `${data.value.toFixed(1)}%`)}
+                      </td>
+                    );
+                  })}
                 </tr>
               </tbody>
             </table>
@@ -1021,6 +1550,7 @@ if (!useSgaEndpoints && queryRole !== "AGT") {
                   <tr>
                     <th>Name</th>
                     {(roleKey === "SA" || roleKey === "GA") && <th>MGA</th>}
+                    {(roleKey === "MGA" || roleKey === "RGA") && <th>Hierarchy</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -1029,6 +1559,14 @@ if (!useSgaEndpoints && queryRole !== "AGT") {
                       <td>{formatName(entry.lagnname) || "N/A"}</td>
                       {(roleKey === "SA" || roleKey === "GA") && (
                         <td>{formatName(entry.mga) || "N/A"}</td>
+                      )}
+                      {(roleKey === "MGA" || roleKey === "RGA") && (
+                        <td>
+                          {entry.sa && <div style={{ backgroundColor: "#B25271" }}>SA: {formatName(entry.sa)}</div>}
+                          {entry.ga && <div style={{ backgroundColor: "#ED722F" }}>GA: {formatName(entry.ga)}</div>}
+                          {entry.mga && <div style={{ backgroundColor: "#68B675" }}>MGA: {formatName(entry.mga)}</div>}
+                          {entry.rga && <div style={{ backgroundColor: "#9B59B6" }}>RGA: {formatName(entry.rga)}</div>}
+                        </td>
                       )}
                     </tr>
                   ))}
@@ -1349,7 +1887,7 @@ const renderHireToCodeTable = () => {
   const currMonthlyRatios = calculateRollingRatio(currCodeMonthly, currHireMonthly, currentYear);
 
   // Format ratios into display format with quarters and YTD
-  const formatRatiosWithQuarters = (monthlyRatios, year) => {
+  const formatRatiosWithQuarters = (monthlyRatios, year, previousYearRatios = null) => {
     const q1 = monthlyRatios.slice(0, 3).filter(v => v > 0).length > 0
       ? monthlyRatios.slice(0, 3).reduce((a, b) => a + b, 0) / monthlyRatios.slice(0, 3).filter(v => v > 0).length
       : 0;
@@ -1375,6 +1913,13 @@ const renderHireToCodeTable = () => {
       ? validMonths.reduce((a, b) => a + b, 0) / validMonths.length
       : 0;
     
+    // Calculate previous year average if data is provided
+    const prevYearAvg = previousYearRatios ? 
+      (previousYearRatios.filter(v => v > 0).length > 0 
+        ? previousYearRatios.reduce((a, b) => a + b, 0) / previousYearRatios.filter(v => v > 0).length 
+        : 0) 
+      : 0;
+    
     return [
       monthlyRatios[0],
       monthlyRatios[1],
@@ -1393,14 +1938,19 @@ const renderHireToCodeTable = () => {
       monthlyRatios[11],
       q4,
       ytd,
+      prevYearAvg,
     ];
   };
 
-  const prevRatios = formatRatiosWithQuarters(prevMonthlyRatios, lastYear);
+  const prevRatios = formatRatiosWithQuarters(prevMonthlyRatios, lastYear, prevMonthlyRatios);
   const currRatios = formatRatiosWithQuarters(currMonthlyRatios, currentYear);
 
   const growthData = currRatios.map((curr, i) => {
     const prev = prevRatios[i];
+    // For the previous year column (index 17), set growth to 0
+    if (i === 17) {
+      return { value: 0, className: "" };
+    }
     const diff = curr - prev;
     return {
       value: diff,
@@ -1411,6 +1961,10 @@ const renderHireToCodeTable = () => {
 
   const percentGrowthData = currRatios.map((curr, i) => {
     const prev = prevRatios[i];
+    // For the previous year column (index 17), set percentage to "N/A"
+    if (i === 17) {
+      return { value: "N/A", className: "" };
+    }
     if (prev === 0) {
       return { value: "N/A", className: "" };
     } else {
@@ -1432,29 +1986,49 @@ const renderHireToCodeTable = () => {
           <thead>
             <tr>
               <th>Year</th>
-              {months.map((month, index) => (
-                <th
-                  key={index}
-                  className={
-                    index === 3 ||
-                    index === 7 ||
-                    index === 11 ||
-                    index === 15
-                      ? "atlas-scorecard-quarter-header"
-                      : index === 16
-                      ? "atlas-scorecard-ytd-header"
-                      : ""
-                  }
-                >
-                  {month}
-                </th>
-              ))}
+              {months.map((month, index) => {
+                const isQuarter = isQuarterColumn(index);
+                const isFuture = isMonthIndexFuture(index);
+                
+                // Check if column should be shown based on quarters mode and future months toggle
+                if (!shouldShowColumn(index, isQuarter, isFuture)) {
+                  return null;
+                }
+                
+                return (
+                  <th
+                    key={index}
+                    className={
+                      index === 3 ||
+                      index === 7 ||
+                      index === 11 ||
+                      index === 15
+                        ? "atlas-scorecard-quarter-header"
+                        : index === 16
+                        ? "atlas-scorecard-ytd-header"
+                        : index === 17
+                        ? "atlas-scorecard-prev-year-header"
+                        : ""
+                    }
+                  >
+                    {month}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
             <tr>
               <td>{lastYear}</td>
               {prevRatios.map((val, index) => {
+                const isQuarter = isQuarterColumn(index);
+                const isFuture = isMonthIndexFuture(index);
+                
+                // Check if column should be shown based on quarters mode and future months toggle
+                if (!shouldShowColumn(index, isQuarter, isFuture)) {
+                  return null;
+                }
+                
                 const monthIndex = convertTableIndexToActualMonth(index);
                 return (
                 <td
@@ -1467,6 +2041,8 @@ const renderHireToCodeTable = () => {
                       ? "atlas-scorecard-quarter-cell"
                       : index === 16
                       ? "atlas-scorecard-ytd-cell"
+                      : index === 17
+                      ? "atlas-scorecard-prev-year-cell"
                       : ""
                   }
                 >
@@ -1478,6 +2054,14 @@ const renderHireToCodeTable = () => {
             <tr>
               <td>{currentYear}</td>
               {currRatios.map((val, index) => {
+                const isQuarter = isQuarterColumn(index);
+                const isFuture = isMonthIndexFuture(index);
+                
+                // Check if column should be shown based on quarters mode and future months toggle
+                if (!shouldShowColumn(index, isQuarter, isFuture)) {
+                  return null;
+                }
+                
                 const monthIndex = convertTableIndexToActualMonth(index);
                 const isFutureMonth = monthIndex !== null && isMonthInFuture(currentYear, monthIndex);
                 
@@ -1492,6 +2076,8 @@ const renderHireToCodeTable = () => {
                       ? "atlas-scorecard-quarter-cell"
                       : index === 16
                       ? "atlas-scorecard-ytd-cell"
+                      : index === 17
+                      ? "atlas-scorecard-prev-year-cell"
                       : ""
                   }
                 >
@@ -1503,6 +2089,14 @@ const renderHireToCodeTable = () => {
             <tr className="atlas-scorecard-growth-row">
               <td>Growth</td>
               {growthData.map(({ value, className }, index) => {
+                const isQuarter = isQuarterColumn(index);
+                const isFuture = isMonthIndexFuture(index);
+                
+                // Check if column should be shown based on quarters mode and future months toggle
+                if (!shouldShowColumn(index, isQuarter, isFuture)) {
+                  return null;
+                }
+                
                 const monthIndex = convertTableIndexToActualMonth(index);
                 const isFutureMonth = monthIndex !== null && isMonthInFuture(currentYear, monthIndex);
                 
@@ -1516,6 +2110,14 @@ const renderHireToCodeTable = () => {
             <tr className="atlas-scorecard-percentage-row">
               <td>%</td>
               {percentGrowthData.map((data, index) => {
+                const isQuarter = isQuarterColumn(index);
+                const isFuture = isMonthIndexFuture(index);
+                
+                // Check if column should be shown based on quarters mode and future months toggle
+                if (!shouldShowColumn(index, isQuarter, isFuture)) {
+                  return null;
+                }
+                
                 const monthIndex = convertTableIndexToActualMonth(index);
                 const isFutureMonth = monthIndex !== null && isMonthInFuture(currentYear, monthIndex);
                 
@@ -1765,6 +2367,8 @@ const renderHireToCodeTable = () => {
           return { isMonth: false, label: "Q4" };
         case 16:
           return { isMonth: false, label: "YTD" };
+        case 17:
+          return { isMonth: false, label: `${currentYear - 1}` };
         default:
           return { isMonth: false, label: "" };
       }
@@ -1790,10 +2394,14 @@ const renderHireToCodeTable = () => {
     let currentYearWithQuarters, previousYearWithQuarters;
     if (title === "Submitting Agent Count") {
       currentYearWithQuarters = calculateQuarterAverages(currentYearData);
-      previousYearWithQuarters = calculateQuarterAverages(previousYearData);
+      previousYearWithQuarters = calculateQuarterAverages(previousYearData, previousYearData);
+    } else if (title === "Hires") {
+      // For Hires table, use sums for current year but averages for previous year in the last column
+      currentYearWithQuarters = calculateQuarterSums(currentYearData);
+      previousYearWithQuarters = calculateQuarterAverages(previousYearData, previousYearData);
     } else {
       currentYearWithQuarters = calculateQuarterSums(currentYearData);
-      previousYearWithQuarters = calculateQuarterSums(previousYearData);
+      previousYearWithQuarters = calculateQuarterSums(previousYearData, previousYearData);
     }
     
   
@@ -1811,6 +2419,10 @@ const renderHireToCodeTable = () => {
         currentYear === today.getFullYear() &&
         monthInfo.monthIndex > today.getMonth()
       ) {
+        growth = 0;
+      }
+      // For the previous year column (index 17), there's no growth comparison
+      if (index === 17) {
         growth = 0;
       }
       return {
@@ -1841,6 +2453,10 @@ const renderHireToCodeTable = () => {
       ) {
         pct = 0;
       }
+      // For the previous year column (index 17), there's no percentage growth comparison
+      if (index === 17) {
+        pct = "N/A";
+      }
       return {
         value: pct,
         className:
@@ -1858,26 +2474,46 @@ const renderHireToCodeTable = () => {
             <thead>
               <tr>
                 <th>Year</th>
-                {months.map((month, index) => (
-                  <th
-                    key={index}
-                                      className={
-                    index === 3 || index === 7 || index === 11 || index === 15
-                      ? "atlas-scorecard-quarter-header"
-                      : index === 16
-                      ? "atlas-scorecard-ytd-header"
-                      : ""
+                {months.map((month, index) => {
+                  const isQuarter = isQuarterColumn(index);
+                  const isFuture = isMonthIndexFuture(index);
+                  
+                  // Check if column should be shown based on quarters mode and future months toggle
+                  if (!shouldShowColumn(index, isQuarter, isFuture)) {
+                    return null;
                   }
-                  >
-                    {month}
-                  </th>
-                ))}
+                  
+                  return (
+                    <th
+                      key={index}
+                      className={
+                        index === 3 || index === 7 || index === 11 || index === 15
+                          ? "atlas-scorecard-quarter-header"
+                          : index === 16
+                          ? "atlas-scorecard-ytd-header"
+                          : index === 17
+                          ? "atlas-scorecard-prev-year-header"
+                          : ""
+                      }
+                    >
+                      {month}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
             <tr>
   <td>{previousYear}</td>
   {previousYearWithQuarters.map((value, index) => {
+    const isQuarter = isQuarterColumn(index);
+    const isFuture = isMonthIndexFuture(index);
+    
+    // Check if column should be shown based on quarters mode and future months toggle
+    if (!shouldShowColumn(index, isQuarter, isFuture)) {
+      return null;
+    }
+    
     const monthInfo = monthIndexToDataIndex(index);
     // For the YTD column (index 16), override with sum of previousYearData for months that have passed
 // For the YTD column (index 16) in the previous-year row:
@@ -1916,6 +2552,7 @@ let cellValue = (index === 16)
       className={`
         ${isQuarterCell ? "atlas-scorecard-quarter-cell" : ""}
         ${index === 16 ? "atlas-scorecard-ytd-cell" : ""}
+        ${index === 17 ? "atlas-scorecard-prev-year-cell" : ""}
         ${isClickable ? "has-data" : ""}
       `}
       title={isClickable ? "Details available" : ""}
@@ -1930,11 +2567,20 @@ let cellValue = (index === 16)
   })}
 </tr>
 
-              <tr>
+                            <tr>
                 <td>{currentYear}</td>
                 {currentYearWithQuarters.map((value, index) => {
+                  const isQuarter = isQuarterColumn(index);
+                  const isFuture = isMonthIndexFuture(index);
+                  
+                  // Check if column should be shown based on quarters mode and future months toggle
+                  if (!shouldShowColumn(index, isQuarter, isFuture)) {
+                    return null;
+                  }
+                  
                   const monthInfo = monthIndexToDataIndex(index);
                   const isQuarterCell = !monthInfo.isMonth;
+                  const isFutureMonth = monthInfo.isMonth && isMonthInFuture(currentYear, monthInfo.monthIndex);
                   const validData = Array.isArray(data) ? data : [];
                   const dataItem = monthInfo.isMonth
                     ? title === "Submitting Agent Count"
@@ -1955,39 +2601,64 @@ let cellValue = (index === 16)
                     : null;
                   
                 
-                  const isClickable = dataItem && dataItem.length > 0;
-  
+                  const isClickable = dataItem && dataItem.length > 0 && !isFutureMonth;
+
                   return (
                     <td
                       key={index}
                             className={`
         ${isQuarterCell ? "atlas-scorecard-quarter-cell" : ""}
         ${index === 16 ? "atlas-scorecard-ytd-cell" : ""}
+        ${index === 17 ? "atlas-scorecard-prev-year-cell" : ""}
         ${isClickable ? "has-data" : ""}
       `}
                       title={isClickable ? "Details available" : ""}
                       onClick={isClickable ? () => handleCellClickWrapper(dataItem, monthInfo, currentYear) : null}
                     >
-                      {isCurrency ? currencyFormatter.format(value) : value}
+                      {isFutureMonth ? "—" : (isCurrency ? currencyFormatter.format(value) : value)}
                     </td>
                   );
                 })}
               </tr>
               <tr className="atlas-scorecard-growth-row">
                 <td>Growth</td>
-                {growthData.map(({ value, className }, index) => (
-                  <td key={index} className={className}>
-                    {isCurrency ? currencyFormatter.format(value) : value}
-                  </td>
-                ))}
+                {growthData.map(({ value, className }, index) => {
+                  const isQuarter = isQuarterColumn(index);
+                  const isFuture = isMonthIndexFuture(index);
+                  
+                  // Check if column should be shown based on quarters mode and future months toggle
+                  if (!shouldShowColumn(index, isQuarter, isFuture)) {
+                    return null;
+                  }
+                  
+                  const monthInfo = monthIndexToDataIndex(index);
+                  const isFutureMonth = monthInfo.isMonth && isMonthInFuture(currentYear, monthInfo.monthIndex);
+                  return (
+                    <td key={index} className={className}>
+                      {isFutureMonth ? "—" : (isCurrency ? currencyFormatter.format(value) : value)}
+                    </td>
+                  );
+                })}
               </tr>
               <tr className="atlas-scorecard-percentage-row">
   <td>%</td>
-  {percentGrowthData.map((data, index) => (
-    <td key={index} className={data.className}>
-      {data.value === "N/A" ? "N/A" : `${data.value.toFixed(1)}%`}
-    </td>
-  ))}
+  {percentGrowthData.map((data, index) => {
+    const isQuarter = isQuarterColumn(index);
+    const isFuture = isMonthIndexFuture(index);
+    
+    // Check if column should be shown based on quarters mode and future months toggle
+    if (!shouldShowColumn(index, isQuarter, isFuture)) {
+      return null;
+    }
+    
+    const monthInfo = monthIndexToDataIndex(index);
+    const isFutureMonth = monthInfo.isMonth && isMonthInFuture(currentYear, monthInfo.monthIndex);
+    return (
+      <td key={index} className={data.className}>
+        {isFutureMonth ? "—" : (data.value === "N/A" ? "N/A" : `${data.value.toFixed(1)}%`)}
+      </td>
+    );
+  })}
 </tr>
 
                       </tbody>
@@ -2003,64 +2674,156 @@ let cellValue = (index === 16)
   return (
       <div className="atlas-scorecard-sga-view">
 <div className="atlas-scorecard-controls">
-{["SA", "GA", "MGA", "RGA"].includes(userRole) && (
-  <div className="atlas-scorecard-tabs">
-  <input
-    type="radio"
-    id="lvl1"
-    name="alp_view"
-    value="LVL_1"
-    checked={selectedAlpTab === "LVL_1"}
-    onChange={() => setSelectedAlpTab("LVL_1")}
-  />
-  <label htmlFor="lvl1">LVL 1</label>
-  <input
-    type="radio"
-    id="lvl3"
-    name="alp_view"
-    value="LVL_3"
-    checked={selectedAlpTab === "LVL_3"}
-    onChange={() => setSelectedAlpTab("LVL_3")}
-  />
-  <label htmlFor="lvl3">LVL 3</label>
-</div>
-
+  {/* Left side - tabs and dropdowns */}
+  <div className="atlas-scorecard-controls-left">
+    {["SA", "GA", "MGA", "RGA"].includes(userRole) && (
+      <div className="atlas-scorecard-tabs">
+        <input
+          type="radio"
+          id="lvl1"
+          name="alp_view"
+          value="LVL_1"
+          checked={selectedAlpTab === "LVL_1"}
+          onChange={() => setSelectedAlpTab("LVL_1")}
+        />
+        <label htmlFor="lvl1">Personal</label>
+        <input
+          type="radio"
+          id="lvl3"
+          name="alp_view"
+          value="LVL_3"
+          checked={selectedAlpTab === "LVL_3"}
+          onChange={() => setSelectedAlpTab("LVL_3")}
+        />
+        <label htmlFor="lvl3">Team</label>
+      </div>
     )}
-  {allowedRoles.includes(userRole) && (
-    <div className="atlas-scorecard-mga-dropdown">
-      <label htmlFor="mga-select">Select MGA: </label>
-      <select
-  id="mga-select"
-  value={selectedMga}
-  onChange={(e) => setSelectedMga(e.target.value)}
->
-  {showAriasOrganization && (
-    <option value="">ARIAS ORGANIZATION</option>
-  )}
-  {uniqueMgas.map((mga, index) => (
-    <option key={index} value={mga.lagnname}>
-      {mga.lagnname}
-    </option>
-  ))}
-</select>
+    
+    {allowedRoles.includes(userRole) && (
+      <div className="atlas-scorecard-mga-dropdown">
+        <label htmlFor="mga-select">Select MGA: </label>
+        <select
+          id="mga-select"
+          value={selectedMga}
+          onChange={(e) => setSelectedMga(e.target.value)}
+        >
+          {showAriasOrganization && (
+            <option value="">ARIAS ORGANIZATION</option>
+          )}
+          {uniqueMgas.map((mga, index) => (
+            <option key={index} value={mga.lagnname}>
+              {mga.lagnname}
+            </option>
+          ))}
+        </select>
+      </div>
+    )}
 
+    <div className="atlas-scorecard-year-navigation">
+      <button className="arrow-change-button" onClick={() => navigateYears("back")}>
+        ←
+      </button>
+      <span>
+        {lastYear} & {currentYear}
+      </span>
+      <button
+        className="arrow-change-button"
+        onClick={() => navigateYears("forward")}
+        disabled={currentYear === new Date().getFullYear()}
+      >
+        →
+      </button>
     </div>
-  )}
+  </div>
 
-  <div className="atlas-scorecard-year-navigation">
-    <button className="arrow-change-button" onClick={() => navigateYears("back")}>
-      ←
-    </button>
-    <span>
-      {lastYear} & {currentYear}
-    </span>
-    <button
-      className="arrow-change-button"
-      onClick={() => navigateYears("forward")}
-      disabled={currentYear === new Date().getFullYear()}
-    >
-      →
-    </button>
+  {/* Right side - toggle buttons */}
+  <div className="atlas-scorecard-controls-right">
+    {/* Only show future months and quarters toggles when in table view */}
+    {viewMode === 'table' && (
+      <>
+        <div className="atlas-scorecard-future-months-toggle">
+          <button 
+            className={`future-months-toggle-btn ${showFutureMonths ? 'active' : ''}`}
+            onClick={() => setShowFutureMonths(!showFutureMonths)}
+            title={showFutureMonths ? 'Hide Future Months' : 'Show Future Months'}
+          >
+            {showFutureMonths ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="m1 1 22 22 M9.88 9.88a3 3 0 1 0 4.24 4.24 M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 11 8 11 8a13.16 13.16 0 0 1-1.67 2.68 M6.61 6.61A13.526 13.526 0 0 0 1 12s4 8 11 8a9.74 9.74 0 0 0 5-1.28" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+          </button>
+        </div>
+
+        <div className="atlas-scorecard-quarters-toggle">
+          <button 
+            className={`quarters-toggle-btn ${quartersMode}`}
+            onClick={() => {
+              const nextMode = quartersMode === 'show' ? 'hide' : quartersMode === 'hide' ? 'only' : 'show';
+              setQuartersMode(nextMode);
+            }}
+            title={
+              quartersMode === 'show' 
+                ? 'Hide Quarters' 
+                : quartersMode === 'hide' 
+                ? 'Show Only Quarters' 
+                : 'Show All Columns'
+            }
+          >
+            {quartersMode === 'show' ? (
+              // Show quarters: Circle with one quarter missing (outline only)
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2 A10 10 0 0 1 22 12 A10 10 0 0 1 12 22 A10 10 0 0 1 2 12 A10 10 0 0 1 12 12 Z" stroke="currentColor" strokeWidth="2" fill="none"/>
+              </svg>
+            ) : quartersMode === 'hide' ? (
+              // Hide quarters: Circle with line through it
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none"/>
+                <line x1="4" y1="4" x2="20" y2="20" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+            ) : (
+              // Only quarters: Circle with 3 quarters filled
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none"/>
+                <path d="M12 2 A10 10 0 0 1 22 12 L12 12 Z" fill="currentColor"/>
+                <path d="M22 12 A10 10 0 0 1 12 22 L12 12 Z" fill="currentColor"/>
+                <path d="M12 22 A10 10 0 0 1 2 12 L12 12 Z" fill="currentColor"/>
+              </svg>
+            )}
+          </button>
+        </div>
+      </>
+    )}
+
+    <div className="atlas-scorecard-view-toggle">
+      <button 
+        className={`view-toggle-btn ${viewMode === 'table' ? 'table-mode' : 'graph-mode'}`}
+        onClick={() => setViewMode(viewMode === 'table' ? 'graph' : 'table')}
+        title={viewMode === 'table' ? 'Switch to Graph View' : 'Switch to Table View'}
+      >
+        {viewMode === 'table' ? (
+          // Table view - show graph icon to switch to graph
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 3v18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M7 12l4-4 4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        ) : (
+          // Graph view - show table icon to switch to table
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="3" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+            <path d="M9 3v18" stroke="currentColor" strokeWidth="2"/>
+            <path d="M15 3v18" stroke="currentColor" strokeWidth="2"/>
+            <path d="M3 9h18" stroke="currentColor" strokeWidth="2"/>
+            <path d="M3 15h18" stroke="currentColor" strokeWidth="2"/>
+          </svg>
+        )}
+      </button>
+    </div>
   </div>
 </div>
 
@@ -2084,26 +2847,73 @@ let cellValue = (index === 16)
           </div>
         )} */}
           <>
-            {renderSummedTable("ALP", alpData, null, true, true)}
-            {userRole !== "AGT" && renderSummedTable("Codes", associatesData, "PRODDATE", false, false)}
-            {userRole !== "AGT" && renderSummedTable("VIPs", vipsData, "vip_month", false, false)}
-            {userRole !== "AGT" &&
-              renderSummedTable(
-                "Submitting Agent Count",
-                subAgentData,
-                null,
-                true,
-                false
-              )}
-            {userRole !== "AGT" &&
-              renderSummedTable("Hires", hiresData, "MORE_Date", true, false)}
-           {/*      {userRole !== "AGT" && renderHireToCodeTable()} */}
-                {userRole !== "AGT" && renderHireToCodeTable()}
-                {userRole !== "AGT" && renderSingleManagementTable("SA", "Management Count - SA")}
-  {userRole !== "AGT" && renderSingleManagementTable("GA", "Management Count - GA")}
-  {userRole !== "AGT" && renderSingleManagementTable("MGA", "Management Count - MGA")}
-  {userRole !== "AGT" && renderSingleManagementTable("RGA", "Management Count - RGA")}
-  {userRole !== "AGT" && renderSingleManagementTable("total", "Total Management Count")}
+            {viewMode === 'table' ? (
+              // Table View
+              <>
+                {renderSummedTable("ALP", alpData, null, true, true)}
+                {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderSummedTable("Codes", associatesData, "PRODDATE", false, false)}
+                {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderSummedTable("VIPs", vipsData, "vip_month", false, false)}
+                {selectedAlpTab !== "LVL_1" && userRole !== "AGT" &&
+                  renderSummedTable(
+                    "Submitting Agent Count",
+                    subAgentData,
+                    null,
+                    true,
+                    false
+                  )}
+                {selectedAlpTab !== "LVL_1" && userRole !== "AGT" &&
+                  renderSummedTable("Hires", hiresData, "MORE_Date", true, false)}
+               {/*      {userRole !== "AGT" && renderHireToCodeTable()} */}
+                    {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderHireToCodeTable()}
+                    {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderSingleManagementTable("SA", "Management Count - SA")}
+      {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderSingleManagementTable("GA", "Management Count - GA")}
+      {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderSingleManagementTable("MGA", "Management Count - MGA")}
+      {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderSingleManagementTable("RGA", "Management Count - RGA")}
+      {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderSingleManagementTable("total", "Total Management Count")}
+              </>
+            ) : (
+              // Graph View
+              <>
+                <LineGraph 
+                  title="ALP" 
+                  currentYearData={alpData[currentYear] || Array(12).fill(0)}
+                  previousYearData={alpData[lastYear] || Array(12).fill(0)}
+                  isCurrency={true}
+                />
+                {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && (
+                  <LineGraph 
+                    title="Codes" 
+                    currentYearData={groupByMonthAndYear(associatesData, "PRODDATE")[currentYear] || Array(12).fill(0)}
+                    previousYearData={groupByMonthAndYear(associatesData, "PRODDATE")[lastYear] || Array(12).fill(0)}
+                    isCurrency={false}
+                  />
+                )}
+                {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && (
+                  <LineGraph 
+                    title="VIPs" 
+                    currentYearData={groupByMonthAndYear(vipsData, "vip_month")[currentYear] || Array(12).fill(0)}
+                    previousYearData={groupByMonthAndYear(vipsData, "vip_month")[lastYear] || Array(12).fill(0)}
+                    isCurrency={false}
+                  />
+                )}
+                {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && (
+                  <LineGraph 
+                    title="Submitting Agent Count" 
+                    currentYearData={subAgentData[currentYear] || Array(12).fill(0)}
+                    previousYearData={subAgentData[lastYear] || Array(12).fill(0)}
+                    isCurrency={false}
+                  />
+                )}
+                {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && (
+                  <LineGraph 
+                    title="Hires" 
+                    currentYearData={hiresData[currentYear] || Array(12).fill(0)}
+                    previousYearData={hiresData[lastYear] || Array(12).fill(0)}
+                    isCurrency={false}
+                  />
+                )}
+              </>
+            )}
           </>
       
       </div>

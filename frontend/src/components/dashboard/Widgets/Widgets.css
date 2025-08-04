@@ -1,0 +1,878 @@
+/* Common Widget Styles */
+.spinner {
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #667eea;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+  margin-right: 0.5rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.widget-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: #6c757d;
+}
+
+.widget-error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  border-radius: 6px;
+  padding: 1rem;
+  text-align: center;
+  margin: 1rem 0;
+}
+
+/* StatCard Widget Styles */
+.stat-card-fallback {
+  padding: 1rem;
+}
+
+.stat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.stat-header h4 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.trend {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+}
+
+.trend-up {
+  color: #28a745;
+  background-color: #d4edda;
+}
+
+.trend-down {
+  color: #dc3545;
+  background-color: #f8d7da;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #333;
+  margin: 0.5rem 0;
+}
+
+.stat-subtitle {
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+
+/* Activity Widget Styles */
+.activity-widget {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.activity-list {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+}
+
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.activity-icon {
+  font-size: 1.2rem;
+  margin-right: 0.75rem;
+  flex-shrink: 0;
+}
+
+.activity-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.25rem;
+}
+
+.activity-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.activity-time {
+  font-size: 0.75rem;
+  color: #6c757d;
+  flex-shrink: 0;
+}
+
+.activity-description {
+  font-size: 0.8rem;
+  color: #6c757d;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.activity-footer {
+  border-top: 1px solid #e9ecef;
+  padding-top: 0.75rem;
+  text-align: center;
+}
+
+.view-all-btn {
+  background: none;
+  border: 1px solid #667eea;
+  color: #667eea;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-all-btn:hover {
+  background-color: #667eea;
+  color: white;
+}
+
+.activity-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: #6c757d;
+}
+
+.empty-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Scorecard Widget Styles */
+.scorecard-widget {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.scorecard-section {
+  margin-bottom: 1.5rem;
+}
+
+.scorecard-section h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 0.75rem 0;
+}
+
+.progress-summary {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.5rem;
+}
+
+.progress-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #333;
+}
+
+.progress-target {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+.progress-bar-container {
+  background: #e9ecef;
+  border-radius: 4px;
+  height: 8px;
+  margin: 0.5rem 0;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-bar.success {
+  background-color: #28a745;
+}
+
+.progress-bar.warning {
+  background-color: #ffc107;
+}
+
+.progress-bar.danger {
+  background-color: #dc3545;
+}
+
+.progress-percentage {
+  font-size: 0.8rem;
+  color: #6c757d;
+  text-align: center;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.metric-item {
+  background: #f8f9fa;
+  border-radius: 6px;
+  padding: 0.75rem;
+}
+
+.metric-label {
+  font-size: 0.8rem;
+  color: #6c757d;
+  margin-bottom: 0.25rem;
+}
+
+.metric-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+.metric-progress {
+  background: #e9ecef;
+  border-radius: 3px;
+  height: 4px;
+  margin-bottom: 0.25rem;
+  overflow: hidden;
+}
+
+.metric-progress-bar {
+  height: 100%;
+  background-color: #667eea;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.metric-target {
+  font-size: 0.7rem;
+  color: #6c757d;
+}
+
+/* Leaderboard Widget Styles */
+.leaderboard-widget {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.leaderboard-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.leaderboard-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e9ecef;
+  position: relative;
+}
+
+.leaderboard-item:last-child {
+  border-bottom: none;
+}
+
+.leaderboard-item.rank-1,
+.leaderboard-item.rank-2,
+.leaderboard-item.rank-3 {
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.1) 0%, transparent 100%);
+}
+
+.rank-indicator {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-right: 0.75rem;
+  min-width: 2rem;
+  text-align: center;
+}
+
+.person-avatar {
+  font-size: 1.5rem;
+  margin-right: 0.75rem;
+}
+
+.person-info {
+  flex: 1;
+}
+
+.person-name {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.person-production {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+.trophy-indicator {
+  margin-left: 0.5rem;
+}
+
+.trophy {
+  font-size: 1rem;
+}
+
+.leaderboard-footer {
+  border-top: 1px solid #e9ecef;
+  padding-top: 0.5rem;
+  text-align: center;
+}
+
+.leaderboard-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: #6c757d;
+}
+
+/* Chart Widget Styles */
+.chart-widget {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.chart-title {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.chart-type {
+  font-size: 0.8rem;
+  color: #6c757d;
+  background: #f8f9fa;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.chart-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  min-height: 120px;
+}
+
+.line-chart,
+.pie-chart {
+  width: 100%;
+  height: 120px;
+}
+
+.bar-chart {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  height: 120px;
+  padding: 0 0.5rem;
+}
+
+.bar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  margin: 0 0.1rem;
+}
+
+.bar {
+  width: 100%;
+  max-width: 20px;
+  border-radius: 2px 2px 0 0;
+  transition: all 0.2s ease;
+}
+
+.bar-label {
+  font-size: 0.7rem;
+  color: #6c757d;
+  margin-top: 0.25rem;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.legend-color {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 0.25rem;
+}
+
+.legend-label {
+  color: #6c757d;
+}
+
+/* Todo Widget Styles */
+.todo-widget {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.todo-input {
+  display: flex;
+  margin-bottom: 1rem;
+}
+
+.todo-input-field {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid #ced4da;
+  border-radius: 4px 0 0 4px;
+  font-size: 0.9rem;
+}
+
+.todo-input-field:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.todo-add-btn {
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.todo-add-btn:hover {
+  background: #5a6fd8;
+}
+
+.todo-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.todo-item {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f1f1f1;
+}
+
+.todo-item:last-child {
+  border-bottom: none;
+}
+
+.todo-item.completed {
+  opacity: 0.6;
+}
+
+.todo-item.priority-high {
+  border-left: 3px solid #dc3545;
+  padding-left: 0.5rem;
+}
+
+.todo-item.priority-medium {
+  border-left: 3px solid #ffc107;
+  padding-left: 0.5rem;
+}
+
+.todo-item.priority-low {
+  border-left: 3px solid #28a745;
+  padding-left: 0.5rem;
+}
+
+.todo-checkbox {
+  margin-right: 0.75rem;
+}
+
+.todo-text {
+  flex: 1;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.todo-item.completed .todo-text {
+  text-decoration: line-through;
+}
+
+.todo-delete {
+  background: none;
+  border: none;
+  color: #dc3545;
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.todo-item:hover .todo-delete {
+  opacity: 1;
+}
+
+.todo-delete:hover {
+  background: #f8d7da;
+  border-radius: 4px;
+}
+
+.todo-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.todo-stats {
+  border-top: 1px solid #e9ecef;
+  padding-top: 0.5rem;
+  text-align: center;
+  color: #6c757d;
+}
+
+/* Weather Widget Styles */
+.weather-widget {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.weather-current {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.weather-location {
+  font-size: 0.8rem;
+  color: #6c757d;
+  margin-bottom: 0.5rem;
+}
+
+.weather-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.weather-icon {
+  font-size: 2.5rem;
+  margin-right: 0.5rem;
+}
+
+.weather-temp {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #333;
+}
+
+.weather-condition {
+  font-size: 0.9rem;
+  color: #6c757d;
+  margin-bottom: 1rem;
+}
+
+.weather-details {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 1rem;
+}
+
+.weather-detail {
+  text-align: center;
+}
+
+.detail-label {
+  display: block;
+  font-size: 0.7rem;
+  color: #6c757d;
+  margin-bottom: 0.25rem;
+}
+
+.detail-value {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.weather-forecast {
+  display: flex;
+  justify-content: space-between;
+  flex: 1;
+}
+
+.forecast-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  padding: 0.5rem 0.25rem;
+}
+
+.forecast-day-name {
+  font-size: 0.7rem;
+  color: #6c757d;
+  margin-bottom: 0.25rem;
+}
+
+.forecast-icon {
+  font-size: 1.2rem;
+  margin-bottom: 0.25rem;
+}
+
+.forecast-temps {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.forecast-high {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.forecast-low {
+  font-size: 0.7rem;
+  color: #6c757d;
+}
+
+/* Calendar Widget Styles */
+.calendar-widget {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.calendar-header h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nav-btn {
+  background: none;
+  border: 1px solid #ced4da;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6c757d;
+}
+
+.nav-btn:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.current-month {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #333;
+  min-width: 100px;
+  text-align: center;
+}
+
+.calendar-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.event-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 0.75rem;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 4px solid transparent;
+}
+
+.event-indicator {
+  width: 4px;
+  height: 100%;
+  border-radius: 2px;
+  margin-right: 0.75rem;
+  flex-shrink: 0;
+}
+
+.event-content {
+  flex: 1;
+}
+
+.event-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.25rem;
+}
+
+.event-datetime {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.event-date,
+.event-time {
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+
+.event-type {
+  font-size: 0.7rem;
+  color: #6c757d;
+  background: #e9ecef;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  display: inline-block;
+  text-transform: capitalize;
+}
+
+.calendar-footer {
+  border-top: 1px solid #e9ecef;
+  padding-top: 0.75rem;
+  text-align: center;
+}
+
+.view-calendar-btn {
+  background: none;
+  border: 1px solid #667eea;
+  color: #667eea;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-calendar-btn:hover {
+  background-color: #667eea;
+  color: white;
+}
+
+.calendar-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: #6c757d;
+}
+
+/* Responsive adjustments for widgets */
+@media (max-width: 768px) {
+  .weather-forecast {
+    gap: 0.25rem;
+  }
+  
+  .forecast-day {
+    padding: 0.25rem;
+  }
+  
+  .weather-icon {
+    font-size: 2rem;
+  }
+  
+  .weather-temp {
+    font-size: 1.5rem;
+  }
+  
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .chart-legend {
+    justify-content: flex-start;
+  }
+}

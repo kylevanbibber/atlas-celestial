@@ -25,6 +25,7 @@ import {
   FiUsers
 } from 'react-icons/fi';
 import { BsFiletypeXlsx, BsCloudCheck } from 'react-icons/bs';
+import { FaHandshake } from 'react-icons/fa';
 import './ProductionReports.css';
 import './ProductionReportsAdmin.css';
 import ReportVersionModal from './ReportVersionModal';
@@ -97,13 +98,27 @@ const ProductionReports = () => {
       'FiUsers': <FiUsers />,
       'FiBarChart2': <FiBarChart2 />,
       'FiCalendar': <FiCalendar />,
-      'FiFolder': <FiFolder />
+      'FiFolder': <FiFolder />,
+      'BsCloudCheck': <BsCloudCheck />,
+      'BsHandshake': <FaHandshake />,
+      'FaHandshake': <FaHandshake />
     };
     return iconMap[iconString] || <FiFileText />;
   };
 
   // Helper function to get category from frequency and metadata
   const getCategoryFromReport = (report) => {
+    // Handle OneDrive reports specifically
+    if (report.report_type === 'onedrive' || report.type === 'onedrive') {
+      const frequency = report.frequency?.toLowerCase();
+      // Treat ad-hoc as daily for OneDrive reports
+      if (frequency === 'ad-hoc') {
+        return 'daily';
+      }
+      return frequency || 'custom';
+    }
+    
+    // Handle app reports
     if (report.metadata) {
       try {
         const metadata = typeof report.metadata === 'string' ? JSON.parse(report.metadata) : report.metadata;
@@ -114,7 +129,13 @@ const ProductionReports = () => {
         console.warn('Failed to parse report metadata:', e);
       }
     }
-    return report.frequency?.toLowerCase() || 'custom';
+    
+    // For app reports, use frequency or fallback to custom
+    const frequency = report.frequency?.toLowerCase();
+    if (frequency === 'ad-hoc') {
+      return 'daily';
+    }
+    return frequency || 'custom';
   };
 
   // Sample OneDrive reports structure (this would come from OneDrive API)
@@ -124,6 +145,8 @@ const ProductionReports = () => {
       title: 'ALP Weekly Summary',
       description: 'Weekly ALP performance data from home office',
       category: 'weekly',
+      frequency: 'weekly',
+      report_type: 'onedrive',
       type: 'onedrive',
       icon: <BsFiletypeXlsx />,
       fileName: 'ALP_Weekly_Summary_2024_W52.xlsx',
@@ -142,6 +165,8 @@ const ProductionReports = () => {
       title: 'Monthly Production Report',
       description: 'Monthly production statistics and trends',
       category: 'monthly',
+      frequency: 'monthly',
+      report_type: 'onedrive',
       type: 'onedrive',
       icon: <BsFiletypeXlsx />,
       fileName: 'Monthly_Production_Dec_2024.xlsx',
@@ -151,6 +176,24 @@ const ProductionReports = () => {
         { date: new Date('2024-12-31'), fileName: 'Monthly_Production_Dec_2024.xlsx' },
         { date: new Date('2024-11-30'), fileName: 'Monthly_Production_Nov_2024.xlsx' },
         { date: new Date('2024-10-31'), fileName: 'Monthly_Production_Oct_2024.xlsx' }
+      ],
+      downloadUrl: '#',
+      isFromHomeOffice: true
+    },
+    {
+      id: 'daily-adhoc-1',
+      title: 'Daily Ad-hoc Report',
+      description: 'Daily ad-hoc production data',
+      category: 'daily',
+      frequency: 'ad-hoc',
+      report_type: 'onedrive',
+      type: 'onedrive',
+      icon: <BsFiletypeXlsx />,
+      fileName: 'Daily_Adhoc_Report_2024_12_31.xlsx',
+      uploadDate: new Date('2024-12-31'),
+      fileSize: '156 KB',
+      versions: [
+        { date: new Date('2024-12-31'), fileName: 'Daily_Adhoc_Report_2024_12_31.xlsx' }
       ],
       downloadUrl: '#',
       isFromHomeOffice: true
@@ -325,8 +368,13 @@ const ProductionReports = () => {
           
           appReports.push(transformedReport);
         } else {
-          // OneDrive report
-          oneDriveReports.push(report);
+          // OneDrive report - transform to include icon component
+          const transformedOneDriveReport = {
+            ...report,
+            icon: getIconComponent(report.icon_name) || <BsFiletypeXlsx />,
+            type: 'onedrive'
+          };
+          oneDriveReports.push(transformedOneDriveReport);
         }
       });
       
@@ -401,8 +449,13 @@ const ProductionReports = () => {
           
           appReports.push(transformedReport);
         } else {
-          // OneDrive report
-          oneDriveReports.push(report);
+          // OneDrive report - transform to include icon component
+          const transformedOneDriveReport = {
+            ...report,
+            icon: getIconComponent(report.icon_name) || <BsFiletypeXlsx />,
+            type: 'onedrive'
+          };
+          oneDriveReports.push(transformedOneDriveReport);
         }
       });
       
@@ -624,32 +677,50 @@ const ProductionReports = () => {
     if (activeCategory === 'all' || activeCategory === 'onedrive') {
       allReports = [...allReports, ...oneDriveReports];
     } else {
-      // Filter OneDrive reports by category
-      const filteredOneDriveReports = oneDriveReports.filter(report => 
-        activeCategory === 'all' || report.category === activeCategory
-      );
+      // Filter OneDrive reports by category using frequency
+      const filteredOneDriveReports = oneDriveReports.filter(report => {
+        // Use getCategoryFromReport to ensure consistent category determination
+        const reportCategory = getCategoryFromReport(report);
+        const matches = activeCategory === 'all' || reportCategory === activeCategory;
+        return matches;
+      });
       allReports = [...allReports, ...filteredOneDriveReports];
     }
 
-    // Filter by category
+    // Filter by category - ensure we're using the correct category property
     if (activeCategory !== 'all') {
-      allReports = allReports.filter(report => report.category === activeCategory);
+      allReports = allReports.filter(report => {
+        // Check both the category property and getCategoryFromReport for consistency
+        const reportCategory = report.category || getCategoryFromReport(report);
+        return reportCategory === activeCategory;
+      });
     }
 
     // Admin mode filtering
     if (isAdminMode) {
       // Filter by admin category filter
       if (filterCategory !== 'all') {
-        allReports = allReports.filter(report => 
-          report.category_id == filterCategory || report.category === filterCategory
-        );
+        allReports = allReports.filter(report => {
+          // Check both category_id and category for consistency
+          const reportCategory = report.category || getCategoryFromReport(report);
+          const matches = report.category_id == filterCategory || reportCategory === filterCategory;
+          return matches;
+        });
       }
       
       // Filter by frequency
       if (filterFrequency) {
-        allReports = allReports.filter(report => 
-          report.frequency === filterFrequency
-        );
+        allReports = allReports.filter(report => {
+          const reportFrequency = report.frequency?.toLowerCase();
+          let matches;
+          // Handle ad-hoc to daily mapping
+          if (filterFrequency === 'daily') {
+            matches = reportFrequency === 'daily' || reportFrequency === 'ad-hoc';
+          } else {
+            matches = reportFrequency === filterFrequency;
+          }
+          return matches;
+        });
       }
       
       // Filter by visibility (show hidden toggle)
@@ -663,10 +734,13 @@ const ProductionReports = () => {
 
     // Filter by search term
     if (searchTerm) {
-      allReports = allReports.filter(report =>
-        (report.title || report.report_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (report.description || report.report_description || '').toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      allReports = allReports.filter(report => {
+        const title = (report.title || report.report_name || '').toLowerCase();
+        const description = (report.description || report.report_description || '').toLowerCase();
+        const searchLower = searchTerm.toLowerCase();
+        const matches = title.includes(searchLower) || description.includes(searchLower);
+        return matches;
+      });
     }
 
     return allReports;
@@ -862,7 +936,7 @@ const ProductionReports = () => {
             <span className="file-size">{report.fileSize}</span>
             <span className="file-date">
               <FiClock size={12} />
-              {report.uploadDate.toLocaleDateString()}
+              {report.uploadDate ? report.uploadDate.toLocaleDateString() : 'No date available'}
             </span>
           </div>
         )}
@@ -1407,8 +1481,8 @@ const ProductionReports = () => {
         <>
                 <div className="reports-header">
         <div className="reports-title-section">
-          <h2>Production Reports</h2>
-          <p>Access all your production reports in one place</p>
+          <h2>Reports</h2>
+          <p>Access all your reports in one place</p>
         </div>
     
     <div className="reports-actions">

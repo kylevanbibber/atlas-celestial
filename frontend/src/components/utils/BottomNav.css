@@ -10,8 +10,17 @@
   padding: 0;
   margin: 0;
   display: none; /* Hidden by default, shown only on mobile */
-  justify-content: space-around;
   align-items: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  /* Hide scrollbar for cleaner look */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+.bottom-nav::-webkit-scrollbar {
+  display: none; /* WebKit browsers */
 }
 
 .bottom-nav-item {
@@ -19,12 +28,14 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  flex: 1;
+  flex-shrink: 0;
+  min-width: 70px;
   height: 100%;
-  padding: 8px 0;
+  padding: 8px 4px;
   transition: background-color 0.2s;
   color: var(--sidebar-text, #333333);
   cursor: pointer;
+  position: relative;
 }
 
 .bottom-nav-item:hover {
@@ -91,15 +102,30 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  text-align: center;
+  margin-top: 2px;
 }
 
 /* Media Query for mobile devices */
 @media (max-width: 768px) {
   .bottom-nav {
     display: flex;
+    padding: 0;
   }
   
-
+  /* Size items to show exactly 4.5 items across the screen width */
+  .bottom-nav-item {
+    width: calc(100vw / 4.5);
+    min-width: calc(100vw / 4.5);
+    max-width: calc(100vw / 4.5);
+  }
+  
+  /* Ensure settings item also follows the same sizing */
+  .bottom-nav-item.settings-item {
+    width: calc(100vw / 4.5);
+    min-width: calc(100vw / 4.5);
+    max-width: calc(100vw / 4.5);
+  }
 }
 
 /* Add safe area padding for iOS devices */

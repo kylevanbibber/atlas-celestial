@@ -1,4 +1,7 @@
 const express = require("express");
+const http = require("http");
+const WebSocket = require("ws");
+const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
@@ -109,14 +112,180 @@ app.use("/api/vips", vipsRoutes);
 app.use("/api/more", moreRoutes);
 app.use("/api/account", accountRoutes);
 app.use("/api/refs", refsRoutes);
+const refvalidationRoutes = require("./routes/refvalidation");
+const adminDashboardRoutes = require("./routes/adminDashboard");
+const adminLicensingRoutes = require("./routes/adminLicensing");
+const verificationRoutes = require("./routes/verification");
+app.use("/api/refvalidation", refvalidationRoutes);
+app.use("/api/admin/dashboard", adminDashboardRoutes);
+app.use("/api/admin/licensing", adminLicensingRoutes);
+app.use("/api/verification", verificationRoutes);
 app.use("/api/custom", customRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/dataroutes", dataRoutes);
 
+// Create HTTP server for both Express and WebSocket
+const server = http.createServer(app);
+
+// WebSocket connection manager
+class NotificationManager {
+  constructor() {
+    this.connections = new Map(); // userId -> Set of WebSocket connections
+  }
+
+  addConnection(userId, ws) {
+    if (!this.connections.has(userId)) {
+      this.connections.set(userId, new Set());
+    }
+    this.connections.get(userId).add(ws);
+    console.log(`WebSocket connected for user ${userId}. Total connections: ${this.connections.get(userId).size}`);
+  }
+
+  removeConnection(userId, ws) {
+    if (this.connections.has(userId)) {
+      this.connections.get(userId).delete(ws);
+      if (this.connections.get(userId).size === 0) {
+        this.connections.delete(userId);
+      }
+      console.log(`WebSocket disconnected for user ${userId}`);
+    }
+  }
+
+  notifyUser(userId, notification) {
+    if (this.connections.has(userId)) {
+      const userConnections = this.connections.get(userId);
+      const message = JSON.stringify({
+        type: 'notification',
+        notification: notification
+      });
+
+      userConnections.forEach(ws => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(message);
+        }
+      });
+
+      console.log(`Sent real-time notification to user ${userId} (${userConnections.size} connections)`);
+      return true;
+    }
+    return false;
+  }
+
+  notifyAll(notification) {
+    const message = JSON.stringify({
+      type: 'notification',
+      notification: notification
+    });
+
+    let notifiedUsers = 0;
+    this.connections.forEach((userConnections, userId) => {
+      userConnections.forEach(ws => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(message);
+        }
+      });
+      notifiedUsers++;
+    });
+
+    console.log(`Sent broadcast notification to ${notifiedUsers} users`);
+    return notifiedUsers;
+  }
+
+  getConnectionCount() {
+    return Array.from(this.connections.values()).reduce((total, userConnections) => total + userConnections.size, 0);
+  }
+}
+
+// Global notification manager instance
+const notificationManager = new NotificationManager();
+
+// Create WebSocket server
+const wss = new WebSocket.Server({ 
+  server,
+  path: '/ws/notifications'
+});
+
+// WebSocket authentication and connection handling
+wss.on('connection', (ws, req) => {
+  console.log('New WebSocket connection attempt');
+  let userId = null;
+  let isAuthenticated = false;
+
+  // Set up ping/pong to keep connection alive
+  const pingInterval = setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'ping' }));
+    }
+  }, 30000); // Ping every 30 seconds
+
+  ws.on('message', (message) => {
+    try {
+      const data = JSON.parse(message);
+
+      if (data.type === 'auth' && data.token) {
+        // Authenticate the WebSocket connection
+        try {
+          const decoded = jwt.verify(data.token, process.env.JWT_SECRET);
+          userId = decoded.userId;
+          isAuthenticated = true;
+          
+          // Add to notification manager
+          notificationManager.addConnection(userId, ws);
+          
+          // Send authentication success
+          ws.send(JSON.stringify({ 
+            type: 'auth_success', 
+            message: 'WebSocket authenticated successfully' 
+          }));
+          
+          console.log(`WebSocket authenticated for user ${userId}`);
+        } catch (error) {
+          console.error('WebSocket authentication failed:', error);
+          ws.send(JSON.stringify({ 
+            type: 'auth_error', 
+            message: 'Authentication failed' 
+          }));
+          ws.close();
+        }
+      } else if (data.type === 'pong') {
+        // Handle pong response - connection is alive
+
+      } else if (!isAuthenticated) {
+        ws.send(JSON.stringify({ 
+          type: 'error', 
+          message: 'Please authenticate first' 
+        }));
+      }
+    } catch (error) {
+      console.error('Error parsing WebSocket message:', error);
+    }
+  });
+
+  ws.on('close', () => {
+    clearInterval(pingInterval);
+    if (userId) {
+      notificationManager.removeConnection(userId, ws);
+    }
+    console.log('WebSocket connection closed');
+  });
+
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+    clearInterval(pingInterval);
+    if (userId) {
+      notificationManager.removeConnection(userId, ws);
+    }
+  });
+});
+
+// Make notification manager available globally
+global.notificationManager = notificationManager;
+
 const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`WebSocket server running on ws://localhost:${PORT}/ws/notifications`);
 
   initDiscordBot();
   console.log('Discord bot initialized');

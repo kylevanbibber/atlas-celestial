@@ -5,8 +5,8 @@ import './Training.css';
 
 // Import component files
 import TrainingSidebar from '../components/training/TrainingSidebar';
-import Release from '../components/production/Release';
-import { ProgressProvider } from '../components/production/ProgressContext';
+import Release from '../components/production/release/Release';
+import { ProgressProvider } from '../components/production/release/ProgressContext';
 
 console.log('🎓 Training.js: File is being loaded!');
 

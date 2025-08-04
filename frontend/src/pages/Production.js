@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FiActivity, FiBarChart2, FiTarget, FiCheckCircle, FiAward, FiList, FiPercent } from 'react-icons/fi';
+import { FiActivity, FiCheckCircle, FiAward, FiList, FiPercent } from 'react-icons/fi';
+import { useAuth } from '../context/AuthContext';
 import './Production.css';
 
 // Import component files
 import ProductionSidebar from '../components/production/ProductionSidebar';
-import DailyActivityForm from '../components/production/DailyActivityForm';
-import ProductionReports from '../components/production/ProductionReports';
-import ProductionGoals from '../components/production/ProductionGoals';
-import Verify from '../components/production/Verify';
-import Release from '../components/production/Release';
+import DailyActivityForm from '../components/production/activity/DailyActivityForm';
+
+import Verify from '../components/production/verification/Verify';
+import Release from '../components/production/release/Release';
 import Scorecard from '../components/production/Scorecard/Scorecard';
-import { ProgressProvider } from '../components/production/ProgressContext';
+import { ProgressProvider } from '../components/production/release/ProgressContext';
 import LeaderboardPage from './LeaderboardPage';
 
 console.log('🏭 Production.js: File is being loaded!');
@@ -21,7 +21,13 @@ const Production = () => {
   console.log('🏭 Production.js: Production component is rendering');
   console.log('🏭 Production.js: Current URL:', window.location.href);
   
-  const [activeSection, setActiveSection] = useState('daily-activity');
+  const { user } = useAuth();
+  
+  // Check if user is admin with teamRole="app" to hide daily activity and set default section
+  const hideDailyActivity = user?.Role === 'Admin' && user?.teamRole === 'app';
+  const defaultSection = hideDailyActivity ? 'verification' : 'daily-activity';
+  
+  const [activeSection, setActiveSection] = useState(defaultSection);
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -32,10 +38,20 @@ const Production = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const section = params.get('section');
-    if (section && ['daily-activity', 'reports', 'scorecard', 'leaderboard', 'goals', 'verification'].includes(section)) {
+    
+    // Define available sections based on user permissions
+    const availableSections = hideDailyActivity 
+      ? ['scorecard', 'leaderboard', 'verification', 'release']
+      : ['daily-activity', 'scorecard', 'leaderboard', 'verification'];
+    
+    if (section && availableSections.includes(section)) {
       setActiveSection(section);
+    } else if (hideDailyActivity && activeSection === 'daily-activity') {
+      // If daily activity is hidden and current section is daily-activity, switch to verification
+      setActiveSection('verification');
+      navigate('/production?section=verification', { replace: true });
     }
-  }, [location]);
+  }, [location, hideDailyActivity, activeSection, navigate]);
   
   // Update URL when section changes
   const handleSectionChange = (section) => {
@@ -45,10 +61,9 @@ const Production = () => {
   
   // Production navigation items (alphabetical order)
   const productionItems = [
-    { id: 'daily-activity', label: 'Daily Activity', icon: <FiActivity /> },
-    { id: 'goals', label: 'Goals', icon: <FiTarget /> },
+    ...(hideDailyActivity ? [] : [{ id: 'daily-activity', label: 'Daily Activity', icon: <FiActivity /> }]),
     { id: 'leaderboard', label: 'Leaderboard', icon: <FiAward /> },
-    { id: 'reports', label: 'Reports', icon: <FiBarChart2 /> },
+    ...(hideDailyActivity ? [{ id: 'release', label: 'Release', icon: <FiList /> }] : []),
     { id: 'scorecard', label: 'Scorecard', icon: <FiPercent /> },
     { id: 'verification', label: 'Verification', icon: <FiCheckCircle /> },
   ];
@@ -63,12 +78,12 @@ const Production = () => {
     
     switch (activeSection) {
       case 'daily-activity':
+        if (hideDailyActivity) {
+          console.log('🏭 Production.js: Daily Activity is hidden for this user, redirecting to scorecard');
+          return <Scorecard />;
+        }
         console.log('🏭 Production.js: Rendering DailyActivityForm');
         return <DailyActivityForm />;
-      case 'reports':
-        console.log('🏭 Production.js: About to render ProductionReports component!');
-        console.log('🏭 Production.js: ProductionReports component reference:', ProductionReports);
-        return <ProductionReports />;
 
       case 'scorecard':
         console.log('🏭 Production.js: Rendering Scorecard');
@@ -77,14 +92,20 @@ const Production = () => {
       case 'leaderboard':
         console.log('🏭 Production.js: Rendering LeaderboardPage');
         return <LeaderboardPage />;
-      case 'goals':
-        console.log('🏭 Production.js: Rendering ProductionGoals');
-        return <ProductionGoals />;
       
       case 'verification':
         console.log('🏭 Production.js: Rendering Verify component');
         return <Verify />;
+      
+      case 'release':
+        console.log('🏭 Production.js: Rendering Release component');
+        return <Release />;
+        
       default:
+        if (hideDailyActivity) {
+          console.log('🏭 Production.js: Default case - Daily Activity hidden, rendering Verify');
+          return <Verify />;
+        }
         console.log('🏭 Production.js: Default case - rendering DailyActivityForm');
         return <DailyActivityForm />;
     }

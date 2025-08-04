@@ -2789,4 +2789,527 @@ router.get('/bot/status', async (req, res) => {
   }
 });
 
-// 15) Get bot status
+/**
+ * @route GET /api/discord/sales/user-sales
+ * @desc Get discord sales for a specific user and date range
+ * @access Private
+ */
+router.get('/sales/user-sales', async (req, res) => {
+  try {
+    const { startDate, endDate, userId: queryUserId } = req.query;
+    
+    console.log(`[DISCORD-SALES-API] 🔍 Auth debugging:`, {
+      hasReqUser: !!req.user,
+      hasReqUserId: !!req.userId,
+      queryUserId,
+      userObject: req.user,
+      userId: req.userId,
+      authHeader: req.headers.authorization,
+      cookies: req.headers.cookie
+    });
+    
+    // For now, use a fallback to test user (21 - COLEMAN CHARLES) or query param
+    // Ensure userId is a single value, not an array
+    let userId = req.user?.userId || req.userId || queryUserId || 21;
+    if (Array.isArray(userId)) {
+      userId = userId[0]; // Take first element if it's an array
+    }
+    userId = String(userId); // Ensure it's a string
+
+    console.log(`[DISCORD-SALES-API] Starting user-sales request for user ${userId} (fallback: 21)`);
+    console.log(`[DISCORD-SALES-API] Date range: ${startDate} to ${endDate}`);
+
+    if (!startDate || !endDate) {
+      console.log(`[DISCORD-SALES-API] ❌ Missing required parameters - startDate: ${startDate}, endDate: ${endDate}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Start date and end date are required'
+      });
+    }
+
+    const query = `
+      SELECT 
+        ds.id,
+        ds.discord_user,
+        ds.guild_id,
+        ds.alp,
+        ds.refs,
+        ds.lead_type,
+        ds.image_url,
+        ds.ts,
+        ds.user_id,
+        DATE(ds.ts) as sale_date,
+        au.lagnname
+      FROM discord_sales ds
+      LEFT JOIN activeusers au ON ds.user_id = au.id
+      WHERE ds.user_id = ? 
+        AND DATE(ds.ts) >= ? 
+        AND DATE(ds.ts) <= ?
+      ORDER BY ds.ts DESC
+    `;
+
+    console.log(`[DISCORD-SALES-API] Executing query with parameters: [${userId}, ${startDate}, ${endDate}]`);
+    console.log(`[DISCORD-SALES-API] Query: ${query.replace(/\s+/g, ' ').trim()}`);
+
+    // First, let's check if there's ANY discord_sales data for this user
+    console.log(`[DISCORD-SALES-API] 🐛 About to query with userId:`, { 
+      userId, 
+      userIdType: typeof userId, 
+      userIdArray: [userId],
+      userIdStringified: JSON.stringify([userId])
+    });
+    
+    const userSalesCount = await db.query(
+      'SELECT COUNT(*) as total_sales, MIN(ts) as earliest_sale, MAX(ts) as latest_sale FROM discord_sales WHERE user_id = ?',
+      [userId]
+    );
+    
+    console.log(`[DISCORD-SALES-API] User ${userId} total discord sales in database:`, userSalesCount[0]);
+
+    // Also check if there are ANY discord_sales records in the database at all
+    const totalSalesCount = await db.query(
+      'SELECT COUNT(*) as total_count, COUNT(DISTINCT user_id) as unique_users, MIN(ts) as earliest, MAX(ts) as latest FROM discord_sales'
+    );
+    
+    console.log(`[DISCORD-SALES-API] Total discord sales in database:`, totalSalesCount[0]);
+
+    // Also check the date range we're looking for
+    console.log(`[DISCORD-SALES-API] Looking for sales between ${startDate} and ${endDate}`);
+    console.log(`[DISCORD-SALES-API] Date comparison: DATE(ts) >= '${startDate}' AND DATE(ts) <= '${endDate}'`);
+
+    // Test the date formatting to see what DATE(ts) actually returns
+    if (userSalesCount[0].total_sales > 0) {
+      const dateFormatTest = await db.query(
+        'SELECT ts, DATE(ts) as date_only, DATE_FORMAT(ts, "%Y-%m-%d") as formatted_date FROM discord_sales WHERE user_id = ? LIMIT 3',
+        [userId]
+      );
+      
+      console.log(`[DISCORD-SALES-API] Date format samples for user ${userId}:`, dateFormatTest);
+    }
+
+    const salesData = await db.query(query, [userId, startDate, endDate]);
+
+    console.log(`[DISCORD-SALES-API] ✅ Query executed successfully`);
+    console.log(`[DISCORD-SALES-API] Raw query result count: ${salesData ? salesData.length : 'null'}`);
+    
+    if (salesData && salesData.length > 0) {
+      console.log(`[DISCORD-SALES-API] Sample record:`, {
+        id: salesData[0].id,
+        sale_date: salesData[0].sale_date,
+        alp: salesData[0].alp,
+        refs: salesData[0].refs,
+        lead_type: salesData[0].lead_type,
+        ts: salesData[0].ts,
+        lagnname: salesData[0].lagnname
+      });
+      
+      // Group by date for logging
+      const dateGroups = {};
+      salesData.forEach(sale => {
+        const date = sale.sale_date;
+        if (!dateGroups[date]) dateGroups[date] = 0;
+        dateGroups[date]++;
+      });
+      
+      console.log(`[DISCORD-SALES-API] Sales by date:`, dateGroups);
+    } else {
+      console.log(`[DISCORD-SALES-API] ⚠️ No sales data found for user ${userId} between ${startDate} and ${endDate}`);
+    }
+
+    const response = {
+      success: true,
+      data: salesData || []
+    };
+
+    console.log(`[DISCORD-SALES-API] Sending response with ${response.data.length} records`);
+
+    res.json(response);
+
+  } catch (error) {
+    console.error(`[DISCORD-SALES-API] ❌ Error fetching discord sales:`, error);
+    console.error(`[DISCORD-SALES-API] Error stack:`, error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch discord sales data'
+    });
+  }
+});
+
+/**
+ * @route PUT /api/discord/sales/:id
+ * @desc Update a discord sale record
+ * @access Private
+ */
+router.put('/sales/:id', authMiddleware, async (req, res) => {
+  try {
+    const saleId = req.params.id;
+    const userId = req.user?.userId || req.userId; // Support both formats
+    const { alp, refs, lead_type } = req.body;
+
+    // Validate the sale belongs to the user
+    const existingSale = await db.query(
+      'SELECT * FROM discord_sales WHERE id = ? AND user_id = ?',
+      [saleId, userId]
+    );
+
+    if (!existingSale || existingSale.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sale not found or access denied'
+      });
+    }
+
+    // Update the sale
+    await db.query(
+      `UPDATE discord_sales 
+       SET alp = ?, refs = ?, lead_type = ?
+       WHERE id = ? AND user_id = ?`,
+      [alp, refs, lead_type, saleId, userId]
+    );
+
+    // Update Daily_Activity table after modifying the sale
+    const saleRecord = await db.query(
+      'SELECT DATE(ts) as sale_date FROM discord_sales WHERE id = ?',
+      [saleId]
+    );
+    
+    if (saleRecord && saleRecord.length > 0) {
+      const saleDate = saleRecord[0].sale_date;
+      await updateDailyActivityFromDiscordSales(userId, saleDate);
+    }
+
+    res.json({
+      success: true,
+      message: 'Discord sale updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Error updating discord sale:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update discord sale'
+    });
+  }
+});
+
+/**
+ * @route DELETE /api/discord/sales/:id
+ * @desc Delete a discord sale record
+ * @access Private
+ */
+router.delete('/sales/:id', authMiddleware, async (req, res) => {
+  try {
+    const saleId = req.params.id;
+    const userId = req.user?.userId || req.userId; // Support both formats
+
+    // Validate the sale belongs to the user
+    const existingSale = await db.query(
+      'SELECT * FROM discord_sales WHERE id = ? AND user_id = ?',
+      [saleId, userId]
+    );
+
+    if (!existingSale || existingSale.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sale not found or access denied'
+      });
+    }
+
+    // Get the sale date before deleting for Daily_Activity update
+    const saleDate = existingSale[0].ts ? new Date(existingSale[0].ts).toISOString().split('T')[0] : null;
+
+    // Delete the sale
+    await db.query(
+      'DELETE FROM discord_sales WHERE id = ? AND user_id = ?',
+      [saleId, userId]
+    );
+
+    // Update Daily_Activity table after deleting the sale
+    if (saleDate) {
+      await updateDailyActivityFromDiscordSales(userId, saleDate);
+    }
+
+    res.json({
+      success: true,
+      message: 'Discord sale deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting discord sale:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete discord sale'
+    });
+  }
+});
+
+/**
+ * Update Daily_Activity table with aggregated Discord sales data
+ * @param {number} userId - The user ID
+ * @param {string} saleDate - The sale date in YYYY-MM-DD format
+ */
+async function updateDailyActivityFromDiscordSales(userId, saleDate) {
+  try {
+    console.log(`[DISCORD-API] 📊 Updating Daily_Activity for user ${userId} on ${saleDate}`);
+
+    // Get user details from activeusers
+    const userDetails = await db.query(
+      'SELECT lagnname, esid, MGA, SA, GA FROM activeusers WHERE id = ?',
+      [userId]
+    );
+
+    if (!userDetails || userDetails.length === 0) {
+      console.error(`[DISCORD-API] ❌ User ${userId} not found in activeusers table`);
+      return;
+    }
+
+    const user = userDetails[0];
+
+    // Aggregate Discord sales for this user and date
+    const salesAggregation = await db.query(`
+      SELECT 
+        COUNT(*) as total_sales,
+        SUM(alp) as total_alp,
+        SUM(refs) as total_refs
+      FROM discord_sales 
+      WHERE user_id = ? AND DATE(ts) = ?
+    `, [userId, saleDate]);
+
+    const salesData = salesAggregation[0];
+    console.log(`[DISCORD-API] 📈 Discord sales aggregation for ${saleDate}:`, salesData);
+
+    // Check if Daily_Activity record exists for this date and user
+    const existingRecord = await db.query(
+      'SELECT * FROM Daily_Activity WHERE agent = ? AND reportDate = ?',
+      [user.lagnname, saleDate]
+    );
+
+    if (existingRecord && existingRecord.length > 0) {
+      // Update existing record - preserve manual additions
+      const existing = existingRecord[0];
+      
+      // Calculate manual additions (what user entered beyond Discord sales)
+      const existingDiscordSales = existing.discord_sales || 0;
+      const existingDiscordAlp = existing.discord_alp || 0;
+      const existingDiscordRefs = existing.discord_refs || 0;
+      
+      const manualSalesAddition = Math.max(0, (existing.sales || 0) - existingDiscordSales);
+      const manualAlpAddition = Math.max(0, (existing.alp || 0) - existingDiscordAlp);
+      const manualRefsAddition = Math.max(0, (existing.refs || 0) - existingDiscordRefs);
+      
+      // New totals = Discord totals + manual additions
+      const newSales = (salesData.total_sales || 0) + manualSalesAddition;
+      const newAlp = (salesData.total_alp || 0) + manualAlpAddition;
+      const newRefs = (salesData.total_refs || 0) + manualRefsAddition;
+
+      await db.query(`
+        UPDATE Daily_Activity 
+        SET 
+          sales = ?,
+          alp = ?,
+          refs = ?,
+          discord_sales = ?,
+          discord_alp = ?,
+          discord_refs = ?
+        WHERE agent = ? AND reportDate = ?
+      `, [
+        newSales, 
+        newAlp, 
+        newRefs,
+        salesData.total_sales || 0,
+        salesData.total_alp || 0,
+        salesData.total_refs || 0,
+        user.lagnname, 
+        saleDate
+      ]);
+
+      console.log(`[DISCORD-API] ✅ Updated Daily_Activity: total_sales=${newSales}, total_alp=${newAlp}, total_refs=${newRefs}`);
+      console.log(`[DISCORD-API] 📊 Discord portion: sales=${salesData.total_sales}, alp=${salesData.total_alp}, refs=${salesData.total_refs}`);
+      console.log(`[DISCORD-API] 📝 Manual addition: sales=${manualSalesAddition}, alp=${manualAlpAddition}, refs=${manualRefsAddition}`);
+    } else {
+      // Create new record
+      await db.query(`
+        INSERT INTO Daily_Activity (
+          reportDate,
+          esid,
+          MGA,
+          Work,
+          sales,
+          alp,
+          refs,
+          agent,
+          SA,
+          GA,
+          userId,
+          discord_sales,
+          discord_alp,
+          discord_refs
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        saleDate,           // reportDate
+        user.esid,          // esid
+        user.MGA,           // MGA
+        saleDate,           // Work (use same date)
+        salesData.total_sales || 0,  // sales
+        salesData.total_alp || 0,    // alp
+        salesData.total_refs || 0,   // refs
+        user.lagnname,      // agent
+        user.SA,            // SA
+        user.GA,            // GA
+        userId,             // userId
+        salesData.total_sales || 0,  // discord_sales
+        salesData.total_alp || 0,    // discord_alp
+        salesData.total_refs || 0    // discord_refs
+      ]);
+
+      console.log(`[DISCORD-API] ✅ Created new Daily_Activity record: sales=${salesData.total_sales}, alp=${salesData.total_alp}, refs=${salesData.total_refs}`);
+    }
+
+  } catch (error) {
+    console.error(`[DISCORD-API] ❌ Error updating Daily_Activity:`, error);
+  }
+}
+
+/**
+ * @route GET /api/discord/sales/breakdown
+ * @desc Get breakdown of Discord sales vs manual entries for a date range
+ * @access Private
+ */
+router.get('/sales/breakdown', async (req, res) => {
+  try {
+    const { startDate, endDate, userId: queryUserId } = req.query;
+    
+    // For now, use a fallback to test user (21 - COLEMAN CHARLES) or query param
+    let userId = req.user?.userId || req.userId || queryUserId || 21;
+    if (Array.isArray(userId)) {
+      userId = userId[0];
+    }
+    userId = String(userId);
+
+    console.log(`[DISCORD-BREAKDOWN-API] 📊 Getting breakdown for user ${userId} from ${startDate} to ${endDate}`);
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Start date and end date are required'
+      });
+    }
+
+    // Get user details
+    const userDetails = await db.query(
+      'SELECT lagnname FROM activeusers WHERE id = ?',
+      [userId]
+    );
+
+    if (!userDetails || userDetails.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const user = userDetails[0];
+
+    // Get Discord sales aggregated by date
+    const discordSales = await db.query(`
+      SELECT 
+        DATE(ts) as report_date,
+        COUNT(*) as discord_sales,
+        SUM(alp) as discord_alp,
+        SUM(refs) as discord_refs
+      FROM discord_sales 
+      WHERE user_id = ? 
+        AND DATE(ts) >= ? 
+        AND DATE(ts) <= ?
+      GROUP BY DATE(ts)
+      ORDER BY DATE(ts) DESC
+    `, [userId, startDate, endDate]);
+
+    // Get Daily Activity entries for the same period
+    const dailyActivity = await db.query(`
+      SELECT 
+        reportDate as report_date,
+        sales as total_sales,
+        alp as total_alp,
+        refs as total_refs,
+        discord_sales,
+        discord_alp,
+        discord_refs
+      FROM Daily_Activity 
+      WHERE agent = ? 
+        AND reportDate >= ? 
+        AND reportDate <= ?
+      ORDER BY reportDate DESC
+    `, [user.lagnname, startDate, endDate]);
+
+    // Combine the data to show breakdown
+    const breakdown = {};
+    
+    // Add Discord sales
+    discordSales.forEach(discord => {
+      const date = discord.report_date;
+      breakdown[date] = {
+        date: date,
+        discord_sales: discord.discord_sales || 0,
+        discord_alp: parseFloat(discord.discord_alp) || 0,
+        discord_refs: discord.discord_refs || 0,
+        total_sales: 0,
+        total_alp: 0,
+        total_refs: 0,
+        manual_sales: 0,
+        manual_alp: 0,
+        manual_refs: 0
+      };
+    });
+
+    // Add Daily Activity data and calculate manual additions
+    dailyActivity.forEach(activity => {
+      const date = activity.report_date;
+      if (!breakdown[date]) {
+        breakdown[date] = {
+          date: date,
+          discord_sales: 0,
+          discord_alp: 0,
+          discord_refs: 0,
+          total_sales: 0,
+          total_alp: 0,
+          total_refs: 0,
+          manual_sales: 0,
+          manual_alp: 0,
+          manual_refs: 0
+        };
+      }
+      
+      // Set totals from Daily_Activity
+      breakdown[date].total_sales = activity.total_sales || 0;
+      breakdown[date].total_alp = parseFloat(activity.total_alp) || 0;
+      breakdown[date].total_refs = activity.total_refs || 0;
+      
+      // Use the Discord tracking columns from Daily_Activity (more reliable than aggregating)
+      breakdown[date].discord_sales = activity.discord_sales || 0;
+      breakdown[date].discord_alp = parseFloat(activity.discord_alp) || 0;
+      breakdown[date].discord_refs = activity.discord_refs || 0;
+      
+      // Calculate manual additions (total - discord)
+      breakdown[date].manual_sales = Math.max(0, breakdown[date].total_sales - breakdown[date].discord_sales);
+      breakdown[date].manual_alp = Math.max(0, breakdown[date].total_alp - breakdown[date].discord_alp);
+      breakdown[date].manual_refs = Math.max(0, breakdown[date].total_refs - breakdown[date].discord_refs);
+    });
+
+    const result = Object.values(breakdown).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    console.log(`[DISCORD-BREAKDOWN-API] ✅ Breakdown calculated for ${result.length} dates`);
+
+    res.json({
+      success: true,
+      data: result
+    });
+
+  } catch (error) {
+    console.error(`[DISCORD-BREAKDOWN-API] ❌ Error getting breakdown:`, error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get sales breakdown'
+    });
+  }
+});

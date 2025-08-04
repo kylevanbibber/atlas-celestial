@@ -13,6 +13,7 @@ import BottomNav from "./components/utils/BottomNav";
 import Dashboard from "./pages/Dashboard";
 import RefsPage from "./pages/refs/page";
 import Production from "./pages/Production";
+import Reports from "./pages/Reports";
 import Training from "./pages/Training";
 import Recruiting from "./pages/Recruiting";
 import Settings from "./pages/settings/Settings";
@@ -20,12 +21,16 @@ import TeamCustomization from "./pages/settings/TeamCustomization";
 import NotificationsAdmin from "./pages/admin/Notifications";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/auth/Login";
+// Removed AdminLogin import - admin users now use unified login system
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { useTeamStyles, TeamStyleProvider } from './context/TeamStyleContext';
 import { LicenseWarningProvider } from "./context/LicenseWarningContext";
 import { NotificationProvider } from "./context/NotificationContext";
-import NotificationSettings from "./components/settings/NotificationSettings";
+import NotificationSettings from "./components/settings/notification/NotificationSettings";
+import RefEntry from "./components/refvalidation/RefEntry";
+
+
 import AdminHierarchySettings from "./components/admin/AdminHierarchySettings";
 import { HierarchyTablePage } from "./pages/settings";
 import AdminCheck from "./pages/admin/AdminCheck";
@@ -83,17 +88,21 @@ function AppContent() {
   }, [styles, stylesLoading]);
 
   // Determine if the current page is an auth page (login, register, etc.)
-  const authPaths = ["/login", "/register"];
+  // Note: /adminlogin now redirects to /login since admin users use the unified login system
+  const authPaths = ["/login", "/register", "/adminlogin"];
   const isAuthPage = authPaths.includes(location.pathname);
 
   // Map routes to page titles (for pages with header)
   const pageTitleMap = {
     "/dashboard": "Dashboard",
+
     "/refs": "Refs",
+    "/ref-entry": "Ref Entry",
     "/production": "Production",
+    "/reports": "Reports",
     "/training": "Training",
     "/recruiting": "Recruiting",
-    "/settings": "Settings",
+    "/settings": user?.Role === 'Admin' && user?.teamRole === 'app' ? "Utilities" : "Settings",
     "/team-customization": "Team Customization",
     "/admin/notifications": "Notifications Management",
     "/admin/hierarchy": "Hierarchy Management",
@@ -116,11 +125,17 @@ function AppContent() {
     
     // If authenticated and on auth page, redirect to dashboard or intended location
     if (isAuthenticated && isAuthPage) {
-      const intendedPath = localStorage.getItem('intendedPath') || '/dashboard';
+      // Determine default path based on user role
+      const isAppAdmin = user?.Role === 'Admin' && user?.teamRole === 'app';
+      const defaultPath = isAppAdmin ? '/production' : '/dashboard';
+      const intendedPath = localStorage.getItem('intendedPath') || defaultPath;
+      
       console.log(`[App] Already authenticated, redirecting from auth page to ${intendedPath}`, {
         from: location.pathname,
         to: intendedPath,
-        userId: user?.userId
+        userId: user?.userId,
+        isAppAdmin,
+        defaultPath
       });
       
       // Log the redirect
@@ -130,7 +145,8 @@ function AppContent() {
         'User already authenticated',
         {
           userId: user?.userId,
-          userRole: user?.Role
+          userRole: user?.Role,
+          isAppAdmin
         }
       );
       
@@ -139,12 +155,14 @@ function AppContent() {
       return;
     }
     
-    // If not authenticated and not on auth page, redirect to login with current path saved
+    // Only redirect to login if not authenticated AND not on any auth page
+    // This prevents redirecting away from /login, /adminlogin, /register, etc.
     if (!isAuthenticated && !isAuthPage) {
       const currentPath = location.pathname + location.search;
       console.log(`[App] Not authenticated, redirecting to login from ${currentPath}`, {
         user,
-        targetPath: currentPath
+        targetPath: currentPath,
+        isAuthPage
       });
       
       // Log the redirect
@@ -160,6 +178,12 @@ function AppContent() {
       // Store the current path for redirection after login
       localStorage.setItem('intendedPath', currentPath);
       navigate("/login", { replace: true });
+      return;
+    }
+    
+    // If we're on an auth page and not authenticated, allow it (don't redirect)
+    if (!isAuthenticated && isAuthPage) {
+      console.log(`[App] On auth page ${location.pathname}, allowing access without redirect`);
       return;
     }
     
@@ -219,6 +243,8 @@ function AppContent() {
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
+        {/* Redirect admin login to regular login since admin users now use unified login */}
+        <Route path="/adminlogin" element={<Navigate to="/login" replace />} />
         {/* Add a register route if needed */}
         <Route path="/register" element={<div>Register Page</div>} />
         {/* Redirect any unknown auth route to /login */}
@@ -239,7 +265,11 @@ function AppContent() {
               path="/dashboard"
               element={
                 <ProtectedRoute requiredPermission="view_dashboard">
-                  <Dashboard />
+                  {user?.Role === 'Admin' && user?.teamRole === 'app' ? (
+                    <Navigate to="/production" replace />
+                  ) : (
+                    <Dashboard />
+                  )}
                 </ProtectedRoute>
               }
             />
@@ -252,10 +282,34 @@ function AppContent() {
               }
             />
             <Route
+              path="/ref-entry"
+              element={
+                <ProtectedRoute>
+                  {user?.Role === 'Admin' && user?.teamRole === 'app' ? (
+                    <RefEntry />
+                  ) : (
+                    <div style={{ padding: "2rem", textAlign: "center" }}>
+                      <h2>Access Denied</h2>
+                      <p>This page is only available to App team administrators.</p>
+                    </div>
+                  )}
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
               path="/production"
               element={
                 <ProtectedRoute>
                   <Production />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute>
+                  <Reports />
                 </ProtectedRoute>
               }
             />
@@ -344,6 +398,7 @@ function AppContent() {
       </div>
       {/* Add BottomNav for mobile */}
       <BottomNav />
+      
     </div>
   );
 }

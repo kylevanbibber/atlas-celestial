@@ -69,11 +69,23 @@
   background: var(--sidebar-hover);
 }
 
+.sidebar-item.active {
+  background-color: var(--sidebar-hover);
+  border-left: 3px solid var(--hover-color, #007BFF);
+  padding-left: 7px; /* 10px - 3px border */
+}
+
+.sidebar-item.active:hover {
+  background-color: var(--sidebar-hover);
+}
+
 .sidebar-item svg {
   min-width: 25px; 
   font-size: 16px;
   margin-right: 10px;
 }
+
+
 
 .sidebar.collapsed .sidebar-text {
   display: none;

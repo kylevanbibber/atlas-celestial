@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { FiAward, FiStar, FiTarget, FiTrendingUp, FiChevronDown, FiChevronRight, FiLoader, FiUser } from 'react-icons/fi';
+import React, { useState, useRef, useEffect } from 'react';
+import { FiAward, FiStar, FiTarget, FiTrendingUp, FiChevronDown, FiChevronRight, FiLoader, FiUser, FiArrowUp } from 'react-icons/fi';
 import { NameFormats, getFirstInitial } from '../../utils/nameFormatter';
 import './Leaderboard.css';
 import './ProfilePicture.css';
@@ -125,10 +125,17 @@ const Leaderboard = ({
   },
   // New props for dynamic value color ranges
   valueColorRanges = null, // { high: { min: number, colors: { bg, text } }, medium: { min: number, colors: { bg, text } }, low: { colors: { bg, text } } }
-  periodType = null // Used to determine which ranges to apply (week, month, year)
+  periodType = null, // Used to determine which ranges to apply (week, month, year)
+  // New props for current user highlighting and scroll functionality
+  currentUser = null, // { name: string, lagnname: string } - current logged in user
+  showScrollButtons = true // Show scroll to user/top buttons
 }) => {
 
   const [expandedItems, setExpandedItems] = useState(new Set());
+  const [scrollPosition, setScrollPosition] = useState(0);
+  const [isUserVisible, setIsUserVisible] = useState(false);
+  const leaderboardRef = useRef(null);
+  const currentUserRef = useRef(null);
 
   // Get level badge styles based on clname
   const getLevelBadgeStyles = (clname) => {
@@ -257,12 +264,89 @@ const Leaderboard = ({
     }
   };
 
+  // Check if an item is the current user
+  const isCurrentUser = (item) => {
+    if (!currentUser || !item) return false;
+    
+    // Check by name (case-insensitive)
+    if (currentUser.name && item[nameField]) {
+      const currentUserName = currentUser.name.toLowerCase().trim();
+      const itemName = item[nameField].toLowerCase().trim();
+      if (currentUserName === itemName) return true;
+    }
+    
+    // Check by lagnname (case-insensitive)
+    if (currentUser.lagnname && item.name) {
+      const currentUserLagnname = currentUser.lagnname.toLowerCase().trim();
+      const itemName = item.name.toLowerCase().trim();
+      if (currentUserLagnname === itemName) return true;
+    }
+    
+    return false;
+  };
+
+  // Scroll to current user
+  const scrollToCurrentUser = (e) => {
+    e.stopPropagation(); // Prevent event from bubbling up to parent
+    if (currentUserRef.current) {
+      currentUserRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      });
+    }
+  };
+
+  // Scroll to top
+  const scrollToTop = (e) => {
+    e.stopPropagation(); // Prevent event from bubbling up to parent
+    if (leaderboardRef.current) {
+      leaderboardRef.current.scrollTo({ 
+        top: 0, 
+        behavior: 'smooth' 
+      });
+    }
+  };
+
   // Process data with proper tie handling if no rank field is provided
   const processedData = data.map(item => item[rankField]).some(rank => rank === undefined) 
     ? calculateRanksWithTies(data, valueField)
     : data;
   
   const displayData = showCount ? processedData.slice(0, showCount) : processedData;
+
+  // Find current user in the data
+  const currentUserIndex = displayData.findIndex(isCurrentUser);
+  const hasCurrentUser = currentUserIndex !== -1;
+
+  // Handle scroll events
+  const handleScroll = () => {
+    if (leaderboardRef.current) {
+      const scrollTop = leaderboardRef.current.scrollTop;
+      setScrollPosition(scrollTop);
+      
+      // Check if user is visible
+      if (currentUserRef.current && hasCurrentUser) {
+        const userElement = currentUserRef.current;
+        const container = leaderboardRef.current;
+        const userTop = userElement.offsetTop;
+        const userBottom = userTop + userElement.offsetHeight;
+        const containerTop = container.scrollTop;
+        const containerBottom = containerTop + container.clientHeight;
+        
+        const isVisible = userTop >= containerTop && userBottom <= containerBottom;
+        setIsUserVisible(isVisible);
+      }
+    }
+  };
+
+  // Add scroll event listener
+  useEffect(() => {
+    const leaderboardElement = leaderboardRef.current;
+    if (leaderboardElement) {
+      leaderboardElement.addEventListener('scroll', handleScroll);
+      return () => leaderboardElement.removeEventListener('scroll', handleScroll);
+    }
+  }, [hasCurrentUser]);
 
   if (loading) {
     return (
@@ -294,11 +378,35 @@ const Leaderboard = ({
           <FiTrendingUp className="title-icon" />
           {title}
         </h3>
-        {showCount && data.length > showCount && (
-          <span className="showing-count">
-            Showing top {showCount} of {data.length}
-          </span>
-        )}
+        <div className="leaderboard-header-controls">
+          {showCount && data.length > showCount && (
+            <span className="showing-count">
+              Showing top {showCount} of {data.length}
+            </span>
+          )}
+          {showScrollButtons && (
+            <div className="scroll-controls">
+              {hasCurrentUser && !isUserVisible && (
+                <button 
+                  className="scroll-button scroll-to-user"
+                  onClick={scrollToCurrentUser}
+                  title="Scroll to your position"
+                >
+                  <FiUser className="scroll-icon" />
+                </button>
+              )}
+              {scrollPosition > 10 && (
+                <button 
+                  className="scroll-button scroll-to-top"
+                  onClick={scrollToTop}
+                  title="Scroll to top"
+                >
+                  <FiArrowUp className="scroll-icon" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="leaderboard-content">
@@ -309,6 +417,7 @@ const Leaderboard = ({
           </div>
         ) : (
           <div 
+            ref={leaderboardRef}
             className="leaderboard-list" 
             style={{ 
               maxHeight: maxHeight, 
@@ -326,13 +435,15 @@ const Leaderboard = ({
               const isExpanded = expandedItems.has(itemKey);
               const hasSubData = expandedData[itemKey];
               const isExpandable = allowExpansion && (item.level !== 'AGENT');
+              const isUser = isCurrentUser(item);
               
               return (
                 <div key={index} className="leaderboard-item-container">
                   <div
+                    ref={isUser ? currentUserRef : null}
                     className={`leaderboard-item ${getRankClass(rank)} ${
                       (onItemClick || isExpandable) ? 'clickable' : ''
-                    }`}
+                    } ${isUser ? 'current-user' : ''}`}
                     onClick={() => {
                       if (isExpandable) {
                         handleToggleExpansion(item, index);
@@ -376,10 +487,17 @@ const Leaderboard = ({
                             <div className="name-line">
                               <span className="item-name">{displayName}</span>
                             </div>
-                            {showMGA && item.mga && ['all', 'sa', 'ga'].includes(hierarchyLevel) && (
+                            {showMGA && item.mgaLastName && ['all', 'sa', 'ga'].includes(hierarchyLevel) && (
                               <div className="mga-line">
-
-                                <span className="mga-info">{item.mga}</span>
+                                {showLevelBadge && item.clname && (
+                                  <span 
+                                    className="user-role-badge"
+                                    style={getLevelBadgeStyles(item.clname)}
+                                  >
+                                    {item.clname}
+                                  </span>
+                                )}
+                                <span className="mga-info">{item.mgaLastName}</span>
                               </div>
                             )}
                             {!showMGA && showLevelBadge && item.clname && (
@@ -479,9 +597,8 @@ const Leaderboard = ({
                                   <div className="sub-name-line">
                                     <span className="sub-item-name">{subDisplayName}</span>
                                   </div>
-                                  {showMGA && subItem.mga && ['all', 'sa', 'ga'].includes(hierarchyLevel) && (
+                                  {showMGA && subItem.mgaLastName && ['all', 'sa', 'ga'].includes(hierarchyLevel) && (
                                     <div className="sub-mga-line">
-                                      <span className="sub-mga-info">{subItem.mga}</span>
                                       {showLevelBadge && subItem.clname && (
                                         <span 
                                           className="user-role-badge"
@@ -490,6 +607,7 @@ const Leaderboard = ({
                                           {subItem.clname}
                                         </span>
                                       )}
+                                      <span className="sub-mga-info">{subItem.mgaLastName}</span>
                                     </div>
                                   )}
                                   {!showMGA && showLevelBadge && subItem.clname && (

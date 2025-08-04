@@ -259,6 +259,7 @@ export const AuthProvider = ({ children }) => {
             lagnname: response.data.agnName || response.data.lagnname || '',
             Role: response.data.Role || '',
             permissions: response.data.Role || response.data.permissions || '',
+            teamRole: response.data.teamRole || decodedToken.teamRole || '',
             // Add team styles to user object
             teamStyles: teamSettings
           };
@@ -278,6 +279,7 @@ export const AuthProvider = ({ children }) => {
             lagnname: decodedToken.agnName || decodedToken.lagnname || '',
             Role: decodedToken.Role || '',
             permissions: decodedToken.Role || decodedToken.permissions || '',
+            teamRole: decodedToken.teamRole || '',
             // Add team styles to basic user data too
             teamStyles: teamSettings
           };

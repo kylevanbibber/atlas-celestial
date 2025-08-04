@@ -163,6 +163,7 @@ router.get("/reports", async (req, res) => {
             params.push(is_hidden === 'true');
         }
 
+        // Get reports with their most recent version data
         const reports = await query(`
             SELECT r.id, r.subject, r.report_name, r.report_description, r.category_id,
                    r.frequency, r.report_type, r.component_name, r.icon_name,
@@ -171,15 +172,36 @@ router.get("/reports", async (req, res) => {
                    r.tags, r.metadata, r.added_at, r.updated_at,
                    c.name as category_name, c.color as category_color, c.icon as category_icon,
                    u.lagnname as created_by_name,
-                   (SELECT COUNT(*) FROM report_versions WHERE report_id = r.id) as version_count
+                   (SELECT COUNT(*) FROM report_versions WHERE report_id = r.id) as version_count,
+                   -- Most recent version data
+                   rv.id as latest_version_id,
+                   rv.file_name as latest_file_name,
+                   rv.onedrive_url as latest_onedrive_url,
+                   rv.file_size as latest_file_size,
+                   rv.upload_date as latest_upload_date,
+                   rv.version_name as latest_version_name,
+                   rv.version_notes as latest_version_notes,
+                   rv.created_at as latest_version_created_at,
+                   rv_creator.lagnname as latest_version_created_by_name
             FROM onedrive_reports r
             LEFT JOIN file_categories c ON r.category_id = c.id
             LEFT JOIN activeusers u ON r.created_by = u.id
+            -- Join with the most recent version for each report
+            LEFT JOIN (
+                SELECT rv1.*
+                FROM report_versions rv1
+                INNER JOIN (
+                    SELECT report_id, MAX(upload_date) as max_upload_date
+                    FROM report_versions
+                    GROUP BY report_id
+                ) rv2 ON rv1.report_id = rv2.report_id AND rv1.upload_date = rv2.max_upload_date
+            ) rv ON r.id = rv.report_id
+            LEFT JOIN activeusers rv_creator ON rv.created_by = rv_creator.id
             ${whereClause}
-            ORDER BY r.sort_order ASC, r.priority DESC, r.upload_date DESC, r.added_at DESC
+            ORDER BY r.sort_order ASC, r.priority DESC, COALESCE(rv.upload_date, r.upload_date) DESC, r.added_at DESC
         `, params);
 
-        // Get versions for each report
+        // Get all versions for each report
         const reportsWithVersions = await Promise.all(reports.map(async (report) => {
             const versions = await query(`
                 SELECT v.*, u.lagnname as created_by_name
@@ -189,10 +211,18 @@ router.get("/reports", async (req, res) => {
                 ORDER BY v.upload_date DESC, v.created_at DESC
             `, [report.id]);
 
-            return {
+            // Use the most recent version data as the default if available
+            const reportWithLatestVersion = {
                 ...report,
+                // Override with latest version data if available
+                onedrive_url: report.latest_onedrive_url || report.onedrive_url,
+                file_name: report.latest_file_name || report.file_name,
+                file_size: report.latest_file_size || report.file_size,
+                upload_date: report.latest_upload_date || report.upload_date,
                 versions: versions
             };
+
+            return reportWithLatestVersion;
         }));
 
         res.json({ success: true, data: reportsWithVersions });
@@ -207,14 +237,34 @@ router.get("/reports/:id", async (req, res) => {
     const { id } = req.params;
     
     try {
+        // Get report with its most recent version data
         const report = await query(`
             SELECT r.*, c.name as category_name, c.color as category_color,
-                   u.lagnname as created_by_name
+                   u.lagnname as created_by_name,
+                   -- Most recent version data
+                   rv.id as latest_version_id,
+                   rv.file_name as latest_file_name,
+                   rv.onedrive_url as latest_onedrive_url,
+                   rv.file_size as latest_file_size,
+                   rv.upload_date as latest_upload_date,
+                   rv.version_name as latest_version_name,
+                   rv.version_notes as latest_version_notes,
+                   rv.created_at as latest_version_created_at,
+                   rv_creator.lagnname as latest_version_created_by_name
             FROM onedrive_reports r
             LEFT JOIN file_categories c ON r.category_id = c.id
             LEFT JOIN activeusers u ON r.created_by = u.id
+            -- Join with the most recent version for this report
+            LEFT JOIN (
+                SELECT rv1.*
+                FROM report_versions rv1
+                WHERE rv1.report_id = ?
+                ORDER BY rv1.upload_date DESC, rv1.created_at DESC
+                LIMIT 1
+            ) rv ON r.id = rv.report_id
+            LEFT JOIN activeusers rv_creator ON rv.created_by = rv_creator.id
             WHERE r.id = ?
-        `, [id]);
+        `, [id, id]);
 
         if (report.length === 0) {
             return res.status(404).json({ success: false, message: "Report not found" });
@@ -228,12 +278,20 @@ router.get("/reports/:id", async (req, res) => {
             ORDER BY v.upload_date DESC, v.created_at DESC
         `, [id]);
 
+        // Use the most recent version data as the default if available
+        const reportWithLatestVersion = {
+            ...report[0],
+            // Override with latest version data if available
+            onedrive_url: report[0].latest_onedrive_url || report[0].onedrive_url,
+            file_name: report[0].latest_file_name || report[0].file_name,
+            file_size: report[0].latest_file_size || report[0].file_size,
+            upload_date: report[0].latest_upload_date || report[0].upload_date,
+            versions: versions
+        };
+
         res.json({ 
             success: true, 
-            data: { 
-                ...report[0], 
-                versions: versions 
-            } 
+            data: reportWithLatestVersion
         });
     } catch (error) {
         console.error("Error fetching report:", error);
@@ -293,18 +351,47 @@ router.post("/reports", async (req, res) => {
                 WHERE id = ?
             `, [onedrive_url, file_name, file_size, upload_date, userId, subject, report_description, is_from_home_office !== false, priority, tags ? JSON.stringify(tags) : null, reportId]);
 
-            // Get the updated report with version info
+            // Get the updated report with version info and most recent version data
             const updatedReport = await query(`
                 SELECT r.*, c.name as category_name,
-                       (SELECT COUNT(*) FROM report_versions WHERE report_id = r.id) as version_count
+                       (SELECT COUNT(*) FROM report_versions WHERE report_id = r.id) as version_count,
+                       -- Most recent version data
+                       rv.id as latest_version_id,
+                       rv.file_name as latest_file_name,
+                       rv.onedrive_url as latest_onedrive_url,
+                       rv.file_size as latest_file_size,
+                       rv.upload_date as latest_upload_date,
+                       rv.version_name as latest_version_name,
+                       rv.version_notes as latest_version_notes,
+                       rv.created_at as latest_version_created_at,
+                       rv_creator.lagnname as latest_version_created_by_name
                 FROM onedrive_reports r
                 LEFT JOIN file_categories c ON r.category_id = c.id
+                -- Join with the most recent version for this report
+                LEFT JOIN (
+                    SELECT rv1.*
+                    FROM report_versions rv1
+                    WHERE rv1.report_id = ?
+                    ORDER BY rv1.upload_date DESC, rv1.created_at DESC
+                    LIMIT 1
+                ) rv ON r.id = rv.report_id
+                LEFT JOIN activeusers rv_creator ON rv.created_by = rv_creator.id
                 WHERE r.id = ?
-            `, [reportId]);
+            `, [reportId, reportId]);
+
+            // Use the most recent version data as the default if available
+            const reportWithLatestVersion = {
+                ...updatedReport[0],
+                // Override with latest version data if available
+                onedrive_url: updatedReport[0].latest_onedrive_url || updatedReport[0].onedrive_url,
+                file_name: updatedReport[0].latest_file_name || updatedReport[0].file_name,
+                file_size: updatedReport[0].latest_file_size || updatedReport[0].file_size,
+                upload_date: updatedReport[0].latest_upload_date || updatedReport[0].upload_date
+            };
 
             res.json({ 
                 success: true, 
-                data: updatedReport[0],
+                data: reportWithLatestVersion,
                 message: `Added as new version to existing report "${report_name}"`
             });
         } else {
@@ -322,6 +409,7 @@ router.post("/reports", async (req, res) => {
                 tags ? JSON.stringify(tags) : null, userId, userId
             ]);
 
+            // Get the new report (no versions yet, so no need for version join)
             const newReport = await query(`
                 SELECT r.*, c.name as category_name
                 FROM onedrive_reports r
@@ -364,14 +452,44 @@ router.put("/reports/:id", async (req, res) => {
             tags ? JSON.stringify(tags) : null, userId, id
         ]);
 
+        // Get the updated report with most recent version data
         const updatedReport = await query(`
-            SELECT r.*, c.name as category_name
+            SELECT r.*, c.name as category_name,
+                   -- Most recent version data
+                   rv.id as latest_version_id,
+                   rv.file_name as latest_file_name,
+                   rv.onedrive_url as latest_onedrive_url,
+                   rv.file_size as latest_file_size,
+                   rv.upload_date as latest_upload_date,
+                   rv.version_name as latest_version_name,
+                   rv.version_notes as latest_version_notes,
+                   rv.created_at as latest_version_created_at,
+                   rv_creator.lagnname as latest_version_created_by_name
             FROM onedrive_reports r
             LEFT JOIN file_categories c ON r.category_id = c.id
+            -- Join with the most recent version for this report
+            LEFT JOIN (
+                SELECT rv1.*
+                FROM report_versions rv1
+                WHERE rv1.report_id = ?
+                ORDER BY rv1.upload_date DESC, rv1.created_at DESC
+                LIMIT 1
+            ) rv ON r.id = rv.report_id
+            LEFT JOIN activeusers rv_creator ON rv.created_by = rv_creator.id
             WHERE r.id = ?
-        `, [id]);
+        `, [id, id]);
 
-        res.json({ success: true, data: updatedReport[0] });
+        // Use the most recent version data as the default if available
+        const reportWithLatestVersion = {
+            ...updatedReport[0],
+            // Override with latest version data if available
+            onedrive_url: updatedReport[0].latest_onedrive_url || updatedReport[0].onedrive_url,
+            file_name: updatedReport[0].latest_file_name || updatedReport[0].file_name,
+            file_size: updatedReport[0].latest_file_size || updatedReport[0].file_size,
+            upload_date: updatedReport[0].latest_upload_date || updatedReport[0].upload_date
+        };
+
+        res.json({ success: true, data: reportWithLatestVersion });
     } catch (error) {
         console.error("Error updating report:", error);
         res.status(500).json({ success: false, message: "Failed to update report" });
@@ -508,6 +626,53 @@ router.get("/test-same-name", async (req, res) => {
         console.error("Error in test endpoint:", error);
         res.status(500).json({ success: false, message: "Test failed", error: error.message });
     }
+});
+
+// Get submitting agent count data from sub_agent table
+router.get('/submitting-agent-count', async (req, res) => {
+  try {
+    const { year, manager } = req.query;
+    
+    let sqlQuery = `
+      SELECT 
+        date,
+        MGA,
+        count,
+        post_six,
+        first_six
+      FROM sub_agent 
+      WHERE 1=1
+    `;
+    
+    const params = [];
+    
+    // Filter by year if provided
+    if (year) {
+      sqlQuery += ` AND YEAR(date) = ?`;
+      params.push(year);
+    }
+    
+    // Filter by manager for SGA endpoints
+    if (manager === 'ARIAS ORGANIZATION') {
+      sqlQuery += ` AND MGA = ?`;
+      params.push('ARIAS ORGANIZATION');
+    }
+    
+    sqlQuery += ` ORDER BY date ASC`;
+    
+    const rows = await query(sqlQuery, params);
+    
+    res.json({
+      success: true,
+      data: rows
+    });
+  } catch (error) {
+    console.error('Error fetching submitting agent count data:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching submitting agent count data'
+    });
+  }
 });
 
 module.exports = router; 

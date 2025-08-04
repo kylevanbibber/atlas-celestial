@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import api from "../../../api";
 import { useAuth } from "../../../context/AuthContext";
 import "../../../pages/abc.css";
@@ -48,19 +48,22 @@ const getHeaderClass = (key) => {
 };
 
 const calculateQuarterTotals = (counts, isCurrentYear = false) => {
-  const Q1 = counts.slice(0, 3).reduce((a, b) => a + b, 0);
-  const Q2 = counts.slice(3, 6).reduce((a, b) => a + b, 0);
-  const Q3 = counts.slice(6, 9).reduce((a, b) => a + b, 0);
-  const Q4 = counts.slice(9, 12).reduce((a, b) => a + b, 0);
+  // Use the last month of each quarter for quarter values
+  const Q1 = counts[2]; // March (index 2)
+  const Q2 = counts[5]; // June (index 5)
+  const Q3 = counts[8]; // September (index 8)
+  const Q4 = counts[11]; // December (index 11)
   
   let YTD;
+  const today = new Date();
+  const currentMonth = today.getMonth(); // 0-indexed
+  const lastMonthIndex = currentMonth === 0 ? 0 : currentMonth - 1; // If January, use January (0), otherwise use previous month
+  
   if (isCurrentYear) {
-    const today = new Date();
-    const currentMonth = today.getMonth(); // 0-indexed
-    // Sum up to the previous month (excluding current month)
-    YTD = counts.slice(0, Math.max(0, currentMonth)).reduce((a, b) => a + b, 0);
+    YTD = counts[lastMonthIndex] || 0;
   } else {
-    YTD = Q1 + Q2 + Q3 + Q4;
+    // For previous year, use the same month as current year YTD for proper comparison
+    YTD = counts[lastMonthIndex] || 0;
   }
   
   return { Q1, Q2, Q3, Q4, YTD };
@@ -424,8 +427,24 @@ const ScorecardSGAData = () => {
   // Get user data from auth context
   const { user } = useAuth();
   const userId = user?.userId;
-  const userRole = user?.clname?.toUpperCase();
-  const agnName = user?.lagnname; // Using lagnname as agent name
+  
+  // Check if user is admin with teamRole="app" - treat as SGA
+  const isAppAdmin = user?.Role === 'Admin' && user?.teamRole === 'app';
+  
+  // Use SGA role for app admins, otherwise use actual clname
+  const userRole = isAppAdmin ? 'SGA' : user?.clname?.toUpperCase();
+  
+  // Use "ARIAS SIMON A" as lagnname for app admins, otherwise use actual lagnname
+  const agnName = isAppAdmin ? 'ARIAS SIMON A' : user?.lagnname; // Using lagnname as agent name
+  
+  // Log for debugging app admin data fetching
+  if (isAppAdmin) {
+    console.log('🏭 ScorecardSGAView: App admin detected, using SGA role and ARIAS SIMON A as lagnname', {
+      userRole,
+      agnName,
+      userId: user?.userId
+    });
+  }
 
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [mgaData, setMgaData] = useState([]);
@@ -441,6 +460,9 @@ const ScorecardSGAData = () => {
   const [sortOrder, setSortOrder] = useState("asc");
   const [selectedTreeFilter, setSelectedTreeFilter] = useState("All");
   const [hireToCodeView, setHireToCodeView] = useState("Month");
+  const [showInactiveMgas, setShowInactiveMgas] = useState(false);
+  const [showFutureMonths, setShowFutureMonths] = useState(true);
+  const [quartersMode, setQuartersMode] = useState('show'); // 'show', 'hide', 'only'
   const currencyFormatter = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -460,34 +482,19 @@ const ScorecardSGAData = () => {
   const useSgaEndpoints = ["SGA", "MGA", "RGA"].includes(userRole);
   const endpoints = useSgaEndpoints
     ? {
-        alp: `/dataroutes/subagent-alp-mga?value=${effectiveAgnName}`,
+        alp: `/dataroutes/monthly-alp-all`,
         vip: `/dataroutes/vips-sga?column=${queryRole}&value=${effectiveAgnName}`,
         associates: `/dataroutes/associates-sga?column=${queryRole}&value=${effectiveAgnName}`,
         hires: `/dataroutes/org-total-hires?value=${effectiveAgnName}`,
-        subagent: `/dataroutes/subagent-alp-sga?value=${effectiveAgnName}`,
+        subagent: `/production-reports/submitting-agent-count?year=${selectedYear}&manager=ARIAS ORGANIZATION`,
       }
     : {
         alp: `/dataroutes/monthly-alp-by-mga?value=${effectiveAgnName}`,
         vip: `/dataroutes/vips?column=${queryRole}&value=${effectiveAgnName}`,
         associates: `/dataroutes/associates?column=${queryRole}&value=${effectiveAgnName}`,
         hires: `/dataroutes/total-hires?value=${effectiveAgnName}`,
-        subagent: `/dataroutes/subagent-alp?value=${effectiveAgnName}`,
+        subagent: `/production-reports/submitting-agent-count?year=${selectedYear}`,
       };
-
-  useEffect(() => {
-    api
-      .get("/dataroutes/get-all-mgas")
-      .then((res) => {
-        if (res.data.success) {
-          console.log("MGA data loaded:", res.data.data.length, "MGAs");
-          console.log("Sample MGA data:", res.data.data.slice(0, 3));
-          setMgaData(res.data.data);
-        }
-      })
-      .catch((err) => {
-        console.error("Error fetching MGA data:", err);
-      });
-  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -669,23 +676,96 @@ const ScorecardSGAData = () => {
     return mgaObj.tree || mgaObj.treeValue || mgaObj.tree_name || mgaObj.treeName || "Unknown";
   };
 
+  // Helper function to determine if a month is in the future
+  const isMonthInFuture = (year, monthIndex) => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+    return (year > currentYear) || (year === currentYear && monthIndex > currentMonth);
+  };
+
+  // Helper function to determine if a column should be shown based on quarters mode and future months
+  const shouldShowColumn = useCallback((index, isQuarter, isFuture, headerKey) => {
+    // Always show the MGA column (first column)
+    if (headerKey === 'mga' || index === 0) {
+      return true;
+    }
+    
+    // Handle quarters mode
+    if (quartersMode === 'hide' && isQuarter) {
+      return false; // Hide quarters
+    }
+    if (quartersMode === 'only') {
+      // Only show quarters, YTD, and previous year columns (plus MGA column which is handled above)
+      if (!isQuarter && !['YTD'].includes(headerKey)) {
+        return false; // Hide non-quarter columns (except YTD)
+      }
+    }
+    
+    // Handle future months
+    if (!showFutureMonths && isFuture) {
+      return false;
+    }
+    
+    return true;
+  }, [quartersMode, showFutureMonths]);
+
+  // All MGA data for totals calculation (always includes all MGAs)
+  const [allMgaData, setAllMgaData] = useState([]);
+
+  // Fetch all MGAs for filtering and totals calculation
+  useEffect(() => {
+    const fetchAllMgaData = async () => {
+      try {
+        const response = await api.get("/dataroutes/get-all-mgas");
+        
+        if (response.data.success) {
+          console.log("All MGA data loaded:", response.data.data.length, "MGAs");
+          setAllMgaData(response.data.data);
+        }
+      } catch (err) {
+        console.error("Error fetching all MGA data:", err);
+      }
+    };
+
+    fetchAllMgaData();
+  }, []);
+
+  // Filter MGA data based on showInactiveMgas state
   const filteredMgaData = useMemo(() => {
-    const filtered = mgaData.filter((mgaObj) => {
-      const active = mgaObj.active?.toLowerCase();
-      const hide = mgaObj.hide?.toLowerCase();
-      // Show all MGAs that are not explicitly hidden
-      return hide !== "y";
+    if (!allMgaData.length) return [];
+    
+    return allMgaData.filter((mgaObj) => {
+      const isActive = mgaObj.Active?.toLowerCase() === 'y';
+      const isHidden = mgaObj.hide?.toLowerCase() === 'y';
+      
+      // Show active, non-hidden MGAs
+      if (isActive && !isHidden) {
+        return true;
+      }
+      
+      // Show inactive MGAs only if showInactiveMgas is true
+      return showInactiveMgas;
     });
-    console.log(`Filtered MGA data: ${filtered.length} MGAs from ${mgaData.length} total`);
-    console.log(`Sample MGAs:`, filtered.slice(0, 3).map(m => ({ 
-      lagnname: m.lagnname, 
-      tree: m.tree, 
-      treeValue: m.treeValue,
-      tree_name: m.tree_name,
-      treeName: m.treeName
-    })));
-    return filtered;
-  }, [mgaData]);
+  }, [allMgaData, showInactiveMgas]);
+
+  // Get inactive MGAs for the "Inactive MGAs" row
+  const inactiveMgaData = useMemo(() => {
+    if (!allMgaData.length) return [];
+    
+    return allMgaData.filter((mgaObj) => {
+      const isActive = mgaObj.Active?.toLowerCase() === 'y';
+      const isHidden = mgaObj.hide?.toLowerCase() === 'y';
+      
+      // Include inactive MGAs
+      if (!isActive) return true;
+      
+      // Include hidden active MGAs (since we're not showing them in the main table)
+      if (isActive && isHidden) return true;
+      
+      return false;
+    });
+  }, [allMgaData]);
 
   // Group each dataset by MGA.
   // For VIP, use the "vip_month" field, count occurrences, and use the "mga" field.
@@ -746,8 +826,60 @@ const ScorecardSGAData = () => {
       };
     });
   };
+
+  // Build inactive MGAs row
+  const buildInactiveMgaRow = (groupedData, isSubagent = false) => {
+    if (inactiveMgaData.length === 0) return null;
+    
+    console.log(`Building inactive MGAs row for ${inactiveMgaData.length} MGAs`);
+    
+    // Sum up data from all inactive MGAs
+    const inactiveMonthlyCounts = Array(12).fill(0);
+    let inactiveQ1 = 0, inactiveQ2 = 0, inactiveQ3 = 0, inactiveQ4 = 0, inactiveYTD = 0;
+    
+    inactiveMgaData.forEach((mgaObj) => {
+      const mgaName = mgaObj.lagnname;
+      
+      if (isSubagent) {
+        if (groupedData[mgaName]) {
+          const monthly = groupedData[mgaName].monthly;
+          monthly.forEach((count, idx) => {
+            inactiveMonthlyCounts[idx] += count;
+          });
+          inactiveQ1 += groupedData[mgaName].Q1 || 0;
+          inactiveQ2 += groupedData[mgaName].Q2 || 0;
+          inactiveQ3 += groupedData[mgaName].Q3 || 0;
+          inactiveQ4 += groupedData[mgaName].Q4 || 0;
+          inactiveYTD += groupedData[mgaName].YTD || 0;
+        }
+      } else {
+        const monthlyCounts = groupedData[mgaName] || Array(12).fill(0);
+        monthlyCounts.forEach((count, idx) => {
+          inactiveMonthlyCounts[idx] += count;
+        });
+        const totals = calculateQuarterTotals(monthlyCounts, selectedYear === new Date().getFullYear());
+        inactiveQ1 += totals.Q1;
+        inactiveQ2 += totals.Q2;
+        inactiveQ3 += totals.Q3;
+        inactiveQ4 += totals.Q4;
+        inactiveYTD += totals.YTD;
+      }
+    });
+    
+    return {
+      mga: "Inactive MGAs",
+      monthlyCounts: inactiveMonthlyCounts,
+      Q1: inactiveQ1,
+      Q2: inactiveQ2,
+      Q3: inactiveQ3,
+      Q4: inactiveQ4,
+      YTD: inactiveYTD,
+      treeValue: "",
+      isInactiveRow: true,
+    };
+  };
   
-  const processSubmittingAgentCountByMGA = (data, selectedYear) => {
+    const processSubmittingAgentCountByMGA = (data, selectedYear) => {
     const groupedByMGA = {};
     data.forEach((row) => {
       if (!row.reportdate) return;
@@ -778,7 +910,7 @@ const ScorecardSGAData = () => {
       }
       groupedByMGA[mga][month][weekIndex].agents.push(row.LagnName);
     });
-  
+
     // For each MGA, compute a 12-element array with the monthly average count (rounded to a whole number)
     // and compute quarterly averages as the average of the three monthly counts, then rounded.
     // For YTD, if the selected year is the current year, average only the months that have passed so far.
@@ -814,6 +946,77 @@ const ScorecardSGAData = () => {
       
       result[mga] = { monthly: monthlyAverages, Q1, Q2, Q3, Q4, YTD };
     }
+    return result;
+  };
+
+  const processSubAgentDataFromDatabase = (data, selectedYear) => {
+    const groupedByMGA = {};
+    
+    data.forEach((row) => {
+      if (!row.date) return;
+      
+      // Parse the date string and ensure it's treated as local date, not UTC
+      const [yearStr, monthStr, dayStr] = row.date.split('-');
+      const year = parseInt(yearStr, 10);
+      if (year !== selectedYear) return;
+      
+      const month = parseInt(monthStr, 10) - 1; // Convert to 0-indexed
+      const mga = row.MGA;
+      if (!mga) return;
+      
+      if (!groupedByMGA[mga]) {
+        groupedByMGA[mga] = {};
+      }
+      if (!groupedByMGA[mga][month]) {
+        groupedByMGA[mga][month] = [];
+      }
+      
+      groupedByMGA[mga][month].push({
+        count: row.count || 0,
+        post_six: row.post_six || 0,
+        first_six: row.first_six || 0
+      });
+    });
+
+    // For each MGA, compute monthly averages and quarterly/YTD totals
+    const result = {};
+    const today = new Date();
+    
+    for (const mga in groupedByMGA) {
+      const monthlyAverages = Array(12).fill(0);
+      
+      for (let m = 0; m < 12; m++) {
+        if (groupedByMGA[mga][m]) {
+          const monthData = groupedByMGA[mga][m];
+          const totalCount = monthData.reduce((sum, week) => sum + week.count, 0);
+          const weeksInMonth = monthData.length;
+          
+          // Calculate average for the month
+          const average = weeksInMonth > 0 ? totalCount / weeksInMonth : 0;
+          monthlyAverages[m] = Math.round(average);
+        } else {
+          monthlyAverages[m] = 0;
+        }
+      }
+      
+      const Q1 = Math.round((monthlyAverages[0] + monthlyAverages[1] + monthlyAverages[2]) / 3);
+      const Q2 = Math.round((monthlyAverages[3] + monthlyAverages[4] + monthlyAverages[5]) / 3);
+      const Q3 = Math.round((monthlyAverages[6] + monthlyAverages[7] + monthlyAverages[8]) / 3);
+      const Q4 = Math.round((monthlyAverages[9] + monthlyAverages[10] + monthlyAverages[11]) / 3);
+      
+      let YTD;
+      if (selectedYear === today.getFullYear()) {
+        const monthsPassed = today.getMonth();
+        YTD = monthsPassed === 0 ? 0 : Math.round(
+          monthlyAverages.slice(0, monthsPassed).reduce((a, b) => a + b, 0) / monthsPassed
+        );
+      } else {
+        YTD = Math.round(monthlyAverages.reduce((a, b) => a + b, 0) / 12);
+      }
+      
+      result[mga] = { monthly: monthlyAverages, Q1, Q2, Q3, Q4, YTD };
+    }
+    
     return result;
   };
   
@@ -884,8 +1087,14 @@ const ScorecardSGAData = () => {
   const vipRows = buildTableRows(vipGrouped);
   const associatesRows = buildTableRows(associatesGrouped);
   const hiresRows = buildTableRows(hiresGrouped);
-  const subagentGrouped = processSubmittingAgentCountByMGA(subagentData, selectedYear);
+  const subagentGrouped = processSubAgentDataFromDatabase(subagentData, selectedYear);
   const subagentRows = buildTableRows(subagentGrouped, true);
+
+  // Build inactive MGAs rows
+  const vipInactiveRow = buildInactiveMgaRow(vipGrouped);
+  const associatesInactiveRow = buildInactiveMgaRow(associatesGrouped);
+  const hiresInactiveRow = buildInactiveMgaRow(hiresGrouped);
+  const subagentInactiveRow = buildInactiveMgaRow(subagentGrouped, true);
 
   // Sorting logic – sorts rows based on the selected sort column and order.
   const sortRows = (rows) => {
@@ -928,7 +1137,20 @@ const ScorecardSGAData = () => {
   const finalSubagentRows = sortRows(filterRowsByTree([...subagentRows]));
   const finalHireToCodeRows = useMemo(() => buildHireToCodeRows(finalAssociatesRows, finalHiresRows), [finalAssociatesRows, finalHiresRows]);
   const hireToCodeTotals = useMemo(() => computeRatioTotals(finalHireToCodeRows), [finalHireToCodeRows]);
-  // Compute totals for a set of rows.
+
+  // Add inactive rows to the final rows if they exist and inactive MGAs are not being shown
+  const addInactiveRows = (rows, inactiveRow) => {
+    if (inactiveRow && !showInactiveMgas && inactiveMgaData.length > 0) {
+      return [...rows, inactiveRow];
+    }
+    return rows;
+  };
+
+  const finalVipRowsWithInactive = addInactiveRows(finalVipRows, vipInactiveRow);
+  const finalAssociatesRowsWithInactive = addInactiveRows(finalAssociatesRows, associatesInactiveRow);
+  const finalHiresRowsWithInactive = addInactiveRows(finalHiresRows, hiresInactiveRow);
+  const finalSubagentRowsWithInactive = addInactiveRows(finalSubagentRows, subagentInactiveRow);
+  // Compute totals for a set of rows (for individual table calculations)
   const computeTotals = (rows) => {
     return rows.reduce(
       (acc, row) => {
@@ -944,6 +1166,61 @@ const ScorecardSGAData = () => {
       },
       { monthly: Array(12).fill(0), Q1: 0, Q2: 0, Q3: 0, Q4: 0, YTD: 0 }
     );
+  };
+
+  // Build table rows using all MGA data (including hidden)
+  const buildAllTableRows = (groupedData, isSubagent = false) => {
+    console.log(`Building ALL table rows for ${allMgaData.length} MGAs`);
+    
+    return allMgaData.map((mgaObj) => {
+      const mgaName = mgaObj.lagnname;
+      let monthlyCounts, Q1, Q2, Q3, Q4, YTD;
+      
+      if (isSubagent) {
+        if (groupedData[mgaName]) {
+          monthlyCounts = groupedData[mgaName].monthly;
+          Q1 = groupedData[mgaName].Q1;
+          Q2 = groupedData[mgaName].Q2;
+          Q3 = groupedData[mgaName].Q3;
+          Q4 = groupedData[mgaName].Q4;
+          YTD = groupedData[mgaName].YTD;
+        } else {
+          monthlyCounts = Array(12).fill(0);
+          Q1 = Q2 = Q3 = Q4 = YTD = 0;
+        }
+      } else {
+        monthlyCounts = groupedData[mgaName] || Array(12).fill(0);
+        const totals = calculateQuarterTotals(monthlyCounts, selectedYear === new Date().getFullYear());
+        Q1 = totals.Q1;
+        Q2 = totals.Q2;
+        Q3 = totals.Q3;
+        Q4 = totals.Q4;
+        YTD = totals.YTD;
+      }
+      
+      return {
+        mga: mgaName,
+        monthlyCounts,
+        Q1,
+        Q2,
+        Q3,
+        Q4,
+        YTD,
+        treeValue: getTreeValue(mgaObj),
+      };
+    });
+  };
+
+  // Compute totals including ALL MGAs (including hidden ones) for totals row
+  const computeAllTotals = (groupedData, isSubagent = false) => {
+    const allRows = buildAllTableRows(groupedData, isSubagent);
+    return computeTotals(allRows);
+  };
+
+  // Compute totals for ALP data including ALL MGAs
+  const computeAllAlpTotals = (groupedData) => {
+    const allRows = buildAlpTableRows(groupedData, allMgaData);
+    return computeTotals(allRows);
   };
 
   // Header click handler to toggle sorting.
@@ -965,13 +1242,7 @@ const ScorecardSGAData = () => {
   };
 
   // Helper function to check if a month is in the future
-  const isMonthInFuture = (year, monthIndex) => {
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth();
-    
-    return (year > currentYear) || (year === currentYear && monthIndex > currentMonth);
-  };
+
 
   if (loading) return (
     <div className="atlas-scorecard-loading">
@@ -986,42 +1257,55 @@ const ScorecardSGAData = () => {
     </div>
   );
 
-  const renderTable = (title, rows, totals) => (
-    <div className="atlas-scorecard-section">
-      <h4>
-        {title} {selectedYear}
-      </h4>
-      <div className="atlas-scorecard-custom-table-container">
-        <table className="atlas-scorecard-custom-table">
-          <thead>
-            <tr>
-              {headers.map((header) => (
-                <th
-                  key={header.key}
-                  className={`${getHeaderClass(header.key)} ${
-                    header.key === "Q1" || header.key === "Q2" || header.key === "Q3" || header.key === "Q4" 
-                      ? "atlas-scorecard-quarter-header" 
-                      : header.key === "YTD" 
-                        ? "atlas-scorecard-ytd-header" 
-                        : ""
-                  }`}
-                  onClick={() => handleSort(header.key)}
-                >
-                  {header.label}
-                  {getSortIndicator(header.key)}
-                </th>
-              ))}
-            </tr>
-          </thead>
+  const renderTable = (title, rows, totals) => {
+    // Filter headers based on quarters mode and future months
+    const filteredHeaders = headers.filter((header, index) => {
+      const isQuarter = ["Q1", "Q2", "Q3", "Q4"].includes(header.key);
+      const isFuture = monthOrder.hasOwnProperty(header.key) && 
+        isMonthInFuture(selectedYear, monthOrder[header.key]);
+      
+      return shouldShowColumn(index, isQuarter, isFuture, header.key);
+    });
+
+    return (
+      <div className="atlas-scorecard-section">
+        <h4>
+          {title} {selectedYear}
+        </h4>
+        <div className="atlas-scorecard-custom-table-container">
+          <table className="atlas-scorecard-custom-table">
+            <thead>
+              <tr>
+                {filteredHeaders.map((header) => (
+                  <th
+                    key={header.key}
+                    className={`${getHeaderClass(header.key)} ${
+                      header.key === "Q1" || header.key === "Q2" || header.key === "Q3" || header.key === "Q4" 
+                        ? "atlas-scorecard-quarter-header" 
+                        : header.key === "YTD" 
+                          ? "atlas-scorecard-ytd-header" 
+                          : ""
+                    }`}
+                    onClick={() => handleSort(header.key)}
+                  >
+                    {header.label}
+                    {getSortIndicator(header.key)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
           <tbody>
             {rows.map((row, index) => (
               <tr
                 key={row.mga}
+                className={row.isInactiveRow ? "atlas-scorecard-inactive-row" : ""}
                 style={{
-                  backgroundColor: index % 2 === 0 ? "white" : "#f9fafb",
+                  backgroundColor: row.isInactiveRow 
+                    ? "#fff3cd" 
+                    : index % 2 === 0 ? "white" : "#f9fafb",
                 }}
               >
-                {headers.map((header) => {
+                {filteredHeaders.map((header) => {
                   // Check if this is a future month for all tables
                   const isFutureCell = monthOrder.hasOwnProperty(header.key) && 
                     isMonthInFuture(selectedYear, monthOrder[header.key]);
@@ -1053,7 +1337,7 @@ const ScorecardSGAData = () => {
               <td className="atlas-scorecard-metric-cell">
                 <strong>Totals</strong>
               </td>
-              {headers.slice(1).map((header) => {
+              {filteredHeaders.slice(1).map((header) => {
                 // Check if this is a future month for all tables
                 const isFutureCell = monthOrder.hasOwnProperty(header.key) && 
                   isMonthInFuture(selectedYear, monthOrder[header.key]);
@@ -1100,8 +1384,8 @@ const ScorecardSGAData = () => {
         </table>
       </div>
     </div>
-  );
-  
+    );
+  };
 
   // Get unique tree values for the dropdown filter.
   const uniqueTreeValues = [
@@ -1117,37 +1401,123 @@ const ScorecardSGAData = () => {
 
   return (
     <div className="atlas-scorecard-sga-view">
-      {/* Tree filter dropdown */}
+      {/* Controls section with left and right alignment */}
       <div className="atlas-scorecard-controls">
-        <div className="atlas-scorecard-mga-dropdown">
-          <label htmlFor="treeFilter">Filter by Tree: </label>
-          <select
-            id="treeFilter"
-            value={selectedTreeFilter}
-            onChange={(e) => setSelectedTreeFilter(e.target.value)}
-          >
-            {uniqueTreeValues.map((treeVal) => (
-              <option key={treeVal} value={treeVal}>
-                {treeVal}
-              </option>
-            ))}
-          </select>
+        {/* Left side - tree filter dropdown */}
+        <div className="atlas-scorecard-controls-left">
+          <div className="atlas-scorecard-mga-dropdown">
+            <label htmlFor="treeFilter">Filter by Tree: </label>
+            <select
+              id="treeFilter"
+              value={selectedTreeFilter}
+              onChange={(e) => setSelectedTreeFilter(e.target.value)}
+            >
+              {uniqueTreeValues.map((treeVal) => (
+                <option key={treeVal} value={treeVal}>
+                  {treeVal}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Right side - toggle buttons */}
+        <div className="atlas-scorecard-controls-right">
+          <div className="atlas-scorecard-inactive-toggle">
+            <button 
+              className={`inactive-mga-toggle-btn ${showInactiveMgas ? 'active' : ''}`}
+              onClick={() => setShowInactiveMgas(!showInactiveMgas)}
+              title={showInactiveMgas ? 'Hide Inactive MGAs' : 'Show Inactive MGAs'}
+            >
+              {showInactiveMgas ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+              <span style={{ marginLeft: '6px' }}>
+                {showInactiveMgas ? 'Hide Inactive' : 'Show Inactive'}
+              </span>
+            </button>
+          </div>
+
+          <div className="atlas-scorecard-future-months-toggle">
+            <button 
+              className={`future-months-toggle-btn ${showFutureMonths ? 'active' : ''}`}
+              onClick={() => setShowFutureMonths(!showFutureMonths)}
+              title={showFutureMonths ? 'Hide Future Months' : 'Show Future Months'}
+            >
+              {showFutureMonths ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="m1 1 22 22 M9.88 9.88a3 3 0 1 0 4.24 4.24 M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 11 8 11 8a13.16 13.16 0 0 1-1.67 2.68 M6.61 6.61A13.526 13.526 0 0 0 1 12s4 8 11 8a9.74 9.74 0 0 0 5-1.28" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </button>
+          </div>
+
+          <div className="atlas-scorecard-quarters-toggle">
+            <button 
+              className={`quarters-toggle-btn ${quartersMode}`}
+              onClick={() => {
+                const nextMode = quartersMode === 'show' ? 'hide' : quartersMode === 'hide' ? 'only' : 'show';
+                setQuartersMode(nextMode);
+              }}
+              title={
+                quartersMode === 'show' 
+                  ? 'Hide Quarters' 
+                  : quartersMode === 'hide' 
+                  ? 'Show Only Quarters' 
+                  : 'Show All Columns'
+              }
+            >
+              {quartersMode === 'show' ? (
+                // Show quarters: Circle with one quarter missing (outline only)
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2 A10 10 0 0 1 22 12 A10 10 0 0 1 12 22 A10 10 0 0 1 2 12 A10 10 0 0 1 12 12 Z" stroke="currentColor" strokeWidth="2" fill="none"/>
+                </svg>
+              ) : quartersMode === 'hide' ? (
+                // Hide quarters: Circle with line through it
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none"/>
+                  <line x1="4" y1="4" x2="20" y2="20" stroke="currentColor" strokeWidth="2"/>
+                </svg>
+              ) : (
+                // Only quarters: Circle with 3 quarters filled
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none"/>
+                  <path d="M12 2 A10 10 0 0 1 22 12 L12 12 Z" fill="currentColor"/>
+                  <path d="M22 12 A10 10 0 0 1 12 22 L12 12 Z" fill="currentColor"/>
+                  <path d="M12 22 A10 10 0 0 1 2 12 L12 12 Z" fill="currentColor"/>
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
       </div>
       
       <div className="atlas-scorecard-tables">
-        {renderTable("Net ALP", finalAlpRows, computeTotals(finalAlpRows))}
-        {renderTable("VIPs", finalVipRows, computeTotals(finalVipRows))}
+        {renderTable("Net ALP", finalAlpRows, computeAllAlpTotals(processAlpDataForMGA(alpData, selectedYear)))}
+        {renderTable("VIPs", finalVipRowsWithInactive, computeAllTotals(vipGrouped))}
         {renderTable(
           "Codes",
-          finalAssociatesRows,
-          computeTotals(finalAssociatesRows)
+          finalAssociatesRowsWithInactive,
+          computeAllTotals(associatesGrouped)
         )}
-        {renderTable("Hires", finalHiresRows, computeTotals(finalHiresRows))}
+        {renderTable("Hires", finalHiresRowsWithInactive, computeAllTotals(hiresGrouped))}
         {renderTable(
           "Submitting Agent Count",
-          finalSubagentRows,
-          computeTotals(finalSubagentRows)
+          finalSubagentRowsWithInactive,
+          computeAllTotals(subagentGrouped, true)
         )}
         
         {renderTable("Hire to Code", finalHireToCodeRows, hireToCodeTotals)}

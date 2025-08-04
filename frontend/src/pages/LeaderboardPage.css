@@ -121,7 +121,7 @@
 }
 
 .arrow-change-button {
-    background: var(--primary-color);
+    background: none;
     color: var(--primary-text);
     border: none;
     padding: 8px 12px;
@@ -133,11 +133,11 @@
 }
 
 .arrow-change-button:hover {
-    background: var(--primary-dark);
+    color: var(--primary-dark);
 }
 
 .arrow-change-button:disabled {
-    background: var(--background-disabled);
+    background: none;
     color: var(--text-disabled);
     cursor: not-allowed;
 }
@@ -222,25 +222,56 @@
 
 @media (max-width: 768px) {    
     .leaderboard-filters {
-        flex-direction: column;
-        gap: 15px;
+        display: grid;
+        grid-template-rows: auto auto auto;
+        gap: 12px;
         padding: 15px;
+        width: 100vw;
+        margin-left: calc(-50vw + 50%);
+        margin-right: calc(-50vw + 50%);
+        border-radius: 0;
     }
     
-    .leaderboard-filters-left,
-    .leaderboard-filters-right {
-        flex-direction: column;
-        gap: 15px;
+    .leaderboard-filters-left {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        align-items: center;
         width: 100%;
     }
     
-    .experience-filter-container,
-    .tabs-filter-container,
-    .toggle-container,
-    .filter-button-container,
+    .leaderboard-filters-right {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 12px;
+        align-items: center;
+        width: 100%;
+    }
+    
+    .experience-filter-container {
+        justify-content: flex-start;
+        width: 100%;
+    }
+    
+    .tabs-filter-container {
+        justify-content: flex-end;
+        width: 100%;
+    }
+    
+    .toggle-container {
+        justify-content: flex-start;
+        width: 100%;
+    }
+    
+    .filter-button-container {
+        justify-content: flex-end;
+        width: auto;
+    }
+    
     .december-toggle-container {
         justify-content: center;
         width: 100%;
+        grid-column: 1 / -1;
     }
     
     .filter-dropdown-container {
@@ -275,6 +306,31 @@
     .december-toggle-container span {
         padding: 6px 8px;
         font-size: 14px;
+    }
+    
+    /* Abbreviate report type labels on mobile */
+    .tabs-filter-container span:nth-child(1)::before {
+        content: "W";
+        font-size: 14px;
+        color: inherit;
+    }
+    
+    .tabs-filter-container span:nth-child(3)::before {
+        content: "M";
+        font-size: 14px;
+        color: inherit;
+    }
+    
+    .tabs-filter-container span:nth-child(5)::before {
+        content: "Y";
+        font-size: 14px;
+        color: inherit;
+    }
+    
+    .tabs-filter-container span:nth-child(1),
+    .tabs-filter-container span:nth-child(3),
+    .tabs-filter-container span:nth-child(5) {
+        font-size: 0;
     }
     
     .date-select {

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNotifications } from '../../context/NotificationContext';
-import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../../context/NotificationContext';
+import { useAuth } from '../../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import api from '../../api';
-import NotificationToggle from './notification/NotificationToggle';
-import NotificationHistory from './notification/NotificationHistory';
-import NotificationSchedule from './notification/NotificationSchedule';
-import AdminNotifications from './notification/AdminNotifications';
+import api from '../../../api';
+import NotificationToggle from './NotificationToggle';
+import NotificationHistory from './NotificationHistory';
+import NotificationSchedule from './NotificationSchedule';
+import AdminNotifications from './AdminNotifications';
 
 const NotificationSettings = () => {
   const navigate = useNavigate();
@@ -18,11 +18,26 @@ const NotificationSettings = () => {
     loading,
     error: notificationError,
     dismissNotification,
+    wsConnected,
     markAsRead,
     fetchNotifications,
   } = useNotifications();
   const { isAdmin: isAdminFromContext, user } = useAuth();
-  const isAdmin = isAdminFromContext || (user && (user.id === 92 || user.userId === 92 || user.user_id === 92));
+  
+  // Check if user is admin with teamRole="app" - should have access to admin notifications
+  const isAppAdmin = user?.Role === 'Admin' && user?.teamRole === 'app';
+  
+  const isAdmin = isAdminFromContext || (user && (user.id === 92 || user.userId === 92 || user.user_id === 92)) || isAppAdmin;
+  
+  // Debug logging for admin notification access
+  console.log('🔔 NotificationSettings: Admin access check', {
+    userRole: user?.Role,
+    teamRole: user?.teamRole,
+    isAdminFromContext,
+    isAppAdmin,
+    finalIsAdmin: isAdmin,
+    adminNotificationsVisible: isAdmin
+  });
   const [permission, setPermission] = useState('default');
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [error, setError] = useState(null);
@@ -97,14 +112,18 @@ const NotificationSettings = () => {
     }
   };
   
-  // Set up periodic checking for new notifications
+  // Set up periodic checking for new notifications (reduced since WebSocket handles real-time)
   useEffect(() => {
     const checkInterval = setInterval(() => {
-      checkForNewNotifications();
-    }, 30000); // Check every 30 seconds
+      // Only poll if WebSocket is not connected
+      if (!wsConnected) {
+        console.log('WebSocket not connected, checking for notifications via polling');
+        checkForNewNotifications();
+      }
+    }, 300000); // Check every 5 minutes (reduced from 30 seconds)
     
     return () => clearInterval(checkInterval);
-  }, []);
+  }, [wsConnected]);
 
   const handleToggleNotifications = async () => {
     try {
@@ -174,7 +193,7 @@ const NotificationSettings = () => {
     }
   };
 
-  // Function to fetch notification groups (admin only)
+  // Function to fetch notification groups (admin and app admin only)
   const fetchNotificationGroups = async () => {
     if (!isAdmin) return;
     
@@ -188,7 +207,7 @@ const NotificationSettings = () => {
     }
   };
   
-  // Function to fetch scheduled notifications (admin only)
+  // Function to fetch scheduled notifications (admin and app admin only)
   const fetchScheduledNotifications = async () => {
     if (!isAdmin) return;
     
@@ -206,7 +225,7 @@ const NotificationSettings = () => {
     }
   };
   
-  // Load notification groups and scheduled notifications on component mount (admin only)
+  // Load notification groups and scheduled notifications on component mount (admin and app admin only)
   useEffect(() => {
     if (isAdmin) {
       fetchNotificationGroups();
@@ -240,10 +259,9 @@ const NotificationSettings = () => {
         onRefresh={checkForNewNotifications}
       />
       
-      {/* Admin Notification Settings - only visible to admins */}
+      {/* Admin Notification Settings - visible to admins and app admins */}
       {isAdmin && (
         <>
-
           <AdminNotifications />
         </>
       )}

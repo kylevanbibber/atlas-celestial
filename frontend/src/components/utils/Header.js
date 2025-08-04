@@ -1,7 +1,7 @@
 // src/components/utils/Header.jsx
 import React, { useContext, useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { AuthContext } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import ThemeContext from "../../context/ThemeContext";
 import { useTeamStyles } from "../../context/TeamStyleContext";
 import { FiMenu, FiUser, FiLogOut, FiMoon, FiSun, FiUsers, FiChevronRight } from "react-icons/fi";
@@ -20,7 +20,7 @@ const Header = ({ pageTitle, isExpanded }) => {
     startImpersonation, 
     stopImpersonation,
     hasPermission 
-  } = useContext(AuthContext);
+  } = useAuth();
   const { theme, toggleTheme } = useContext(ThemeContext);
   const { teamName } = useTeamStyles();
   const defaultProfilePic = "http://www.gravatar.com/avatar/?d=mp";
