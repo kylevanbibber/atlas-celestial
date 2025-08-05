@@ -3,7 +3,7 @@ import axios from "axios";
 
 const API_URL =
   process.env.NODE_ENV === "production"
-    ? (process.env.REACT_APP_API_URL || "https://atlas-celest-backend-3bb2fea96236.herokuapp.com") + "/api"  // Production URL
+    ? "https://atlas-celest-backend-3bb2fea96236.herokuapp.com/api"  // Production URL  
     : "http://localhost:5001/api"; // Local development URL
 
 console.log(`[API] Initializing with baseURL: ${API_URL}`);

@@ -488,6 +488,34 @@
 
 /* Mobile responsiveness */
 @media (max-width: 768px) {
+  /* Prevent any horizontal overflow on mobile */
+  body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+  
+  /* Add mobile container centering and safe area padding */
+  .reports-page .settings-content {
+    padding: 0 calc(15px + env(safe-area-inset-right, 0)) 0 calc(15px + env(safe-area-inset-left, 0));
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100vw; /* Ensure it never exceeds viewport width */
+    overflow-x: hidden; /* Prevent horizontal scrolling */
+  }
+  
+  .reports-page .padded-content {
+    padding: 10px 0; /* Remove side padding, keep top/bottom */
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  .reports-container {
+    padding: 0;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+  }
+  
   .reports-controls {
     flex-direction: column;
     align-items: stretch;
@@ -508,13 +536,56 @@
   }
 
   .reports-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
+    grid-template-columns: 1fr !important; /* Single card per row on mobile - override base grid */
+    gap: 16px; /* Good spacing between cards */
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    /* Override any min-width constraints from base grid */
+    grid-template-rows: auto;
   }
 
   .report-card {
-    padding: 16px;
-    height: 320px; /* Slightly smaller height on mobile */
+    padding: 16px; /* Comfortable padding for full-width cards */
+    height: 320px; /* Good height for full-width display */
+    width: 100%; /* Use full grid cell width */
+    max-width: 100%; /* Never exceed container */
+    box-sizing: border-box; /* Include padding in width calculation */
+    overflow: hidden; /* Prevent content overflow */
+  }
+  
+  /* Mobile font size optimizations for full-width cards */
+  .report-card .report-title {
+    font-size: 16px !important; /* Comfortable title size for full-width */
+    line-height: 1.3;
+    word-wrap: break-word; /* Prevent long words from causing overflow */
+    overflow-wrap: break-word;
+  }
+  
+  .report-card .report-description {
+    font-size: 14px !important; /* Good description size for readability */
+    line-height: 1.4;
+    word-wrap: break-word; /* Prevent long words from causing overflow */
+    overflow-wrap: break-word;
+  }
+  
+  .report-card .report-meta {
+    font-size: 12px !important; /* Clear meta text size */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  
+  .report-card .report-frequency {
+    font-size: 11px !important; /* Readable frequency badge size */
+    padding: 4px 8px;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  
+  /* Ensure all card content fits within bounds */
+  .report-card * {
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   .report-list-item {
@@ -547,6 +618,23 @@
   .category-filter {
     font-size: 12px;
     padding: 4px 8px;
+  }
+  
+  /* Extra small screens: maintain full-width cards */
+  .report-card {
+    height: 300px; /* Slightly smaller height for very small screens */
+    padding: 14px; /* Comfortable padding */
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  
+  .report-card .report-title {
+    font-size: 15px !important; /* Slightly smaller for very small screens */
+  }
+  
+  .report-card .report-description {
+    font-size: 13px !important; /* Maintain readability */
   }
 
   .report-actions {

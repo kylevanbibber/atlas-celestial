@@ -6,10 +6,10 @@
     justify-content: space-between !important;
     padding: 0 20px; 
     position: fixed;
-    top: 0;
+    top: env(safe-area-inset-top, 0); /* Respect safe area on mobile */
     left: 45px !important; 
     width: calc(100% - 45px) !important;
-    height: 60px;
+    height: var(--header-height);
     transition: left 0.3s ease-in-out, width 0.3s ease-in-out, background-color 0.3s ease, color 0.3s ease;
     z-index: 1100; /* Lower than sidebar for proper shadow rendering */
 }
@@ -111,8 +111,14 @@
   .header {
     left: 0 !important;
     width: 100% !important;
-    padding: 0 15px;
+    padding-left: calc(15px + env(safe-area-inset-left, 0));
+    padding-right: calc(15px + env(safe-area-inset-right, 0));
     justify-content: space-between !important;
+    /* Ensure header content is below the safe area */
+    padding-top: max(10px, env(safe-area-inset-top, 0));
+    padding-bottom: 10px;
+    height: auto; /* Allow height to adjust with safe area */
+    min-height: var(--header-height);
   }
   
   .header-left {
@@ -123,7 +129,7 @@
   .header-logo-container {
     display: block;
     position: absolute;
-    left: 15px;
+    left: 0; /* Remove additional left offset since we have safe area padding */
     top: 50%;
     transform: translateY(-50%);
     z-index: 1;

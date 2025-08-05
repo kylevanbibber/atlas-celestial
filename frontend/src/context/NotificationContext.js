@@ -2,6 +2,15 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useAuth } from './AuthContext';
 import api from '../api';
 
+// WebSocket URL configuration - matches API configuration
+const getWebSocketUrl = () => {
+  if (process.env.NODE_ENV === "production") {
+    return "wss://atlas-celest-backend-3bb2fea96236.herokuapp.com/ws/notifications";
+  } else {
+    return "ws://localhost:5001/ws/notifications";
+  }
+};
+
 // Create context with default value
 const NotificationContext = createContext({
   notifications: [],
@@ -331,17 +340,15 @@ const NotificationProvider = ({ children }) => {
       const wsTimeout = setTimeout(() => {
         if (!wsConnected && !isReconnecting && isAuthenticated && token && reconnectAttempts === 0) {
           // Inline WebSocket connection to avoid dependency loops
+          
+          // Create WebSocket connection using the same URL logic as API
+          const wsUrl = getWebSocketUrl();
+          
           try {
             // Close any existing connection first
             if (wsConnection && wsConnection.readyState !== WebSocket.CLOSED) {
               wsConnection.close();
             }
-
-            // Create WebSocket connection
-            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsHost = window.location.hostname;
-            const wsPort = process.env.NODE_ENV === 'production' ? window.location.port : '5001';
-            const wsUrl = `${wsProtocol}//${wsHost}:${wsPort}/ws/notifications`;
             
             console.log('Connecting to WebSocket:', wsUrl);
             setIsReconnecting(true);
@@ -400,31 +407,33 @@ const NotificationProvider = ({ children }) => {
               setIsReconnecting(false);
               
               // Only attempt to reconnect if still authenticated and not intentional close
-              if (event.code !== 1000 && isAuthenticated && reconnectAttempts < 5) {
-                const backoffDelay = Math.min(2000 * Math.pow(2, reconnectAttempts), 10000);
-                console.log(`Will attempt to reconnect WebSocket in ${backoffDelay/1000} seconds... (attempt ${reconnectAttempts + 1}/5)`);
+              if (event.code !== 1000 && isAuthenticated && reconnectAttempts < 3) {
+                const backoffDelay = Math.min(2000 * Math.pow(2, reconnectAttempts), 8000);
+                console.log(`Will attempt to reconnect WebSocket in ${backoffDelay/1000} seconds... (attempt ${reconnectAttempts + 1}/3)`);
                 
                 setTimeout(() => {
                   setReconnectAttempts(prev => prev + 1);
                 }, backoffDelay);
-              } else if (reconnectAttempts >= 5) {
-                console.log('Max reconnection attempts reached. Stopping reconnection.');
-                setWsError('Connection failed after multiple attempts');
+              } else if (reconnectAttempts >= 3) {
+                console.log('Max reconnection attempts reached. Using polling fallback for notifications.');
+                setWsError('WebSocket connection failed. Using polling fallback.');
                 setIsReconnecting(false);
               }
             };
 
             ws.onerror = (error) => {
               console.error('WebSocket error:', error);
+              console.error('Failed to connect to:', wsUrl);
               setWsConnected(false);
-              setWsError('Connection error');
+              setWsError(`Connection failed to ${wsUrl}. Backend server may not be running.`);
               setIsReconnecting(false);
             };
 
             setWsConnection(ws);
           } catch (error) {
             console.error('Failed to connect WebSocket:', error);
-            setWsError('Failed to connect');
+            console.error('WebSocket URL was:', wsUrl);
+            setWsError(`Failed to connect to WebSocket server at ${wsUrl}. Please ensure the backend server is running.`);
             setIsReconnecting(false);
           }
         }
@@ -432,11 +441,11 @@ const NotificationProvider = ({ children }) => {
       
       // Fallback polling (only if WebSocket fails or for redundancy)
       const fallbackInterval = setInterval(() => {
-        if (!wsConnected) {
-          console.log('WebSocket not connected, using fallback polling');
+        if (!wsConnected && isAuthenticated) {
+          console.log('WebSocket not connected, using fallback polling for notifications');
           fetchNotifications();
         }
-      }, 120000); // Every 2 minutes as fallback
+      }, 60000); // Every 1 minute as fallback (reduced from 2 minutes for better UX)
       
       return () => {
         clearTimeout(wsTimeout);
@@ -459,7 +468,7 @@ const NotificationProvider = ({ children }) => {
 
   // Handle reconnection attempts
   useEffect(() => {
-    if (reconnectAttempts > 0 && reconnectAttempts < 5 && isAuthenticated && !wsConnected && !isReconnecting) {
+    if (reconnectAttempts > 0 && reconnectAttempts < 3 && isAuthenticated && !wsConnected && !isReconnecting) {
       console.log(`Triggering reconnection attempt ${reconnectAttempts}`);
       // Trigger the main connection effect to retry
       const retryTimeout = setTimeout(() => {
@@ -495,12 +504,38 @@ const NotificationProvider = ({ children }) => {
         });
       }
       
-      // Check for existing push subscription
+      // For iOS PWAs, add additional wait time to ensure everything is ready
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isPWA = window.matchMedia('(display-mode: standalone)').matches;
+      
+      if (isIOS && isPWA) {
+        console.log('🍎 Detected iOS PWA, adding extra initialization time...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      
+      // Check for existing push subscription with retry logic for iOS
       try {
-        const subscription = await registration.pushManager.getSubscription();
+        let subscription = null;
+        let retries = 3;
+        
+        while (!subscription && retries > 0) {
+          try {
+            subscription = await registration.pushManager.getSubscription();
+            if (!subscription && retries > 1) {
+              console.log('🔄 Subscription not found, retrying...', retries - 1, 'attempts left');
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          } catch (err) {
+            console.log('⚠️ Error getting subscription, retrying...', err);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          retries--;
+        }
+        
         console.log('🔔 Found existing push subscription:', subscription);
         if (subscription) {
           setPushSubscription(subscription);
+          console.log('✅ Push subscription state updated');
         }
       } catch (err) {
         console.error('❌ Error checking push subscription:', err);
@@ -511,22 +546,39 @@ const NotificationProvider = ({ children }) => {
     async function setupServiceWorker() {
       // Check if the browser supports service workers and push notifications
       if ('serviceWorker' in navigator && 'PushManager' in window) {
-        console.log('🔧 Setting up service worker...');
+        console.log('🔧 Setting up service worker for iOS PWA...');
         
         try {
-          // Check if service worker is already registered
-          const existingRegistration = await navigator.serviceWorker.getRegistration('/service-worker.js');
-          if (existingRegistration) {
-            console.log('🔧 Service worker already registered:', existingRegistration);
-            // Use existing registration
-            await handleServiceWorkerRegistration(existingRegistration);
-            return;
+          // For iOS PWAs, we need to wait a bit for the service worker to be fully ready
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Try multiple registration paths for iOS PWA compatibility
+          const possiblePaths = ['/service-worker.js', './service-worker.js'];
+          let registration = null;
+          
+          // First, check for existing registrations
+          const existingRegistrations = await navigator.serviceWorker.getRegistrations();
+          if (existingRegistrations.length > 0) {
+            registration = existingRegistrations[0];
+            console.log('🔧 Found existing service worker registration:', registration);
+          } else {
+            // Try to register with different paths
+            for (const path of possiblePaths) {
+              try {
+                registration = await navigator.serviceWorker.register(path);
+                console.log('🔧 Successfully registered service worker with path:', path);
+                break;
+              } catch (error) {
+                console.log('🔧 Failed to register with path:', path, error);
+              }
+            }
           }
           
-          // Register service worker for push notifications
-          console.log('🔧 Registering new service worker...');
-          const registration = await navigator.serviceWorker.register('/service-worker.js');
-          await handleServiceWorkerRegistration(registration);
+          if (registration) {
+            await handleServiceWorkerRegistration(registration);
+          } else {
+            console.error('❌ Failed to register service worker with any path');
+          }
           
         } catch (error) {
           console.error('❌ Service worker setup failed:', error);
@@ -564,6 +616,14 @@ const NotificationProvider = ({ children }) => {
     const checkSubscriptionSync = async () => {
       if (!vapidPublicKey || !isAuthenticated) return;
       
+      // Add delay for iOS PWAs to ensure everything is loaded
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isPWA = window.matchMedia('(display-mode: standalone)').matches;
+      
+      if (isIOS && isPWA) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+      
       try {
         // Check if user has a subscription in the database
         const response = await api.get('/notifications/subscription-status');
@@ -573,17 +633,28 @@ const NotificationProvider = ({ children }) => {
           
           // Check if there's a browser subscription
           if ('serviceWorker' in navigator && 'PushManager' in window) {
-            const registration = await navigator.serviceWorker.ready;
-            const existingSubscription = await registration.pushManager.getSubscription();
-            
-            if (!existingSubscription && Notification.permission === 'granted') {
-              // Browser allows notifications but subscription is missing - recreate it
-              console.log('Permission granted but subscription missing - recreating subscription');
-              subscribeToPushNotifications();
-            } else if (existingSubscription) {
-              // We have both database record and browser subscription
-              console.log('Found existing browser subscription');
-              setPushSubscription(existingSubscription);
+            try {
+              // Use getRegistrations instead of ready for better iOS PWA compatibility
+              const registrations = await navigator.serviceWorker.getRegistrations();
+              if (registrations.length === 0) {
+                console.log('No service worker registrations found');
+                return;
+              }
+              
+              const registration = registrations[0];
+              const existingSubscription = await registration.pushManager.getSubscription();
+              
+              if (!existingSubscription && Notification.permission === 'granted') {
+                // Browser allows notifications but subscription is missing - recreate it
+                console.log('Permission granted but subscription missing - recreating subscription');
+                subscribeToPushNotifications();
+              } else if (existingSubscription) {
+                // We have both database record and browser subscription
+                console.log('Found existing browser subscription, syncing state');
+                setPushSubscription(existingSubscription);
+              }
+            } catch (err) {
+              console.error('Error checking service worker registration:', err);
             }
           }
         }
@@ -592,12 +663,39 @@ const NotificationProvider = ({ children }) => {
       }
     };
     
-    checkSubscriptionSync();
+    // Add a longer delay before running the sync check
+    const timeoutId = setTimeout(checkSubscriptionSync, 2000);
+    return () => clearTimeout(timeoutId);
   }, [vapidPublicKey, isAuthenticated, subscribeToPushNotifications]);
 
 
 
 
+
+  // Force refresh subscription status - useful for iOS PWAs
+  const forceRefreshSubscription = useCallback(async () => {
+    console.log('🔄 Force refreshing subscription status...');
+    
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        if (registrations.length > 0) {
+          const registration = registrations[0];
+          const subscription = await registration.pushManager.getSubscription();
+          
+          if (subscription) {
+            console.log('✅ Found subscription during force refresh');
+            setPushSubscription(subscription);
+          } else {
+            console.log('❌ No subscription found during force refresh');
+            setPushSubscription(null);
+          }
+        }
+      } catch (err) {
+        console.error('Error during force refresh:', err);
+      }
+    }
+  }, []);
 
   const value = {
     notifications,
@@ -610,6 +708,7 @@ const NotificationProvider = ({ children }) => {
     dismissNotification,
     subscribeToPushNotifications,
     unsubscribeFromPushNotifications,
+    forceRefreshSubscription,
     pushEnabled: !!pushSubscription,
     wsConnected,
     wsError,

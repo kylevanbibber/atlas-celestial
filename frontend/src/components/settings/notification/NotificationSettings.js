@@ -21,6 +21,7 @@ const NotificationSettings = () => {
     wsConnected,
     markAsRead,
     fetchNotifications,
+    forceRefreshSubscription,
   } = useNotifications();
   const { isAdmin: isAdminFromContext, user } = useAuth();
   
@@ -248,6 +249,7 @@ const NotificationSettings = () => {
         onToggle={handleToggleNotifications}
         onTest={handleTestNotification}
         hasDbSubscription={hasDbSubscription}
+        forceRefreshSubscription={forceRefreshSubscription}
       />
 
       <NotificationHistory

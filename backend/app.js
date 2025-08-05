@@ -21,6 +21,7 @@ app.use(cors({
       "https://localhost:3000",
       "http://127.0.0.1:3000",
       "https://127.0.0.1:3000",
+      "https://atlas-celest-frontend-8eed044a5046.herokuapp.com",
       process.env.FRONTEND_URL
     ].filter(Boolean);
     

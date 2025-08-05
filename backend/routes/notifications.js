@@ -12,11 +12,22 @@ const vapidKeys = {
   privateKey: process.env.VAPID_PRIVATE_KEY
 };
 
-webpush.setVapidDetails(
-  process.env.VAPID_CONTACT_EMAIL || 'mailto:your-email@example.com',
-  vapidKeys.publicKey,
-  vapidKeys.privateKey
-);
+// Only set VAPID details if keys are provided
+if (vapidKeys.publicKey && vapidKeys.privateKey) {
+  webpush.setVapidDetails(
+    process.env.VAPID_CONTACT_EMAIL || 'mailto:your-email@example.com',
+    vapidKeys.publicKey,
+    vapidKeys.privateKey
+  );
+  console.log('✅ Web Push VAPID details configured');
+} else {
+  console.log('⚠️ Web Push VAPID keys not found - push notifications will be disabled');
+}
+
+// Helper function to check if web push is configured
+const isWebPushConfigured = () => {
+  return !!(vapidKeys.publicKey && vapidKeys.privateKey);
+};
 
 // Check if user is admin
 const isAdmin = (req, res, next) => {

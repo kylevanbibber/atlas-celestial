@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FiBell, FiAlertCircle } from 'react-icons/fi';
+import { FiBell, FiAlertCircle, FiRefreshCw } from 'react-icons/fi';
 
 const NotificationToggle = ({ 
   pushEnabled, 
@@ -7,7 +7,8 @@ const NotificationToggle = ({
   isSubscribing, 
   onToggle, 
   onTest,
-  hasDbSubscription
+  hasDbSubscription,
+  forceRefreshSubscription
 }) => {
   const [testLoading, setTestLoading] = useState(false);
 
@@ -32,6 +33,13 @@ const NotificationToggle = ({
       await onTest();
     } finally {
       setTestLoading(false);
+    }
+  };
+
+  // Add refresh handler
+  const handleRefresh = async () => {
+    if (forceRefreshSubscription) {
+      await forceRefreshSubscription();
     }
   };
 
@@ -60,6 +68,24 @@ const NotificationToggle = ({
           <div style={{ color: '#e67e22', marginBottom: '8px', display: 'flex', alignItems: 'center' }}>
             <FiAlertCircle style={{ marginRight: '5px' }} />
             Your browser subscription needs to be restored.
+            <button 
+              onClick={handleRefresh}
+              style={{ 
+                marginLeft: '10px', 
+                background: 'none', 
+                border: '1px solid #e67e22', 
+                color: '#e67e22', 
+                padding: '4px 8px', 
+                borderRadius: '4px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                fontSize: '12px'
+              }}
+            >
+              <FiRefreshCw style={{ marginRight: '4px' }} />
+              Refresh
+            </button>
           </div>
         )}
         {getStatusMessage()}
