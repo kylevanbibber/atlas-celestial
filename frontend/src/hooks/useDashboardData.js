@@ -60,8 +60,14 @@ const findMostRecentMonthWithData = (monthlyData, maxIndex, dataType) => {
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
   ];
   
-  for (let i = maxIndex; i >= 0; i--) {
+  console.log(`🔍 [${dataType}] Searching for most recent month with data. Max index: ${maxIndex}`);
+  console.log(`🔍 [${dataType}] Monthly data:`, monthlyData);
+  
+  // Start from maxIndex - 1 to exclude the current month
+  for (let i = maxIndex - 1; i >= 0; i--) {
+    console.log(`🔍 [${dataType}] Checking month ${i} (${monthNames[i]}): ${monthlyData[i]}`);
     if (monthlyData[i] > 0) {
+      console.log(`🔍 [${dataType}] Found data at month ${i} (${monthNames[i]}): ${monthlyData[i]}`);
       return {
         value: monthlyData[i],
         month: monthNames[i]
@@ -69,6 +75,7 @@ const findMostRecentMonthWithData = (monthlyData, maxIndex, dataType) => {
     }
   }
   
+  console.log(`🔍 [${dataType}] No data found, returning 0`);
   return {
     value: 0,
     month: monthNames[0]
@@ -311,23 +318,104 @@ const calculateCodesAndHiresMetrics = (vipsData, associatesData, hiresData, repo
   };
 
   /**
-   * Calculate ALP metrics from monthly data (for non-SGA roles)
+   * Calculate ALP metrics from monthly data for MGA/RGA (uses LVL_3_NET)
    */
-  const calculateAlpMetrics = (monthlyData, reportingMonthIndex) => {
+  const calculateMgaAlpMetrics = (monthlyData, reportingMonthIndex) => {
+    console.log(`🔍 [MGA ALP Processing] Raw monthly data:`, monthlyData);
     const currentYear = new Date().getFullYear();
     const previousYear = currentYear - 1;
     
-    // Group data by year and month
+    // Group data by year and month using LVL_3_NET
     const grouped = {};
-    monthlyData.forEach(item => {
-      if (!item.month_year || !item.TotalALP) return;
-      const [month, year] = item.month_year.split('-').map(Number);
-      const monthIndex = month - 1; // Convert to 0-based index
+    monthlyData.forEach((item, index) => {
+      console.log(`🔍 [MGA ALP Processing] Item ${index}:`, item);
+      if (!item.month) {
+        console.log(`⚠️ [MGA ALP Processing] No month field for item ${index}`);
+        return;
+      }
+      if (!item.LVL_3_NET) {
+        console.log(`⚠️ [MGA ALP Processing] No LVL_3_NET field for item ${index}, LVL_3_NET: ${item.LVL_3_NET}`);
+        return;
+      }
+      
+      const parts = item.month.split("/");
+      if (parts.length !== 2) {
+        console.log(`⚠️ [MGA ALP Processing] Invalid month format for item ${index}: ${item.month}`);
+        return;
+      }
+      
+      const monthIndex = parseInt(parts[0], 10) - 1; // Convert to 0-indexed
+      const year = parseInt(parts[1], 10);
+      
+      console.log(`🔍 [MGA ALP Processing] Parsed - Month: ${monthIndex + 1}, Year: ${year}, LVL_3_NET: ${item.LVL_3_NET}`);
       
       if (!grouped[year]) {
         grouped[year] = Array(12).fill(0);
       }
-      grouped[year][monthIndex] = parseFloat(item.TotalALP) || 0;
+      const alpValue = parseFloat(item.LVL_3_NET) || 0;
+      grouped[year][monthIndex] = alpValue;
+      console.log(`🔍 [MGA ALP Processing] Set month ${monthIndex + 1} to: ${alpValue}`);
+    });
+
+    console.log(`🔍 [MGA ALP Processing] Final grouped data:`, grouped);
+    const currentYearData = grouped[currentYear] || Array(12).fill(0);
+    const previousYearData = grouped[previousYear] || Array(12).fill(0);
+
+    console.log(`🔍 [MGA ALP Processing] Current year data:`, currentYearData);
+    console.log(`🔍 [MGA ALP Processing] Previous year data:`, previousYearData);
+    console.log(`🔍 [MGA ALP Processing] Reporting month index: ${reportingMonthIndex}`);
+    console.log(`🔍 [MGA ALP Processing] May 2025 data (index 4): ${currentYearData[4]}`);
+
+    const ytdAlp = currentYearData.slice(0, reportingMonthIndex + 1).reduce((sum, val) => sum + val, 0);
+    const currentMonthAlp = currentYearData[reportingMonthIndex] || 0;
+    
+    console.log(`🔍 [MGA ALP Processing] YTD ALP: ${ytdAlp}, Current Month ALP: ${currentMonthAlp}`);
+    
+    // Find the most recent month with actual ALP data
+    const alpComparison = findMostRecentMonthWithData(currentYearData, reportingMonthIndex, "MGA ALP");
+    const previousMonthAlp = alpComparison.value;
+    const comparisonMonth = alpComparison.month;
+    
+    const previousYearYtdAlp = previousYearData.slice(0, reportingMonthIndex + 1).reduce((sum, val) => sum + val, 0);
+
+    // Get month names for display
+    const monthNames = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    const reportingMonth = monthNames[reportingMonthIndex];
+
+    return {
+      ytdAlp,
+      currentMonthAlp,
+      previousMonthAlp,
+      previousYearYtdAlp,
+      reportingMonth,
+      comparisonMonth
+    };
+  };
+
+  /**
+   * Calculate ALP metrics from monthly data for SA (uses LVL_2_NET)
+   */
+  const calculateSaAlpMetrics = (monthlyData, reportingMonthIndex) => {
+    const currentYear = new Date().getFullYear();
+    const previousYear = currentYear - 1;
+    
+    // Group data by year and month using LVL_2_NET
+    const grouped = {};
+    monthlyData.forEach((item, index) => {
+      if (!item.month || !item.LVL_2_NET) return;
+      const parts = item.month.split("/");
+      if (parts.length !== 2) return;
+      
+      const monthIndex = parseInt(parts[0], 10) - 1; // Convert to 0-indexed
+      const year = parseInt(parts[1], 10);
+      
+      if (!grouped[year]) {
+        grouped[year] = Array(12).fill(0);
+      }
+      grouped[year][monthIndex] = parseFloat(item.LVL_2_NET) || 0;
     });
 
     const currentYearData = grouped[currentYear] || Array(12).fill(0);
@@ -337,7 +425,67 @@ const calculateCodesAndHiresMetrics = (vipsData, associatesData, hiresData, repo
     const currentMonthAlp = currentYearData[reportingMonthIndex] || 0;
     
     // Find the most recent month with actual ALP data
-    const alpComparison = findMostRecentMonthWithData(currentYearData, reportingMonthIndex, "ALP");
+    const alpComparison = findMostRecentMonthWithData(currentYearData, reportingMonthIndex, "SA ALP");
+    const previousMonthAlp = alpComparison.value;
+    const comparisonMonth = alpComparison.month;
+    
+    const previousYearYtdAlp = previousYearData.slice(0, reportingMonthIndex + 1).reduce((sum, val) => sum + val, 0);
+
+    // Get month names for display
+    const monthNames = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    const reportingMonth = monthNames[reportingMonthIndex];
+
+    return {
+      ytdAlp,
+      currentMonthAlp,
+      previousMonthAlp,
+      previousYearYtdAlp,
+      reportingMonth,
+      comparisonMonth
+    };
+  };
+
+  /**
+   * Calculate ALP metrics from monthly data for GA (uses LVL_3_NET with fallback to LVL_2_NET)
+   */
+  const calculateGaAlpMetrics = (monthlyData, reportingMonthIndex) => {
+    const currentYear = new Date().getFullYear();
+    const previousYear = currentYear - 1;
+    
+    // Group data by year and month using LVL_3_NET with fallback to LVL_2_NET
+    const grouped = {};
+    monthlyData.forEach((item, index) => {
+      if (!item.month) return;
+      const parts = item.month.split("/");
+      if (parts.length !== 2) return;
+      
+      const monthIndex = parseInt(parts[0], 10) - 1; // Convert to 0-indexed
+      const year = parseInt(parts[1], 10);
+      
+      if (!grouped[year]) {
+        grouped[year] = Array(12).fill(0);
+      }
+      
+      // Use LVL_3_NET for GA dashboard, fallback to LVL_2_NET if LVL_3_NET is 0
+      let alpValue = parseFloat(item.LVL_3_NET) || 0;
+      if (alpValue === 0) {
+        alpValue = parseFloat(item.LVL_2_NET) || 0;
+      }
+      
+      grouped[year][monthIndex] = alpValue;
+    });
+
+    const currentYearData = grouped[currentYear] || Array(12).fill(0);
+    const previousYearData = grouped[previousYear] || Array(12).fill(0);
+
+    const ytdAlp = currentYearData.slice(0, reportingMonthIndex + 1).reduce((sum, val) => sum + val, 0);
+    const currentMonthAlp = currentYearData[reportingMonthIndex] || 0;
+    
+    // Find the most recent month with actual ALP data
+    const alpComparison = findMostRecentMonthWithData(currentYearData, reportingMonthIndex, "GA ALP");
     const previousMonthAlp = alpComparison.value;
     const comparisonMonth = alpComparison.month;
     
@@ -369,10 +517,13 @@ const calculateCodesAndHiresMetrics = (vipsData, associatesData, hiresData, repo
     
     // Group data by year and month using LVL_1_NET
     const grouped = {};
-    monthlyData.forEach(item => {
-      if (!item.month_year || !item.LVL_1_NET) return;
-      const [month, year] = item.month_year.split('-').map(Number);
-      const monthIndex = month - 1; // Convert to 0-based index
+    monthlyData.forEach((item, index) => {
+      if (!item.month || !item.LVL_1_NET) return;
+      const parts = item.month.split("/");
+      if (parts.length !== 2) return;
+      
+      const monthIndex = parseInt(parts[0], 10) - 1; // Convert to 0-indexed
+      const year = parseInt(parts[1], 10);
       
       if (!grouped[year]) {
         grouped[year] = Array(12).fill(0);
@@ -696,11 +847,25 @@ export const useDashboardData = (userRole, user) => {
         const metrics = calculateAgtAlpMetrics(monthlyAlpData, reportingMonthIndex - 1); // Convert to 0-based
         setAlpMetrics(metrics);
       }
-    } else {
-      // Other roles use standard processing
+    } else if (userRole === 'SA') {
+      // SA uses LVL_2_NET processing
       if (monthlyAlpData.length > 0) {
         const { reportingMonth: reportingMonthIndex } = getReportingMonth();
-        const metrics = calculateAlpMetrics(monthlyAlpData, reportingMonthIndex - 1); // Convert to 0-based
+        const metrics = calculateSaAlpMetrics(monthlyAlpData, reportingMonthIndex - 1); // Convert to 0-based
+        setAlpMetrics(metrics);
+      }
+    } else if (userRole === 'GA') {
+      // GA uses LVL_3_NET with fallback to LVL_2_NET
+      if (monthlyAlpData.length > 0) {
+        const { reportingMonth: reportingMonthIndex } = getReportingMonth();
+        const metrics = calculateGaAlpMetrics(monthlyAlpData, reportingMonthIndex - 1); // Convert to 0-based
+        setAlpMetrics(metrics);
+      }
+    } else if (userRole === 'MGA' || userRole === 'RGA') {
+      // MGA and RGA use LVL_3_NET processing
+      if (monthlyAlpData.length > 0) {
+        const { reportingMonth: reportingMonthIndex } = getReportingMonth();
+        const metrics = calculateMgaAlpMetrics(monthlyAlpData, reportingMonthIndex - 1); // Convert to 0-based
         setAlpMetrics(metrics);
       }
     }

@@ -46,9 +46,22 @@ const DashboardSection = ({
       comparisonLabel = 'vs same period last year';
     } else if (card.comparisonType === 'month') {
       currentValue = data[card.dataKey] || 0;
-      previousValue = data[`previous${card.dataKey.charAt(0).toUpperCase() + card.dataKey.slice(1)}`] || 0;
+      // Fix the previous value key for month comparisons
+      let previousKey;
+      if (card.dataKey === 'currentMonthAlp') {
+        previousKey = 'previousMonthAlp';
+      } else if (card.dataKey === 'currentMonthCodes') {
+        previousKey = 'previousMonthCodes';
+      } else if (card.dataKey === 'currentMonthHires') {
+        previousKey = 'previousMonthHires';
+      } else {
+        previousKey = `previous${card.dataKey.charAt(0).toUpperCase() + card.dataKey.slice(1)}`;
+      }
+      previousValue = data[previousKey] || 0;
       comparisonLabel = `from ${data.comparisonMonth || 'previous month'}`;
     }
+
+    console.log(`🔍 [DashboardSection] Card: ${card.title}, DataKey: ${card.dataKey}, CurrentValue: ${currentValue}, PreviousValue: ${previousValue}`);
 
     return {
       showComparison: true,
