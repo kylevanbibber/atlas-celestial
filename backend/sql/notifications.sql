@@ -5,8 +5,6 @@ CREATE TABLE IF NOT EXISTS notifications (
     type VARCHAR(50) NOT NULL, -- 'info', 'warning', 'error', 'success'
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     target_group VARCHAR(100), -- For group-targeted notifications
-    is_read BOOLEAN DEFAULT FALSE,
-    is_dismissed BOOLEAN DEFAULT FALSE,
     scheduled_for TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     link_url TEXT, -- Optional URL to direct users to

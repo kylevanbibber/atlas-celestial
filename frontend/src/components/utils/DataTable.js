@@ -39,8 +39,11 @@ const DataTable = ({
   onToggleArchivedView,
   onRefresh,
   onMassReassign,
+  onSaveChanges,
+  onCancelChanges,
   showActionBar = true,
   disableCellEditing = false,
+  autoSave = true, // New prop to control auto-save behavior
   actionBarButtons = {
     addNew: true,
     import: true,
@@ -50,7 +53,9 @@ const DataTable = ({
     sendEmail: true,
     toggleArchived: true,
     refresh: true,
-    reassign: true
+    reassign: true,
+    saveChanges: false,
+    cancelChanges: false
   },
   filterOptions = {
     showFilterMenu: false,
@@ -166,8 +171,15 @@ const DataTable = ({
       )
     );
   
-    // 2c) kick off the debounced save
-    saveChangeDebounced(id, field, value);
+    // 2c) always call onCellUpdate for local state management (even without autoSave)
+    if (onCellUpdate) {
+      onCellUpdate(id, field, value);
+    }
+  
+    // 2d) only trigger debounced save if autoSave is enabled
+    if (autoSave) {
+      saveChangeDebounced(id, field, value);
+    }
   };
 
   const handleCellClick = (id, field, value) => {
@@ -737,6 +749,23 @@ const DataTable = ({
               disabled={Object.keys(selectedRows).length === 0}
             >
               Reassign
+            </button>
+          )}
+          {actionBarButtons.saveChanges && onSaveChanges && (
+            <button onClick={onSaveChanges} className="action-button save-changes-button" style={{
+              backgroundColor: '#28a745',
+              color: 'white',
+              fontWeight: 'bold'
+            }}>
+              Save Changes
+            </button>
+          )}
+          {actionBarButtons.cancelChanges && onCancelChanges && (
+            <button onClick={onCancelChanges} className="action-button cancel-changes-button" style={{
+              backgroundColor: '#dc3545',
+              color: 'white'
+            }}>
+              Cancel Changes
             </button>
           )}
         </ActionBar>

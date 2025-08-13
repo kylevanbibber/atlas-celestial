@@ -92,12 +92,12 @@
 }
 
 .context-menu-items {
-    max-height: 300px;
+    max-height: 450px;
     overflow-y: auto;
 }
 
 .context-menu-items.with-search {
-    max-height: 250px;
+    max-height: 400px;
 }
 
 .context-menu-items::-webkit-scrollbar {
@@ -222,5 +222,66 @@
 .menu-item-copy:hover {
     background-color: rgba(6, 182, 212, 0.1);
     color: #0891b2;
+}
+
+/* Submenu Styles */
+.menu-item.has-submenu {
+    position: relative;
+    justify-content: space-between;
+}
+
+.submenu-arrow {
+    margin-left: auto;
+    font-size: 14px;
+    color: var(--text-secondary);
+    transition: color 0.2s;
+    transform: rotate(180deg); /* Point left instead of right */
+}
+
+.menu-item.has-submenu:hover .submenu-arrow {
+    color: var(--text-primary);
+}
+
+.context-submenu {
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 4px 15px var(--shadow-color);
+    min-width: 180px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    /* Add smooth transition for better UX */
+    transition: opacity 0.2s ease-in-out;
+}
+
+.context-submenu .context-menu-items {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+/* Nested submenu styling */
+.context-nested-submenu {
+    border: 1px solid var(--border-color);
+    box-shadow: 0 6px 20px var(--shadow-color);
+}
+
+.context-nested-submenu .context-menu-items {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* Menu separator styling */
+.menu-item.menu-separator {
+    color: var(--text-secondary);
+    font-size: 12px;
+    text-align: center;
+    padding: 8px 15px;
+    background: var(--bg-secondary);
+    cursor: default;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+.menu-item.menu-separator:hover {
+    background: var(--bg-secondary);
 }
   

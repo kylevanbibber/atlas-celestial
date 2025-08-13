@@ -222,6 +222,22 @@ router.post("/newlogin", async (req, res) => {
         });
 
         if (parseInt(validRegularUser.redeemed) === 1) {
+          // Log successful login
+          try {
+            const clientIp = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
+            const userAgent = req.headers['user-agent'] || 'unknown';
+            
+            await query(
+              `INSERT INTO login_logs (user_id, lagnname, timestamp, ip_address, user_agent) 
+               VALUES (?, ?, UTC_TIMESTAMP(), ?, ?)`,
+              [validRegularUser.id, validRegularUser.lagnname, clientIp, userAgent]
+            );
+            console.log('[Auth] Login logged for user:', validRegularUser.lagnname);
+          } catch (logError) {
+            console.error('[Auth] Failed to log login:', logError);
+            // Don't fail the login if logging fails
+          }
+
           // Create token payload for regular user (now includes teamRole from activeusers)
           const tokenPayload = {
             userId: validRegularUser.id,
@@ -348,6 +364,22 @@ router.post("/newlogin", async (req, res) => {
           adminLevel: admin.Admin_Level,
           agency: admin.Agency
         });
+
+        // Log successful admin login
+        try {
+          const clientIp = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
+          const userAgent = req.headers['user-agent'] || 'unknown';
+          
+          await query(
+            `INSERT INTO login_logs (user_id, lagnname, timestamp, ip_address, user_agent) 
+             VALUES (?, ?, UTC_TIMESTAMP(), ?, ?)`,
+            [admin.id, admin.Username, clientIp, userAgent]
+          );
+          console.log('[Auth] Login logged for admin user:', admin.Username);
+        } catch (logError) {
+          console.error('[Auth] Failed to log admin login:', logError);
+          // Don't fail the login if logging fails
+        }
 
         // Create token payload for admin user
         const adminTokenPayload = {
@@ -707,7 +739,7 @@ router.post("/searchByUserId", async (req, res) => {
     if (clName === "RGA") {
       console.log('[searchByUserId] User is RGA, searching for MGAs');
       const mgaResults = await query(
-        `SELECT lagnname FROM MGAs WHERE rga = ? OR legacy = ? OR tree = ?`,
+        `SELECT lagnname FROM MGAs WHERE (rga = ? OR legacy = ? OR tree = ?) AND (active = 'y' OR active IS NULL) AND (hide = 'n' OR hide IS NULL)`,
         [agnName, agnName, agnName]
       );
       console.log('[searchByUserId] MGA search results:', mgaResults);
@@ -770,10 +802,9 @@ router.post("/searchByUserId", async (req, res) => {
                 'agent_num', pnp.agent_num
               )
               FROM pnp
-              WHERE pnp.name_line = au.lagnname
+              WHERE (pnp.name_line = au.lagnname OR au.lagnname LIKE CONCAT(pnp.name_line, ' %'))
                 AND ABS(DATEDIFF(STR_TO_DATE(pnp.esid, '%m/%d/%y'), STR_TO_DATE(au.esid, '%Y-%m-%d'))) <= 7
-              ORDER BY STR_TO_DATE(pnp.date, '%m/%d/%y') DESC,
-                CASE WHEN pnp.agent_num LIKE '%-1%' THEN 0 ELSE 1 END ASC
+              ORDER BY STR_TO_DATE(pnp.date, '%m/%d/%y') DESC
               LIMIT 1
             ) AS pnp_data
         FROM activeusers au
@@ -783,7 +814,7 @@ router.post("/searchByUserId", async (req, res) => {
         LEFT JOIN usersinfo mga_ui ON au.mga = mga_ui.lagnname AND mga_ui.esid = (SELECT esid FROM activeusers WHERE lagnname = au.mga LIMIT 1)
         LEFT JOIN usersinfo rga_ui ON au.rga = rga_ui.lagnname AND rga_ui.esid = (SELECT esid FROM activeusers WHERE lagnname = au.rga LIMIT 1)
         WHERE au.Active = 'y'
-            AND (au.lagnname IN (${placeholders}) OR au.sa IN (${placeholders}) OR au.ga IN (${placeholders}) OR au.mga IN (${placeholders}) OR au.rga IN (${placeholders}))
+            AND ((au.clname = 'RGA' AND au.lagnname = ?) OR au.sa IN (${placeholders}) OR au.ga IN (${placeholders}) OR au.mga IN (${placeholders}) OR au.rga IN (${placeholders}))
         ORDER BY au.lagnname;
       `;
       
@@ -833,13 +864,13 @@ router.post("/searchByUserId", async (req, res) => {
         LEFT JOIN usersinfo mga_ui ON au.mga = mga_ui.lagnname AND mga_ui.esid = (SELECT esid FROM activeusers WHERE lagnname = au.mga LIMIT 1)
         LEFT JOIN usersinfo rga_ui ON au.rga = rga_ui.lagnname AND rga_ui.esid = (SELECT esid FROM activeusers WHERE lagnname = au.rga LIMIT 1)
         WHERE au.Active = 'y'
-            AND (au.lagnname IN (${placeholders}) OR au.sa IN (${placeholders}) OR au.ga IN (${placeholders}) OR au.mga IN (${placeholders}) OR au.rga IN (${placeholders}))
+            AND ((au.clname = 'RGA' AND au.lagnname = ?) OR au.sa IN (${placeholders}) OR au.ga IN (${placeholders}) OR au.mga IN (${placeholders}) OR au.rga IN (${placeholders}))
         ORDER BY au.lagnname;
       `;
     }
     
     const queryParams = [
-      ...lagnnameList,
+      agnName,
       ...lagnnameList,
       ...lagnnameList,
       ...lagnnameList,
@@ -873,12 +904,12 @@ router.post("/searchByUserId", async (req, res) => {
           // Look for matches in PNP
           const pnpMatchQuery = `
             SELECT * FROM pnp 
-            WHERE name_line = ? 
+            WHERE (name_line = ? OR ? LIKE CONCAT(name_line, ' %'))
             AND esid = ?
             ORDER BY STR_TO_DATE(date, '%m/%d/%y') DESC
             LIMIT 1
           `;
-          const pnpMatches = await query(pnpMatchQuery, [user.lagnname, formattedEsid]);
+          const pnpMatches = await query(pnpMatchQuery, [user.lagnname, user.lagnname, formattedEsid]);
           console.log(`[searchByUserId] PNP matches for ${user.lagnname}: ${pnpMatches.length}`);
           if (pnpMatches.length > 0) {
             console.log(`[searchByUserId] Found PNP match:`, pnpMatches[0]);
@@ -887,10 +918,10 @@ router.post("/searchByUserId", async (req, res) => {
             const lenientSearchQuery = `
               SELECT name_line, esid, date, curr_mo_4mo_rate, proj_plus_1 
               FROM pnp 
-              WHERE name_line = ?
+              WHERE (name_line = ? OR ? LIKE CONCAT(name_line, ' %'))
               LIMIT 3
             `;
-            const lenientResults = await query(lenientSearchQuery, [user.lagnname]);
+            const lenientResults = await query(lenientSearchQuery, [user.lagnname, user.lagnname]);
             if (lenientResults.length > 0) {
               console.log(`[searchByUserId] Found similar PNP records for ${user.lagnname}:`, 
                 lenientResults.map(r => ({

@@ -173,65 +173,34 @@ const ClientInfo = ({ setClientInfo, setAgentInfo, setSelectedAgentId }) => {
           <hr />
           <h4>Agent Information</h4>
 
-          {userRole === 'AGT' ? (
-            <>
-              <div className="input-row">
-                <div className="input-group">
-                  <label htmlFor="agent_name">Agent Name</label>
-                  <input
-                    type="text"
-                    id="agent_name"
-                    name="agent_name"
-                    value={agentName}
-                    readOnly
-                    className="agent-readonly-input"
-                  />
-                </div>
-                <div className="input-group">
-                  <label htmlFor="agent_email">Agent Email</label>
-                  <input
-                    type="email"
-                    id="agent_email"
-                    name="agent_email"
-                    value={agentEmail}
-                    onChange={(e) => setAgentEmail(e.target.value)}
-                    className="agent-input"
-                  />
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="input-row">
-                <div className="input-group">
-                  <label htmlFor="agent_name">Agent Name</label>
-                  <select
-                    id="agent_name"
-                    value={selectedAgent}
-                    onChange={handleAgentChange}
-                    className="agent-select"
-                  >
-                    {allAgents.map((agent, index) => (
-                      <option key={index} value={agent.lagnname}>
-                        {agent.lagnname}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="input-group">
-                  <label htmlFor="agent_email">Agent Email</label>
-                  <input
-                    type="email"
-                    id="agent_email"
-                    name="agent_email"
-                    value={agentEmail}
-                    onChange={(e) => setAgentEmail(e.target.value)}
-                    className="agent-input"
-                  />
-                </div>
-              </div>
-            </>
-          )}
+          <div className="input-row">
+            <div className="input-group">
+              <label htmlFor="agent_name">Agent Name</label>
+              <select
+                id="agent_name"
+                value={selectedAgent}
+                onChange={handleAgentChange}
+                className="agent-select"
+              >
+                {allAgents.map((agent, index) => (
+                  <option key={index} value={agent.lagnname}>
+                    {agent.lagnname}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="input-group">
+              <label htmlFor="agent_email">Agent Email</label>
+              <input
+                type="email"
+                id="agent_email"
+                name="agent_email"
+                value={agentEmail}
+                onChange={(e) => setAgentEmail(e.target.value)}
+                className="agent-input"
+              />
+            </div>
+          </div>
         </div>
       )}
 

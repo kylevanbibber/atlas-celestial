@@ -702,12 +702,6 @@ const HierarchySettings = () => {
                   <span className="pnp-value">{node.pnp_data.curr_mo_4mo_rate}%</span>
                 </div>
               )}
-              {node.pnp_data.proj_plus_1 && (
-                <div className="pnp-stat">
-                  <span className="pnp-label">13mo Ret:</span>
-                  <span className="pnp-value">{node.pnp_data.proj_plus_1}%</span>
-                </div>
-              )}
               {node.pnp_data.pnp_date && (
                 <div className="pnp-date">
                   <span className="pnp-date-label">As of:</span>
@@ -1068,14 +1062,9 @@ const HierarchySettings = () => {
 
   if (loading) {
     return (
-      <div className="settings-section">
-        <h1 className="settings-section-title">Hierarchy</h1>
-        <div className="settings-card">
-          <div className="hierarchy-loading">
-            <FiLoader className="spinner" />
-            <span>Loading hierarchy data...</span>
-          </div>
-        </div>
+      <div className="route-loading" role="alert" aria-busy="true">
+        <div className="spinner"></div>
+        <span>Loading hierarchy data...</span>
       </div>
     );
   }

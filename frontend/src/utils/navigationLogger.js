@@ -9,11 +9,7 @@
  * @param {Object} metadata - Additional metadata about the navigation
  */
 export const logNavigation = (from, to, metadata = {}) => {
-  const timestamp = new Date().toISOString();
-  console.log(`[Navigation] ${timestamp} - From: ${from} To: ${to}`, {
-    ...metadata,
-    timestamp
-  });
+  // Navigation logging disabled
 };
 
 /**
@@ -24,12 +20,7 @@ export const logNavigation = (from, to, metadata = {}) => {
  * @param {Object} metadata - Additional metadata about the redirect
  */
 export const logRedirect = (from, to, reason, metadata = {}) => {
-  const timestamp = new Date().toISOString();
-  console.log(`[Redirect] ${timestamp} - From: ${from} To: ${to} Reason: ${reason}`, {
-    ...metadata,
-    reason,
-    timestamp
-  });
+  // Redirect logging disabled
 };
 
 /**
@@ -39,12 +30,7 @@ export const logRedirect = (from, to, reason, metadata = {}) => {
  * @param {Object} metadata - Additional metadata about the denied access
  */
 export const logAccessDenied = (path, reason, metadata = {}) => {
-  const timestamp = new Date().toISOString();
-  console.log(`[Access Denied] ${timestamp} - Path: ${path} Reason: ${reason}`, {
-    ...metadata,
-    reason,
-    timestamp
-  });
+  // Access denied logging disabled
 };
 
 export default {

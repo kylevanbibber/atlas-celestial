@@ -17,12 +17,23 @@ const DiscordSettings = () => {
   const [activeTab, setActiveTab] = useState('servers');
   const [rateLimitStatus, setRateLimitStatus] = useState(null);
 
+  // Check if user has management-level access (MGA, RGA, SGA) or Admin role
+  const hasManagementAccess = (user?.clname && ['MGA', 'RGA', 'SGA'].includes(user.clname)) || 
+                              (user?.Role === 'Admin');
+
   // Form states
 
   
   useEffect(() => {
     loadDiscordData();
   }, []);
+
+  // Reset tab if user doesn't have management access and is on a restricted tab
+  useEffect(() => {
+    if (!hasManagementAccess && (activeTab === 'servers' || activeTab === 'reminders' || activeTab === 'leaderboards')) {
+      setActiveTab('servers'); // This won't be shown anyway, but keeps state clean
+    }
+  }, [hasManagementAccess, activeTab]);
 
   const loadDiscordData = async () => {
     try {
@@ -33,31 +44,35 @@ const DiscordSettings = () => {
       setDiscordStatus(statusRes.data);
 
       if (statusRes.data.linked) {
-        // Load configured servers (needed for reminders and leaderboards)
-        const configuredRes = await api.getCached('/discord/guilds/configured');
-        setConfiguredGuilds(configuredRes.data.guilds);
+        // Only load advanced Discord data for management-level users
+        if (hasManagementAccess) {
+          // Load configured servers (needed for reminders and leaderboards)
+          const configuredRes = await api.getCached('/discord/guilds/configured');
+          setConfiguredGuilds(configuredRes.data.guilds);
 
-        // Load reminders
-        const remindersRes = await api.getCached('/discord/reminders');
-        setReminders(remindersRes.data.reminders);
+          // Load reminders
+          const remindersRes = await api.getCached('/discord/reminders');
+          setReminders(remindersRes.data.reminders);
 
-        // Load leaderboards
-        const leaderboardsRes = await api.getCached('/discord/leaderboards');
-        setLeaderboards(leaderboardsRes.data.leaderboards);
-// Load available managers for all users
-try {
-  const managersRes = await api.get('/discord/managers');
-  setAvailableManagers(managersRes.data.managers);
-} catch (error) {
-  console.warn('Could not load managers:', error);
-}
+          // Load leaderboards
+          const leaderboardsRes = await api.getCached('/discord/leaderboards');
+          setLeaderboards(leaderboardsRes.data.leaderboards);
 
-        // Load rate limit status
-        try {
-          const rateLimitRes = await api.get('/discord/rate-limit-status');
-          setRateLimitStatus(rateLimitRes.data);
-        } catch (error) {
-          console.warn('Could not load rate limit status:', error);
+          // Load available managers
+          try {
+            const managersRes = await api.get('/discord/managers');
+            setAvailableManagers(managersRes.data.managers);
+          } catch (error) {
+            console.warn('Could not load managers:', error);
+          }
+
+          // Load rate limit status
+          try {
+            const rateLimitRes = await api.get('/discord/rate-limit-status');
+            setRateLimitStatus(rateLimitRes.data);
+          } catch (error) {
+            console.warn('Could not load rate limit status:', error);
+          }
         }
       }
     } catch (error) {
@@ -161,68 +176,77 @@ try {
               </button>
             </div>
 
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '20px' }}>
-              <button 
-                className={`settings-button ${activeTab === 'servers' ? '' : 'settings-button-secondary'}`}
-                style={{ 
-                  border: 'none', 
-                  borderRadius: '0', 
-                  borderBottom: activeTab === 'servers' ? '2px solid var(--button-primary-bg)' : 'none',
-                  marginRight: '10px'
-                }}
-                onClick={() => setActiveTab('servers')}
-              >
-                <FaServer /> Servers
-              </button>
-              <button 
-                className={`settings-button ${activeTab === 'reminders' ? '' : 'settings-button-secondary'}`}
-                style={{ 
-                  border: 'none', 
-                  borderRadius: '0', 
-                  borderBottom: activeTab === 'reminders' ? '2px solid var(--button-primary-bg)' : 'none',
-                  marginRight: '10px'
-                }}
-                onClick={() => setActiveTab('reminders')}
-              >
-                <FaClock /> Reminders
-              </button>
-              <button 
-                className={`settings-button ${activeTab === 'leaderboards' ? '' : 'settings-button-secondary'}`}
-                style={{ 
-                  border: 'none', 
-                  borderRadius: '0', 
-                  borderBottom: activeTab === 'leaderboards' ? '2px solid var(--button-primary-bg)' : 'none'
-                }}
-                onClick={() => setActiveTab('leaderboards')}
-              >
-                <FaTrophy /> Leaderboards
-              </button>
-            </div>
+            {hasManagementAccess ? (
+              <>
+                <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '20px' }}>
+                  <button 
+                    className={`settings-button ${activeTab === 'servers' ? '' : 'settings-button-secondary'}`}
+                    style={{ 
+                      border: 'none', 
+                      borderRadius: '0', 
+                      borderBottom: activeTab === 'servers' ? '2px solid var(--button-primary-bg)' : 'none',
+                      marginRight: '10px'
+                    }}
+                    onClick={() => setActiveTab('servers')}
+                  >
+                    <FaServer /> Servers
+                  </button>
+                  <button 
+                    className={`settings-button ${activeTab === 'reminders' ? '' : 'settings-button-secondary'}`}
+                    style={{ 
+                      border: 'none', 
+                      borderRadius: '0', 
+                      borderBottom: activeTab === 'reminders' ? '2px solid var(--button-primary-bg)' : 'none',
+                      marginRight: '10px'
+                    }}
+                    onClick={() => setActiveTab('reminders')}
+                  >
+                    <FaClock /> Reminders
+                  </button>
+                  <button 
+                    className={`settings-button ${activeTab === 'leaderboards' ? '' : 'settings-button-secondary'}`}
+                    style={{ 
+                      border: 'none', 
+                      borderRadius: '0', 
+                      borderBottom: activeTab === 'leaderboards' ? '2px solid var(--button-primary-bg)' : 'none'
+                    }}
+                    onClick={() => setActiveTab('leaderboards')}
+                  >
+                    <FaTrophy /> Leaderboards
+                  </button>
+                </div>
 
-            {activeTab === 'servers' && (
-              <ServerSettings 
-                discordStatus={discordStatus}
-                onLoadData={loadDiscordData}
-                rateLimitStatus={rateLimitStatus}
-              />
-            )}
+                {activeTab === 'servers' && (
+                  <ServerSettings 
+                    discordStatus={discordStatus}
+                    onLoadData={loadDiscordData}
+                    rateLimitStatus={rateLimitStatus}
+                  />
+                )}
 
-            {activeTab === 'reminders' && (
-              <ReminderSettings 
-                reminders={reminders}
-                setReminders={setReminders}
-                configuredGuilds={configuredGuilds}
-              />
-            )}
+                {activeTab === 'reminders' && (
+                  <ReminderSettings 
+                    reminders={reminders}
+                    setReminders={setReminders}
+                    configuredGuilds={configuredGuilds}
+                  />
+                )}
 
-            {activeTab === 'leaderboards' && (
-              <LeaderboardSettings 
-                leaderboards={leaderboards}
-                setLeaderboards={setLeaderboards}
-                configuredGuilds={configuredGuilds}
-                availableManagers={availableManagers}
-                userRole={user && user.Role}
-              />
+                {activeTab === 'leaderboards' && (
+                  <LeaderboardSettings 
+                    leaderboards={leaderboards}
+                    setLeaderboards={setLeaderboards}
+                    configuredGuilds={configuredGuilds}
+                    availableManagers={availableManagers}
+                    userRole={user && user.Role}
+                  />
+                )}
+              </>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+                <p>Your Discord account is successfully linked.</p>
+                <p>Advanced Discord features are available to management-level users.</p>
+              </div>
             )}
           </div>
         )}

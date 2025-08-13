@@ -33,7 +33,7 @@ const ProtectedRoute = ({ children, requiredPermission }) => {
     return (
       <div className="route-loading" role="alert" aria-busy="true">
         <div className="spinner"></div>
-        <p>Loading...</p>
+        <p>Loading user data...</p>
       </div>
     );
   }

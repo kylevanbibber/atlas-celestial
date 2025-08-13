@@ -1263,7 +1263,7 @@ const AdminHierarchyTableView = (props) => {
         'RGA', 'User ID', 'Name', 'Role', 'Email', 'Phone', 
         'Active', 'Redeemed', 'Released', 'ESID',
         'SA', 'GA', 'MGA', 'RGA',
-        'License States', '4mo Retention', '13mo Retention', 'Retention As Of'
+        'License States', '4mo Retention', 'Retention As Of'
       ]);
       
       // Add data rows
@@ -1276,7 +1276,6 @@ const AdminHierarchyTableView = (props) => {
           
           // Format retention rates from PNP data
           const fourMonthRate = user.pnp_data?.curr_mo_4mo_rate || '';
-          const thirteenMonthRate = user.pnp_data?.proj_plus_1 || '';
           const retentionDate = user.pnp_data?.pnp_date ? formatDateForDisplay(user.pnp_data.pnp_date) : '';
           
           csvData.push([
@@ -1296,7 +1295,6 @@ const AdminHierarchyTableView = (props) => {
             user.rga || '',
             licenseStates,
             fourMonthRate,
-            thirteenMonthRate,
             retentionDate
           ]);
         });
@@ -1753,13 +1751,9 @@ const AdminHierarchyTableView = (props) => {
   // Main render function
   if (loading) {
     return (
-      <div className="settings-section">
-        <div className="settings-card">
-          <div className="hierarchy-loading">
-            <FiLoader className="spinner" />
-            <span>Loading hierarchy data...</span>
-          </div>
-        </div>
+      <div className="route-loading" role="alert" aria-busy="true">
+        <div className="spinner"></div>
+        <span>Loading hierarchy data...</span>
       </div>
     );
   }

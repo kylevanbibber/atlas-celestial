@@ -75,9 +75,10 @@ async function processScheduledNotifications() {
         // Send the notification
         await sendNotification(notification);
         
-        // Mark the notification as read so it won't be sent again
+        // Mark the notification as sent by updating the scheduled_for to NULL
+        // This prevents it from being processed again while keeping the notification intact
         await db.query(
-          `UPDATE notifications SET is_read = 1 WHERE id = ?`,
+          `UPDATE notifications SET scheduled_for = NULL WHERE id = ?`,
           [notification.id]
         );
         
@@ -129,29 +130,65 @@ async function sendNotification(notification) {
 // Send notification to a specific user
 async function sendToUser(userId, notification) {
   try {
-    // Get user's push subscription
+    // Get user's push subscriptions (all devices)
     const subscriptions = await db.query(
       'SELECT subscription FROM push_subscriptions WHERE user_id = ?',
       [userId]
     );
     
     if (subscriptions.length === 0) {
-      console.log(`No push subscription found for user ${userId}`);
+      console.log(`No push subscriptions found for user ${userId}`);
       return;
     }
     
-    // Send push notification
-    const subscription = JSON.parse(subscriptions[0].subscription);
+    console.log(`Found ${subscriptions.length} subscription(s) for user ${userId}`);
     
-    const payload = JSON.stringify({
-      title: notification.title,
-      message: notification.message,
-      id: notification.id,
-      link_url: notification.link_url || '/notifications'
-    });
+    let successCount = 0;
+    let failureCount = 0;
     
-    await webpush.sendNotification(subscription, payload);
-    console.log(`Sent notification to user ${userId}`);
+    // Send to all user's subscriptions (all their devices)
+    for (let i = 0; i < subscriptions.length; i++) {
+      try {
+        const subscription = JSON.parse(subscriptions[i].subscription);
+        
+        const payload = JSON.stringify({
+          title: notification.title,
+          body: notification.message,
+          icon: notification.icon || '/favicon.ico',
+          badge: '/badge-icon.png',
+          data: {
+            notificationId: notification.id,
+            url: notification.link_url || '/notifications',
+            timestamp: Date.now()
+          },
+          tag: `scheduled-${notification.id}`,
+          renotify: true
+        });
+        
+        await webpush.sendNotification(subscription, payload);
+        console.log(`✅ Scheduled notification sent to user ${userId}, device ${i + 1}`);
+        successCount++;
+        
+      } catch (error) {
+        console.error(`❌ Error sending to user ${userId}, device ${i + 1}:`, error);
+        failureCount++;
+        
+        // If subscription is invalid (410 Gone), remove it from database
+        if (error.statusCode === 410) {
+          console.log(`🧹 Removing invalid subscription for user ${userId}, device ${i + 1}`);
+          try {
+            await db.query(
+              'DELETE FROM push_subscriptions WHERE user_id = ? AND subscription = ?',
+              [userId, subscriptions[i].subscription]
+            );
+          } catch (deleteError) {
+            console.error(`❌ Error removing invalid subscription:`, deleteError);
+          }
+        }
+      }
+    }
+    
+    console.log(`📊 Scheduled notification summary for user ${userId}: ${successCount} successful, ${failureCount} failed out of ${subscriptions.length} devices`);
     
   } catch (error) {
     console.error(`Error sending notification to user ${userId}:`, error);

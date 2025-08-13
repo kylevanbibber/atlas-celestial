@@ -5,7 +5,7 @@ import getSidebarNavItems from "../../context/sidebarNavItems";
 import { useTeamStyles } from "../../context/TeamStyleContext";
 import { useLicenseWarning } from "../../context/LicenseWarningContext";
 import { AuthContext } from "../../context/AuthContext";
-import { useNotifications } from "../../context/NotificationContext";
+import { useNotificationContext } from '../../context/NotificationContext';
 import { FiSettings } from "react-icons/fi";
 import Logo from "../Layout/Logo";
 import "./BottomNav.css";
@@ -16,7 +16,7 @@ const BottomNav = () => {
   const { teamName } = useTeamStyles();
   const { hasWarning: licenseWarning } = useLicenseWarning();
   const { user } = useContext(AuthContext);
-  const { unreadCount } = useNotifications();
+  const { unreadCount } = useNotificationContext();
   
   // Check if user is admin
   const isAdmin = user?.isAdmin || false;
@@ -28,7 +28,7 @@ const BottomNav = () => {
   const shouldShowLicenseWarning = teamRole !== "app" ? licenseWarning : false;
   
   // Get nav items with warning status
-  const allNavItems = getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole);
+  const allNavItems = getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole, user?.userId);
   
   // Check if settings has a warning (check both "Settings" and "Utilities" names)
   const settingsItem = allNavItems.find(item => item.name === "Settings" || item.name === "Utilities");

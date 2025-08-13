@@ -1,7 +1,88 @@
 .dashboard-container {
   width: 100%;
   min-height: 100vh;
+  box-sizing: border-box;
+  overflow-x: hidden; /* Prevent horizontal overflow */
+}
 
+/* Dashboard Navigation Buttons */
+.dashboard-nav-buttons {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom:.5rem;
+  padding: 1.5rem 0;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.time-button {
+  padding: 8px 20px;
+  border: 2px solid var(--button-primary-bg, #00558c);
+  border-radius: 4px;
+  background-color: var(--card-bg, #fff);
+  color: var(--button-primary-bg, #00558c);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+  font-family: 'Avenir Next LT Pro', sans-serif;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.time-button:hover {
+  background-color: var(--button-primary-bg, #00558c);
+  color: var(--button-primary-text, white);
+  opacity: 0.9;
+}
+
+.time-button.active {
+  background-color: var(--button-primary-bg, #00558c);
+  border-color: var(--button-primary-bg, #00558c);
+  color: var(--button-primary-text, white);
+}
+
+.time-button.active:hover {
+  opacity: 0.9;
+}
+
+/* Responsive navigation buttons - keep proper sizing */
+@media (max-width: 768px) {
+  .dashboard-nav-buttons {
+    gap: 0.75rem;
+    padding: 1rem 0;
+  }
+
+  .time-button {
+    padding: 8px 16px;
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .dashboard-nav-buttons {
+    gap: 0.5rem;
+    padding: 1rem 0;
+  }
+
+  .time-button {
+    padding: 6px 12px;
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-nav-buttons {
+    gap: 0.25rem;
+    padding: 1rem 0;
+  }
+
+  .time-button {
+    padding: 6px 10px;
+    font-size: 0.7rem;
+  }
 }
 
 .dashboard-header {
@@ -23,6 +104,7 @@
   display: flex;
   gap: 1rem;
   align-items: center;
+  flex-wrap: nowrap;
 }
 
 .date-range-selector label {
@@ -31,6 +113,8 @@
   gap: 0.25rem;
   font-size: 0.875rem;
   font-weight: 500;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .date-range-selector input[type="date"] {
@@ -40,6 +124,8 @@
   background-color: var(--input-bg, #fff);
   color: var(--text-color, #333);
   font-size: 0.875rem;
+  min-width: 0;
+  width: 100%;
 }
 
 .date-range-selector input[type="date"]:focus {
@@ -73,29 +159,75 @@
   font-size: 0.8rem;
 }
 
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  .section-header-with-controls .date-range-selector {
+    gap: 0.5rem;
+    flex-direction: row;
+    flex-wrap: nowrap;
+  }
+
+  .section-header-with-controls .date-range-selector label {
+    font-size: 0.75rem;
+    min-width: 80px;
+    flex: 1;
+  }
+
+  .section-header-with-controls .date-range-selector input[type="date"] {
+    padding: 0.3rem;
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .section-header-with-controls .date-range-selector {
+    gap: 0.25rem;
+    flex-direction: row;
+    flex-wrap: nowrap;
+  }
+
+  .section-header-with-controls .date-range-selector label {
+    font-size: 0.7rem;
+    min-width: 70px;
+    flex: 1;
+  }
+
+  .section-header-with-controls .date-range-selector input[type="date"] {
+    padding: 0.25rem;
+    font-size: 0.7rem;
+  }
+}
+
 .dashboard-cards-wrapper {
-  margin-bottom: 2rem;
+  margin-bottom: .5rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .dashboard-layout {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 2rem;
-  align-items: start;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .dashboard-main-content {
   width: 100%;
+  box-sizing: border-box;
+  order: 1;
 }
 
 .dashboard-sidebar {
-  position: sticky;
-  height: fit-content;
-  border-radius: 8px;
+  position: static;
+  width: 100%;
+  box-sizing: border-box;
+  order: 2;
 }
 
 .leaderboard-section {
   width: 100%;
+  box-sizing: border-box;
 }
 
 .leaderboard-section .section-title {
@@ -106,21 +238,15 @@
 .dashboard-leaderboard {
   max-height: 1000px;
   overflow-y: auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .dashboard-section {
-  margin-bottom: 3rem;
+  margin-bottom: 1rem;
   transition: all 0.3s ease;
-}
-
-.clickable-section {
-  cursor: pointer;
-}
-
-.clickable-section:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px var(--shadow-color, rgba(0, 0, 0, 0.15));
-  border-color: var(--primary-color, #2196f3);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .section-title {
@@ -137,31 +263,58 @@
   margin: 0 0 2rem 0;
 }
 
+/* Base card container - mobile-first approach */
 .card-container {
   display: grid;
   gap: 1.5rem;
   margin-bottom: 2rem;
+  width: 100%;
+  box-sizing: border-box;
+  /* Mobile first: 2 cards per row */
+  grid-template-columns: repeat(2, 1fr);
 }
 
-/* YTD Section: 3 cards */
-.dashboard-section:nth-child(1) .card-container {
-  grid-template-columns: repeat(3, 1fr);
-}
-
-/* Last Month Section: 4 cards */
-.dashboard-section:nth-child(2) .card-container {
-  grid-template-columns: repeat(4, 1fr);
-}
-
-/* Reported Activity Section: 3 cards */
-.dashboard-section:nth-child(3) .card-container {
-  grid-template-columns: repeat(3, 1fr);
+.dashboard-section .card-container {
+  display: grid;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+  /* Mobile first: 2 cards per row for all sections */
+  grid-template-columns: repeat(2, 1fr);
 }
 
 .dashboard-card {
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Base card font sizing - mobile first */
+.dashboard-card .card-title {
+  font-size: 0.875rem;
+  line-height: 1.3;
+  font-weight: 500;
+}
+
+.dashboard-card .card-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.dashboard-card .card-subtitle,
+.dashboard-card .card-subtext {
+  font-size: 0.75rem;
+  line-height: 1.3;
+  opacity: 0.8;
+}
+
+.dashboard-card .card-growth {
+  font-size: 0.7rem;
+  font-weight: 500;
 }
 
 .dashboard-card:hover {
@@ -224,17 +377,37 @@
   color: var(--text-muted, #666);
 }
 
+.loading-message {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  font-size: 1.1rem;
+  color: var(--text-muted, #666);
+  text-align: center;
+  padding: 2rem;
+}
+
 .error-message {
   background-color: #fff3cd;
   color: #856404;
-  padding: 1rem;
-  border-radius: 4px;
+  padding: 2rem;
+  border-radius: 8px;
   border: 1px solid #ffeaa7;
   text-align: center;
-  margin: 2rem 0;
+  margin: 2rem auto;
+  max-width: 500px;
 }
 
+.error-message h3 {
+  margin: 0 0 1rem 0;
+  color: #856404;
+}
 
+.error-message p {
+  margin: 0;
+  line-height: 1.5;
+}
 
 .dark .dashboard-summary {
   background-color: var(--card-bg-dark, #2d2d2d);
@@ -251,46 +424,147 @@
   color: var(--text-color-dark, #e0e0e0);
 }
 
-/* Responsive design */
-@media (max-width: 1650px) {
-  .dashboard-layout {
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
+/* Responsive design - Progressive enhancement */
+/* Small tablets and larger phones */
+@media (min-width: 480px) {
+  .dashboard-section .card-container {
+    gap: 1rem;
   }
 
-  .dashboard-sidebar {
-    position: static;
-    order: 2;
+  /* Slightly larger fonts for small tablets */
+  .dashboard-card .card-title {
+    font-size: 0.9rem;
   }
 
-  .dashboard-main-content {
-    order: 1;
+  .dashboard-card .card-value {
+    font-size: 1.6rem;
+  }
+
+  .dashboard-card .card-subtitle,
+  .dashboard-card .card-subtext {
+    font-size: 0.8rem;
+  }
+
+  .dashboard-card .card-growth {
+    font-size: 0.75rem;
   }
 }
 
-@media (max-width: 1200px) {
-  .dashboard-layout {
-    grid-template-columns: 3fr 2fr;
-    gap: 1.5rem;
+/* Medium tablets */
+@media (min-width: 600px) {
+  /* Medium tablet font sizing */
+  .dashboard-card .card-title {
+    font-size: 0.95rem;
+  }
+
+  .dashboard-card .card-value {
+    font-size: 1.65rem;
+  }
+
+  .dashboard-card .card-subtitle,
+  .dashboard-card .card-subtext {
+    font-size: 0.825rem;
+  }
+
+  .dashboard-card .card-growth {
+    font-size: 0.775rem;
+  }
+}
+
+/* Medium screens - more cards per row for desktop sections */
+@media (min-width: 768px) {
+  /* YTD Section: 4 cards per row on larger screens */
+  .dashboard-section:nth-child(1) .card-container {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  /* Last Month Section: 4 cards per row on larger screens */
+  .dashboard-section:nth-child(2) .card-container {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  /* This Month (Reported Activity) Section: 4 cards per row on larger screens */
+  .dashboard-section:nth-child(3) .card-container {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  /* Card font sizing for tablet and larger */
+  .dashboard-card .card-title {
+    font-size: 1rem;
+  }
+
+  .dashboard-card .card-value {
+    font-size: 1.75rem;
+    font-weight: 600;
+  }
+
+  .dashboard-card .card-subtitle,
+  .dashboard-card .card-subtext {
+    font-size: 0.875rem;
+  }
+
+  .dashboard-card .card-growth {
+    font-size: 0.8rem;
+  }
+}
+
+/* Large screens layout adjustments */
+@media (min-width: 1200px) {
+  /* Card font sizing for desktop */
+  .dashboard-card .card-title {
+    font-size: 1.125rem;
+  }
+
+  .dashboard-card .card-value {
+    font-size: 2rem;
+    font-weight: 600;
+  }
+
+  .dashboard-card .card-subtitle,
+  .dashboard-card .card-subtext {
+    font-size: 0.9rem;
+  }
+
+  .dashboard-card .card-growth {
+    font-size: 0.85rem;
+  }
+}
+
+/* Very large screens */
+@media (min-width: 1650px) {
+  /* Card font sizing for very large screens */
+  .dashboard-card .card-title {
+    font-size: 1.25rem;
+  }
+
+  .dashboard-card .card-value {
+    font-size: 2.25rem;
+    font-weight: 600;
+  }
+
+  .dashboard-card .card-subtitle,
+  .dashboard-card .card-subtext {
+    font-size: 1rem;
+  }
+
+  .dashboard-card .card-growth {
+    font-size: 0.9rem;
+  }
+}
+
+/* Mobile-specific optimizations */
+@media (max-width: 767px) {
+  .dashboard-container {
+    padding: 0 4px;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
   
-  /* Last Month Section: Stack 4 cards in 2x2 grid on medium screens */
-  .dashboard-section:nth-child(2) .card-container {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 768px) {
-  .dashboard-container {
+  .dashboard-layout {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    padding: 0 calc(15px + env(safe-area-inset-right, 0)) 0 calc(15px + env(safe-area-inset-left, 0));
-    box-sizing: border-box;
-  }
-  
-  .dashboard-layout {
-    grid-template-columns: 1fr;
     gap: 1rem;
     width: 100%;
     max-width: 100%;
@@ -298,8 +572,16 @@
   
   .dashboard-sidebar {
     position: static;
-    order: 1;
+    order: 2;
     margin-bottom: 1rem;
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  .dashboard-main-content {
+    order: 1;
+    width: 100%;
+    max-width: 100%;
   }
   
   .dashboard-header {
@@ -313,66 +595,130 @@
     justify-content: center;
   }
   
-  /* Show 2 cards per row on mobile */
-  .dashboard-section:nth-child(1) .card-container,
-  .dashboard-section:nth-child(2) .card-container,
-  .dashboard-section:nth-child(3) .card-container {
+  /* Ensure all card containers use consistent 2-per-row layout on mobile */
+  .dashboard-section .card-container {
     grid-template-columns: repeat(2, 1fr);
-    grid-gap: 8px; /* Reduce gap for better mobile fit */
-    justify-items: center; /* Center cards within grid */
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
   
-  /* Ensure dashboard sections are properly aligned */
+  /* Ensure dashboard sections are properly constrained */
   .dashboard-section {
     width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    max-width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 1rem;
+    overflow-x: hidden;
   }
   
   .dashboard-section .section-title {
     text-align: center;
     width: 100%;
+    font-size: 1.2rem;
   }
   
   .summary-grid {
     grid-template-columns: 1fr;
   }
   
-  .section-title {
-    font-size: 1.1rem; /* Reduce from 1.25rem for better mobile fit */
-  }
-  
-  /* Font sizes are now handled globally in App.css for consistency */
-  
   /* Reduce header section spacing on mobile */
   .section-header-with-controls {
     margin-bottom: 0.75rem;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
   }
   
   .section-header-with-controls .section-title {
-    font-size: 1rem;
+    font-size: 1.1rem;
+    text-align: center;
+  }
+  
+  .section-header-with-controls .date-range-selector {
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  /* Leaderboard mobile constraints */
+  .dashboard-leaderboard,
+  .leaderboard-section {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Mobile card font sizing for readability */
+  .dashboard-card .card-title {
+    font-size: 0.875rem;
+    line-height: 1.3;
+  }
+
+  .dashboard-card .card-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .dashboard-card .card-subtitle,
+  .dashboard-card .card-subtext {
+    font-size: 0.75rem;
+    line-height: 1.3;
+  }
+
+  .dashboard-card .card-growth {
+    font-size: 0.7rem;
   }
 }
 
+/* Extra small screens with even more refined spacing */
 @media (max-width: 480px) {
-  .date-range-selector {
-    flex-direction: column;
-    gap: 0.5rem;
+  .dashboard-container {
+    padding: 0 2px;
   }
   
   .dashboard-header h2 {
     text-align: center;
+    font-size: 1.4rem;
   }
   
-  /* Extra small screens: reduce spacing further */
-  .dashboard-section:nth-child(1) .card-container,
-  .dashboard-section:nth-child(2) .card-container,
-  .dashboard-section:nth-child(3) .card-container {
-    grid-gap: 6px; /* Tighter spacing for very small screens */
+  /* Tighter spacing for very small screens */
+  .dashboard-section .card-container {
+    gap: 4px;
   }
   
-  .section-title {
-    font-size: 1rem; /* Further reduce for very small screens */
+  .dashboard-section .section-title {
+    font-size: 1rem;
+  }
+  
+  .section-header-with-controls .section-title {
+    font-size: 0.95rem;
+  }
+  
+  .dashboard-section {
+    margin-bottom: 1rem;
+  }
+
+  /* Extra small screen card font sizing */
+  .dashboard-card .card-title {
+    font-size: 0.8rem;
+    line-height: 1.2;
+  }
+
+  .dashboard-card .card-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+
+  .dashboard-card .card-subtitle,
+  .dashboard-card .card-subtext {
+    font-size: 0.7rem;
+    line-height: 1.2;
+  }
+
+  .dashboard-card .card-growth {
+    font-size: 0.65rem;
   }
 }

@@ -24,9 +24,7 @@ const CSS_VARIABLES = {
  * @returns {Promise<Object|null>} - The team settings or null if none found
  */
 export const loadTeamCustomization = async (userId) => {
-  console.log(`[themeManager] Loading team customization for userId: ${userId}`);
   if (!userId) {
-    console.log('[themeManager] No userId provided, skipping customization load');
     return null;
   }
   
@@ -35,7 +33,6 @@ export const loadTeamCustomization = async (userId) => {
     const userResponse = await api.get('/auth/profile', { params: { userId } });
     
     if (!userResponse?.data) {
-      console.log('[themeManager] No user data returned from profile call');
       return null;
     }
     
@@ -44,22 +41,17 @@ export const loadTeamCustomization = async (userId) => {
     const teamId = user.rga || user.mga;
     
     if (!teamId) {
-      console.log('[themeManager] No team ID found for user');
       return null;
     }
     
-    console.log(`[themeManager] Fetching customization for ${teamType}/${teamId}`);
     const response = await api.get(`/custom/team/${teamType}/${teamId}`);
     
     if (response.data?.success && response.data?.settings) {
-      console.log('[themeManager] Successfully loaded team settings');
       return response.data.settings;
     }
     
-    console.log('[themeManager] No settings found in response');
     return null;
   } catch (error) {
-    console.error('[themeManager] Error loading team customization:', error.message);
     return null;
   }
 };
@@ -72,15 +64,12 @@ export const applyTeamStyling = (settings) => {
   // Debounce application of styles
   const now = Date.now();
   if (now - lastStyleApplied < DEBOUNCE_TIME) {
-    console.log('[themeManager] Skipping style application - debounced');
     return;
   }
   
   lastStyleApplied = now;
   
-  console.log('[themeManager] Applying team styling:', settings);
   if (!settings) {
-    console.log('[themeManager] No settings provided, skipping style application');
     return;
   }
   
@@ -89,14 +78,12 @@ export const applyTeamStyling = (settings) => {
     
     // Apply font family (if provided)
     if (settings.custom_font) {
-      console.log(`[themeManager] Setting font family: ${settings.custom_font}`);
       rootElement.style.setProperty('--font-family', settings.custom_font);
       document.body.style.fontFamily = settings.custom_font;
     }
     
     // Apply primary color (if provided)
     if (settings.primary_color) {
-      console.log(`[themeManager] Setting primary color: ${settings.primary_color}`);
       rootElement.style.setProperty('--primary-color', settings.primary_color);
       
       // Convert to RGB for rgba() usage
@@ -108,24 +95,20 @@ export const applyTeamStyling = (settings) => {
     
     // Apply secondary color (if provided)
     if (settings.secondary_color) {
-      console.log(`[themeManager] Setting secondary color: ${settings.secondary_color}`);
       rootElement.style.setProperty('--secondary-color', settings.secondary_color);
     }
     
     // Apply accent color (if provided)
     if (settings.accent_color) {
-      console.log(`[themeManager] Setting accent color: ${settings.accent_color}`);
       rootElement.style.setProperty('--accent-color', settings.accent_color);
     }
     
     // Set team name attribute for templates
     const teamName = settings.team_name || 'Arias Organization';
-    console.log(`[themeManager] Setting team name: ${teamName}`);
     rootElement.setAttribute('data-team-name', teamName);
     
-    console.log('[themeManager] Team styling successfully applied');
   } catch (error) {
-    console.error('[themeManager] Error applying team styling:', error.message);
+    // Silently handle errors
   }
 };
 
@@ -136,13 +119,11 @@ export const resetTeamStyling = () => {
   // Debounce application of styles
   const now = Date.now();
   if (now - lastStyleApplied < DEBOUNCE_TIME) {
-    console.log('[themeManager] Skipping style reset - debounced');
     return;
   }
   
   lastStyleApplied = now;
   
-  console.log('[themeManager] Resetting to default styling');
   try {
     const rootElement = document.documentElement;
     
@@ -159,9 +140,8 @@ export const resetTeamStyling = () => {
     // Reset team name attribute
     rootElement.setAttribute('data-team-name', 'Arias Organization');
     
-    console.log('[themeManager] Default styling successfully applied');
   } catch (error) {
-    console.error('[themeManager] Error resetting to default styling:', error.message);
+    // Silently handle errors
   }
 };
 
@@ -266,7 +246,6 @@ const hexToRgb = (hex) => {
     
     return `${r}, ${g}, ${b}`;
   } catch (error) {
-    console.error('[themeManager] Error converting hex to RGB:', error.message);
     return null;
   }
 };

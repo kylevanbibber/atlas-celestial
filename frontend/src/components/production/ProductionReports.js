@@ -1460,8 +1460,8 @@ const ProductionReports = () => {
 
   if (loading) {
     return (
-      <div className="reports-loading">
-        <FiRefreshCw className="loading-spinner" />
+      <div className="route-loading" role="alert" aria-busy="true">
+        <div className="spinner"></div>
         <p>Loading reports...</p>
       </div>
     );

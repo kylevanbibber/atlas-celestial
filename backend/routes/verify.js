@@ -56,8 +56,8 @@ router.post('/', async (req, res) => {
         // Check total_annual_premium to set status
         const status = total_annual_premium < 1200 ? 'Not at Threshold' : 'Queued';
 
-        // Build url using application_id
-        const url = `https://atlas.ariaslife.com/verify/clients.html?${application_id}`;
+        // Build url using application_id - this should be the client-facing URL, not the admin panel
+        const url = `https://ariaslife.com/verify/clients.html?${application_id}`;
 
         // Prepare the INSERT query
         const insertQuery = `
@@ -138,13 +138,19 @@ router.get('/getpackage', async (req, res) => {
         }
 
         // Now, check if the application_id exists in the verify_client table
-        const verifyClientQuery = 'SELECT * FROM verify_client WHERE application_id = ?';
+        const verifyClientQuery = `
+            SELECT vc.*, v.client_email, v.client_phoneNumber 
+            FROM verify_client vc 
+            JOIN verify v ON vc.application_id = v.application_id 
+            WHERE vc.application_id = ?
+        `;
         const verifyClientResults = await db.query(verifyClientQuery, [application_id]);
 
         if (verifyClientResults.length > 0) {
             return res.status(200).json({
                 success: true,
                 data: verifyResults[0],
+                clientData: verifyClientResults[0],
                 message: 'Survey already completed',
             });
         }
@@ -244,7 +250,8 @@ router.get('/verifyclient/all', async (req, res) => {
         if (archive === 'true') {
             // Show client responses for archived applications
             queryText = `
-                SELECT vc.* FROM verify_client vc 
+                SELECT vc.*, v.client_email, v.client_phoneNumber 
+                FROM verify_client vc 
                 JOIN verify v ON vc.application_id = v.application_id 
                 WHERE v.archive = 'y' 
                 ORDER BY vc.submission_date DESC
@@ -252,7 +259,8 @@ router.get('/verifyclient/all', async (req, res) => {
         } else {
             // Show client responses for non-archived applications (default behavior)
             queryText = `
-                SELECT vc.* FROM verify_client vc 
+                SELECT vc.*, v.client_email, v.client_phoneNumber 
+                FROM verify_client vc 
                 JOIN verify v ON vc.application_id = v.application_id 
                 WHERE (v.archive IS NULL OR v.archive != 'y') 
                 ORDER BY vc.submission_date DESC
@@ -292,6 +300,79 @@ router.put('/update-client-info', async (req, res) => {
         res.status(200).json({ success: true, message: 'Client information updated successfully' });
     } catch (error) {
         console.error('Error updating client information:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+});
+
+// Route to update individual client contact fields (email or phone)
+router.put('/update-client-contact', async (req, res) => {
+    try {
+        const { application_id, client_email, client_phoneNumber } = req.body;
+        
+        // Check if user has app admin permissions
+        const authHeader = req.headers.authorization;
+        if (!authHeader) {
+            return res.status(401).json({ success: false, message: 'No authorization token provided' });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const jwt = require('jsonwebtoken');
+        
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret');
+            const userId = decoded.id || decoded.userId;
+            
+            const userQuery = 'SELECT teamRole FROM activeusers WHERE id = ?';
+            const userResult = await db.query(userQuery, [userId]);
+            
+            if (userResult.length === 0 || userResult[0].teamRole !== 'app') {
+                return res.status(403).json({ 
+                    success: false, 
+                    message: 'Access denied. Only app admins can update client contact information.' 
+                });
+            }
+        } catch (jwtError) {
+            return res.status(401).json({ success: false, message: 'Invalid authorization token' });
+        }
+
+        if (!application_id) {
+            return res.status(400).json({ success: false, message: 'Missing application_id' });
+        }
+
+        if (!client_email && !client_phoneNumber) {
+            return res.status(400).json({ success: false, message: 'Must provide either client_email or client_phoneNumber' });
+        }
+
+        // Build dynamic update query based on provided fields
+        let updateQuery = 'UPDATE verify SET ';
+        let updateValues = [];
+        let updateFields = [];
+
+        if (client_email !== undefined) {
+            updateFields.push('client_email = ?');
+            updateValues.push(client_email);
+        }
+
+        if (client_phoneNumber !== undefined) {
+            updateFields.push('client_phoneNumber = ?');
+            updateValues.push(client_phoneNumber);
+        }
+
+        updateQuery += updateFields.join(', ') + ' WHERE application_id = ?';
+        updateValues.push(application_id);
+
+        await db.query(updateQuery, updateValues);
+
+        res.status(200).json({ 
+            success: true, 
+            message: 'Client contact information updated successfully',
+            updatedFields: {
+                client_email: client_email !== undefined ? client_email : 'unchanged',
+                client_phoneNumber: client_phoneNumber !== undefined ? client_phoneNumber : 'unchanged'
+            }
+        });
+    } catch (error) {
+        console.error('Error updating client contact information:', error);
         res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });
@@ -344,7 +425,12 @@ router.post('/searchByUserId', async (req, res) => {
         }
 
         // Get the user's info to determine their role and hierarchy
-        const userQuery = 'SELECT * FROM activeusers WHERE id = ?';
+        const userQuery = `
+            SELECT au.*, COALESCE(ui.email, '') AS email 
+            FROM activeusers au
+            LEFT JOIN usersinfo ui ON au.lagnname = ui.lagnname AND au.esid = ui.esid
+            WHERE au.id = ?
+        `;
         const userResult = await db.query(userQuery, [userId]);
         
         if (userResult.length === 0) {
@@ -361,28 +447,66 @@ router.post('/searchByUserId', async (req, res) => {
             agentData = [user];
             defaultAgent = user.lagnname;
         } else if (user.clname === 'SA') {
-            // For SAs, return all agents under them
-            const query = 'SELECT * FROM activeusers WHERE sa = ? AND clname = "AGT" AND managerActive = "y"';
+            // For SAs, return all agents under them PLUS themselves
+            const query = `
+                SELECT au.*, COALESCE(ui.email, '') AS email 
+                FROM activeusers au
+                LEFT JOIN usersinfo ui ON au.lagnname = ui.lagnname AND au.esid = ui.esid
+                WHERE au.sa = ? AND au.clname = "AGT" AND au.managerActive = "y" AND au.Active = "y"
+                ORDER BY au.lagnname ASC
+            `;
             agentData = await db.query(query, [user.lagnname]);
-            defaultAgent = agentData.length > 0 ? agentData[0].lagnname : '';
+            // Add the SA themselves to the beginning of the list
+            agentData.unshift(user);
+            defaultAgent = user.lagnname;
         } else if (user.clname === 'GA') {
-            // For GAs, return all agents under them
-            const query = 'SELECT * FROM activeusers WHERE ga = ? AND clname = "AGT" AND managerActive = "y"';
+            // For GAs, return all agents under them PLUS themselves
+            const query = `
+                SELECT au.*, COALESCE(ui.email, '') AS email 
+                FROM activeusers au
+                LEFT JOIN usersinfo ui ON au.lagnname = ui.lagnname AND au.esid = ui.esid
+                WHERE au.ga = ? AND au.clname = "AGT" AND au.managerActive = "y" AND au.Active = "y"
+                ORDER BY au.lagnname ASC
+            `;
             agentData = await db.query(query, [user.lagnname]);
-            defaultAgent = agentData.length > 0 ? agentData[0].lagnname : '';
+            // Add the GA themselves to the beginning of the list
+            agentData.unshift(user);
+            defaultAgent = user.lagnname;
         } else if (user.clname === 'MGA') {
-            // For MGAs, return all agents under them
-            const query = 'SELECT * FROM activeusers WHERE mga = ? AND clname = "AGT" AND managerActive = "y"';
+            // For MGAs, return all agents under them PLUS themselves
+            const query = `
+                SELECT au.*, COALESCE(ui.email, '') AS email 
+                FROM activeusers au
+                LEFT JOIN usersinfo ui ON au.lagnname = ui.lagnname AND au.esid = ui.esid
+                WHERE au.mga = ? AND au.clname = "AGT" AND au.managerActive = "y" AND au.Active = "y"
+                ORDER BY au.lagnname ASC
+            `;
             agentData = await db.query(query, [user.lagnname]);
-            defaultAgent = agentData.length > 0 ? agentData[0].lagnname : '';
+            // Add the MGA themselves to the beginning of the list
+            agentData.unshift(user);
+            defaultAgent = user.lagnname;
         } else if (user.clname === 'RGA') {
-            // For RGAs, return all agents under them
-            const query = 'SELECT * FROM activeusers WHERE rga = ? AND clname = "AGT" AND managerActive = "y"';
+            // For RGAs, return all agents under them PLUS themselves
+            const query = `
+                SELECT au.*, COALESCE(ui.email, '') AS email 
+                FROM activeusers au
+                LEFT JOIN usersinfo ui ON au.lagnname = ui.lagnname AND au.esid = ui.esid
+                WHERE au.rga = ? AND au.clname = "AGT" AND au.managerActive = "y" AND au.Active = "y"
+                ORDER BY au.lagnname ASC
+            `;
             agentData = await db.query(query, [user.lagnname]);
-            defaultAgent = agentData.length > 0 ? agentData[0].lagnname : '';
+            // Add the RGA themselves to the beginning of the list
+            agentData.unshift(user);
+            defaultAgent = user.lagnname;
         } else {
             // For other roles (admin, etc.), return all active agents
-            const query = 'SELECT * FROM activeusers WHERE clname = "AGT" AND managerActive = "y"';
+            const query = `
+                SELECT au.*, COALESCE(ui.email, '') AS email 
+                FROM activeusers au
+                LEFT JOIN usersinfo ui ON au.lagnname = ui.lagnname AND au.esid = ui.esid
+                WHERE au.clname = "AGT" AND au.managerActive = "y" AND au.Active = "y"
+                ORDER BY au.lagnname ASC
+            `;
             agentData = await db.query(query);
             defaultAgent = agentData.length > 0 ? agentData[0].lagnname : '';
         }
@@ -401,6 +525,30 @@ router.post('/searchByUserId', async (req, res) => {
 // Route to send emails to all queued applications (Send Early functionality)
 router.post('/send-queued', async (req, res) => {
     try {
+        // Check if user has app admin permissions
+        const authHeader = req.headers.authorization;
+        if (!authHeader) {
+            return res.status(401).json({ success: false, message: 'No authorization token provided' });
+        }
+
+        const token = authHeader.replace('Bearer ', '');
+        const jwt = require('jsonwebtoken');
+        
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret');
+            const userId = decoded.id || decoded.userId;
+            
+            // Check if user has teamRole = "app"
+            const userQuery = 'SELECT teamRole FROM activeusers WHERE id = ?';
+            const userResult = await db.query(userQuery, [userId]);
+            
+            if (userResult.length === 0 || userResult[0].teamRole !== 'app') {
+                return res.status(403).json({ success: false, message: 'Access denied. Only app admins can send verification emails.' });
+            }
+        } catch (jwtError) {
+            return res.status(401).json({ success: false, message: 'Invalid authorization token' });
+        }
+
         const query = `
             SELECT application_id, client_email, agent_email, agent_name, url, client_phoneNumber
             FROM verify
@@ -417,7 +565,7 @@ router.post('/send-queued', async (req, res) => {
         const nodemailer = require('nodemailer');
         const axios = require('axios');
         
-        const transporter = nodemailer.createTransporter({
+        const transporter = nodemailer.createTransport({
             host: 'mail.ariaslife.com',
             port: 465,
             secure: true,
@@ -505,6 +653,30 @@ router.post('/resend', async (req, res) => {
     }
 
     try {
+        // Check if user has app admin permissions
+        const authHeader = req.headers.authorization;
+        if (!authHeader) {
+            return res.status(401).json({ success: false, message: 'No authorization token provided' });
+        }
+
+        const token = authHeader.replace('Bearer ', '');
+        const jwt = require('jsonwebtoken');
+        
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret');
+            const userId = decoded.id || decoded.userId;
+            
+            // Check if user has teamRole = "app"
+            const userQuery = 'SELECT teamRole FROM activeusers WHERE id = ?';
+            const userResult = await db.query(userQuery, [userId]);
+            
+            if (userResult.length === 0 || userResult[0].teamRole !== 'app') {
+                return res.status(403).json({ success: false, message: 'Access denied. Only app admins can resend verification emails.' });
+            }
+        } catch (jwtError) {
+            return res.status(401).json({ success: false, message: 'Invalid authorization token' });
+        }
+
         // Fetch application data
         const query = `
             SELECT client_email, agent_email, agent_name, url, client_phoneNumber, resend_count
@@ -524,7 +696,7 @@ router.post('/resend', async (req, res) => {
         const nodemailer = require('nodemailer');
         const axios = require('axios');
         
-        const transporter = nodemailer.createTransporter({
+        const transporter = nodemailer.createTransport({
             host: 'mail.ariaslife.com',
             port: 465,
             secure: true,
@@ -590,6 +762,302 @@ router.post('/resend', async (req, res) => {
         });
     } catch (error) {
         console.error('Error in resend:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+});
+
+// Route to send email for a single application (Individual Send Early functionality)
+router.post('/send-early/:applicationId', async (req, res) => {
+    try {
+        const { applicationId } = req.params;
+
+        // Check if user has app admin permissions
+        const authHeader = req.headers.authorization;
+        if (!authHeader) {
+            return res.status(401).json({ success: false, message: 'No authorization token provided' });
+        }
+
+        const token = authHeader.replace('Bearer ', '');
+        const jwt = require('jsonwebtoken');
+        
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret');
+            const userId = decoded.id || decoded.userId;
+            
+            // Check if user has teamRole = "app"
+            const userQuery = 'SELECT teamRole FROM activeusers WHERE id = ?';
+            const userResult = await db.query(userQuery, [userId]);
+            
+            if (userResult.length === 0 || userResult[0].teamRole !== 'app') {
+                return res.status(403).json({ success: false, message: 'Access denied. Only app admins can send verification emails.' });
+            }
+        } catch (jwtError) {
+            return res.status(401).json({ success: false, message: 'Invalid authorization token' });
+        }
+
+        // Get the specific application
+        const query = `
+            SELECT application_id, client_email, agent_email, agent_name, url, client_phoneNumber, status
+            FROM verify
+            WHERE application_id = ?
+        `;
+
+        const results = await db.query(query, [applicationId]);
+
+        if (results.length === 0) {
+            return res.status(404).json({ success: false, message: 'Application not found.' });
+        }
+
+        const application = results[0];
+
+        // Check if application is already sent
+        if (application.status === 'Sent') {
+            return res.status(400).json({ success: false, message: 'Application has already been sent.' });
+        }
+
+        // Check if application is queued (optional validation)
+        if (application.status !== 'Queued') {
+            console.warn(`Application ${applicationId} status is '${application.status}', but proceeding with send early.`);
+        }
+
+        // Setup nodemailer transporter
+        const nodemailer = require('nodemailer');
+        const axios = require('axios');
+        
+        const transporter = nodemailer.createTransport({
+            host: 'mail.ariaslife.com',
+            port: 465,
+            secure: true,
+            auth: {
+                user: 'noreply@ariaslife.com',
+                pass: 'Ariaslife123!'
+            },
+            tls: {
+                rejectUnauthorized: false
+            }
+        });
+
+        try {
+            const mailOptions = {
+                from: 'noreply@ariaslife.com',
+                to: application.client_email,
+                subject: 'Welcome to Globe Life - AIL/NIL Arias Organization',
+                html: `
+                    <p>Thank you for choosing us to protect you and your family.</p>
+                    <p>Please use this <a href="${application.url}">link</a> to verify your application information.</p>
+                    <p>This checklist is required to move forward with the application process.</p>
+                    <p>If you have any questions, please reach out to your agent.</p>
+                `
+            };
+
+            // Send email
+            await transporter.sendMail(mailOptions);
+
+            // Send SMS if phone number exists
+            if (application.client_phoneNumber) {
+                const cleanedPhoneNumber = application.client_phoneNumber.replace(/\D/g, '');
+                const formattedPhoneNumber = `1${cleanedPhoneNumber}`;
+
+                const smsPayload = {
+                    phones: formattedPhoneNumber,
+                    text: `Please review your American Income Life application survey: ${application.url}`
+                };
+
+                const smsOptions = {
+                    headers: {
+                        'Authorization': 'Basic ' + Buffer.from('kylevanbibber:KhOgOwCHQVhUMXR2h37tV3HTZym2pb').toString('base64'),
+                        'Content-Type': 'application/json'
+                    }
+                };
+
+                try {
+                    await axios.post('https://rest.textmagic.com/api/v2/messages', smsPayload, smsOptions);
+                } catch (smsError) {
+                    console.error(`SMS failed for ${application.application_id}:`, smsError.message);
+                }
+            }
+
+            // Update status to 'Sent'
+            const updateQuery = `UPDATE verify SET status = 'Sent' WHERE application_id = ?`;
+            await db.query(updateQuery, [application.application_id]);
+
+            res.status(200).json({ 
+                success: true, 
+                message: `Application ${application.application_id} sent successfully.`,
+                application_id: application.application_id
+            });
+
+        } catch (error) {
+            console.error(`Failed to send application ${applicationId}:`, error);
+            res.status(500).json({ success: false, message: 'Failed to send application.' });
+        }
+
+    } catch (error) {
+        console.error('Error in send-early:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+});
+
+// Route to get promotion tracking data
+router.get('/promotion-tracking', async (req, res) => {
+    try {
+        // Check if user has app admin permissions
+        const authHeader = req.headers.authorization;
+        if (!authHeader) {
+            return res.status(401).json({ success: false, message: 'No authorization token provided' });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const jwt = require('jsonwebtoken');
+        
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret');
+            const userId = decoded.id || decoded.userId;
+            
+            const userQuery = 'SELECT teamRole FROM activeusers WHERE id = ?';
+            const userResult = await db.query(userQuery, [userId]);
+            
+            if (userResult.length === 0 || userResult[0].teamRole !== 'app') {
+                return res.status(403).json({ 
+                    success: false, 
+                    message: 'Access denied. Only app admins can access promotion tracking.' 
+                });
+            }
+        } catch (jwtError) {
+            return res.status(401).json({ success: false, message: 'Invalid authorization token' });
+        }
+
+        // Get the months from query parameters or use default past two months
+        let month1, month2;
+        
+        if (req.query.months && Array.isArray(req.query.months) && req.query.months.length === 2) {
+            // Use months from frontend
+            month1 = req.query.months[0];
+            month2 = req.query.months[1];
+        } else {
+            // Default to past two months
+            const now = new Date();
+            const currentMonth = now.getMonth() + 1; // getMonth() returns 0-11
+            const currentYear = now.getFullYear();
+            
+            // Calculate previous month
+            let prevMonth = currentMonth - 1;
+            let prevYear = currentYear;
+            if (prevMonth === 0) {
+                prevMonth = 12;
+                prevYear = currentYear - 1;
+            }
+            
+            // Calculate two months ago
+            let twoMonthsAgo = prevMonth - 1;
+            let twoMonthsAgoYear = prevYear;
+            if (twoMonthsAgo === 0) {
+                twoMonthsAgo = 12;
+                twoMonthsAgoYear = prevYear - 1;
+            }
+            
+            // Format months as MM/YYYY
+            const formatMonth = (month, year) => {
+                return `${month.toString().padStart(2, '0')}/${year}`;
+            };
+            
+            month1 = formatMonth(twoMonthsAgo, twoMonthsAgoYear);
+            month2 = formatMonth(prevMonth, prevYear);
+        }
+
+        // Get agent type from query parameters (default to GA)
+        const agentType = req.query.agentType || 'GA';
+        const isSA = agentType === 'SA';
+
+        console.log('🏆 Promotion tracking months:', { month1, month2, agentType });
+
+        // Query for promotion tracking data based on agent type
+        let promotionQuery;
+        if (isSA) {
+            // SA agents use LVL_2_NET and LVL_2_F6_NET
+            promotionQuery = `
+                SELECT
+                    m.LagnName,
+                    COALESCE(SUM(m.LVL_2_NET), 0) AS lvl_2_net_total,
+                    COALESCE(SUM(m.LVL_2_F6_NET), 0) AS lvl_2_f6_net_total,
+                    COALESCE(SUM(m.LVL_2_NET + m.LVL_2_F6_NET), 0) AS combined_total,
+                    a.lagnname,
+                    a.clname AS currentLevel,
+                    a.mga
+                FROM Monthly_ALP AS m
+                JOIN activeusers AS a ON m.LagnName = a.lagnname
+                WHERE a.clname = 'SA'
+                    AND a.Active = 'y'
+                    AND m.Month IN (?, ?)
+                GROUP BY m.LagnName, a.lagnname, a.clname, a.mga
+                ORDER BY combined_total DESC, m.LagnName
+            `;
+        } else {
+            // GA agents use LVL_3_NET and LVL_3_F6_NET
+            promotionQuery = `
+                SELECT
+                    m.LagnName,
+                    COALESCE(SUM(m.LVL_3_NET), 0) AS lvl_2_net_total,
+                    COALESCE(SUM(m.LVL_3_F6_NET), 0) AS lvl_2_f6_net_total,
+                    COALESCE(SUM(m.LVL_3_NET + m.LVL_3_F6_NET), 0) AS combined_total,
+                    a.lagnname,
+                    a.clname AS currentLevel,
+                    a.mga
+                FROM Monthly_ALP AS m
+                JOIN activeusers AS a ON m.LagnName = a.lagnname
+                WHERE a.clname = 'GA'
+                    AND a.Active = 'y'
+                    AND m.Month IN (?, ?)
+                GROUP BY m.LagnName, a.lagnname, a.clname, a.mga
+                ORDER BY combined_total DESC, m.LagnName
+            `;
+        }
+
+        const promotionResults = await db.query(promotionQuery, [month1, month2]);
+
+        // Calculate statistics
+        const totalAgents = promotionResults.length;
+        const avgCombinedTotal = totalAgents > 0 
+            ? Math.round(promotionResults.reduce((sum, agent) => sum + parseFloat(agent.combined_total), 0) / totalAgents)
+            : 0;
+        
+        // Define promotion thresholds based on agent type
+        let netLvl3Threshold, f6Lvl3Threshold;
+        if (isSA) {
+            netLvl3Threshold = 50000;  // $50,000 lvl 2 net for SA
+            f6Lvl3Threshold = 25000;   // $25,000 lvl 2 f6 net for SA
+        } else {
+            netLvl3Threshold = 120000; // $120,000 net lvl 3 alp for GA
+            f6Lvl3Threshold = 60000;   // $60,000 f6 lvl 3 net alp for GA
+        }
+        
+        // Check if agent meets BOTH requirements
+        const eligibleForPromotion = promotionResults.filter(agent => {
+            const netLvl3Total = parseFloat(agent.lvl_2_net_total);
+            const f6Lvl3Total = parseFloat(agent.lvl_2_f6_net_total);
+            
+            return netLvl3Total >= netLvl3Threshold && f6Lvl3Total >= f6Lvl3Threshold;
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                agents: promotionResults,
+                statistics: {
+                    totalAgents,
+                    avgCombinedTotal,
+                    eligibleForPromotion: eligibleForPromotion.length,
+                    netLvl3Threshold,
+                    f6Lvl3Threshold
+                },
+                months: [month1, month2],
+                selectedMonths: [month1, month2],
+                agentType: agentType
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching promotion tracking data:', error);
         res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });

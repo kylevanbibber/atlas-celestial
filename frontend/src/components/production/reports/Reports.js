@@ -1083,8 +1083,8 @@ const Reports = ({
       {/* Report Content */}
       <div className="report-content">
         {loading && (
-          <div className="report-loading">
-            <FiRefreshCw className="loading-spinner" />
+          <div className="route-loading" role="alert" aria-busy="true">
+            <div className="spinner"></div>
             <p>Loading report data...</p>
           </div>
         )}

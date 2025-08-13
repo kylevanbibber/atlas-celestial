@@ -24,6 +24,7 @@ async function createNotification(notificationData) {
       created_at = null
     } = notificationData;
 
+
     // Process metadata with proper error handling
     let metadataStr;
     try {

@@ -6,6 +6,7 @@ import ActionBar from '../../utils/ActionBar';
 import { FiSend, FiMousePointer, FiCheckCircle, FiXCircle, FiClock, FiPlus, FiSearch, FiRefreshCw } from 'react-icons/fi';
 import '../ProductionReports.css';
 import { debounce } from 'lodash';
+import { toast } from 'react-hot-toast';
 
 const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
     const [verifyData, setVerifyData] = useState([]);
@@ -14,10 +15,18 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
     const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('unverified');
     const [userIds, setUserIds] = useState([]);
+    // Normalized Set for fast, robust filtering using only activeusers.id -> verify.userId
+    const allowedIdsSet = useMemo(() => new Set(userIds.map(id => String(id))), [userIds]);
     const [isArchiveView, setIsArchiveView] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
     const [isSearching, setIsSearching] = useState(false);
+    
+    // Mass selection state
+    const [selectedRows, setSelectedRows] = useState({});
+    
+    // Loading state for individual rows during bulk operations
+    const [processingRows, setProcessingRows] = useState({});
     
     const { user } = useContext(AuthContext);
     
@@ -76,6 +85,20 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
         }
     }, [isAppAdmin, isArchiveView]);
     
+    // Mass selection handlers
+    const handleSelectionChange = useCallback((selectedIds) => {
+        const newSelection = {};
+        selectedIds.forEach(id => {
+            newSelection[id] = true;
+        });
+        setSelectedRows(newSelection);
+    }, []);
+    
+    const clearSelection = useCallback(() => {
+        setSelectedRows({});
+        setProcessingRows({}); // Also clear any processing states
+    }, []);
+    
     // Helper function to check if a date is within the last week
     const isWithinLastWeek = (dateString) => {
         if (!dateString) return false;
@@ -104,9 +127,19 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
             });
 
             if (response.data.success) {
-                setUserIds(response.data.data.map(user => user.id));
+                const hierarchy = response.data.data || [];
+                console.log('[VerifyTable] /auth/searchByUserId full data:', hierarchy);
+                // Include both the current user's ID and their team's IDs
+                const teamIds = hierarchy.map(u => u.id).filter(Boolean);
+                const userIdFromAuth = user?.userId ? [user.userId] : [];
+                const allAllowedIds = [...userIdFromAuth, ...teamIds];
+                setUserIds(allAllowedIds);
+                console.log('[VerifyTable] Current user ID:', user?.userId);
+                console.log('[VerifyTable] Team IDs from hierarchy:', teamIds);
+                console.log('[VerifyTable] All allowed activeusers.id list:', allAllowedIds);
             } else {
                 setError('Failed to fetch hierarchy information');
+                console.warn('[VerifyTable] /auth/searchByUserId error:', response.data.message);
             }
         } catch (err) {
             setError('Error fetching hierarchy information: ' + err.message);
@@ -128,9 +161,29 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
 
             if (verifyResult.success) {
                 // For app admins, show all data. For others, filter by hierarchy
+                const allRows = Array.isArray(verifyResult.data) ? verifyResult.data : [];
+                console.log('[VerifyTable] /verify/all full data:', allRows);
+
                 const filteredData = isAppAdmin 
-                    ? verifyResult.data 
-                    : verifyResult.data.filter(row => userIds.includes(row.userId));
+                    ? allRows 
+                    : allRows.filter(row => row.userId !== undefined && row.userId !== null && allowedIdsSet.has(String(row.userId)));
+
+                if (!isAppAdmin) {
+                    // Log matching diagnostics for all rows
+                    const diagnostics = allRows.map(r => ({
+                        application_id: r.application_id || r.id,
+                        userId: r.userId,
+                        matches: r.userId !== undefined && r.userId !== null && allowedIdsSet.has(String(r.userId))
+                    }));
+                    const matchedCount = diagnostics.filter(d => d.matches).length;
+                    console.log('[VerifyTable] Hierarchy filter diagnostics (full):', diagnostics);
+                    console.log('[VerifyTable] Hierarchy filter summary:', {
+                        allowedIdsSize: allowedIdsSet.size,
+                        totalFetched: allRows.length,
+                        filteredCount: filteredData.length,
+                        matchedCount: matchedCount
+                    });
+                }
                 setVerifyData(filteredData);
             } else {
                 setError('Failed to fetch verification data');
@@ -189,6 +242,25 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
         }
     }, [userIds, isAppAdmin, isArchiveView]);
 
+    // Cleanup processing state when component unmounts or when there's an error
+    useEffect(() => {
+        return () => {
+            setProcessingRows({});
+        };
+    }, []);
+
+    // Clear processing state when there's an error
+    useEffect(() => {
+        if (error) {
+            setProcessingRows({});
+        }
+    }, [error]);
+
+    // Clear processing state when active tab changes
+    useEffect(() => {
+        setProcessingRows({});
+    }, [activeTab]);
+
     const parseInsuredInfo = (info) => {
         if (!info || info === 'n/a,0,n,n') return null;
         const [name, premium, trial, senior] = info.split(',');
@@ -224,55 +296,77 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
         return date.toLocaleDateString();
     };
 
-    // Memoized columns for DataTable
-    const columns = useMemo(() => [
-        {
-            Header: 'Date',
-            accessor: 'created_at',
-            Cell: ({ value }) => formatDate(value),
-            width: 100
-        },
-        {
-            Header: 'Agent',
-            accessor: 'agent_name',
-            width: 200
-        },
-        {
-            Header: 'Client Name',
-            accessor: 'client_name',
-            width: 200
-        },
-        {
-            Header: 'Annual Premium',
-            accessor: 'total_annual_premium',
-            Cell: ({ value }) => `$${value}`,
-            width: 130
-        },
-        {
-            Header: 'Sale Type',
-            accessor: 'sale_type',
-            Cell: ({ row }) => getSaleType(row.original),
-            width: 150
-        },
-        {
-            Header: 'Status',
-            accessor: 'displayStatus', // Use displayStatus instead of status
-            Cell: ({ value }) => {
-                const statusStyle = getStatusColor(value);
-                return (
-                    <span style={{ 
-                        padding: '2px 6px', 
-                        borderRadius: '3px', 
-                        fontSize: '10px',
-                        ...statusStyle
-                    }}>
-                        {value}
-                    </span>
-                );
-            },
-            width: 120
+    // Helper to style status chips
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'Received':
+                return { backgroundColor: '#d4edda', color: '#155724' };
+            case 'Verified':
+                return { backgroundColor: '#d4edda', color: '#155724' };
+            case 'Queued':
+                return { backgroundColor: '#fff3cd', color: '#856404' };
+            case 'Discrepancy':
+                return { backgroundColor: '#f8d7da', color: '#721c24' };
+            case 'Unverified':
+            default:
+                return { backgroundColor: '#e2e3e5', color: '#383d41' };
         }
-    ], []); // Removed activeTab dependency since displayStatus is now in the data
+    };
+
+    // Memoized columns for DataTable
+    const columns = useMemo(() => {
+        const base = [
+            {
+                Header: '',
+                accessor: 'massSelection',
+                massSelection: true,
+                width: 40
+            },
+            {
+                Header: 'Date',
+                accessor: 'created_at',
+                Cell: ({ value }) => formatDate(value),
+                width: 100
+            },
+            {
+                Header: 'Agent',
+                accessor: 'agent_name',
+                width: 200
+            },
+            {
+                Header: 'Client Name',
+                accessor: 'client_name',
+                width: 200
+            },
+            {
+                Header: 'Annual Premium',
+                accessor: 'total_annual_premium',
+                Cell: ({ value }) => `$${value}`,
+                width: 130
+            },
+            {
+                Header: 'Sale Type',
+                accessor: 'sale_type',
+                Cell: ({ row }) => getSaleType(row.original),
+                width: 150
+            },
+            {
+                Header: 'Status',
+                accessor: 'status',
+                Cell: ({ value, row }) => {
+                    const display = row.original.displayStatus || value;
+                    return (
+                        <span style={{ padding: '2px 6px', borderRadius: '3px', fontSize: '10px', ...getStatusColor(display) }}>
+                            {display}
+                        </span>
+                    );
+                },
+                width: 120
+            }
+        ];
+
+        return base;
+    }, [activeTab]);
 
     // QUEUED: No client response + status = 'Queued' + archive status based on view
     const getQueuedData = useCallback(() => {
@@ -304,45 +398,103 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
         );
     }, [verifyData, verifyClientData, isArchiveView, isAdmin]);
 
-    // VERIFIED: Has client response + no discrepancies + archive status based on view
-    const getVerifiedData = useCallback(() => {
+    // Shared helper to compute discrepancy reasons for a verify row
+    const computeDiscrepancyReasons = useCallback((verifyRow, clientRow) => {
+        if (!verifyRow || !clientRow) return [];
+
+        const reasons = [];
         const medicalKeys = [
             'amputation', 'anxiety_depression', 'cancer', 'cancer_senior', 'chronic_illness',
             'cirrhosis', 'diabetes', 'dui', 'er_visit', 'heart_issues', 'heart_lung',
             'high_blood_pressure', 'medications', 'oxygen', 'senior_rejected'
         ];
 
+        const normalizeName = (name) => (name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+        const extractInsureds = (answer) => {
+            if (!answer || !answer.toLowerCase().includes('yes(')) return [];
+            const match = answer.match(/\(([^)]+)\)/);
+            if (!match || !match[1]) return [];
+            return match[1].split(',').map(s => normalizeName(s)).filter(Boolean);
+        };
+
+        medicalKeys.forEach((key) => {
+            const agentAnswer = verifyRow[`${key}_answer`] || 'n';
+            const clientAnswer = clientRow[key] || 'n';
+
+            const agentInsureds = extractInsureds(agentAnswer);
+            const clientInsureds = extractInsureds(clientAnswer);
+
+            // Allow agent 'yes(insureds)' and client 'n'
+            if (agentInsureds.length > 0 && clientAnswer === 'n') {
+                return;
+            }
+
+            const agentSet = new Set(agentInsureds);
+            const isSubset = clientInsureds.every(insured => agentSet.has(insured));
+            if (agentInsureds.length > 0 && clientInsureds.length > 0 && !isSubset) {
+                reasons.push(`Medical: ${key} mismatch. Agent: ${agentInsureds.join(', ')}; Client: ${clientInsureds.join(', ')}`);
+            }
+            if (agentAnswer === 'n' && clientInsureds.length > 0) {
+                reasons.push(`Medical: ${key} agent 'No' vs client 'Yes' (${clientInsureds.join(', ')})`);
+            }
+        });
+
+        if (clientRow.account_verification === 'n') {
+            reasons.push('Client: account verification failed');
+        }
+        if (clientRow.application_verification === 'n') {
+            reasons.push('Client: application verification failed');
+        }
+        if (clientRow.agent_contact_request && clientRow.agent_contact_request.toLowerCase() !== 'no') {
+            reasons.push(`Client: agent contact request = ${clientRow.agent_contact_request}`);
+        }
+        if (verifyRow.agent_ip === clientRow.client_ip) {
+            reasons.push('IP address match between agent and client');
+        }
+
+        return reasons;
+    }, []);
+
+    // VERIFIED: Has client response + no discrepancies + archive status based on view
+    const getVerifiedData = useCallback(() => {
         return verifyData.filter((verifyRow) => {
             const matchingClientRow = verifyClientData.find(
                 (clientRow) => clientRow.application_id === verifyRow.application_id
             );
 
             if (matchingClientRow) {
-                // Allow rows where answers match exactly, whether they are both "n" or both "yes(insureds)"
-                const allMedicalMatch = !medicalKeys.some((key) => {
-                    const agentAnswer = verifyRow[`${key}_answer`];
-                    const clientAnswer = matchingClientRow[key];
-                    return agentAnswer !== clientAnswer;
-                });
-
-                const noVerificationIssues = (
-                    matchingClientRow.account_verification === 'y' &&
-                    matchingClientRow.application_verification === 'y' &&
-                    matchingClientRow.agent_contact_request === 'No'
-                );
-
-                const ipAddressMismatch = verifyRow.agent_ip === matchingClientRow.client_ip;
-
+                const reasons = computeDiscrepancyReasons(verifyRow, matchingClientRow);
                 const matchesArchiveView = isArchiveView ? 
                     (verifyRow.archive === 'y' && (isAdmin || isWithinLastWeek(verifyRow.created_at))) :
                     verifyRow.archive !== 'y';
-
-                return allMedicalMatch && noVerificationIssues && !ipAddressMismatch && matchesArchiveView;
+                return reasons.length === 0 && matchesArchiveView;
             }
-
             return false;
         });
-    }, [verifyData, verifyClientData, isArchiveView, isAdmin]);
+    }, [verifyData, verifyClientData, isArchiveView, isAdmin, computeDiscrepancyReasons]);
+
+    // DISCREPANCY: Has client response + has discrepancies + archive status based on view
+    const getDiscrepancyData = useCallback(() => {
+        return verifyData.map(verifyRow => {
+            const matchingClientRow = verifyClientData.find(clientRow => clientRow.application_id === verifyRow.application_id);
+            if (!matchingClientRow) return null;
+
+            const discrepancyReasons = computeDiscrepancyReasons(verifyRow, matchingClientRow);
+            const discrepancies = discrepancyReasons.length > 0 ? [{}] : []; // retain structure
+
+            return {
+                ...verifyRow,
+                discrepancies,
+                discrepancyReasons,
+            };
+        }).filter(row => {
+            if (!row) return false;
+            const matchesArchiveView = isArchiveView ? 
+                (row.archive === 'y' && (isAdmin || isWithinLastWeek(row.created_at))) :
+                row.archive !== 'y';
+            return row.discrepancyReasons && row.discrepancyReasons.length > 0 && matchesArchiveView;
+        });
+    }, [verifyData, verifyClientData, isArchiveView, isAdmin, computeDiscrepancyReasons]);
 
     const hasDiscrepancies = (verifyRow, clientRow) => {
         // Define medical questions keys
@@ -366,124 +518,12 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
         // Check for discrepancies in other fields
         if (clientRow.account_verification === 'n') return true;
         if (clientRow.application_verification === 'n') return true;
-        if (clientRow.agent_contact_request !== 'No') return true;
+        if (clientRow.agent_contact_request && clientRow.agent_contact_request.toLowerCase() !== 'no') return true;
 
         // Check IP address match (considered suspicious)
         if (verifyRow.agent_ip === clientRow.client_ip) return true;
         
         return false;
-    };
-
-    // DISCREPANCY: Has client response + has discrepancies + archive status based on view
-    const getDiscrepancyData = useCallback(() => {
-        return verifyData.map(verifyRow => {
-            const matchingClientRow = verifyClientData.find(clientRow => clientRow.application_id === verifyRow.application_id);
-            
-            if (!matchingClientRow) return null;
-            
-            const discrepancies = [];
-            const discrepancyReasons = []; // Array to store detailed reasons for discrepancies
-
-            // Define medical questions keys
-            const medicalKeys = [
-                'amputation', 'anxiety_depression', 'cancer', 'cancer_senior', 'chronic_illness', 
-                'cirrhosis', 'diabetes', 'dui', 'er_visit', 'heart_issues', 'heart_lung', 
-                'high_blood_pressure', 'medications', 'oxygen', 'senior_rejected'
-            ];
-
-            // Check discrepancies in each medical question (using AdminVerify.js logic)
-            medicalKeys.forEach((key) => {
-                const agentAnswer = verifyRow[`${key}_answer`] || 'n';
-                const clientAnswer = matchingClientRow[key] || 'n';
-
-                // Extract insured names from 'yes(insureds)' format with data cleaning (same logic as AdminVerify.js)
-                const agentInsureds = agentAnswer.toLowerCase().includes('yes(')
-                    ? (agentAnswer.match(/\(([^)]+)\)/) || [])[1]?.split(',').map(name => {
-                        // Clean up duplicate names and formatting issues
-                        const cleanedName = name.trim().toLowerCase();
-                        // Remove duplicate words (like "Douglas Shope Shope" -> "Douglas Shope")
-                        const words = cleanedName.split(' ');
-                        const uniqueWords = words.filter((word, index) => words.indexOf(word) === index);
-                        return uniqueWords.join(' ');
-                    }) || []
-                    : [];
-
-                const clientInsureds = clientAnswer.toLowerCase().includes('yes(')
-                    ? (clientAnswer.match(/\(([^)]+)\)/) || [])[1]?.split(',').map(name => name.trim().toLowerCase()) || []
-                    : [];
-
-                // Allow agent 'yes(insureds)' and client 'no' (same as AdminVerify.js)
-                if (agentInsureds.length > 0 && clientAnswer === 'n') {
-                    // This is acceptable, not a discrepancy
-                    return;
-                }
-
-                // Check if client insureds are a subset of agent insureds (same as AdminVerify.js)
-                const isSubset = clientInsureds.every(insured => agentInsureds.includes(insured));
-
-                if (agentInsureds.length > 0 && clientInsureds.length > 0 && !isSubset) {
-                    discrepancies.push({ question: key, agentAnswer, clientAnswer });
-                    discrepancyReasons.push(`Discrepancy in ${key}: Mismatch in insureds. Agent: ${agentInsureds.join(',')}, Client: ${clientInsureds.join(',')}.`);
-                }
-
-                // Flag a mismatch if the client lists insureds but the agent says 'no' (same as AdminVerify.js)
-                if (agentAnswer === 'n' && clientInsureds.length > 0) {
-                    discrepancies.push({ question: key, agentAnswer, clientAnswer });
-                    discrepancyReasons.push(`Discrepancy in ${key}: Agent answered 'No', but client answered 'Yes' for ${clientInsureds.join(', ')}.`);
-                }
-            });
-
-            // Check for discrepancies in other fields
-            if (matchingClientRow.account_verification === 'n') {
-                discrepancies.push({ question: 'account_verification', issue: 'Account verification failed' });
-                discrepancyReasons.push("Discrepancy in account verification: Client verification failed.");
-            }
-            if (matchingClientRow.application_verification === 'n') {
-                discrepancies.push({ question: 'application_verification', issue: 'Application verification failed' });
-                discrepancyReasons.push("Discrepancy in application verification: Application verification failed.");
-            }
-            if (matchingClientRow.agent_contact_request !== 'No') {
-                discrepancies.push({ question: 'agent_contact_request', issue: 'Agent contact request present' });
-                discrepancyReasons.push(`Agent contact request discrepancy: Client requested contact with agent.`);
-            }
-
-            // Add IP address match as a discrepancy if needed
-            if (verifyRow.agent_ip === matchingClientRow.client_ip) {
-                discrepancies.push({ question: 'IP Match', issue: 'IP address matches between agent and client' });
-                discrepancyReasons.push("IP address discrepancy: IP addresses match between agent and client.");
-            }
-
-   
-
-            return {
-                ...verifyRow,
-                discrepancies,
-            };
-        }).filter(row => {
-            if (!row) return false; // Filter out null rows first
-            
-            const matchesArchiveView = isArchiveView ? 
-                (row.archive === 'y' && (isAdmin || isWithinLastWeek(row.created_at))) :
-                row.archive !== 'y';
-            
-            return row.discrepancies && row.discrepancies.length > 0 && matchesArchiveView;
-        });
-    }, [verifyData, verifyClientData, isArchiveView, isAdmin]);
-
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'Received':
-                return { backgroundColor: '#d4edda', color: '#155724' };
-            case 'Verified':
-                return { backgroundColor: '#d4edda', color: '#155724' };
-            case 'Queued':
-                return { backgroundColor: '#fff3cd', color: '#856404' };
-            case 'Discrepancy':
-                return { backgroundColor: '#f8d7da', color: '#721c24' };
-            case 'Unverified':
-            default:
-                return { backgroundColor: '#e2e3e5', color: '#383d41' };
-        }
     };
 
     // Memoize current data based on active tab with proper displayStatus
@@ -549,8 +589,9 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
     const dataWithIds = useMemo(() => 
         currentData.map(row => ({
             ...row,
-            id: row.application_id || row.id
-        })), [currentData]
+            id: row.application_id || row.id,
+            isProcessing: processingRows[row.application_id || row.id] || false
+        })), [currentData, processingRows]
     );
 
     // Archive function to handle archiving applications
@@ -597,23 +638,56 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
 
     // Send Early function (for queued applications) - sends all queued emails
     const handleSendEarly = useCallback(async () => {
+        console.log('🚀 Bulk send early called - will send ALL queued applications');
+        
         try {
             const response = await api.post('/verify/send-queued');
 
             if (response.data.success) {
                 // Refresh data to reflect status changes from 'Queued' to 'Sent'
                 await fetchVerifyData(isArchiveView);
+                toast.success(`Bulk send early completed: ${response.data.message}`);
                 console.log('Send early completed:', response.data.message);
             } else {
                 console.error('Failed to send early:', response.data.message);
+                toast.error(`Failed to send verification emails: ${response.data.message}`);
             }
         } catch (error) {
             console.error('Error sending early:', error);
+            toast.error(`Error sending verification emails: ${error.message}`);
+        }
+    }, [isArchiveView]);
+
+    // Individual Send Early function for a specific application
+    const handleSendEarlyIndividual = useCallback(async (applicationId) => {
+        console.log('🚀 Individual send early called for application:', applicationId);
+        
+        try {
+            const response = await api.post(`/verify/send-early/${applicationId}`);
+
+            if (response.data.success) {
+                // Refresh data to reflect status change from 'Queued' to 'Sent'
+                await fetchVerifyData(isArchiveView);
+                toast.success(`Verification email sent for application ${applicationId}`);
+                console.log('Individual send early completed:', response.data.message);
+            } else {
+                console.error('Failed to send early:', response.data.message);
+                toast.error(`Failed to send verification email: ${response.data.message}`);
+            }
+        } catch (error) {
+            console.error('Error sending early:', error);
+            toast.error(`Error sending verification email: ${error.message}`);
         }
     }, [isArchiveView]);
 
     // Resend function (for unverified applications)
     const handleResend = useCallback(async (applicationId) => {
+        // Only allow app admins to resend
+        if (!isAppAdmin) {
+            console.warn('🚫 VerifyTable: Resend access denied - user is not app admin');
+            return;
+        }
+
         try {
             const response = await api.post('/verify/resend', {
                 application_id: applicationId
@@ -628,6 +702,7 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
                             : item
                     )
                 );
+                toast.success(`Resend completed for ${verifyData.find(item => item.application_id === applicationId)?.client_name || 'this application'}`);
                 console.log('Resend completed:', response.data.message);
             } else {
                 console.error('Failed to resend:', response.data.message);
@@ -635,7 +710,312 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
         } catch (error) {
             console.error('Error resending:', error);
         }
+    }, [verifyData, isAppAdmin]);
+
+    // Helper function to refresh tab data when applications change status
+    const refreshTabData = useCallback(() => {
+        // Force a re-render of the current tab data by updating the dependency
+        // This ensures that when applications change status, they move to the correct tab
+        setVerifyData(prevData => [...prevData]);
     }, []);
+
+    // Bulk action functions
+    const handleBulkArchive = useCallback(async () => {
+        const selectedIds = Object.keys(selectedRows);
+        if (selectedIds.length === 0) {
+            toast.error('No applications selected');
+            return;
+        }
+
+        if (!window.confirm(`Archive ${selectedIds.length} selected application(s)?`)) {
+            return;
+        }
+
+        try {
+            let successCount = 0;
+            let failCount = 0;
+            
+            // Set all selected rows as processing
+            const processingState = {};
+            selectedIds.forEach(id => { processingState[id] = true; });
+            setProcessingRows(processingState);
+            console.log(`🚀 Processing started for rows:`, Object.keys(processingState));
+            
+            // Process sequentially with small delays to avoid overwhelming the database
+            for (let i = 0; i < selectedIds.length; i++) {
+                const id = selectedIds[i];
+                
+                try {
+                    // Add a small delay between requests to avoid overwhelming the database
+                    if (i > 0) {
+                        await new Promise(resolve => setTimeout(resolve, 200)); // 200ms delay
+                    }
+                    
+                    const response = await api.put('/verify/archive', { application_id: id });
+                    
+                    if (response.data.success) {
+                        successCount++;
+                        console.log(`Archive successful for application ${id}`);
+                        
+                        // Update local state immediately for this application
+                        setVerifyData(prevData => 
+                            prevData.map(item => 
+                                (item.application_id || item.id) === id 
+                                    ? { ...item, archive: 'y' }
+                                    : item
+                            )
+                        );
+                        
+                        // Show individual success toast
+                        const clientName = verifyData.find(item => (item.application_id || item.id) === id)?.client_name || id;
+                        toast.success(`Archived: ${clientName}`);
+                        
+                        // Refresh tab data to ensure applications move to correct tabs
+                        refreshTabData();
+                    } else {
+                        failCount++;
+                        console.error(`Failed to archive application ${id}:`, response.data.message);
+                        toast.error(`Failed to archive: ${response.data.message}`);
+                    }
+                } catch (error) {
+                    failCount++;
+                    console.error(`Error archiving application ${id}:`, error);
+                    toast.error(`Error archiving: ${error.message}`);
+                }
+                
+                // Clear processing state for this specific row as it completes
+                setProcessingRows(prev => {
+                    const newState = { ...prev };
+                    delete newState[id];
+                    console.log(`🔄 Processing cleared for row ${id}, remaining:`, Object.keys(newState));
+                    return newState;
+                });
+                
+                // Update progress for user feedback
+                if (i % 10 === 0 || i === selectedIds.length - 1) {
+                    toast.loading(`Processing... ${i + 1}/${selectedIds.length} completed`);
+                }
+            }
+            
+            // Clear loading toast and show final results
+            toast.dismiss();
+            
+            if (successCount > 0) {
+                toast.success(`Successfully archived ${successCount} application(s)${failCount > 0 ? `, ${failCount} failed` : ''}`);
+            } else {
+                toast.error('All archive operations failed');
+            }
+            
+            clearSelection();
+            // No need to fetch all data again since we updated local state
+        } catch (error) {
+            console.error('Error in bulk archive:', error);
+            toast.error('Error during bulk archive operation');
+            // Clear all processing states on error
+            setProcessingRows({});
+        }
+    }, [selectedRows, verifyData, clearSelection, refreshTabData]);
+
+    const handleBulkSendEarly = useCallback(async () => {
+        const selectedIds = Object.keys(selectedRows);
+        if (selectedIds.length === 0) {
+            toast.error('No applications selected');
+            return;
+        }
+
+        if (!window.confirm(`Send early ${selectedIds.length} selected application(s)?`)) {
+            return;
+        }
+
+        try {
+            let successCount = 0;
+            let failCount = 0;
+            
+            // Set all selected rows as processing
+            const processingState = {};
+            selectedIds.forEach(id => { processingState[id] = true; });
+            setProcessingRows(processingState);
+            console.log(`🚀 Processing started for rows:`, Object.keys(processingState));
+            
+            // Process sequentially with delays to avoid overwhelming the service
+            for (let i = 0; i < selectedIds.length; i++) {
+                const id = selectedIds[i];
+                
+                try {
+                    // Add a small delay between requests to avoid overwhelming the service
+                    if (i > 0) {
+                        await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay
+                    }
+                    
+                    const response = await api.post(`/verify/send-early/${id}`);
+                    
+                    if (response.data.success) {
+                        successCount++;
+                        console.log(`Send early successful for application ${id}`);
+                        
+                        // Update local state immediately for this application
+                        setVerifyData(prevData => 
+                            prevData.map(item => 
+                                (item.application_id || item.id) === id 
+                                    ? { ...item, status: 'Sent' }
+                                    : item
+                            )
+                        );
+                        
+                        // Show individual success toast
+                        toast.success(`Sent early: ${verifyData.find(item => (item.application_id || item.id) === id)?.client_name || id}`);
+                        
+                        // Refresh tab data to ensure applications move to correct tabs
+                        refreshTabData();
+                    } else {
+                        failCount++;
+                        console.error(`Failed to send early for application ${id}:`, response.data.message);
+                        toast.error(`Failed to send early: ${response.data.message}`);
+                    }
+                } catch (error) {
+                    failCount++;
+                    console.error(`Error sending early for application ${id}:`, error);
+                    toast.error(`Error sending early: ${error.message}`);
+                }
+                
+                // Clear processing state for this specific row as it completes
+                setProcessingRows(prev => {
+                    const newState = { ...prev };
+                    delete newState[id];
+                    return newState;
+                });
+                
+                // Update progress for user feedback
+                if (i % 5 === 0 || i === selectedIds.length - 1) {
+                    toast.loading(`Processing... ${i + 1}/${selectedIds.length} completed`);
+                }
+            }
+            
+            // Clear loading toast and show final results
+            toast.dismiss();
+            
+            if (successCount > 0) {
+                toast.success(`Successfully sent ${successCount} application(s) early${failCount > 0 ? `, ${failCount} failed` : ''}`);
+            } else {
+                toast.error('All send early operations failed');
+            }
+            
+            clearSelection();
+            // No need to fetch all data again since we updated local state
+        } catch (error) {
+            console.error('Error in bulk send early:', error);
+            toast.error('Error during bulk send early operation');
+            // Clear all processing states on error
+            setProcessingRows({});
+        }
+    }, [selectedRows, verifyData, clearSelection, refreshTabData]);
+
+    const handleBulkResend = useCallback(async () => {
+        const selectedIds = Object.keys(selectedRows);
+        if (selectedIds.length === 0) {
+            toast.error('No applications selected');
+            return;
+        }
+
+        if (!window.confirm(`Resend ${selectedIds.length} selected application(s)?`)) {
+            return;
+        }
+
+        try {
+            let successCount = 0;
+            let failCount = 0;
+            
+            // Set all selected rows as processing
+            const processingState = {};
+            selectedIds.forEach(id => { processingState[id] = true; });
+            setProcessingRows(processingState);
+            console.log(`🚀 Processing started for rows:`, Object.keys(processingState));
+            
+            // Process sequentially with delays to avoid overwhelming the service
+            for (let i = 0; i < selectedIds.length; i++) {
+                const id = selectedIds[i];
+                
+                try {
+                    // Add a small delay between requests to avoid overwhelming the service
+                    if (i > 0) {
+                        await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay
+                    }
+                    
+                    const response = await api.post('/verify/resend', { application_id: id });
+                    
+                    if (response.data.success) {
+                        successCount++;
+                        console.log(`Resend successful for application ${id}`);
+                        
+                        // Update local state immediately for this application
+                        setVerifyData(prevData => 
+                            prevData.map(item => 
+                                (item.application_id || item.id) === id 
+                                    ? { 
+                                        ...item, 
+                                        status: 'Resent by Staff', 
+                                        resend_count: (item.resend_count || 0) + 1 
+                                    }
+                                    : item
+                            )
+                        );
+                        
+                        // Show individual success toast
+                        const clientName = verifyData.find(item => (item.application_id || item.id) === id)?.client_name || id;
+                        toast.success(`Resent: ${clientName}`);
+                        
+                        // Refresh tab data to ensure applications move to correct tabs
+                        refreshTabData();
+                    } else {
+                        failCount++;
+                        console.error(`Failed to resend application ${id}:`, response.data.message);
+                        toast.error(`Failed to resend: ${response.data.message}`);
+                    }
+                } catch (error) {
+                    failCount++;
+                    console.error(`Error resending application ${id}:`, error);
+                    toast.error(`Error resending: ${error.message}`);
+                }
+                
+                // Clear processing state for this specific row as it completes
+                setProcessingRows(prev => {
+                    const newState = { ...prev };
+                    delete newState[id];
+                    console.log(`🔄 Processing cleared for row ${id}, remaining:`, Object.keys(newState));
+                    return newState;
+                });
+                
+                // Update progress for user feedback
+                if (i % 5 === 0 || i === selectedIds.length - 1) {
+                    toast.loading(`Processing... ${i + 1}/${selectedIds.length} completed`);
+                }
+            }
+            
+            // Clear processing state and loading toast, then show final results
+            setProcessingRows({});
+            toast.dismiss();
+            
+            if (successCount > 0) {
+                toast.success(`Successfully resent ${successCount} application(s)${failCount > 0 ? `, ${failCount} failed` : ''}`);
+            } else {
+                toast.error('All resend operations failed');
+            }
+            
+            clearSelection();
+            // No need to fetch all data again since we updated local state
+        } catch (error) {
+            console.error('Error in bulk resend:', error);
+            toast.error('Error during bulk resend operation');
+            // Clear all processing states on error
+            setProcessingRows({});
+        }
+    }, [selectedRows, verifyData, clearSelection, refreshTabData]);
+
+    // Helper function to get selected applications data
+    const getSelectedApplications = useCallback(() => {
+        const selectedIds = Object.keys(selectedRows);
+        return currentData.filter(row => selectedIds.includes(row.application_id || row.id));
+    }, [selectedRows, currentData]);
 
     // Copy details function for verified applications
     const handleCopyVerifiedDetails = useCallback(() => {
@@ -765,7 +1145,8 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
         }
         
         if (matchingClientRow.agent_contact_request && matchingClientRow.agent_contact_request.toLowerCase() !== 'no') {
-            generalDiscrepancies.push('Agent contact request present');
+            const requestType = matchingClientRow.agent_contact_request;
+            generalDiscrepancies.push(`Agent contact request: ${requestType}`);
         }
         
         if (verifyRow.agent_ip === matchingClientRow.client_ip) {
@@ -832,27 +1213,31 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
             
             // Add tab-specific options first
             if (activeTab === 'queued') {
+                // Add individual send early option for each row (this is what users expect)
                 options.push({
-                    label: 'Send Early',
-                    icon: '🚀',
+                    label: 'Send This Application Only',
+                    icon: '📧',
                     onClick: () => {
-                        if (window.confirm('This will send emails to ALL queued applications. Continue?')) {
-                            handleSendEarly();
+                        if (window.confirm(`Send verification email for application ${row.application_id || row.id} only?`)) {
+                            handleSendEarlyIndividual(row.application_id || row.id);
                         }
                     },
-                    className: 'menu-item-send-early'
+                    className: 'menu-item-send-early-individual'
                 });
             } else if (activeTab === 'unverified') {
-                options.push({
-                    label: 'Resend',
-                    icon: '🔄',
-                    onClick: () => {
-                        if (window.confirm(`Resend verification email to ${row.client_name}?`)) {
-                            handleResend(row.application_id || row.id);
-                        }
-                    },
-                    className: 'menu-item-resend'
-                });
+                // Only show resend option for app admins
+                if (isAppAdmin) {
+                    options.push({
+                        label: 'Resend',
+                        icon: '🔄',
+                        onClick: () => {
+                            if (window.confirm(`Resend verification email to ${row.client_name}?`)) {
+                                handleResend(row.application_id || row.id);
+                            }
+                        },
+                        className: 'menu-item-resend'
+                    });
+                }
             } else if (activeTab === 'verified') {
                 options.push({
                     label: 'Copy Details',
@@ -878,8 +1263,23 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
             });
         }
 
+        console.log('🔍 Context menu options generated:', {
+            row: row.application_id || row.id,
+            activeTab,
+            optionsCount: options.length,
+            options: options.map(opt => opt.label)
+        });
+
+        // Debug: Check if we're in the right tab and have the right options
+        if (activeTab === 'queued') {
+            console.log('📋 Queued tab context menu details:', {
+                individualOption: options.find(opt => opt.label.includes('Send This Application Only')),
+                rowId: row.application_id || row.id
+            });
+        }
+
         return options;
-    }, [handleArchiveApplication, handleUnarchiveApplication, handleSendEarly, handleResend, handleCopyVerifiedDetails, handleCopyDiscrepancyDetails, isArchiveView, activeTab, isAppAdmin]);
+    }, [handleArchiveApplication, handleUnarchiveApplication, handleSendEarly, handleResend, handleCopyVerifiedDetails, handleCopyDiscrepancyDetails, isArchiveView, activeTab, isAppAdmin, handleSendEarlyIndividual]);
 
     // Memoized DataTable component to prevent unnecessary re-renders
     const MemoizedDataTable = useMemo(() => (
@@ -894,6 +1294,8 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
             onRowClick={handleRowClick}
             enableRowContextMenu={isAppAdmin} // Only enable context menu for app admins
             getRowContextMenuOptions={isAppAdmin ? getRowContextMenuOptions : undefined}
+            // Mass selection
+            onSelectionChange={handleSelectionChange}
             // Add totals for queued applications
             showTotals={activeTab === 'queued'}
             totalsPosition="bottom"
@@ -904,7 +1306,7 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
             initialPageSize={50}
             pageSizeOptions={[25, 50, 100, 200]}
         />
-    ), [columns, dataWithIds, isArchiveView, handleRowClick, activeTab, getRowContextMenuOptions, isAppAdmin]);
+    ), [columns, dataWithIds, isArchiveView, handleRowClick, activeTab, getRowContextMenuOptions, isAppAdmin, handleSelectionChange]);
 
     // Memoized tab counts to prevent recalculation on every render
     const tabCounts = useMemo(() => ({
@@ -1075,6 +1477,134 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
                                 }} 
                             />
                         </button>
+
+                        {/* Bulk Send Early Button - Only show for app admins on queued tab */}
+                        {isAppAdmin && activeTab === 'queued' && (
+                            <button
+                                onClick={() => {
+                                    if (window.confirm(`This will send verification emails to ALL ${tabCounts.queued} queued applications. Continue?`)) {
+                                        handleSendEarly();
+                                    }
+                                }}
+                                disabled={loading || tabCounts.queued === 0}
+                                style={{
+                                    padding: '8px 12px',
+                                    backgroundColor: tabCounts.queued > 0 ? '#FF9800' : '#ccc',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: (loading || tabCounts.queued === 0) ? 'not-allowed' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '4px',
+                                    opacity: (loading || tabCounts.queued === 0) ? 0.6 : 1
+                                }}
+                                title={`Send verification emails to all ${tabCounts.queued} queued applications`}
+                            >
+                                <FiSend size={14} />
+                                Send All Queued ({tabCounts.queued})
+                            </button>
+                        )}
+
+                        {/* Bulk Action Buttons - Only show when rows are selected */}
+                        {Object.keys(selectedRows).length > 0 && (
+                            <>
+                                {/* Bulk Archive Button */}
+                                <button
+                                    onClick={handleBulkArchive}
+                                    disabled={loading}
+                                    style={{
+                                        padding: '8px 12px',
+                                        backgroundColor: '#6c757d',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: loading ? 'not-allowed' : 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '4px',
+                                        opacity: loading ? 0.6 : 1
+                                    }}
+                                    title={`Archive ${Object.keys(selectedRows).length} selected application(s)`}
+                                >
+                                    📁
+                                    Archive ({Object.keys(selectedRows).length})
+                                </button>
+
+                                {/* Bulk Send Early Button - Only for queued applications */}
+                                {activeTab === 'queued' && (
+                                    <button
+                                        onClick={handleBulkSendEarly}
+                                        disabled={loading}
+                                        style={{
+                                            padding: '8px 12px',
+                                            backgroundColor: '#28a745',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            cursor: loading ? 'not-allowed' : 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '4px',
+                                            opacity: loading ? 0.6 : 1
+                                        }}
+                                        title={`Send early ${Object.keys(selectedRows).length} selected application(s)`}
+                                    >
+                                        <FiSend size={14} />
+                                        Send Early ({Object.keys(selectedRows).length})
+                                    </button>
+                                )}
+
+                                {/* Bulk Resend Button - Only for unverified applications */}
+                                {activeTab === 'unverified' && (
+                                    <button
+                                        onClick={handleBulkResend}
+                                        disabled={loading}
+                                        style={{
+                                            padding: '8px 12px',
+                                            backgroundColor: '#17a2b8',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            cursor: loading ? 'not-allowed' : 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '4px',
+                                            opacity: loading ? 0.6 : 1
+                                        }}
+                                        title={`Resend ${Object.keys(selectedRows).length} selected application(s)`}
+                                    >
+                                        🔄
+                                        Resend ({Object.keys(selectedRows).length})
+                                    </button>
+                                )}
+
+                                {/* Clear Selection Button */}
+                                <button
+                                    onClick={clearSelection}
+                                    style={{
+                                        padding: '8px 12px',
+                                        backgroundColor: '#dc3545',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '4px'
+                                    }}
+                                    title="Clear selection"
+                                >
+                                    ✕
+                                    Clear Selection
+                                </button>
+                            </>
+                        )}
 
                         {/* Add Form Button - Hidden for app admin users */}
                         {!isAppAdmin && (

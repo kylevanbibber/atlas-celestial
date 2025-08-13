@@ -65,9 +65,20 @@ const NotificationToggle = ({
       
       <div className="settings-help-text">
         {hasDbSubscription && !pushEnabled && permission !== 'denied' && (
-          <div style={{ color: '#e67e22', marginBottom: '8px', display: 'flex', alignItems: 'center' }}>
-            <FiAlertCircle style={{ marginRight: '5px' }} />
-            Your browser subscription needs to be restored.
+          <div style={{ 
+            color: '#e67e22', 
+            marginBottom: '8px', 
+            display: 'flex', 
+            alignItems: 'center',
+            padding: '8px 12px',
+            backgroundColor: 'rgba(230, 126, 34, 0.1)',
+            borderRadius: '4px',
+            border: '1px solid #e67e22'
+          }}>
+            <FiAlertCircle style={{ marginRight: '5px', fontSize: '16px' }} />
+            <span style={{ flex: 1 }}>
+              Your browser subscription needs to be restored.
+            </span>
             <button 
               onClick={handleRefresh}
               style={{ 
@@ -80,15 +91,24 @@ const NotificationToggle = ({
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                fontSize: '12px'
+                fontSize: '12px',
+                fontWeight: '500'
               }}
+              disabled={isSubscribing}
             >
               <FiRefreshCw style={{ marginRight: '4px' }} />
-              Refresh
+              {isSubscribing ? 'Fixing...' : 'Fix Now'}
             </button>
           </div>
         )}
-        {getStatusMessage()}
+        
+        <div style={{ 
+          color: permission === 'denied' ? '#e74c3c' : 
+                pushEnabled ? '#27ae60' : '#7f8c8d',
+          fontSize: '14px'
+        }}>
+          {getStatusMessage()}
+        </div>
       </div>
 
 

@@ -36,7 +36,6 @@ const RefsPage = () => {
       const userResponse = await api.get(`/auth/activeusers/${user.id}`);
       
       if (!userResponse.data || !userResponse.data.lagnname) {
-        console.error('No lagnname found in activeusers data');
         return;
       }
 
@@ -61,7 +60,7 @@ const RefsPage = () => {
 
       setTableData(mappedData);
     } catch (error) {
-      console.error("Error fetching refs:", error);
+      // Silently handle errors
     }
   };
 
@@ -69,15 +68,12 @@ const RefsPage = () => {
     try {
       // Get the logged-in user's lagnname from activeusers table
       const userResponse = await api.get(`/auth/activeusers/${user.id}`);
-      console.log('User data from activeusers:', userResponse.data);
       
       if (!userResponse.data || !userResponse.data.lagnname) {
-        console.error('No lagnname found in activeusers data');
         return;
       }
 
       const lagnname = userResponse.data.lagnname;
-      console.log('Current user lagnname:', lagnname);
 
       // Then get all users with matching lagnname in sa, ga, mga, or rga fields
       // and where Active = 'y' and managerActive = 'y'
@@ -89,8 +85,6 @@ const RefsPage = () => {
         }
       });
       
-      console.log('Raw response from activeusers:', response.data);
-      
       // Transform the data to use lagnname for display but ID for value
       // and sort alphabetically by lagnname
       const transformedUsers = response.data
@@ -101,10 +95,9 @@ const RefsPage = () => {
         }))
         .sort((a, b) => a.first_name.localeCompare(b.first_name)); // Sort alphabetically by lagnname
       
-      console.log('Transformed users for dropdown:', transformedUsers);
       setUsers(transformedUsers);
     } catch (error) {
-      console.error("Error fetching users:", error);
+      // Silently handle errors
     }
   };
 
@@ -294,18 +287,13 @@ const RefsPage = () => {
 
   const handleCellUpdate = async (id, field, value) => {
     try {
-      console.log('handleCellUpdate called with:', { id, field, value });
       
       // If updating date fields, format them
       if (field === 'date_created' || field === 'last_updated' || field === 'scheduled') {
-        console.log('Processing date field:', field);
-        console.log('Original date value:', value);
         
         const date = new Date(value);
-        console.log('Parsed date object:', date);
         
         if (isNaN(date.getTime())) {
-          console.error('Invalid date value:', value);
           return;
         }
         
@@ -314,24 +302,15 @@ const RefsPage = () => {
         const displayHours = hours % 12 || 12;
         // Format as m/d/yy h:mm am/pm (single digits for month and day)
         value = `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear().toString().slice(-2)} ${displayHours}:${date.getMinutes().toString().padStart(2, '0')} ${ampm}`;
-        console.log('Formatted date value:', value);
       }
       
-      console.log('Sending update to API:', { id, field, value });
       const response = await api.put(`/refs/${id}`, { [field]: value });
-      console.log('API response:', response.data);
       
       setTableData((prev) =>
         prev.map((row) => (row.id === id ? { ...row, [field]: value } : row))
       );
     } catch (error) {
-      console.error("Error updating ref:", error);
-      console.error("Error details:", {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        config: error.config
-      });
+      // Silently handle errors
     }
   };
 
@@ -351,21 +330,18 @@ const RefsPage = () => {
         )
       );
     } catch (error) {
-      console.error("Error updating status:", error);
+      // Silently handle errors
     }
   };
 
   const handleMassReassign = async (newUserId) => {
     try {
-      console.log('Reassigning to user ID:', newUserId);
-      console.log('Selected rows:', selectedRows);
       
       const updatePromises = selectedRows.map(id =>
         api.put(`/refs/${id}`, { assigned_to: newUserId })
       );
       await Promise.all(updatePromises);
       
-      console.log('Reassignment successful');
       setTableData(prev =>
         prev.map(row =>
           selectedRows.includes(row.id.toString()) ? { ...row, assigned_to: newUserId } : row
@@ -373,7 +349,7 @@ const RefsPage = () => {
       );
       setShowMassReassignMenu(false);
     } catch (error) {
-      console.error("Error reassigning refs:", error);
+      // Silently handle errors
     }
   };
 
@@ -413,7 +389,7 @@ const RefsPage = () => {
 
       setTableData(prev => [...prev, newRow]);
     } catch (error) {
-      console.error("Error creating new ref:", error);
+      // Silently handle errors
     }
   };
 
@@ -426,7 +402,7 @@ const RefsPage = () => {
       await api.post('/refs/import', importedData);
       fetchRefs(); // Refresh the data after import
     } catch (error) {
-      console.error("Error importing data:", error);
+      // Silently handle errors
     }
   };
 
@@ -450,7 +426,7 @@ const RefsPage = () => {
       setTableData(prev => prev.filter(row => !selectedRows.includes(row.id.toString())));
       setSelectedRows([]);
     } catch (error) {
-      console.error("Error deleting refs:", error);
+      // Silently handle errors
     }
   };
 
@@ -469,7 +445,7 @@ const RefsPage = () => {
       );
       setSelectedRows([]);
     } catch (error) {
-      console.error("Error archiving refs:", error);
+      // Silently handle errors
     }
   };
 
@@ -496,7 +472,6 @@ const RefsPage = () => {
 
   const handleAddInteraction = (row) => {
     // Implement interaction functionality
-    console.log('Add interaction for:', row);
   };
 
   const handleArchiveRef = async (id) => {
@@ -513,7 +488,7 @@ const RefsPage = () => {
         )
       );
     } catch (error) {
-      console.error("Error archiving ref:", error);
+      // Silently handle errors
     }
   };
 
@@ -522,7 +497,7 @@ const RefsPage = () => {
       await api.delete(`/refs/${id}`);
       setTableData(prev => prev.filter(row => row.id !== id));
     } catch (error) {
-      console.error("Error deleting ref:", error);
+      // Silently handle errors
     }
   };
 
@@ -631,7 +606,7 @@ const RefsPage = () => {
                     );
                     setDetailsData(null);
                   } catch (error) {
-                    console.error("Error updating ref:", error);
+                    // Silently handle errors
                   }
                 }}
               />

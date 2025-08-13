@@ -9,10 +9,14 @@ const dbConfig = {
   password: process.env.DB_PASS || 'Atlas2024!',
   database: process.env.DB_NAME || 'AriasLifeUsers',
   multipleStatements: true,
-  connectionLimit: 10,
+  connectionLimit: 15,
   queueLimit: 0,
   waitForConnections: true,
-  connectTimeout: 10000,
+  connectTimeout: 60000,
+  acquireTimeout: 60000,
+  timeout: 60000,
+  reconnect: true,
+  idleTimeout: 300000,
   timezone: 'America/New_York',
 };
 
@@ -42,6 +46,7 @@ const query = (sql, params) => {
   return new Promise((resolve, reject) => {
     pool.query(sql, params, (err, results) => {
       if (err) {
+        console.error('Database query error:', err);
         return reject(err);
       }
       resolve(results);

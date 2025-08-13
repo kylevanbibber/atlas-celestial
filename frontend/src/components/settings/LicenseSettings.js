@@ -376,11 +376,9 @@ const LicenseSettings = () => {
   
   if (loading && licenses.length === 0) {
     return (
-      <div className="settings-section">
-        <div className="settings-loading">
-          <div className="spinner"></div>
-          <p>Loading licenses...</p>
-        </div>
+      <div className="route-loading" role="alert" aria-busy="true">
+        <div className="spinner"></div>
+        <p>Loading licenses...</p>
       </div>
     );
   }

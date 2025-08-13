@@ -164,7 +164,6 @@ const TeamCustomization = ({ teamType: propTeamType, teamId: propTeamId }) => {
         });
       }
     } catch (err) {
-      console.error('Error fetching team settings:', err);
       // Only set error if it's not a 404 (no settings found yet is OK)
       if (err.response?.status !== 404) {
         setError('Failed to load team settings');
@@ -218,7 +217,6 @@ const TeamCustomization = ({ teamType: propTeamType, teamId: propTeamId }) => {
         throw new Error(response.data.message || 'Failed to remove logo');
       }
     } catch (err) {
-      console.error('Error removing logo:', err);
       setError(err.message || 'Failed to remove logo');
       toast.error('Error removing logo');
     } finally {
@@ -253,7 +251,6 @@ const TeamCustomization = ({ teamType: propTeamType, teamId: propTeamId }) => {
       // Refresh styles to apply changes immediately
       refreshStyles();
     } catch (err) {
-      console.error('Error saving team settings:', err);
       setError('Failed to save team settings');
       toast.error('Error saving customization settings');
     } finally {
@@ -328,7 +325,6 @@ const TeamCustomization = ({ teamType: propTeamType, teamId: propTeamId }) => {
         throw new Error('Failed to update team with new logo');
       }
     } catch (err) {
-      console.error('Error uploading logo:', err);
       setError(err.message || 'Failed to upload logo');
       toast.error('Error uploading logo');
       
@@ -389,7 +385,6 @@ const TeamCustomization = ({ teamType: propTeamType, teamId: propTeamId }) => {
         // Refresh styles to apply default styles immediately
         refreshStyles();
       } catch (err) {
-        console.error('Error resetting team settings:', err);
         setError('Failed to reset team settings');
         toast.error('Error resetting customization settings');
       } finally {
@@ -418,7 +413,12 @@ const TeamCustomization = ({ teamType: propTeamType, teamId: propTeamId }) => {
   };
   
   if (loadingSettings) {
-    return <div className="loading-spinner">Loading team settings...</div>;
+    return (
+      <div className="route-loading" role="alert" aria-busy="true">
+        <div className="spinner"></div>
+        <p>Loading team settings...</p>
+      </div>
+    );
   }
   
   if (!hasPermission('edit_team')) {

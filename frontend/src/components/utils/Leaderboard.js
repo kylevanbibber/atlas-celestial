@@ -107,6 +107,7 @@ const Leaderboard = ({
   maxHeight = "600px", // Make scrollable
   // Name formatting options
   nameFormat = "FIRST_LAST", // "FIRST_LAST", "FIRST_MIDDLE_LAST", "FIRST_LAST_SUFFIX", "FULL"
+  mobileNameFormat = "FIRST_LAST_INITIAL", // Name format for mobile screens (e.g., "John S." instead of "John Smith")
   showProfilePicture = true,
   profilePictureField = "profile_picture",
   // New props for hierarchy levels and MGA display
@@ -428,6 +429,7 @@ const Leaderboard = ({
               const rank = item[rankField] || (index + 1);
               const rawName = item[nameField] || "Unknown";
               const displayName = NameFormats[nameFormat] ? NameFormats[nameFormat](rawName) : rawName;
+              const mobileDisplayName = NameFormats[mobileNameFormat] ? NameFormats[mobileNameFormat](rawName) : displayName;
               const profilePicture = item[profilePictureField];
               const value = item[valueField];
               const secondaryValue = secondaryValueField ? item[secondaryValueField] : null;
@@ -485,9 +487,10 @@ const Leaderboard = ({
                           )}
                           <div className="name-info">
                             <div className="name-line">
-                              <span className="item-name">{displayName}</span>
+                              <span className="item-name desktop-name">{displayName}</span>
+                              <span className="item-name mobile-name">{mobileDisplayName}</span>
                             </div>
-                            {showMGA && item.mgaLastName && ['all', 'sa', 'ga'].includes(hierarchyLevel) && (
+                            {showMGA && item.mgaLastName && ['all', 'sa', 'ga', 'mga', 'rga', 'sga', 'agt'].includes(hierarchyLevel) && (
                               <div className="mga-line">
                                 {showLevelBadge && item.clname && (
                                   <span 
@@ -570,6 +573,7 @@ const Leaderboard = ({
                       {hasSubData.data.map((subItem, subIndex) => {
                         const subRawName = subItem[nameField] || "Unknown";
                         const subDisplayName = NameFormats[nameFormat] ? NameFormats[nameFormat](subRawName) : subRawName;
+                        const subMobileDisplayName = NameFormats[mobileNameFormat] ? NameFormats[mobileNameFormat](subRawName) : subDisplayName;
                         const subProfilePicture = subItem[profilePictureField];
                         
                         return (
@@ -595,9 +599,10 @@ const Leaderboard = ({
                                 )}
                                 <div className="sub-name-info">
                                   <div className="sub-name-line">
-                                    <span className="sub-item-name">{subDisplayName}</span>
+                                    <span className="sub-item-name desktop-name">{subDisplayName}</span>
+                                    <span className="sub-item-name mobile-name">{subMobileDisplayName}</span>
                                   </div>
-                                  {showMGA && subItem.mgaLastName && ['all', 'sa', 'ga'].includes(hierarchyLevel) && (
+                                  {showMGA && subItem.mgaLastName && ['all', 'sa', 'ga', 'mga', 'rga', 'sga', 'agt'].includes(hierarchyLevel) && (
                                     <div className="sub-mga-line">
                                       {showLevelBadge && subItem.clname && (
                                         <span 

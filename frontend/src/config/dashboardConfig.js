@@ -26,6 +26,7 @@ export const CARD_TYPES = {
   YTD_ALP: 'ytd_alp',
   YTD_CODES_VIPS: 'ytd_codes_vips',
   YTD_HIRES: 'ytd_hires',
+  YTD_REF_SALES: 'ytd_ref_sales',
   
   // Last Month Performance Cards
   MONTHLY_ALP: 'monthly_alp',
@@ -33,10 +34,11 @@ export const CARD_TYPES = {
   MONTHLY_HIRES: 'monthly_hires',
   MONTHLY_REF_SALES: 'monthly_ref_sales',
   
-  // Reported Activity Cards
+  // Reported Activity Cards (This Month)
   DAILY_ALP: 'daily_alp',
   DAILY_REF_ALP: 'daily_ref_alp',
-  DAILY_REFS: 'daily_refs'
+  DAILY_REFS: 'daily_refs',
+  CURRENT_MONTH_REF_SALES: 'current_month_ref_sales'
 };
 
 /**
@@ -127,7 +129,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(76, 175, 80, 0.1)',
           format: 'currency',
           showComparison: true,
-          comparisonType: 'year'
+          comparisonType: 'year',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.YTD_CODES_VIPS,
@@ -137,7 +140,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(63, 81, 181, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'year'
+          comparisonType: 'year',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.YTD_HIRES,
@@ -147,19 +151,32 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(255, 152, 0, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'year'
+          comparisonType: 'year',
+          navigateTo: '/production?section=scorecard'
+        },
+        {
+          type: CARD_TYPES.YTD_REF_SALES,
+          title: 'YTD Ref Sales',
+          dataKey: 'ytdRefSales',
+          icon: FiTrendingUp,
+          iconColor: 'rgba(156, 39, 176, 0.1)',
+          format: 'number',
+          showComparison: true,
+          comparisonType: 'year',
+          navigateTo: '/reports?report=ref-sales'
         }
       ],
       [DASHBOARD_SECTIONS.LAST_MONTH_PERFORMANCE]: [
         {
           type: CARD_TYPES.MONTHLY_ALP,
-          title: (monthName) => `${monthName} ALP`,
+          title: (monthName) => `${monthName} SGA ALP`,
           dataKey: 'currentMonthAlp',
           icon: FiDollarSign,
           iconColor: 'rgba(76, 175, 80, 0.1)',
           format: 'currency',
           showComparison: true,
-          comparisonType: 'month'
+          comparisonType: 'month',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.MONTHLY_CODES_VIPS,
@@ -169,7 +186,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(63, 81, 181, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'month'
+          comparisonType: 'month',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.MONTHLY_HIRES,
@@ -179,7 +197,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(255, 152, 0, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'month'
+          comparisonType: 'month',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.MONTHLY_REF_SALES,
@@ -188,7 +207,9 @@ export const DASHBOARD_CONFIG = {
           icon: FiDollarSign,
           iconColor: 'rgba(156, 39, 176, 0.1)',
           format: 'number',
-          showComparison: false
+          showComparison: true,
+          comparisonType: 'month',
+          navigateTo: '/reports?report=ref-sales'
         }
       ],
       [DASHBOARD_SECTIONS.REPORTED_ACTIVITY]: [
@@ -200,7 +221,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(255, 152, 0, 0.1)',
           format: 'currency',
           showDateRange: true,
-          showAgentCount: true
+          showAgentCount: true,
+          navigateTo: '/daily-activity'
         },
         {
           type: CARD_TYPES.DAILY_REF_ALP,
@@ -210,7 +232,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(156, 39, 176, 0.1)',
           format: 'currency',
           showDateRange: true,
-          showAgentCount: true
+          showAgentCount: true,
+          navigateTo: '/daily-activity'
         },
         {
           type: CARD_TYPES.DAILY_REFS,
@@ -220,7 +243,21 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(156, 39, 176, 0.1)',
           format: 'number',
           showDateRange: true,
-          showAgentCount: true
+          showAgentCount: true,
+          navigateTo: '/daily-activity'
+        },
+        {
+          type: CARD_TYPES.CURRENT_MONTH_REF_SALES,
+          title: 'Ref Sales',
+          dataKey: 'totalRefSales',
+          icon: FiTrendingUp,
+          iconColor: 'rgba(76, 175, 80, 0.1)',
+          format: 'number',
+          showDateRange: false,
+          showAgentCount: false,
+          showComparison: true,
+          comparisonType: 'month',
+          navigateTo: '/reports?report=ref-sales'
         }
       ]
     },
@@ -248,7 +285,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(76, 175, 80, 0.1)',
           format: 'currency',
           showComparison: true,
-          comparisonType: 'year'
+          comparisonType: 'year',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.YTD_CODES_VIPS,
@@ -258,7 +296,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(63, 81, 181, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'year'
+          comparisonType: 'year',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.YTD_HIRES,
@@ -268,7 +307,19 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(255, 152, 0, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'year'
+          comparisonType: 'year',
+          navigateTo: '/production?section=scorecard'
+        },
+        {
+          type: CARD_TYPES.YTD_REF_SALES,
+          title: 'YTD Ref Sales',
+          dataKey: 'ytdRefSales',
+          icon: FiTrendingUp,
+          iconColor: 'rgba(156, 39, 176, 0.1)',
+          format: 'number',
+          showComparison: true,
+          comparisonType: 'year',
+          navigateTo: '/reports?report=ref-sales'
         }
       ],
       [DASHBOARD_SECTIONS.LAST_MONTH_PERFORMANCE]: [
@@ -280,7 +331,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(76, 175, 80, 0.1)',
           format: 'currency',
           showComparison: true,
-          comparisonType: 'month'
+          comparisonType: 'month',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.MONTHLY_CODES_VIPS,
@@ -290,7 +342,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(63, 81, 181, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'month'
+          comparisonType: 'month',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.MONTHLY_HIRES,
@@ -300,7 +353,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(255, 152, 0, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'month'
+          comparisonType: 'month',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.MONTHLY_REF_SALES,
@@ -309,7 +363,9 @@ export const DASHBOARD_CONFIG = {
           icon: FiDollarSign,
           iconColor: 'rgba(156, 39, 176, 0.1)',
           format: 'number',
-          showComparison: false
+          showComparison: true,
+          comparisonType: 'month',
+          navigateTo: '/reports?report=ref-sales'
         }
       ],
       [DASHBOARD_SECTIONS.REPORTED_ACTIVITY]: [
@@ -321,7 +377,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(255, 152, 0, 0.1)',
           format: 'currency',
           showDateRange: true,
-          showAgentCount: true
+          showAgentCount: true,
+          navigateTo: '/daily-activity'
         },
         {
           type: CARD_TYPES.DAILY_REF_ALP,
@@ -331,7 +388,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(156, 39, 176, 0.1)',
           format: 'currency',
           showDateRange: true,
-          showAgentCount: true
+          showAgentCount: true,
+          navigateTo: '/daily-activity'
         },
         {
           type: CARD_TYPES.DAILY_REFS,
@@ -341,7 +399,21 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(156, 39, 176, 0.1)',
           format: 'number',
           showDateRange: true,
-          showAgentCount: true
+          showAgentCount: true,
+          navigateTo: '/daily-activity'
+        },
+        {
+          type: CARD_TYPES.CURRENT_MONTH_REF_SALES,
+          title: 'Ref Sales',
+          dataKey: 'totalRefSales',
+          icon: FiTrendingUp,
+          iconColor: 'rgba(76, 175, 80, 0.1)',
+          format: 'number',
+          showDateRange: false,
+          showAgentCount: false,
+          showComparison: true,
+          comparisonType: 'month',
+          navigateTo: '/reports?report=ref-sales'
         }
       ]
     },
@@ -369,7 +441,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(76, 175, 80, 0.1)',
           format: 'currency',
           showComparison: true,
-          comparisonType: 'year'
+          comparisonType: 'year',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.YTD_CODES_VIPS,
@@ -379,7 +452,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(63, 81, 181, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'year'
+          comparisonType: 'year',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.YTD_HIRES,
@@ -389,7 +463,19 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(255, 152, 0, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'year'
+          comparisonType: 'year',
+          navigateTo: '/production?section=scorecard'
+        },
+        {
+          type: CARD_TYPES.YTD_REF_SALES,
+          title: 'YTD Ref Sales',
+          dataKey: 'ytdRefSales',
+          icon: FiTrendingUp,
+          iconColor: 'rgba(156, 39, 176, 0.1)',
+          format: 'number',
+          showComparison: true,
+          comparisonType: 'year',
+          navigateTo: '/reports?report=ref-sales'
         }
       ],
       [DASHBOARD_SECTIONS.LAST_MONTH_PERFORMANCE]: [
@@ -401,7 +487,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(76, 175, 80, 0.1)',
           format: 'currency',
           showComparison: true,
-          comparisonType: 'month'
+          comparisonType: 'month',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.MONTHLY_CODES_VIPS,
@@ -411,7 +498,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(63, 81, 181, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'month'
+          comparisonType: 'month',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.MONTHLY_HIRES,
@@ -421,7 +509,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(255, 152, 0, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'month'
+          comparisonType: 'month',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.MONTHLY_REF_SALES,
@@ -430,7 +519,9 @@ export const DASHBOARD_CONFIG = {
           icon: FiDollarSign,
           iconColor: 'rgba(156, 39, 176, 0.1)',
           format: 'number',
-          showComparison: false
+          showComparison: true,
+          comparisonType: 'month',
+          navigateTo: '/reports?report=ref-sales'
         }
       ],
       [DASHBOARD_SECTIONS.REPORTED_ACTIVITY]: [
@@ -442,7 +533,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(255, 152, 0, 0.1)',
           format: 'currency',
           showDateRange: true,
-          showAgentCount: true
+          showAgentCount: true,
+          navigateTo: '/daily-activity'
         },
         {
           type: CARD_TYPES.DAILY_REF_ALP,
@@ -452,7 +544,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(156, 39, 176, 0.1)',
           format: 'currency',
           showDateRange: true,
-          showAgentCount: true
+          showAgentCount: true,
+          navigateTo: '/daily-activity'
         },
         {
           type: CARD_TYPES.DAILY_REFS,
@@ -462,7 +555,21 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(156, 39, 176, 0.1)',
           format: 'number',
           showDateRange: true,
-          showAgentCount: true
+          showAgentCount: true,
+          navigateTo: '/daily-activity'
+        },
+        {
+          type: CARD_TYPES.CURRENT_MONTH_REF_SALES,
+          title: 'Ref Sales',
+          dataKey: 'totalRefSales',
+          icon: FiTrendingUp,
+          iconColor: 'rgba(76, 175, 80, 0.1)',
+          format: 'number',
+          showDateRange: false,
+          showAgentCount: false,
+          showComparison: true,
+          comparisonType: 'month',
+          navigateTo: '/reports?report=ref-sales'
         }
       ]
     },
@@ -490,7 +597,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(76, 175, 80, 0.1)',
           format: 'currency',
           showComparison: true,
-          comparisonType: 'year'
+          comparisonType: 'year',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.YTD_CODES_VIPS,
@@ -500,7 +608,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(63, 81, 181, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'year'
+          comparisonType: 'year',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.YTD_HIRES,
@@ -510,7 +619,19 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(255, 152, 0, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'year'
+          comparisonType: 'year',
+          navigateTo: '/production?section=scorecard'
+        },
+        {
+          type: CARD_TYPES.YTD_REF_SALES,
+          title: 'YTD Ref Sales',
+          dataKey: 'ytdRefSales',
+          icon: FiTrendingUp,
+          iconColor: 'rgba(156, 39, 176, 0.1)',
+          format: 'number',
+          showComparison: true,
+          comparisonType: 'year',
+          navigateTo: '/reports?report=ref-sales'
         }
       ],
       [DASHBOARD_SECTIONS.LAST_MONTH_PERFORMANCE]: [
@@ -522,7 +643,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(76, 175, 80, 0.1)',
           format: 'currency',
           showComparison: true,
-          comparisonType: 'month'
+          comparisonType: 'month',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.MONTHLY_CODES_VIPS,
@@ -532,7 +654,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(63, 81, 181, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'month'
+          comparisonType: 'month',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.MONTHLY_HIRES,
@@ -542,7 +665,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(255, 152, 0, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'month'
+          comparisonType: 'month',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.MONTHLY_REF_SALES,
@@ -551,7 +675,9 @@ export const DASHBOARD_CONFIG = {
           icon: FiDollarSign,
           iconColor: 'rgba(156, 39, 176, 0.1)',
           format: 'number',
-          showComparison: false
+          showComparison: true,
+          comparisonType: 'month',
+          navigateTo: '/reports?report=ref-sales'
         }
       ],
       [DASHBOARD_SECTIONS.REPORTED_ACTIVITY]: [
@@ -563,7 +689,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(255, 152, 0, 0.1)',
           format: 'currency',
           showDateRange: true,
-          showAgentCount: true
+          showAgentCount: true,
+          navigateTo: '/daily-activity'
         },
         {
           type: CARD_TYPES.DAILY_REF_ALP,
@@ -573,7 +700,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(156, 39, 176, 0.1)',
           format: 'currency',
           showDateRange: true,
-          showAgentCount: true
+          showAgentCount: true,
+          navigateTo: '/daily-activity'
         },
         {
           type: CARD_TYPES.DAILY_REFS,
@@ -583,7 +711,21 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(156, 39, 176, 0.1)',
           format: 'number',
           showDateRange: true,
-          showAgentCount: true
+          showAgentCount: true,
+          navigateTo: '/daily-activity'
+        },
+        {
+          type: CARD_TYPES.CURRENT_MONTH_REF_SALES,
+          title: 'Ref Sales',
+          dataKey: 'totalRefSales',
+          icon: FiTrendingUp,
+          iconColor: 'rgba(76, 175, 80, 0.1)',
+          format: 'number',
+          showDateRange: false,
+          showAgentCount: false,
+          showComparison: true,
+          comparisonType: 'month',
+          navigateTo: '/reports?report=ref-sales'
         }
       ]
     },
@@ -611,7 +753,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(76, 175, 80, 0.1)',
           format: 'currency',
           showComparison: true,
-          comparisonType: 'year'
+          comparisonType: 'year',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.YTD_CODES_VIPS,
@@ -621,7 +764,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(63, 81, 181, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'year'
+          comparisonType: 'year',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.YTD_HIRES,
@@ -631,7 +775,19 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(255, 152, 0, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'year'
+          comparisonType: 'year',
+          navigateTo: '/production?section=scorecard'
+        },
+        {
+          type: CARD_TYPES.YTD_REF_SALES,
+          title: 'YTD Ref Sales',
+          dataKey: 'ytdRefSales',
+          icon: FiTrendingUp,
+          iconColor: 'rgba(156, 39, 176, 0.1)',
+          format: 'number',
+          showComparison: true,
+          comparisonType: 'year',
+          navigateTo: '/reports?report=ref-sales'
         }
       ],
       [DASHBOARD_SECTIONS.LAST_MONTH_PERFORMANCE]: [
@@ -643,7 +799,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(76, 175, 80, 0.1)',
           format: 'currency',
           showComparison: true,
-          comparisonType: 'month'
+          comparisonType: 'month',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.MONTHLY_CODES_VIPS,
@@ -653,7 +810,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(63, 81, 181, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'month'
+          comparisonType: 'month',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.MONTHLY_HIRES,
@@ -663,7 +821,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(255, 152, 0, 0.1)',
           format: 'number',
           showComparison: true,
-          comparisonType: 'month'
+          comparisonType: 'month',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.MONTHLY_REF_SALES,
@@ -672,7 +831,9 @@ export const DASHBOARD_CONFIG = {
           icon: FiDollarSign,
           iconColor: 'rgba(156, 39, 176, 0.1)',
           format: 'number',
-          showComparison: false
+          showComparison: true,
+          comparisonType: 'month',
+          navigateTo: '/reports?report=ref-sales'
         }
       ],
       [DASHBOARD_SECTIONS.REPORTED_ACTIVITY]: [
@@ -684,7 +845,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(255, 152, 0, 0.1)',
           format: 'currency',
           showDateRange: true,
-          showAgentCount: true
+          showAgentCount: true,
+          navigateTo: '/daily-activity'
         },
         {
           type: CARD_TYPES.DAILY_REF_ALP,
@@ -694,7 +856,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(156, 39, 176, 0.1)',
           format: 'currency',
           showDateRange: true,
-          showAgentCount: true
+          showAgentCount: true,
+          navigateTo: '/daily-activity'
         },
         {
           type: CARD_TYPES.DAILY_REFS,
@@ -704,7 +867,21 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(156, 39, 176, 0.1)',
           format: 'number',
           showDateRange: true,
-          showAgentCount: true
+          showAgentCount: true,
+          navigateTo: '/daily-activity'
+        },
+        {
+          type: CARD_TYPES.CURRENT_MONTH_REF_SALES,
+          title: 'Ref Sales',
+          dataKey: 'totalRefSales',
+          icon: FiTrendingUp,
+          iconColor: 'rgba(76, 175, 80, 0.1)',
+          format: 'number',
+          showDateRange: false,
+          showAgentCount: false,
+          showComparison: true,
+          comparisonType: 'month',
+          navigateTo: '/reports?report=ref-sales'
         }
       ]
     },
@@ -732,7 +909,19 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(76, 175, 80, 0.1)',
           format: 'currency',
           showComparison: true,
-          comparisonType: 'year'
+          comparisonType: 'year',
+          navigateTo: '/production?section=scorecard'
+        },
+        {
+          type: CARD_TYPES.YTD_REF_SALES,
+          title: 'YTD Ref Sales',
+          dataKey: 'ytdRefSales',
+          icon: FiTrendingUp,
+          iconColor: 'rgba(156, 39, 176, 0.1)',
+          format: 'number',
+          showComparison: true,
+          comparisonType: 'year',
+          navigateTo: '/reports?report=ref-sales'
         }
       ],
       [DASHBOARD_SECTIONS.LAST_MONTH_PERFORMANCE]: [
@@ -744,7 +933,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(76, 175, 80, 0.1)',
           format: 'currency',
           showComparison: true,
-          comparisonType: 'month'
+          comparisonType: 'month',
+          navigateTo: '/production?section=scorecard'
         },
         {
           type: CARD_TYPES.MONTHLY_REF_SALES,
@@ -753,7 +943,9 @@ export const DASHBOARD_CONFIG = {
           icon: FiDollarSign,
           iconColor: 'rgba(156, 39, 176, 0.1)',
           format: 'number',
-          showComparison: false
+          showComparison: true,
+          comparisonType: 'month',
+          navigateTo: '/reports?report=ref-sales'
         }
       ],
       [DASHBOARD_SECTIONS.REPORTED_ACTIVITY]: [
@@ -765,7 +957,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(255, 152, 0, 0.1)',
           format: 'currency',
           showDateRange: true,
-          showAgentCount: true
+          showAgentCount: true,
+          navigateTo: '/daily-activity'
         },
         {
           type: CARD_TYPES.DAILY_REF_ALP,
@@ -775,7 +968,8 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(156, 39, 176, 0.1)',
           format: 'currency',
           showDateRange: true,
-          showAgentCount: true
+          showAgentCount: true,
+          navigateTo: '/daily-activity'
         },
         {
           type: CARD_TYPES.DAILY_REFS,
@@ -785,7 +979,21 @@ export const DASHBOARD_CONFIG = {
           iconColor: 'rgba(156, 39, 176, 0.1)',
           format: 'number',
           showDateRange: true,
-          showAgentCount: true
+          showAgentCount: true,
+          navigateTo: '/daily-activity'
+        },
+        {
+          type: CARD_TYPES.CURRENT_MONTH_REF_SALES,
+          title: 'Ref Sales',
+          dataKey: 'totalRefSales',
+          icon: FiTrendingUp,
+          iconColor: 'rgba(76, 175, 80, 0.1)',
+          format: 'number',
+          showDateRange: false,
+          showAgentCount: false,
+          showComparison: true,
+          comparisonType: 'month',
+          navigateTo: '/reports?report=ref-sales'
         }
       ]
     },

@@ -100,6 +100,111 @@
     box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
 }
 
+/* Agent Tools Buttons */
+.agent-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tool-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  white-space: nowrap;
+  width: 40px;
+  height: 40px;
+}
+
+.tool-button:hover {
+  background: transparent;
+  border: none;
+  transform: none;
+  box-shadow: none;
+}
+
+.tool-button.active {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.tool-button.active:hover {
+  background: transparent;
+  border: none;
+}
+
+.tool-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.phone-button {
+  /* Orange accent for phone scripts */
+  --tool-accent: #f97316;
+}
+
+.phone-button:hover:not(.active) {
+  color: var(--tool-accent);
+}
+
+.phone-button.active {
+  color: var(--tool-accent);
+}
+
+.presentation-button {
+  /* Green accent for presentation */
+  --tool-accent: #16a34a;
+}
+
+.presentation-button:hover:not(.active) {
+  color: var(--tool-accent);
+}
+
+.presentation-button.active {
+  color: var(--tool-accent);
+}
+
+/* Agent Sites Dropdown */
+.agent-sites-dropdown {
+  position: relative;
+}
+
+.sites-button {
+  /* Blue accent for agent sites */
+  --tool-accent: #2563eb;
+}
+
+.sites-button:hover:not(.active) {
+  border-color: var(--tool-accent);
+  color: var(--tool-accent);
+}
+
+.dropdown-arrow {
+  margin-left: 4px;
+  transition: transform 0.3s ease;
+}
+
+.dropdown-arrow.rotated {
+  transform: rotate(180deg);
+}
+
+.agent-sites-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 200px;
+  z-index: 1200;
+}
+
 @media (min-width: 768px) {
     .hamburger-container {
         display: none;
@@ -176,5 +281,10 @@
   .profile-pic.impersonating {
     border: 2px solid #f59e0b;
     box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2);
+  }
+  
+  /* Hide agent tools on mobile */
+  .agent-tools {
+    display: none;
   }
 }

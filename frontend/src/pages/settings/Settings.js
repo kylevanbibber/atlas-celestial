@@ -7,7 +7,6 @@ import './Settings.css';
 // Import component files
 import SettingsSidebar from '../../components/settings/SettingsSidebar';
 import AccountSettings from '../../components/settings/AccountSettings';
-import CustomizeSettings from '../../components/settings/CustomizeSettings';
 import DiscordSettings from '../../components/settings/discord/DiscordSettings';
 import HierarchyViewSelector from '../../components/settings/HierarchyViewSelector';
 import LicenseSettings from '../../components/settings/LicenseSettings';
@@ -26,14 +25,6 @@ const Settings = () => {
   // Check if user is admin with teamRole="app" - hide account and customize options
   const isAppAdmin = user?.Role === 'Admin' && user?.teamRole === 'app';
   
-  // Debug logging for app admin detection
-  console.log('🏭 Settings: User permissions check', {
-    userRole: user?.Role,
-    teamRole: user?.teamRole,
-    isAppAdmin,
-    availableSettings: isAppAdmin ? 'Limited (no account/customize/discord)' : 'Full access'
-  });
-  
   // Default section based on user type
   const defaultSection = isAppAdmin ? 'hierarchy' : 'account';
   
@@ -47,7 +38,7 @@ const Settings = () => {
     // Define valid sections based on user type
     const validSections = isAppAdmin 
       ? ['hierarchy', 'licensing', 'notifications'] // Exclude account, customize, and discord for app admins
-      : ['account', 'customize', 'hierarchy', 'licensing', 'notifications', 'discord'];
+      : ['account', 'hierarchy', 'licensing', 'notifications', 'discord']; // Remove customize for all users
     
     if (section && validSections.includes(section)) {
       setActiveSection(section);
@@ -76,7 +67,7 @@ const Settings = () => {
   // Filter out account, customize, and discord options for app admins
   const settingsItems = isAppAdmin 
     ? allSettingsItems.filter(item => !['account', 'customize', 'discord'].includes(item.id))
-    : allSettingsItems;
+    : allSettingsItems.filter(item => item.id !== 'customize'); // Hide customize for all users
   
   // Items that need warning indicators
   const warningItems = licenseWarning ? ['licensing'] : [];
@@ -88,8 +79,6 @@ const Settings = () => {
         return <AccountSettings />;
       case 'hierarchy':
         return <HierarchyViewSelector />;
-      case 'customize':
-        return <CustomizeSettings />;
       case 'discord':
         return <DiscordSettings />;
       case 'licensing':

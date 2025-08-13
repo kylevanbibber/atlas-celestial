@@ -55,6 +55,12 @@ function ApplicationDetails({ row, data, onClose, parseInsuredInfo, isDiscrepanc
     const [selectedInsuredIndex, setSelectedInsuredIndex] = useState(null);
     const [clientData, setClientData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [editingEmail, setEditingEmail] = useState(false);
+    const [editingPhone, setEditingPhone] = useState(false);
+    const [editEmail, setEditEmail] = useState('');
+    const [editPhone, setEditPhone] = useState('');
+    const [updating, setUpdating] = useState(false);
+    const [updatedContactInfo, setUpdatedContactInfo] = useState({});
     
     // Use row prop if provided, otherwise use data prop (from RightDetails)
     const verificationData = row || data;
@@ -111,6 +117,13 @@ function ApplicationDetails({ row, data, onClose, parseInsuredInfo, isDiscrepanc
                     const clientRecord = response.data.data.find(
                         client => client.application_id === verificationData.application_id
                     );
+                    console.log('🔍 Client data fetch debug:', {
+                        allClientData: response.data.data,
+                        applicationId: verificationData.application_id,
+                        foundClientRecord: clientRecord,
+                        hasEmail: clientRecord?.client_email,
+                        hasPhone: clientRecord?.client_phoneNumber
+                    });
                     setClientData(clientRecord || null);
                 }
             } catch (error) {
@@ -146,6 +159,102 @@ function ApplicationDetails({ row, data, onClose, parseInsuredInfo, isDiscrepanc
         return str
             .replace(/_/g, ' ') // Replace underscores with spaces
             .replace(/\b\w/g, (char) => char.toUpperCase()); // Capitalize each word
+    };
+
+    // Helper functions to get current contact info with updates
+    const getCurrentEmail = () => {
+        return updatedContactInfo.client_email || 
+               clientData?.client_email || 
+               verificationData?.client_email || 
+               '';
+    };
+
+    const getCurrentPhone = () => {
+        return updatedContactInfo.client_phoneNumber || 
+               clientData?.client_phoneNumber || 
+               verificationData?.client_phoneNumber || 
+               '';
+    };
+
+    const handleEditEmail = () => {
+        setEditEmail(getCurrentEmail());
+        setEditingEmail(true);
+    };
+
+    const handleEditPhone = () => {
+        setEditPhone(getCurrentPhone());
+        setEditingPhone(true);
+    };
+
+    const handleSaveEmail = async () => {
+        const applicationId = clientData?.application_id || verificationData?.application_id;
+        if (!applicationId) return;
+        
+        try {
+            setUpdating(true);
+            const response = await api.put('/verify/update-client-contact', {
+                application_id: applicationId,
+                client_email: editEmail
+            });
+            
+            if (response.data.success) {
+                // Update clientData if it exists
+                if (clientData) {
+                    setClientData(prev => ({ ...prev, client_email: editEmail }));
+                }
+                // Update local contact info state to reflect the change immediately
+                setUpdatedContactInfo(prev => ({ ...prev, client_email: editEmail }));
+                setEditingEmail(false);
+                // Show success message
+                alert('Client email updated successfully!');
+            } else {
+                alert('Failed to update client email: ' + response.data.message);
+            }
+        } catch (error) {
+            console.error('Error updating client email:', error);
+            alert('Error updating client email: ' + error.message);
+        } finally {
+            setUpdating(false);
+        }
+    };
+
+    const handleSavePhone = async () => {
+        const applicationId = clientData?.application_id || verificationData?.application_id;
+        if (!applicationId) return;
+        
+        try {
+            setUpdating(true);
+            const response = await api.put('/verify/update-client-contact', {
+                application_id: applicationId,
+                client_phoneNumber: editPhone
+            });
+            
+            if (response.data.success) {
+                // Update clientData if it exists
+                if (clientData) {
+                    setClientData(prev => ({ ...prev, client_phoneNumber: editPhone }));
+                }
+                // Update local contact info state to reflect the change immediately
+                setUpdatedContactInfo(prev => ({ ...prev, client_phoneNumber: editPhone }));
+                setEditingPhone(false);
+                // Show success message
+                alert('Client phone number updated successfully!');
+            } else {
+                alert('Failed to update client phone number: ' + response.data.message);
+            }
+        } catch (error) {
+            console.error('Error updating client phone number:', error);
+            alert('Error updating client phone number: ' + error.message);
+        } finally {
+            setUpdating(false);
+        }
+    };
+
+    const handleCancelEdit = () => {
+        setEditingEmail(false);
+        setEditingPhone(false);
+        setEditEmail('');
+        setEditPhone('');
     };
 
     const renderMedicalQuestions = (insuredType, insuredName) => {
@@ -313,7 +422,8 @@ function ApplicationDetails({ row, data, onClose, parseInsuredInfo, isDiscrepanc
         }
         
         if (clientData.agent_contact_request && clientData.agent_contact_request.toLowerCase() !== 'no') {
-            generalDiscrepancies.push('Agent contact request present');
+            const requestType = clientData.agent_contact_request;
+            generalDiscrepancies.push(`Agent contact request: ${requestType}`);
         }
         
         if (verificationData.agent_ip === clientData.client_ip) {
@@ -584,16 +694,9 @@ function ApplicationDetails({ row, data, onClose, parseInsuredInfo, isDiscrepanc
 
     if (loading) {
         return (
-            <div className="application-details-container">
-                <div className="application-details-header">
-                    <h3>Application Details</h3>
-                    {onClose && (
-                        <button onClick={onClose} className="application-details-close-button">
-                            ×
-                        </button>
-                    )}
-                </div>
-                <div className="loading-container">Loading...</div>
+            <div className="route-loading" role="alert" aria-busy="true">
+              <div className="spinner"></div>
+              <p>Loading...</p>
             </div>
         );
     }
@@ -609,7 +712,10 @@ function ApplicationDetails({ row, data, onClose, parseInsuredInfo, isDiscrepanc
                         </button>
                     )}
                 </div>
-                <div className="loading-container">No verification data available.</div>
+                <div className="error-message">
+                    <h3>No Data Available</h3>
+                    <p>No verification data available for this application.</p>
+                </div>
             </div>
         );
     }
@@ -751,6 +857,206 @@ function ApplicationDetails({ row, data, onClose, parseInsuredInfo, isDiscrepanc
                                     </td>
                                     <td className={clientData?.application_verification === 'n' ? 'contact-request-yes' : ''}>
                                         {clientData?.application_verification === 'y' ? 'Verified' : 'Failed'}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {/* Client Contact Information Section - Only for App Admins */}
+                {isAppAdmin && (
+                    <div className="application-details-section">
+                        <h4>
+                            <span>📞</span>
+                            Client Contact Information
+                        </h4>
+                        {console.log('🔍 Contact info debug:', {
+                            isAppAdmin,
+                            clientData,
+                            verificationData,
+                            updatedContactInfo,
+                            currentEmail: getCurrentEmail(),
+                            currentPhone: getCurrentPhone(),
+                            hasClientEmail: !!getCurrentEmail(),
+                            hasClientPhone: !!getCurrentPhone()
+                        })}
+                        <table className='contact-agent-table'>
+                            <thead>
+                                <tr>
+                                    <th>Client Email</th>
+                                    <th>Client Phone Number</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        {getCurrentEmail() ? (
+                                            <div className="client-contact-info">
+                                                <span>{getCurrentEmail()}</span>
+                                                <div className="contact-actions">
+                                                    <button 
+                                                        className="copy-btn"
+                                                        onClick={() => navigator.clipboard.writeText(getCurrentEmail())}
+                                                        title="Copy email to clipboard"
+                                                    >
+                                                        📋
+                                                    </button>
+                                                    {editingEmail ? (
+                                                        <div className="edit-form">
+                                                            <input
+                                                                type="email"
+                                                                value={editEmail}
+                                                                onChange={(e) => setEditEmail(e.target.value)}
+                                                                className="edit-input"
+                                                                placeholder="Enter email"
+                                                            />
+                                                            <button 
+                                                                onClick={handleSaveEmail} 
+                                                                className="save-btn"
+                                                                disabled={updating}
+                                                            >
+                                                                {updating ? 'Saving...' : 'Save'}
+                                                            </button>
+                                                            <button 
+                                                                onClick={handleCancelEdit} 
+                                                                className="cancel-btn"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <button 
+                                                            className="edit-btn"
+                                                            onClick={handleEditEmail}
+                                                            title="Edit email"
+                                                        >
+                                                            ✏️
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="client-contact-info">
+                                                <span className="no-data">No email provided</span>
+                                                {editingEmail ? (
+                                                    <div className="edit-form">
+                                                        <input
+                                                            type="email"
+                                                            value={editEmail}
+                                                            onChange={(e) => setEditEmail(e.target.value)}
+                                                            className="edit-input"
+                                                            placeholder="Enter email"
+                                                        />
+                                                        <button 
+                                                            onClick={handleSaveEmail} 
+                                                            className="save-btn"
+                                                            disabled={updating}
+                                                        >
+                                                            {updating ? 'Saving...' : 'Save'}
+                                                        </button>
+                                                        <button 
+                                                            onClick={handleCancelEdit} 
+                                                            className="cancel-btn"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button 
+                                                        className="edit-btn"
+                                                        onClick={handleEditEmail}
+                                                        title="Add email"
+                                                    >
+                                                        ➕
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td>
+                                        {getCurrentPhone() ? (
+                                            <div className="client-contact-info">
+                                                <span>{getCurrentPhone()}</span>
+                                                <div className="contact-actions">
+                                                    <button 
+                                                        className="copy-btn"
+                                                        onClick={() => navigator.clipboard.writeText(getCurrentPhone())}
+                                                        title="Copy phone to clipboard"
+                                                    >
+                                                        📋
+                                                    </button>
+                                                    {editingPhone ? (
+                                                        <div className="edit-form">
+                                                            <input
+                                                                type="text"
+                                                                value={editPhone}
+                                                                onChange={(e) => setEditPhone(e.target.value)}
+                                                                className="edit-input"
+                                                                placeholder="Enter phone number"
+                                                            />
+                                                            <button 
+                                                                onClick={handleSavePhone} 
+                                                                className="save-btn"
+                                                                disabled={updating}
+                                                            >
+                                                                {updating ? 'Saving...' : 'Save'}
+                                                            </button>
+                                                            <button 
+                                                                onClick={handleCancelEdit} 
+                                                                className="cancel-btn"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <button 
+                                                            className="edit-btn"
+                                                            onClick={handleEditPhone}
+                                                            title="Edit phone number"
+                                                        >
+                                                            ✏️
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="client-contact-info">
+                                                <span className="no-data">No phone number provided</span>
+                                                {editingPhone ? (
+                                                    <div className="edit-form">
+                                                        <input
+                                                            type="text"
+                                                            value={editPhone}
+                                                            onChange={(e) => setEditPhone(e.target.value)}
+                                                            className="edit-input"
+                                                            placeholder="Enter phone number"
+                                                        />
+                                                        <button 
+                                                            onClick={handleSavePhone} 
+                                                            className="save-btn"
+                                                            disabled={updating}
+                                                        >
+                                                            {updating ? 'Saving...' : 'Save'}
+                                                        </button>
+                                                        <button 
+                                                            onClick={handleCancelEdit} 
+                                                            className="cancel-btn"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button 
+                                                        className="edit-btn"
+                                                        onClick={handleEditPhone}
+                                                        title="Add phone number"
+                                                    >
+                                                        ➕
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
                                     </td>
                                 </tr>
                             </tbody>

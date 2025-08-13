@@ -61,6 +61,13 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
+    // Check for impersonation state from AuthContext
+    // We'll get this from window to avoid circular dependencies
+    const impersonationData = window.__IMPERSONATION_STATE__;
+    if (impersonationData && impersonationData.isImpersonating && impersonationData.impersonatedUserId) {
+      config.headers['X-Impersonated-User-Id'] = impersonationData.impersonatedUserId;
+    }
+    
     // Ensure credentials are included for all requests
     config.withCredentials = true;
     
@@ -70,6 +77,7 @@ api.interceptors.request.use(
     console.log(`[API] 🚀 Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, {
       params: config.params,
       hasToken: !!config.headers.Authorization,
+      hasImpersonation: !!config.headers['X-Impersonated-User-Id'],
       withCredentials: config.withCredentials
     });
     return config;

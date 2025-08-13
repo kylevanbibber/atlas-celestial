@@ -28,10 +28,16 @@ import { useTeamStyles, TeamStyleProvider } from './context/TeamStyleContext';
 import { LicenseWarningProvider } from "./context/LicenseWarningContext";
 import { NotificationProvider } from "./context/NotificationContext";
 import NotificationSettings from "./components/settings/notification/NotificationSettings";
+import InPageNotificationContainer from "./components/notifications/InPageNotificationContainer";
 import RefEntry from "./components/refvalidation/RefEntry";
+import DocumentSigning from "./components/tools/DocumentSigning";
+import ClientSigning from "./components/tools/ClientSigning";
+import { PromotionTracking } from "./components/promotion-tracking";
+import { Toaster } from 'react-hot-toast';
 
 
 import AdminHierarchySettings from "./components/admin/AdminHierarchySettings";
+import LoginLogs from "./components/admin/LoginLogs";
 import { HierarchyTablePage } from "./pages/settings";
 import AdminCheck from "./pages/admin/AdminCheck";
 import { logRedirect, logNavigation } from "./utils/navigationLogger";
@@ -87,10 +93,15 @@ function AppContent() {
     }
   }, [styles, stylesLoading]);
 
-  // Determine if the current page is an auth page (login, register, etc.)
+  // Determine if the current page is an auth page (login, register, etc.) or public page
   // Note: /adminlogin now redirects to /login since admin users use the unified login system
   const authPaths = ["/login", "/register", "/adminlogin"];
   const isAuthPage = authPaths.includes(location.pathname);
+  
+  // Check if current path is a public route that doesn't require authentication
+  const publicPaths = ["/login", "/register", "/adminlogin"];
+  const isClientSigningPage = location.pathname.startsWith("/client-sign/");
+  const isPublicPage = publicPaths.includes(location.pathname) || isClientSigningPage;
 
   // Map routes to page titles (for pages with header)
   const pageTitleMap = {
@@ -107,6 +118,7 @@ function AppContent() {
     "/admin/notifications": "Notifications Management",
     "/admin/hierarchy": "Hierarchy Management",
     "/admin/hierarchy-table": "Hierarchy Table View",
+    "/admin/login-logs": "Login Logs",
     "/admin/check": "Admin Permissions Check",
     "/notifications": "Notifications",
     "/notification-settings": "Notification Settings",
@@ -157,12 +169,13 @@ function AppContent() {
     
     // Only redirect to login if not authenticated AND not on any auth page
     // This prevents redirecting away from /login, /adminlogin, /register, etc.
-    if (!isAuthenticated && !isAuthPage) {
+    if (!isAuthenticated && !isPublicPage) {
       const currentPath = location.pathname + location.search;
       console.log(`[App] Not authenticated, redirecting to login from ${currentPath}`, {
         user,
         targetPath: currentPath,
-        isAuthPage
+        isAuthPage,
+        isPublicPage
       });
       
       // Log the redirect
@@ -184,6 +197,12 @@ function AppContent() {
     // If we're on an auth page and not authenticated, allow it (don't redirect)
     if (!isAuthenticated && isAuthPage) {
       console.log(`[App] On auth page ${location.pathname}, allowing access without redirect`);
+      return;
+    }
+    
+    // If we're on a public page (including client signing) and not authenticated, allow it
+    if (!isAuthenticated && isClientSigningPage) {
+      console.log(`[App] On public client signing page ${location.pathname}, allowing access without redirect`);
       return;
     }
     
@@ -236,7 +255,7 @@ function AppContent() {
       });
     }
 
-  }, [isAuthenticated, isAuthPage, location.pathname, location.search, navigate, authLoading, user, hasPermission]);
+  }, [isAuthenticated, isAuthPage, location.pathname, location.search, navigate, authLoading, user, hasPermission, isPublicPage, isClientSigningPage]);
 
   // If we're on an auth page, we render only the auth routes
   if (isAuthPage) {
@@ -249,6 +268,17 @@ function AppContent() {
         <Route path="/register" element={<div>Register Page</div>} />
         {/* Redirect any unknown auth route to /login */}
         <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
+
+  // If we're on a client signing page, render without header/sidebar
+  if (isClientSigningPage) {
+    return (
+      <Routes>
+        <Route path="/client-sign/:token" element={<ClientSigning />} />
+        {/* Redirect any unknown client signing route to dashboard */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     );
   }
@@ -302,6 +332,21 @@ function AppContent() {
               element={
                 <ProtectedRoute>
                   <Production />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/promotion-tracking"
+              element={
+                <ProtectedRoute>
+                  {user?.Role === 'Admin' && user?.teamRole === 'app' ? (
+                    <PromotionTracking />
+                  ) : (
+                    <div style={{ padding: "2rem", textAlign: "center" }}>
+                      <h2>Access Denied</h2>
+                      <p>This page is only available to App team administrators.</p>
+                    </div>
+                  )}
                 </ProtectedRoute>
               }
             />
@@ -370,6 +415,14 @@ function AppContent() {
               }
             />
             <Route
+              path="/admin/login-logs"
+              element={
+                <ProtectedRoute requiredPermission="admin">
+                  <LoginLogs />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/admin/check"
               element={
                 <AdminCheck />
@@ -391,6 +444,14 @@ function AppContent() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/document-signing"
+              element={
+                <ProtectedRoute>
+                  <DocumentSigning />
+                </ProtectedRoute>
+              }
+            />
             {/* Redirect unknown routes to dashboard */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
@@ -398,7 +459,23 @@ function AppContent() {
       </div>
       {/* Add BottomNav for mobile */}
       <BottomNav />
-      
+      <InPageNotificationContainer />
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            duration: 3000,
+            theme: {
+              primary: '#4aed88',
+            },
+          },
+        }}
+      />
     </div>
   );
 }

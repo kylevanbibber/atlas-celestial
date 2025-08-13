@@ -80,33 +80,115 @@ router.get("/admin-tabs", async (req, res) => {
 // Save (create/update) refvalidation records
 router.post("/save", async (req, res) => {
   try {
-    const records = req.body;
+    let records = req.body;
+    const userId = req.userId; // Get userId from middleware instead of body
+    console.log("RefValidation Save - Received records:", JSON.stringify(records, null, 2));
     
+    // Handle case where records come as an object with numbered keys
     if (!Array.isArray(records)) {
-      return res.status(400).json({ success: false, message: "Expected array of records" });
+      console.log("RefValidation Save - Converting object to array");
+      
+      // Check if it's an object with numbered keys and a userId property
+      if (typeof records === 'object' && records !== null) {
+        const recordsArray = [];
+        Object.keys(records).forEach(key => {
+          // Skip non-numeric keys (like 'userId')
+          if (!isNaN(key)) {
+            recordsArray.push(records[key]);
+          }
+        });
+        
+        if (recordsArray.length > 0) {
+          records = recordsArray;
+          console.log("RefValidation Save - Converted to array:", recordsArray.length, "records");
+        } else {
+          console.error("RefValidation Save - No valid records found in object");
+          return res.status(400).json({ success: false, message: "No valid records found" });
+        }
+      } else {
+        console.error("RefValidation Save - Expected array, received:", typeof records);
+        return res.status(400).json({ success: false, message: "Expected array of records" });
+      }
     }
 
     const savedRows = [];
 
     for (const record of records) {
+      console.log("RefValidation Save - Processing record:", record.uuid || record.id || "new");
       let savedRecord;
       
       if (record.id) {
+        console.log("RefValidation Save - Updating existing record with ID:", record.id);
+        
+        // Look up agent_id from activeusers based on lagnname for existing records too
+        let sa = record.sa, ga = record.ga, mga = record.mga, rga = record.rga, clname = record.clname;
+        let lagnnameValue = record.lagnname || '';
+        let resolvedAgentId = record.agent_id; // Use the provided agent_id first
+        
+        // If agent_id is provided, validate it and get hierarchy data
+        if (record.agent_id) {
+          console.log("RefValidation Save - Validating provided agent_id for update:", record.agent_id);
+          const agentQuery = `SELECT id, sa, ga, mga, rga, clname, lagnname FROM activeusers WHERE id = ? AND Active = "y"`;
+          const agentResult = await query(agentQuery, [record.agent_id]);
+          
+          if (agentResult.length > 0) {
+            resolvedAgentId = agentResult[0].id;
+            sa = agentResult[0].sa;
+            ga = agentResult[0].ga;
+            mga = agentResult[0].mga;
+            rga = agentResult[0].rga;
+            clname = agentResult[0].clname;
+            lagnnameValue = agentResult[0].lagnname; // Use the canonical lagnname from database
+            
+            console.log("RefValidation Save - Validated agent_id for update:", { 
+              resolvedAgentId, sa, ga, mga, rga, clname, lagnname: lagnnameValue 
+            });
+          } else {
+            console.warn("RefValidation Save - Invalid agent_id provided for update:", record.agent_id);
+            resolvedAgentId = null;
+          }
+        } else if (record.lagnname) {
+          // Fallback: look up by lagnname if no agent_id provided
+          console.log("RefValidation Save - Looking up agent by lagnname for update:", record.lagnname);
+          const agentQuery = `SELECT id, sa, ga, mga, rga, clname, lagnname FROM activeusers WHERE lagnname = ? AND Active = "y"`;
+          const agentResult = await query(agentQuery, [record.lagnname]);
+          
+          if (agentResult.length > 0) {
+            resolvedAgentId = agentResult[0].id;
+            sa = agentResult[0].sa;
+            ga = agentResult[0].ga;
+            mga = agentResult[0].mga;
+            rga = agentResult[0].rga;
+            clname = agentResult[0].clname;
+            lagnnameValue = agentResult[0].lagnname;
+            
+            console.log("RefValidation Save - Found agent by lagnname for update:", { 
+              resolvedAgentId, sa, ga, mga, rga, clname, lagnname: lagnnameValue 
+            });
+          } else {
+            console.warn("RefValidation Save - No active agent found for lagnname during update:", record.lagnname);
+            resolvedAgentId = null;
+          }
+        } else {
+          console.log("RefValidation Save - No agent_id or lagnname provided for update, agent_id will be NULL");
+          resolvedAgentId = null;
+        }
+        
         // Update existing record
         const updateQuery = `
           UPDATE refvalidation 
           SET true_ref = ?, ref_detail = ?, lagnname = ?, agent_id = ?, client_name = ?, 
               zip_code = ?, existing_policy = ?, trial = ?, date_app_checked = ?, 
               notes = ?, admin_name = ?, admin_id = ?, sa = ?, ga = ?, mga = ?, 
-              rga = ?, clname = ?, agent_admin_id = ?, updated_at = CURRENT_TIMESTAMP
+              rga = ?, clname = ?, updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
         `;
         
         await query(updateQuery, [
           record.true_ref || null,
           record.ref_detail || null,
-          record.lagnname || null,
-          record.agent_id || null,
+          lagnnameValue,
+          resolvedAgentId, // Use the resolved agent_id from lagnname lookup
           record.client_name || null,
           record.zip_code || null,
           record.existing_policy || null,
@@ -115,59 +197,111 @@ router.post("/save", async (req, res) => {
           record.notes || null,
           record.admin_name || null,
           record.admin_id || null,
-          record.sa || null,
-          record.ga || null,
-          record.mga || null,
-          record.rga || null,
-          record.clname || null,
-          record.agent_admin_id || null,
+          sa,
+          ga,
+          mga,
+          rga,
+          clname,
           record.id
         ]);
         
-        savedRecord = { ...record };
+        savedRecord = { ...record, agent_id: resolvedAgentId, lagnname: lagnnameValue, sa, ga, mga, rga, clname };
+        console.log("RefValidation Save - Updated record:", savedRecord.id);
       } else {
+        console.log("RefValidation Save - Creating new record");
         // Create new record
         const uuid = record.uuid || uuidv4();
+        console.log("RefValidation Save - Generated UUID:", uuid);
+        
+        // Look up agent_id from activeusers based on lagnname
+        let sa = null, ga = null, mga = null, rga = null, clname = null;
+        let lagnnameValue = record.lagnname || ''; // Use empty string like old system
+        let resolvedAgentId = record.agent_id; // Use the provided agent_id first
+        
+        // If agent_id is provided, validate it and get hierarchy data
+        if (record.agent_id) {
+          console.log("RefValidation Save - Validating provided agent_id:", record.agent_id);
+          const agentQuery = `SELECT id, sa, ga, mga, rga, clname, lagnname FROM activeusers WHERE id = ? AND Active = "y"`;
+          const agentResult = await query(agentQuery, [record.agent_id]);
+          
+          if (agentResult.length > 0) {
+            resolvedAgentId = agentResult[0].id;
+            sa = agentResult[0].sa;
+            ga = agentResult[0].ga;
+            mga = agentResult[0].mga;
+            rga = agentResult[0].rga;
+            clname = agentResult[0].clname;
+            lagnnameValue = agentResult[0].lagnname; // Use the canonical lagnname from database
+            
+            console.log("RefValidation Save - Validated agent_id:", { 
+              resolvedAgentId, sa, ga, mga, rga, clname, lagnname: lagnnameValue 
+            });
+          } else {
+            console.warn("RefValidation Save - Invalid agent_id provided:", record.agent_id);
+            resolvedAgentId = null;
+          }
+        } else if (record.lagnname) {
+          // Fallback: look up by lagnname if no agent_id provided
+          console.log("RefValidation Save - Looking up agent by lagnname:", record.lagnname);
+          const agentQuery = `SELECT id, sa, ga, mga, rga, clname, lagnname FROM activeusers WHERE lagnname = ? AND Active = "y"`;
+          const agentResult = await query(agentQuery, [record.lagnname]);
+          
+          if (agentResult.length > 0) {
+            resolvedAgentId = agentResult[0].id;
+            sa = agentResult[0].sa;
+            ga = agentResult[0].ga;
+            mga = agentResult[0].mga;
+            rga = agentResult[0].rga;
+            clname = agentResult[0].clname;
+            lagnnameValue = agentResult[0].lagnname;
+            
+            console.log("RefValidation Save - Found agent by lagnname:", { 
+              resolvedAgentId, sa, ga, mga, rga, clname, lagnname: lagnnameValue 
+            });
+          } else {
+            console.warn("RefValidation Save - No active agent found for lagnname:", record.lagnname);
+            resolvedAgentId = null;
+          }
+        } else {
+          console.log("RefValidation Save - No agent_id or lagnname provided, agent_id will be NULL");
+          resolvedAgentId = null;
+        }
         
         const insertQuery = `
           INSERT INTO refvalidation 
-          (uuid, true_ref, ref_detail, lagnname, agent_id, client_name, zip_code, 
-           existing_policy, trial, date_app_checked, notes, admin_name, admin_id, 
-           sa, ga, mga, rga, clname, agent_admin_id, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          (true_ref, ref_detail, lagnname, agent_id, client_name, zip_code, 
+           existing_policy, trial, date_app_checked, notes, admin_name, admin_id,
+           sa, ga, mga, rga, clname) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
         const result = await query(insertQuery, [
-          uuid,
-          record.true_ref || null,
-          record.ref_detail || null,
-          record.lagnname || null,
-          record.agent_id || null,
-          record.client_name || null,
-          record.zip_code || null,
-          record.existing_policy || null,
-          record.trial || null,
-          record.date_app_checked || null,
-          record.notes || null,
-          record.admin_name || null,
-          record.admin_id || null,
-          record.sa || null,
-          record.ga || null,
-          record.mga || null,
-          record.rga || null,
-          record.clname || null,
-          record.agent_admin_id || null
+          record.true_ref, 
+          record.ref_detail, 
+          lagnnameValue, 
+          resolvedAgentId, // Use the resolved agent_id from lagnname lookup
+          record.client_name, 
+          record.zip_code, 
+          record.existing_policy, 
+          record.trial,
+          record.date_app_checked, 
+          record.notes, 
+          record.admin_name, 
+          record.admin_id,
+          sa, ga, mga, rga, clname
         ]);
         
-        savedRecord = { ...record, id: result.insertId, uuid };
+        savedRecord = { ...record, id: result.insertId, uuid, agent_id: resolvedAgentId, sa, ga, mga, rga, clname };
+        console.log("RefValidation Save - Created new record with ID:", result.insertId);
       }
       
       savedRows.push(savedRecord);
     }
 
+    console.log("RefValidation Save - Returning response with", savedRows.length, "saved rows");
     res.json({ success: true, message: "Records saved successfully", savedRows });
   } catch (error) {
-    console.error("Error saving refvalidation records:", error);
+    console.error("RefValidation Save - Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import ThemeContext from "../../context/ThemeContext";
 import { useTeamStyles } from "../../context/TeamStyleContext";
-import { FiMenu, FiUser, FiLogOut, FiMoon, FiSun, FiUsers, FiChevronRight } from "react-icons/fi";
+import { FiMenu, FiUser, FiLogOut, FiMoon, FiSun, FiUsers, FiChevronRight, FiPhone, FiMonitor, FiExternalLink, FiChevronDown } from "react-icons/fi";
 import { sidebarNavItems } from "../../context/sidebarNavItems";
 import ContextMenu from "./ContextMenu";
 import Logo from "../Layout/Logo";
@@ -26,6 +26,7 @@ const Header = ({ pageTitle, isExpanded }) => {
   const defaultProfilePic = "http://www.gravatar.com/avatar/?d=mp";
   const profilePic = user?.profpic || defaultProfilePic;
   const navigate = useNavigate();
+  
   // State to detect if on mobile
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   
@@ -36,8 +37,30 @@ const Header = ({ pageTitle, isExpanded }) => {
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [selectedRoleFilter, setSelectedRoleFilter] = useState('');
 
+  // Phone Scripts and Presentation state
+  const [isPhoneOpen, setIsPhoneOpen] = useState(false);
+  const [isPresOpen, setIsPresOpen] = useState(false);
+  const phoneWindowRef = useRef(null);
+  const presWindowRef = useRef(null);
+
   // Use custom team name or fall back to the page title
   const displayTitle = pageTitle || teamName || "Atlas";
+
+  // Check window status periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (phoneWindowRef.current && phoneWindowRef.current.closed) {
+        setIsPhoneOpen(false);
+        phoneWindowRef.current = null;
+      }
+      if (presWindowRef.current && presWindowRef.current.closed) {
+        setIsPresOpen(false);
+        presWindowRef.current = null;
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Check if device is mobile on mount and on resize
   React.useEffect(() => {
@@ -58,6 +81,124 @@ const Header = ({ pageTitle, isExpanded }) => {
   const [showHamburgerMenu, setShowHamburgerMenu] = useState(false);
   const hamburgerRef = useRef(null);
   const [hamburgerMenuPosition, setHamburgerMenuPosition] = useState({ top: 0, left: 0 });
+
+  // Phone Scripts window function
+  const openPhone = (phoneFile) => {
+    // Check if a phone window is already open and not closed
+    if (phoneWindowRef.current && !phoneWindowRef.current.closed) {
+      phoneWindowRef.current.focus();
+      return;
+    }
+
+    const screenWidth = window.screen.availWidth;
+    const screenHeight = window.screen.availHeight;
+
+    // Set width to half of the screen width
+    const width = Math.round(screenWidth / 2);
+
+    // Full height
+    const height = screenHeight;
+
+    // Position the window on the right half of the screen
+    const left = screenWidth - width; // Start from the middle of the screen
+    const top = 0; // Align to the top of the screen
+
+    phoneWindowRef.current = window.open(
+      phoneFile,
+      '_blank',
+      `toolbar=no,scrollbars=no,resizable=yes,top=${top},left=${left},width=${width},height=${height},alwaysRaised=true`
+    );
+
+    if (phoneWindowRef.current) {
+      setIsPhoneOpen(true);
+      phoneWindowRef.current.focus();
+
+      // Listen for window close event
+      phoneWindowRef.current.onbeforeunload = () => {
+        setIsPhoneOpen(false);
+        phoneWindowRef.current = null;
+      };
+    } else {
+      alert('Failed to open phone scripts window. Please allow pop-ups for this site.');
+    }
+  };
+
+  // Presentation window function
+  const openPres = async (presFile) => {
+    // Check if a presentation window is already open and not closed
+    if (presWindowRef.current && !presWindowRef.current.closed) {
+      presWindowRef.current.focus();
+      return;
+    }
+
+    // Determine available screen dimensions
+    const screenWidth = window.screen.availWidth;
+    const screenHeight = window.screen.availHeight;
+
+    // Check for ultrawide (32:9 aspect ratio or similar)
+    const isUltrawide = screenWidth / screenHeight > 2;
+
+    // Calculate dimensions
+    let width = Math.round(screenWidth * 0.71);
+    let height = Math.round(width * (9 / 16));
+
+    if (height > screenHeight) {
+      height = screenHeight;
+      width = Math.round(height * (16 / 9));
+    }
+
+    let left, top;
+
+    if (isUltrawide) {
+      // Calculate a centered virtual 16:9 screen in the middle of the 32:9 monitor
+      const virtualWidth = screenHeight * (16 / 9); // Virtual 16:9 width based on screen height
+      const virtualLeft = (screenWidth - virtualWidth) / 2; // Centered 16:9 viewport
+
+      // Align to the left side of the virtual 16:9 screen
+      left = Math.round(virtualLeft); // Align left of the virtual viewport
+      width = Math.round(virtualWidth * 0.71); // 70% of virtual 16:9 width
+      height = Math.round(width * (9 / 16)); // Maintain 16:9 aspect ratio
+    } else {
+      // Standard positioning for non-ultrawide screens
+      left = window.screen.availLeft !== undefined ? window.screen.availLeft : 0;
+    }
+
+    top = screenHeight - height; // Align to bottom
+
+    // Open the presentation window
+    presWindowRef.current = window.open(
+      presFile,
+      '_blank',
+      `toolbar=no,scrollbars=no,resizable=yes,top=${top},left=${left},width=${width},height=${height},alwaysRaised=true`
+    );
+
+    if (presWindowRef.current) {
+      try {
+        presWindowRef.current.moveTo(left, top);
+        presWindowRef.current.resizeTo(width, height);
+      } catch (e) {
+        console.warn('Window positioning not fully supported in this browser.');
+      }
+
+      presWindowRef.current.focus();
+      setIsPresOpen(true);
+
+      // Listen for window close event
+      presWindowRef.current.onbeforeunload = () => {
+        setIsPresOpen(false);
+        presWindowRef.current = null;
+      };
+    } else {
+      alert('Failed to open presentation window. Please allow pop-ups for this site.');
+    }
+  };
+
+  const handleLaunchPresentation = () => {
+    const userId = user?.userId;
+    const userToken = localStorage.getItem('auth_token');
+    const presUrl = `https://ariaslife.com/temp/agent_tools/presentation/pres_setup.html?a=${userToken}&b=${userId}`;
+    openPres(presUrl);
+  };
 
   // Handle profile menu click
   const handleProfileClick = () => {
@@ -84,7 +225,7 @@ const Header = ({ pageTitle, isExpanded }) => {
         setUsers(response.data.users);
       }
     } catch (error) {
-      console.error('Error loading users:', error);
+      // Silently handle errors
     } finally {
       setLoadingUsers(false);
     }
@@ -99,7 +240,7 @@ const Header = ({ pageTitle, isExpanded }) => {
         setShowUserSwitcher(false);
       }
     } catch (error) {
-      console.error('Error switching user:', error);
+      // Silently handle errors
     }
   };
 
@@ -153,6 +294,61 @@ const Header = ({ pageTitle, isExpanded }) => {
       label: theme === 'light' ? "Dark Mode" : "Light Mode",
       onClick: toggleTheme,
       icon: theme === 'light' ? <FiMoon /> : <FiSun />
+    },
+    // Agent Sites with submenu
+    {
+      label: "Agent Sites",
+      onClick: () => {}, // Handled by submenu
+      icon: <FiExternalLink />,
+      submenu: [
+        {
+          label: "Impact Mobile",
+          onClick: () => window.open("https://login.ailife.com/ImpactMobile/", "_blank"),
+          icon: <FiExternalLink />
+        },
+        {
+          label: "Impact AWS",
+          onClick: () => window.open("https://login.ailife.com/ImpactPortal/", "_blank"),
+          icon: <FiExternalLink />
+        },
+        {
+          label: "ICM",
+          onClick: () => window.open("https://payeeweb.ailicm.globelifeinc.com/payeewebv2/login?nextPathname=%2F", "_blank"),
+          icon: <FiExternalLink />
+        },
+        {
+          label: "Option Builder",
+          onClick: () => window.open("https://thekeefersuccess.com/WinnersCircle/agent_tools/presentation/option_builder_solo.html", "_blank"),
+          icon: <FiExternalLink />
+        },
+        {
+          label: "Spanish Scripts",
+          onClick: () => {}, // Handled by submenu
+          icon: <FiExternalLink />,
+          submenu: [
+            {
+              label: "CSK Phone Script",
+              onClick: () => window.open("https://ariaslife.com/uploads/defaultFolder/Spanish CSK Script.pdf", "_blank"),
+              icon: <FiExternalLink />
+            },
+            {
+              label: "Will Kit Phone Script",
+              onClick: () => window.open("https://ariaslife.com/uploads/defaultFolder/Spanish Will Kit Phone Script.docx", "_blank"),
+              icon: <FiExternalLink />
+            }
+          ]
+        },
+        {
+          label: "AD&D Signing",
+          onClick: () => navigate("/document-signing"),
+          icon: <FiUser />
+        },
+        {
+          label: "PR Directory",
+          onClick: () => window.open("https://aagencies-my.sharepoint.com/:w:/g/personal/kvanbibber_ariasagencies_com/EaPhjMWWMNtEmxutLriHI2kBRPryI_Y0ot6BFb0PWxc8dQ?e=cRFzCI", "_blank"),
+          icon: <FiExternalLink />
+        },
+      ]
     },
     {
       label: "Logout",
@@ -264,6 +460,27 @@ const Header = ({ pageTitle, isExpanded }) => {
       
       {/* Right section - Header actions container */}
       <div className="header-actions">
+        {/* Agent Tools - Only show on desktop */}
+        {!isMobile && (
+          <div className="agent-tools">
+            <button
+              className={`tool-button phone-button ${isPhoneOpen ? 'active' : ''}`}
+              onClick={() => openPhone('https://ariaslife.com/temp/agent_tools/phone_scripts/phone_scripts.html')}
+              title="Phone Scripts"
+            >
+              <FiPhone size={18} />
+            </button>
+
+            <button
+              className={`tool-button presentation-button ${isPresOpen ? 'active' : ''}`}
+              onClick={handleLaunchPresentation}
+              title="Launch Presentation"
+            >
+              <FiMonitor size={18} />
+            </button>
+          </div>
+        )}
+        
         {/* Notification Center */}
         <NotificationCenter />
         

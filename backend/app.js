@@ -21,7 +21,8 @@ app.use(cors({
       "https://localhost:3000",
       "http://127.0.0.1:3000",
       "https://127.0.0.1:3000",
-      "https://atlas-celest-frontend-8eed044a5046.herokuapp.com",
+      "https://agents.ariaslife.com",
+      "https://agents.ariaslife.com",
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
@@ -94,6 +95,10 @@ app.use("/api/release", releaseRoutes);
 // Discord routes
 const discordRoutes = require("./routes/discord");
 app.use("/api/discord", discordRoutes);
+
+// Document signing routes
+const sigRoutes = require("./routes/sigRoutes");
+app.use("/api/signing-session", sigRoutes);
 
 // Other routes...
 const alpRoutes = require("./routes/alp");

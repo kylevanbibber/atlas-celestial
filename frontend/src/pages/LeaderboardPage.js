@@ -12,7 +12,7 @@ import './LeaderboardPage.css';
  * Features:
  * - Real-time leaderboard data with filtering (Experience, Report Type, F6/Net/Gross, Date, MGA/RGA/Tree)
  * - Rank change tracking: Shows movement indicators (▲ Up, ▼ Down, 🆕 New, ➖ Same)
- * - Achievement system: Detects and displays achievement badges for special accomplishments:
+ *   - Achievement system: Detects and displays achievement badges for special accomplishments:
  *   - 👑 Champion/Defending Champion - #1 position
  *   - 🚀 Big Mover - moved up 5+ positions 
  *   - 📈 Rising Star - moved up 3+ positions and in top 10
@@ -45,22 +45,11 @@ const parseAlpValue = (value) => {
  * @returns {Array} Combined data with December values added to YTD values
  */
 const combineYTDWithDecember = (ytdData, decemberData) => {
-    console.log('[combineYTDWithDecember] Starting combination process');
-    console.log('[combineYTDWithDecember] YTD data count:', ytdData.length);
-    console.log('[combineYTDWithDecember] December data count:', decemberData.length);
-    
     // Create a map of December data by LagnName for quick lookup
     const decemberMap = new Map();
     decemberData.forEach(item => {
         const key = item.LagnName;
         decemberMap.set(key, item);
-        console.log(`[combineYTDWithDecember] December entry for ${key}:`, {
-            LVL_1_NET: item.LVL_1_NET,
-            LVL_1_NET_parsed: parseAlpValue(item.LVL_1_NET),
-            LVL_1_GROSS: item.LVL_1_GROSS,
-            LVL_1_GROSS_parsed: parseAlpValue(item.LVL_1_GROSS),
-            month: item.month
-        });
     });
     
     // Process YTD data and add December values where available
@@ -72,14 +61,6 @@ const combineYTDWithDecember = (ytdData, decemberData) => {
             const ytdLvl1Net = parseAlpValue(ytdItem.LVL_1_NET);
             const decLvl1Net = parseAlpValue(decemberItem.LVL_1_NET);
             const combinedLvl1Net = ytdLvl1Net + decLvl1Net;
-            
-            console.log(`[combineYTDWithDecember] Combining ${ytdItem.LagnName}:`, {
-                ytd_LVL_1_NET: ytdItem.LVL_1_NET,
-                ytd_LVL_1_NET_parsed: ytdLvl1Net,
-                dec_LVL_1_NET: decemberItem.LVL_1_NET,
-                dec_LVL_1_NET_parsed: decLvl1Net,
-                combined_LVL_1_NET: combinedLvl1Net
-            });
             
             // Add December values to YTD values for all ALP levels (convert strings to numbers first)
             return {
@@ -111,7 +92,6 @@ const combineYTDWithDecember = (ytdData, decemberData) => {
     decemberData.forEach(decemberItem => {
         const existsInYTD = ytdData.some(ytdItem => ytdItem.LagnName === decemberItem.LagnName);
         if (!existsInYTD) {
-            console.log(`[combineYTDWithDecember] Adding December-only entry for ${decemberItem.LagnName}`);
             // Create YTD-compatible structure from December data (convert strings to numbers)
             combinedData.push({
                 ...decemberItem,
@@ -136,7 +116,6 @@ const combineYTDWithDecember = (ytdData, decemberData) => {
         }
     });
     
-    console.log('[combineYTDWithDecember] Final combined data count:', combinedData.length);
     return combinedData;
 };
 
@@ -147,6 +126,17 @@ const LeaderboardPage = () => {
     const [reportType, setReportType] = useState('Weekly Recap');
     const [includePrevDecember, setIncludePrevDecember] = useState(false);
     const [loading, setLoading] = useState(false);
+    // Add Daily_Activity toggle state
+    const [isDailyActivity, setIsDailyActivity] = useState(false);
+    // Add Daily_Activity metric selection state
+    const [dailyActivityMetric, setDailyActivityMetric] = useState('alp');
+    // Add Codes toggle state
+    const [isCodes, setIsCodes] = useState(false);
+    // Add VIPs toggle state
+    const [isVIPs, setIsVIPs] = useState(false);
+    
+    // Add dropdown state for Reported button
+    const [isReportedDropdownOpen, setIsReportedDropdownOpen] = useState(false);
     
     // Filter states for the filter menu
     const [filters, setFilters] = useState({});
@@ -190,6 +180,103 @@ const LeaderboardPage = () => {
         const dd = String(date.getDate()).padStart(2, '0');
         const yyyy = date.getFullYear();
         return `${mm}/${dd}/${yyyy}`;
+    };
+
+    // Format date to MM/DD/YY (for Daily_Activity ranges)
+    const formatToMMDDYY = (dateStr) => {
+        const date = new Date(dateStr);
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const dd = String(date.getDate()).padStart(2, '0');
+        const yy = String(date.getFullYear()).slice(-2);
+        return `${mm}/${dd}/${yy}`;
+    };
+
+    // Get the Monday of the week for a given date
+    const getMondayOfWeek = (date) => {
+        const d = new Date(date);
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+        return new Date(d.setDate(diff));
+    };
+
+    // Get the Sunday of the week for a given date
+    const getSundayOfWeek = (date) => {
+        const monday = getMondayOfWeek(date);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        return sunday;
+    };
+
+    // Format weekly date range for display (MM/DD/YY-MM/DD/YY)
+    const formatWeeklyRange = (date) => {
+        // Handle invalid dates gracefully
+        if (!date || date === '' || date === null || date === undefined) {
+            return 'Invalid Date';
+        }
+        
+        // If the date is already in MM/YYYY or YYYY format, return it as-is
+        if (isMMYYYYFormat(date) || isYYYYFormat(date)) {
+            return date;
+        }
+        
+        try {
+            const monday = getMondayOfWeek(date);
+            const sunday = getSundayOfWeek(date);
+            
+            // Check if the dates are valid
+            if (isNaN(monday.getTime()) || isNaN(sunday.getTime())) {
+                return date; // Return original date if parsing failed
+            }
+            
+            return `${formatToMMDDYY(monday)}-${formatToMMDDYY(sunday)}`;
+        } catch (error) {
+            console.warn('Error formatting weekly range for date:', date, error);
+            return date; // Return original date if formatting failed
+        }
+    };
+
+    // Get weekly date range in YYYY-MM-DD format for API filtering
+    const getWeeklyDateRange = (date) => {
+        const monday = getMondayOfWeek(date);
+        const sunday = getSundayOfWeek(date);
+        return {
+            startDate: monday.toISOString().split('T')[0],
+            endDate: sunday.toISOString().split('T')[0]
+        };
+    };
+
+    // Check if the date is in MM/YYYY format (for MTD)
+    const isMMYYYYFormat = (dateStr) => {
+        return /^\d{2}\/\d{4}$/.test(dateStr);
+    };
+
+    // Check if the date is in YYYY format (for YTD)
+    const isYYYYFormat = (dateStr) => {
+        return /^\d{4}$/.test(dateStr);
+    };
+
+    // Get monthly date range from MM/YYYY format
+    const getMonthlyDateRange = (mmYYYY) => {
+        const [month, year] = mmYYYY.split('/');
+        const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+        const endDate = new Date(parseInt(year), parseInt(month), 0); // Last day of month
+        
+        return {
+            startDate: startDate.toISOString().split('T')[0],
+            endDate: endDate.toISOString().split('T')[0]
+        };
+    };
+
+    // Get yearly date range from YYYY format
+    const getYearlyDateRange = (yyyy) => {
+        const year = parseInt(yyyy);
+        const startDate = new Date(year, 0, 1); // January 1st
+        const endDate = new Date(year, 11, 31); // December 31st
+        
+        return {
+            startDate: startDate.toISOString().split('T')[0],
+            endDate: endDate.toISOString().split('T')[0]
+        };
     };
 
     // Calculate date range for filtering
@@ -394,6 +481,64 @@ const LeaderboardPage = () => {
     // Fetch report dates
     const fetchReportDates = async () => {
         try {
+            // For Daily_Activity, Codes, or VIPs mode, generate date ranges based on report type
+            if (isDailyActivity || isCodes || isVIPs) {
+                if (reportType === 'MTD Recap') {
+                    // Generate last 12 months in MM/YYYY format for MTD
+                    const months = [];
+                    const today = new Date();
+                    
+                    for (let i = 0; i < 12; i++) {
+                        const monthDate = new Date(today.getFullYear(), today.getMonth() - i, 1);
+                        const monthString = `${String(monthDate.getMonth() + 1).padStart(2, '0')}/${monthDate.getFullYear()}`;
+                        months.push(monthString);
+                    }
+                    
+                    setReportDates(months);
+                    setDefaultDate(months[0]); // Most recent month
+                    setSelectedDate(months[0]);
+                } else if (reportType === 'YTD Recap') {
+                    // Generate last 5 years in YYYY format for YTD
+                    const years = [];
+                    const currentYear = new Date().getFullYear();
+                    
+                    for (let i = 0; i < 5; i++) {
+                        years.push((currentYear - i).toString());
+                    }
+                    
+                    setReportDates(years);
+                    setDefaultDate(years[0]); // Most recent year
+                    setSelectedDate(years[0]);
+                } else {
+                    // Handle Weekly mode differently for VIPs vs Daily_Activity/Codes
+                    if (isVIPs) {
+                        // For VIPs in Weekly mode, default to current month (MM/YYYY format) since VIPs doesn't support weekly
+                        const today = new Date();
+                        const currentMonth = `${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+                        setReportDates([currentMonth]);
+                        setDefaultDate(currentMonth);
+                        setSelectedDate(currentMonth);
+                    } else {
+                        // Generate last 12 weeks of Monday-Sunday ranges for Weekly (Daily_Activity and Codes only)
+                        const weeks = [];
+                        const today = new Date();
+                        
+                        for (let i = 0; i < 12; i++) {
+                            const weekDate = new Date(today);
+                            weekDate.setDate(today.getDate() - (i * 7));
+                            const monday = getMondayOfWeek(weekDate);
+                            weeks.push(monday.toISOString().split('T')[0]);
+                        }
+                        
+                        setReportDates(weeks);
+                        setDefaultDate(weeks[0]); // Most recent week
+                        setSelectedDate(weeks[0]);
+                    }
+                }
+                return;
+            }
+
+            // For regular ALP data
             const response = await api.get('/alp/getReportDates', {
                 params: { reportType }
             });
@@ -423,7 +568,294 @@ const LeaderboardPage = () => {
     const fetchLeaderboardData = async (endpoint, key) => {
         let filters = {};
         
-        // Determine if we should use Monthly_ALP or Weekly_ALP
+        // Handle Daily_Activity data source
+        if (isDailyActivity) {
+            try {
+                setLeaderboardData(prev => ({
+                    ...prev,
+                    [key]: { ...prev[key], loading: true }
+                }));
+
+                // Build filter parameters for the new filtered endpoint
+                const filterParams = {};
+                
+                // Add date range filtering
+                if (selectedDate) {
+                    let startDate, endDate;
+                    
+                    if (isYYYYFormat(selectedDate)) {
+                        // YTD format: YYYY -> get full year range
+                        const yearRange = getYearlyDateRange(selectedDate);
+                        startDate = yearRange.startDate;
+                        endDate = yearRange.endDate;
+                    } else if (isMMYYYYFormat(selectedDate)) {
+                        // MTD format: MM/YYYY -> get full month range
+                        const monthRange = getMonthlyDateRange(selectedDate);
+                        startDate = monthRange.startDate;
+                        endDate = monthRange.endDate;
+                    } else {
+                        // Weekly format: get Monday-Sunday range
+                        const weekRange = getWeeklyDateRange(selectedDate);
+                        startDate = weekRange.startDate;
+                        endDate = weekRange.endDate;
+                    }
+                    
+                    filterParams.startDate = startDate;
+                    filterParams.endDate = endDate;
+                }
+                
+                // Add MGA/RGA/Tree filters (same logic as Weekly_ALP)
+                if (selectedMGA && selectedMGA.value) {
+                    filterParams.MGA_NAME = selectedMGA.value;
+                }
+                if (selectedRGA && selectedRGA.value) {
+                    filterParams.rga = selectedRGA.value;
+                }
+                if (selectedTree && selectedTree.value) {
+                    filterParams.tree = selectedTree.value;
+                }
+
+                // Use the new filtered endpoint with MGA table joins
+                const response = await api.get('/dailyActivity/filtered', { params: filterParams });
+                
+                if (response.data.success) {
+                    let currentData = response.data.data;
+                    
+                    const currentProcessedData = processDailyActivityData(currentData, key, dailyActivityMetric);
+                    
+                    // For Daily_Activity, we might not have previous period data initially
+                    // TODO: Implement previous period comparison for Daily_Activity if needed
+                    const dataWithRankChanges = currentProcessedData.map(item => ({
+                        ...item,
+                        previousRank: undefined,
+                        rankChange: "NEW"
+                    }));
+
+                    setLeaderboardData(prev => ({
+                        ...prev,
+                        [key]: { data: dataWithRankChanges, loading: false }
+                    }));
+                } else {
+                    setLeaderboardData(prev => ({
+                        ...prev,
+                        [key]: { data: [], loading: false }
+                    }));
+                }
+            } catch (error) {
+                console.error(`Error fetching Daily_Activity ${key} leaderboard data:`, error);
+                setLeaderboardData(prev => ({
+                    ...prev,
+                    [key]: { data: [], loading: false }
+                }));
+            }
+            return; // Exit early for Daily_Activity data
+        }
+
+        // Handle Codes data source
+        if (isCodes) {
+            try {
+                setLeaderboardData(prev => ({
+                    ...prev,
+                    [key]: { ...prev[key], loading: true }
+                }));
+
+                // Build filter parameters for the codes endpoint
+                const filterParams = {};
+                
+                // Add date range filtering
+                if (selectedDate) {
+                    let startDate, endDate;
+                    
+                    if (isYYYYFormat(selectedDate)) {
+                        // YTD format: YYYY -> get full year range
+                        const yearRange = getYearlyDateRange(selectedDate);
+                        startDate = yearRange.startDate;
+                        endDate = yearRange.endDate;
+                    } else if (isMMYYYYFormat(selectedDate)) {
+                        // MTD format: MM/YYYY -> get full month range
+                        const monthRange = getMonthlyDateRange(selectedDate);
+                        startDate = monthRange.startDate;
+                        endDate = monthRange.endDate;
+                    } else {
+                        // Weekly format: get Monday-Sunday range
+                        const weekRange = getWeeklyDateRange(selectedDate);
+                        startDate = weekRange.startDate;
+                        endDate = weekRange.endDate;
+                    }
+                    
+                    filterParams.startDate = startDate;
+                    filterParams.endDate = endDate;
+                }
+                
+                // Add MGA/RGA/Tree filters (same logic as Weekly_ALP)
+                if (selectedMGA && selectedMGA.value) {
+                    filterParams.MGA_NAME = selectedMGA.value;
+                }
+                if (selectedRGA && selectedRGA.value) {
+                    filterParams.rga = selectedRGA.value;
+                }
+                if (selectedTree && selectedTree.value) {
+                    filterParams.tree = selectedTree.value;
+                }
+
+                // Use the codes endpoint
+                const response = await api.get('/dailyActivity/codes', { params: filterParams });
+                
+                if (response.data.success) {
+                    let currentData = response.data.data;
+                    
+                    const currentProcessedData = processCodesData(currentData, key);
+                    
+                    // For Codes, we might not have previous period data initially
+                    const dataWithRankChanges = currentProcessedData.map(item => ({
+                        ...item,
+                        previousRank: undefined,
+                        rankChange: "NEW"
+                    }));
+
+                    setLeaderboardData(prev => ({
+                        ...prev,
+                        [key]: { data: dataWithRankChanges, loading: false }
+                    }));
+                } else {
+                    setLeaderboardData(prev => ({
+                        ...prev,
+                        [key]: { data: [], loading: false }
+                    }));
+                }
+            } catch (error) {
+                console.error(`Error fetching Codes ${key} leaderboard data:`, error);
+                setLeaderboardData(prev => ({
+                    ...prev,
+                    [key]: { data: [], loading: false }
+                }));
+            }
+            return; // Exit early for Codes data
+        }
+
+        // Handle VIPs data source
+        if (isVIPs) {
+            try {
+                setLeaderboardData(prev => ({
+                    ...prev,
+                    [key]: { ...prev[key], loading: true }
+                }));
+
+                // Validate that selectedDate format matches reportType expectations
+                const isValidDateFormat = 
+                    (reportType === 'MTD Recap' && isMMYYYYFormat(selectedDate)) ||
+                    (reportType === 'YTD Recap' && isYYYYFormat(selectedDate)) ||
+                    (reportType === 'Weekly Recap') || // Weekly can use any format since it defaults to MTD
+                    (!selectedDate); // Allow empty selectedDate during initialization
+                
+                if (!isValidDateFormat && selectedDate) {
+                    setLeaderboardData(prev => ({
+                        ...prev,
+                        [key]: { data: [], loading: false }
+                    }));
+                    return;
+                }
+
+                // Build filter parameters for the VIPs endpoint
+                const filterParams = {};
+                
+                // Add period and date filtering for VIPs (MTD/YTD only)
+                // Convert reportType to the format expected by backend
+                let period;
+                let year, month;
+                
+                if (reportType === 'MTD Recap') {
+                    period = 'mtd';
+                    if (selectedDate && isMMYYYYFormat(selectedDate)) {
+                        // Parse MM/YYYY format
+                        const [monthStr, yearStr] = selectedDate.split('/');
+                        month = parseInt(monthStr);
+                        year = parseInt(yearStr);
+                    } else {
+                        // Default to current month when selectedDate is not in MM/YYYY format
+                        // This happens when switching from YTD (YYYY format) to MTD mode
+                        const currentDate = new Date();
+                        year = currentDate.getFullYear();
+                        month = currentDate.getMonth() + 1;
+                    }
+                } else if (reportType === 'YTD Recap') {
+                    period = 'ytd';
+                    if (selectedDate && isYYYYFormat(selectedDate)) {
+                        // Parse YYYY format
+                        year = parseInt(selectedDate);
+                    } else {
+                        // Default to current year
+                        year = new Date().getFullYear();
+                    }
+                } else {
+                    // Default to MTD for Weekly mode (VIPs doesn't support weekly)
+                    period = 'mtd';
+                    if (selectedDate && isMMYYYYFormat(selectedDate)) {
+                        const [monthStr, yearStr] = selectedDate.split('/');
+                        month = parseInt(monthStr);
+                        year = parseInt(yearStr);
+                    } else {
+                        // Default to current month for any other date format or no date
+                        const currentDate = new Date();
+                        year = currentDate.getFullYear();
+                        month = currentDate.getMonth() + 1;
+                    }
+                }
+                
+                filterParams.period = period;
+                filterParams.year = year;
+                
+                if (period === 'mtd') {
+                    filterParams.month = month;
+                }
+                
+                // Add MGA/RGA/Tree filters (same logic as other endpoints)
+                if (selectedMGA && selectedMGA.value) {
+                    filterParams.MGA_NAME = selectedMGA.value;
+                }
+                if (selectedRGA && selectedRGA.value) {
+                    filterParams.rga = selectedRGA.value;
+                }
+                if (selectedTree && selectedTree.value) {
+                    filterParams.tree = selectedTree.value;
+                }
+
+                // Use the VIPs endpoint
+                const response = await api.get('/dailyActivity/vips', { params: filterParams });
+                
+                if (response.data.success) {
+                    let currentData = response.data.data;
+                    
+                    const currentProcessedData = processVIPsData(currentData, key);
+                    
+                    // For VIPs, we might not have previous period data initially
+                    const dataWithRankChanges = currentProcessedData.map(item => ({
+                        ...item,
+                        previousRank: undefined,
+                        rankChange: "NEW"
+                    }));
+
+                    setLeaderboardData(prev => ({
+                        ...prev,
+                        [key]: { data: dataWithRankChanges, loading: false }
+                    }));
+                } else {
+                    setLeaderboardData(prev => ({
+                        ...prev,
+                        [key]: { data: [], loading: false }
+                    }));
+                }
+            } catch (error) {
+                console.error(`Error fetching VIPs ${key} leaderboard data:`, error);
+                setLeaderboardData(prev => ({
+                    ...prev,
+                    [key]: { data: [], loading: false }
+                }));
+            }
+            return; // Exit early for VIPs data
+        }
+        
+        // Determine if we should use Monthly_ALP or Weekly_ALP (existing logic)
         const useMonthlyData = isMonthSelection(selectedDate);
         
         if (useMonthlyData) {
@@ -477,8 +909,6 @@ const LeaderboardPage = () => {
                         const currentYear = new Date().getFullYear();
                         const previousDecember = `12/${currentYear - 1}`;
                         
-                        console.log(`[LeaderboardPage] Fetching December data for: ${previousDecember}`);
-                        
                         const decemberEndpoint = endpoint.replace('getweekly', 'getmonthly');
                         const decemberResponse = await api.get(`/alp/${decemberEndpoint}`, {
                             params: {
@@ -490,12 +920,8 @@ const LeaderboardPage = () => {
                         });
                         
                         if (decemberResponse.data.success && decemberResponse.data.data.length > 0) {
-                            console.log(`[LeaderboardPage] December data found: ${decemberResponse.data.data.length} records`);
                             // Combine current YTD data with previous December data
                             currentData = combineYTDWithDecember(currentData, decemberResponse.data.data);
-                            console.log(`[LeaderboardPage] Combined data: ${currentData.length} records`);
-                        } else {
-                            console.log(`[LeaderboardPage] No December data found for ${previousDecember}`);
                         }
                     } catch (error) {
                         console.warn('Could not fetch previous December data:', error);
@@ -587,6 +1013,520 @@ const LeaderboardPage = () => {
             .map((item, index) => ({ ...item, rank: index + 1 }));
     };
 
+    // Process Daily_Activity data to match the Leaderboard component format
+    const processDailyActivityData = (data, key, selectedMetric = 'alp') => {
+        if (key === 'all') {
+            // For "all" leaderboard, aggregate by agent name to avoid duplicates
+            const agentMap = new Map();
+            
+            // First, group all data by agent name and apply experience filtering
+            data.forEach(row => {
+                if (!row.agent || row.agent.trim() === '') return;
+                
+                // Apply experience filtering
+                if (!filterByExperienceForDailyActivity(row)) return;
+                
+                const agentName = row.agent.trim();
+                if (!agentMap.has(agentName)) {
+                    agentMap.set(agentName, {
+                        agent: agentName,
+                        MGA: row.MGA || '',
+                        esid: row.esid || '',
+                        reportDate: row.reportDate,
+                        userRole: row.userRole || '', // Add userRole from activeusers.clname
+                        calls: 0,
+                        appts: 0,
+                        sits: 0,
+                        sales: 0,
+                        alp: 0,
+                        refs: 0,
+                        refAlp: 0
+                    });
+                }
+                
+                // Aggregate the metrics
+                const existing = agentMap.get(agentName);
+                existing.calls += parseFloat(row.calls || 0);
+                existing.appts += parseFloat(row.appts || 0);
+                existing.sits += parseFloat(row.sits || 0);
+                existing.sales += parseFloat(row.sales || 0);
+                existing.alp += parseFloat(row.alp || 0);
+                existing.refs += parseFloat(row.refs || 0);
+                existing.refAlp += parseFloat(row.refAlp || 0);
+                
+                // Update userRole if current entry has one and existing doesn't
+                if (row.userRole && !existing.userRole) {
+                    existing.userRole = row.userRole;
+                }
+            });
+            
+            // Convert aggregated data to array and process
+            return Array.from(agentMap.values())
+                .map((row, index) => {
+                    let value;
+                    
+                    // Map the selected metric to the actual column value
+                    switch (selectedMetric) {
+                        case 'calls':
+                            value = row.calls;
+                            break;
+                        case 'appts':
+                            value = row.appts;
+                            break;
+                        case 'sits':
+                            value = row.sits;
+                            break;
+                        case 'sales':
+                            value = row.sales;
+                            break;
+                        case 'alp':
+                            value = row.alp;
+                            break;
+                        case 'refs':
+                            value = row.refs;
+                            break;
+                        case 'refAlp':
+                            value = row.refAlp;
+                            break;
+                        default:
+                            value = row.alp;
+                    }
+
+                    return {
+                        rank: index + 1,
+                        name: row.agent,
+                        value: parseFloat(value) || 0,
+                        profile_picture: null,
+                        clname: row.userRole || row.agent, // Use userRole from activeusers.clname, fallback to agent name
+                        mga: getMgalastName(row.MGA, row.agent), // Use last name only
+                        mgaLastName: getMgalastName(row.MGA, row.agent),
+                        esid: row.esid || '',
+                        start: null,
+                        reportdate: row.reportDate,
+                        // Additional Daily_Activity specific fields for reference
+                        calls: row.calls,
+                        appts: row.appts,
+                        sits: row.sits,
+                        sales: row.sales,
+                        alp: row.alp,
+                        refs: row.refs,
+                        refAlp: row.refAlp
+                    };
+                })
+                .sort((a, b) => (b.value || 0) - (a.value || 0))
+                .map((item, index) => ({ ...item, rank: index + 1 }));
+        } else {
+            // For SA, GA, MGA, RGA - aggregate by hierarchy level
+            let hierarchyColumn;
+            let hierarchyName;
+            
+            switch (key) {
+                case 'sa':
+                    hierarchyColumn = 'SA';
+                    hierarchyName = 'SA';
+                    break;
+                case 'ga':
+                    hierarchyColumn = 'GA';
+                    hierarchyName = 'GA';
+                    break;
+                case 'mga':
+                    hierarchyColumn = 'MGA';
+                    hierarchyName = 'MGA';
+                    break;
+                case 'rga':
+                    hierarchyColumn = 'rga';
+                    hierarchyName = 'RGA';
+                    break;
+                default:
+                    return [];
+            }
+            
+            // Apply experience filtering to the data first
+            const filteredData = data.filter(filterByExperienceForDailyActivity);
+            
+            // Get unique values from the hierarchy column
+            const uniqueHierarchyValues = [...new Set(
+                filteredData
+                    .filter(row => row[hierarchyColumn] && row[hierarchyColumn].trim() !== '')
+                    .map(row => row[hierarchyColumn].trim())
+            )];
+            
+            // Aggregate data for each unique hierarchy value
+            const aggregatedData = uniqueHierarchyValues.map(hierarchyValue => {
+                // Find all rows where either:
+                // 1. The hierarchy column matches this value, OR
+                // 2. The agent column matches this value (for self-reporting)
+                const relatedRows = filteredData.filter(row => 
+                    (row[hierarchyColumn] && row[hierarchyColumn].trim() === hierarchyValue) ||
+                    (row.agent && row.agent.trim() === hierarchyValue)
+                );
+                
+                // Sum up the metrics for all related rows
+                const aggregatedMetrics = relatedRows.reduce((acc, row) => {
+                    acc.calls += parseFloat(row.calls || 0);
+                    acc.appts += parseFloat(row.appts || 0);
+                    acc.sits += parseFloat(row.sits || 0);
+                    acc.sales += parseFloat(row.sales || 0);
+                    acc.alp += parseFloat(row.alp || 0);
+                    acc.refs += parseFloat(row.refs || 0);
+                    acc.refAlp += parseFloat(row.refAlp || 0);
+                    return acc;
+                }, {
+                    calls: 0,
+                    appts: 0,
+                    sits: 0,
+                    sales: 0,
+                    alp: 0,
+                    refs: 0,
+                    refAlp: 0
+                });
+                
+                // Get the value for the selected metric
+                let value;
+                switch (selectedMetric) {
+                    case 'calls':
+                        value = aggregatedMetrics.calls;
+                        break;
+                    case 'appts':
+                        value = aggregatedMetrics.appts;
+                        break;
+                    case 'sits':
+                        value = aggregatedMetrics.sits;
+                        break;
+                    case 'sales':
+                        value = aggregatedMetrics.sales;
+                        break;
+                    case 'alp':
+                        value = aggregatedMetrics.alp;
+                        break;
+                    case 'refs':
+                        value = aggregatedMetrics.refs;
+                        break;
+                    case 'refAlp':
+                        value = aggregatedMetrics.refAlp;
+                        break;
+                    default:
+                        value = aggregatedMetrics.alp;
+                }
+                
+                // Get additional info from the first related row for display purposes
+                const firstRow = relatedRows[0] || {};
+                
+                return {
+                    rank: 0, // Will be set after sorting
+                    name: hierarchyValue,
+                    value: value,
+                    profile_picture: null,
+                    clname: hierarchyName,
+                    mga: getMgalastName(firstRow.MGA, firstRow.agent), // Use last name only
+                    mgaLastName: getMgalastName(firstRow.MGA, firstRow.agent),
+                    esid: firstRow.esid || '',
+                    start: null,
+                    reportdate: firstRow.reportDate,
+                    // Store all aggregated metrics for reference
+                    calls: aggregatedMetrics.calls,
+                    appts: aggregatedMetrics.appts,
+                    sits: aggregatedMetrics.sits,
+                    sales: aggregatedMetrics.sales,
+                    alp: aggregatedMetrics.alp,
+                    refs: aggregatedMetrics.refs,
+                    refAlp: aggregatedMetrics.refAlp
+                };
+            });
+            
+            // Sort by value and assign ranks
+            return aggregatedData
+                .sort((a, b) => (b.value || 0) - (a.value || 0))
+                .map((item, index) => ({ ...item, rank: index + 1 }));
+        }
+    };
+
+    // Process Codes data to match the Leaderboard component format
+    const processCodesData = (data, key) => {
+        if (key === 'all') {
+            // For "all" leaderboard, aggregate all manager types with hierarchical counting
+            const managerMap = new Map();
+            
+            // Process each row and count codes for the highest-level manager present
+            data.forEach(row => {
+                let managerName = null;
+                let managerType = null;
+                
+                // Hierarchical logic: SA takes priority, then GA, then MGA
+                if (row.SA && row.SA.trim() !== '') {
+                    // If SA is present, count for SA only
+                    managerName = row.SA.trim();
+                    managerType = 'SA';
+                } else if (row.GA && row.GA.trim() !== '') {
+                    // If GA is present but no SA, count for GA
+                    managerName = row.GA.trim();
+                    managerType = 'GA';
+                } else if (row.MGA && row.MGA.trim() !== '') {
+                    // If MGA is present but no SA or GA, count for MGA
+                    managerName = row.MGA.trim();
+                    managerType = 'MGA';
+                }
+                
+                // Only process if we found a manager
+                if (managerName && managerType) {
+                    if (!managerMap.has(managerName)) {
+                        managerMap.set(managerName, {
+                            name: managerName,
+                            MGA: row.MGA || '',
+                            PRODDATE: row.PRODDATE,
+                            codeCount: 0,
+                            managerType: managerType
+                        });
+                    }
+                    managerMap.get(managerName).codeCount += 1;
+                }
+            });
+            
+            // Convert aggregated data to array and process
+            return Array.from(managerMap.values())
+                .map((row, index) => ({
+                    rank: index + 1,
+                    name: row.name,
+                    value: row.codeCount,
+                    profile_picture: null,
+                    clname: row.managerType, // Show SA, GA, or MGA as the role
+                    mga: getMgalastName(row.MGA, row.name),
+                    mgaLastName: getMgalastName(row.MGA, row.name),
+                    esid: '',
+                    start: null,
+                    reportdate: row.PRODDATE,
+                }))
+                .sort((a, b) => (b.value || 0) - (a.value || 0))
+                .map((item, index) => ({ ...item, rank: index + 1 }));
+        } else {
+            // For SA, GA, MGA - aggregate by hierarchy level
+            let hierarchyColumn;
+            let hierarchyName;
+            
+            switch (key) {
+                case 'sa':
+                    hierarchyColumn = 'SA';
+                    hierarchyName = 'SA';
+                    break;
+                case 'ga':
+                    hierarchyColumn = 'GA';
+                    hierarchyName = 'GA';
+                    break;
+                case 'mga':
+                    hierarchyColumn = 'MGA';
+                    hierarchyName = 'MGA';
+                    break;
+                default:
+                    return [];
+            }
+            
+            // Get unique values from the hierarchy column
+            const uniqueHierarchyValues = [...new Set(
+                data
+                    .filter(row => row[hierarchyColumn] && row[hierarchyColumn].trim() !== '')
+                    .map(row => row[hierarchyColumn].trim())
+            )];
+            
+            // Aggregate data for each unique hierarchy value
+            const aggregatedData = uniqueHierarchyValues.map(hierarchyValue => {
+                // Find all rows where either:
+                // 1. The hierarchy column matches this value, OR
+                // 2. The LagnName column matches this value (for self-reporting)
+                const relatedRows = data.filter(row => 
+                    (row[hierarchyColumn] && row[hierarchyColumn].trim() === hierarchyValue) ||
+                    (row.LagnName && row.LagnName.trim() === hierarchyValue)
+                );
+                
+                // Count the codes for this hierarchy value
+                const codeCount = relatedRows.length;
+                
+                // Get additional info from the first related row for display purposes
+                const firstRow = relatedRows[0] || {};
+                
+                return {
+                    rank: 0, // Will be set after sorting
+                    name: hierarchyValue,
+                    value: codeCount,
+                    profile_picture: null,
+                    clname: hierarchyName,
+                    mga: getMgalastName(firstRow.MGA, firstRow.LagnName),
+                    mgaLastName: getMgalastName(firstRow.MGA, firstRow.LagnName),
+                    esid: '',
+                    start: null,
+                    reportdate: firstRow.PRODDATE,
+                };
+            });
+            
+            // Sort by value and assign ranks
+            return aggregatedData
+                .sort((a, b) => (b.value || 0) - (a.value || 0))
+                .map((item, index) => ({ ...item, rank: index + 1 }));
+        }
+    };
+
+    // Process VIPs data to match the Leaderboard component format
+    const processVIPsData = (data, key) => {
+        if (key === 'all') {
+            // For "all" leaderboard, aggregate all manager types with hierarchical counting
+            const managerMap = new Map();
+            
+            // Process each row and count VIPs for the highest-level manager present
+            data.forEach(row => {
+                let managerName = null;
+                let managerType = null;
+                
+                // Hierarchical logic: SA takes priority, then GA, then MGA
+                if (row.sa && row.sa.trim() !== '') {
+                    // If SA is present, count for SA only
+                    managerName = row.sa.trim();
+                    managerType = 'SA';
+                } else if (row.ga && row.ga.trim() !== '') {
+                    // If GA is present but no SA, count for GA
+                    managerName = row.ga.trim();
+                    managerType = 'GA';
+                } else if (row.mga && row.mga.trim() !== '') {
+                    // If MGA is present but no SA or GA, count for MGA
+                    managerName = row.mga.trim();
+                    managerType = 'MGA';
+                }
+                
+                // Only process if we found a manager
+                if (managerName && managerType) {
+                    if (!managerMap.has(managerName)) {
+                        managerMap.set(managerName, {
+                            name: managerName,
+                            mga: row.mga || '',
+                            vip_month: row.vip_month,
+                            vipCount: 0,
+                            managerType: managerType
+                        });
+                    }
+                    managerMap.get(managerName).vipCount += 1;
+                }
+            });
+            
+            // Convert aggregated data to array and process
+            return Array.from(managerMap.values())
+                .map((row, index) => ({
+                    rank: index + 1,
+                    name: row.name,
+                    value: row.vipCount,
+                    profile_picture: null,
+                    clname: row.managerType, // Show SA, GA, or MGA as the role
+                    mga: getMgalastName(row.mga, row.name),
+                    mgaLastName: getMgalastName(row.mga, row.name),
+                    esid: '',
+                    start: null,
+                    reportdate: row.vip_month,
+                }))
+                .sort((a, b) => (b.value || 0) - (a.value || 0))
+                .map((item, index) => ({ ...item, rank: index + 1 }));
+        } else {
+            // For SA, GA, MGA - aggregate by hierarchy level
+            let hierarchyColumn;
+            let hierarchyName;
+            
+            switch (key) {
+                case 'sa':
+                    hierarchyColumn = 'sa';
+                    hierarchyName = 'SA';
+                    break;
+                case 'ga':
+                    hierarchyColumn = 'ga';
+                    hierarchyName = 'GA';
+                    break;
+                case 'mga':
+                    hierarchyColumn = 'mga';
+                    hierarchyName = 'MGA';
+                    break;
+                default:
+                    return [];
+            }
+            
+            // Get unique values from the hierarchy column
+            const uniqueHierarchyValues = [...new Set(
+                data
+                    .filter(row => row[hierarchyColumn] && row[hierarchyColumn].trim() !== '')
+                    .map(row => row[hierarchyColumn].trim())
+            )];
+            
+            // Aggregate data for each unique hierarchy value
+            const aggregatedData = uniqueHierarchyValues.map(hierarchyValue => {
+                // Find all rows where either:
+                // 1. The hierarchy column matches this value, OR
+                // 2. The lagnname column matches this value (for self-reporting)
+                const relatedRows = data.filter(row => 
+                    (row[hierarchyColumn] && row[hierarchyColumn].trim() === hierarchyValue) ||
+                    (row.lagnname && row.lagnname.trim() === hierarchyValue)
+                );
+                
+                // Count the VIPs for this hierarchy value
+                const vipCount = relatedRows.length;
+                
+                // Get additional info from the first related row for display purposes
+                const firstRow = relatedRows[0] || {};
+                
+                return {
+                    rank: 0, // Will be set after sorting
+                    name: hierarchyValue,
+                    value: vipCount,
+                    profile_picture: null,
+                    clname: hierarchyName,
+                    mga: getMgalastName(firstRow.mga, firstRow.lagnname),
+                    mgaLastName: getMgalastName(firstRow.mga, firstRow.lagnname),
+                    esid: '',
+                    start: null,
+                    reportdate: firstRow.vip_month,
+                };
+            });
+            
+            // Sort by value and assign ranks
+            return aggregatedData
+                .sort((a, b) => (b.value || 0) - (a.value || 0))
+                .map((item, index) => ({ ...item, rank: index + 1 }));
+        }
+    };
+
+    // Filter by experience logic for Daily_Activity data
+    const filterByExperienceForDailyActivity = (row) => {
+        if (experienceFilter === 'all') return true;
+
+        const today = new Date();
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(today.getFullYear() - 1);
+
+        let hireDate = null;
+
+        // Use esid as hire date for Daily_Activity data
+        if (row.esid) {
+            // Handle different date formats that might be in esid
+            // Could be ISO string, date string, or timestamp
+            hireDate = new Date(row.esid);
+            
+            // If the date parsing failed, try parsing as ISO date
+            if (isNaN(hireDate.getTime()) && typeof row.esid === 'string') {
+                // Try parsing just the date part if it's an ISO string
+                const datePart = row.esid.split('T')[0];
+                hireDate = new Date(datePart);
+            }
+        }
+
+        // If we couldn't parse a valid hire date, include in all groups
+        if (!hireDate || isNaN(hireDate.getTime())) {
+            return true;
+        }
+
+        // Rookie: hired within the last year
+        // Veteran: hired more than a year ago
+        if (experienceFilter === 'rookie') {
+            return hireDate > oneYearAgo;
+        } else if (experienceFilter === 'veteran') {
+            return hireDate <= oneYearAgo;
+        }
+
+        return true;
+    };
+
     // Filter by experience logic
     const filterByExperience = (row) => {
         if (experienceFilter === 'all') return true;
@@ -632,6 +1572,27 @@ const LeaderboardPage = () => {
         }).format(value);
     };
 
+    // Format Daily_Activity values (non-currency)
+    const formatDailyActivityValue = (value) => {
+        if (!value && value !== 0) return "0";
+        
+        // For ALP and refAlp metrics, format as currency
+        if (dailyActivityMetric === 'alp' || dailyActivityMetric === 'refAlp') {
+            return new Intl.NumberFormat('en-US', { 
+                style: 'currency', 
+                currency: 'USD',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(value);
+        }
+        
+        // For other metrics (calls, appts, sits, sales, refs), format as number
+        return new Intl.NumberFormat('en-US', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(value);
+    };
+
     // Extract last name from MGA field (format: "LAST FIRST MIDDLE SUFFIX")
     // If MGA is blank, use the agent's last name (also in "LAST FIRST MIDDLE SUFFIX" format)
     const getMgalastName = (mgaName, agentName) => {
@@ -647,6 +1608,20 @@ const LeaderboardPage = () => {
         }
         
         return '';
+    };
+
+    // Format metric name for display
+    const formatMetricName = (metric) => {
+        const metricNames = {
+            'calls': 'Calls',
+            'appts': 'Appointments',
+            'sits': 'Sits',
+            'sales': 'Sales',
+            'alp': 'ALP',
+            'refs': 'Referrals',
+            'refAlp': 'Ref ALP'
+        };
+        return metricNames[metric] || metric;
     };
 
     // Handle date navigation
@@ -709,14 +1684,17 @@ const LeaderboardPage = () => {
 
     // Load data when filters change
     useEffect(() => {
-        if (selectedDate && reportDates.length > 0) {
+        if ((selectedDate && reportDates.length > 0) || (isVIPs && selectedDate)) {
             fetchLeaderboardData('getweeklyall', 'all');
             fetchLeaderboardData('getweeklysa', 'sa');
             fetchLeaderboardData('getweeklyga', 'ga');
             fetchLeaderboardData('getweeklymga', 'mga');
+            // Only fetch RGA data when not in Daily Activity, Codes, or VIPs mode
+            if (!isDailyActivity && !isCodes && !isVIPs) {
             fetchLeaderboardData('getweeklyrga', 'rga');
         }
-    }, [selectedDate, reportType, selectedMGA, selectedRGA, selectedTree, isF6, netOrGross, experienceFilter, reportDates, includePrevDecember]);
+        }
+    }, [selectedDate, reportType, selectedMGA, selectedRGA, selectedTree, isF6, netOrGross, experienceFilter, reportDates, includePrevDecember, isDailyActivity, dailyActivityMetric, isCodes, isVIPs]);
 
     // Initialize data and refetch when reportType changes
     useEffect(() => {
@@ -727,7 +1705,7 @@ const LeaderboardPage = () => {
         if (reportType !== 'YTD Recap') {
             setIncludePrevDecember(false);
         }
-    }, [reportType]);
+    }, [reportType, isDailyActivity, isCodes, isVIPs]);
 
     // Reset all filters
     const resetAllFilters = () => {
@@ -735,6 +1713,20 @@ const LeaderboardPage = () => {
         setSelectedRGA(null);
         setSelectedTree(null);
     };
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (!event.target.closest('.reported-button-container')) {
+                setIsReportedDropdownOpen(false);
+            }
+        };
+
+        if (isReportedDropdownOpen) {
+            document.addEventListener('click', handleClickOutside);
+            return () => document.removeEventListener('click', handleClickOutside);
+        }
+    }, [isReportedDropdownOpen]);
 
     // Custom filter content for the FilterMenu
     const customFilterContent = (
@@ -852,10 +1844,97 @@ const LeaderboardPage = () => {
 
     return (
         <div className="leaderboard-page">
+            {/* Data Source Selection - Centered at top */}
+            <div className="data-source-selection">
+                <div className="data-source-buttons">
+                    <button 
+                        className={!isDailyActivity && !isCodes && !isVIPs ? 'data-source-btn active' : 'data-source-btn'}
+                        onClick={() => {
+                            setIsDailyActivity(false);
+                            setIsCodes(false);
+                            setIsVIPs(false);
+                        }}
+                    >
+                        Official ALP
+                    </button>
+                    <div className="reported-button-container">
+                        <button 
+                            className={isDailyActivity ? 'data-source-btn active reported-btn' : 'data-source-btn reported-btn'}
+                            onClick={() => {
+                                setIsDailyActivity(true);
+                                setIsCodes(false);
+                                setIsVIPs(false);
+                            }}
+                        >
+                            <span>Reported {formatMetricName(dailyActivityMetric)}</span>
+                        </button>
+                        <button 
+                            className={isDailyActivity ? 'data-source-dropdown-btn active' : 'data-source-dropdown-btn'}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsReportedDropdownOpen(!isReportedDropdownOpen);
+                            }}
+                        >
+                            <span className={`dropdown-arrow ${isReportedDropdownOpen ? 'open' : ''}`}>▼</span>
+                        </button>
+                        {isReportedDropdownOpen && (
+                            <div className="reported-dropdown">
+                                <div className="dropdown-item" onClick={() => { setDailyActivityMetric('alp'); setIsReportedDropdownOpen(false); }}>
+                                    ALP
+                                </div>
+                                <div className="dropdown-item" onClick={() => { setDailyActivityMetric('calls'); setIsReportedDropdownOpen(false); }}>
+                                    Calls
+                                </div>
+                                <div className="dropdown-item" onClick={() => { setDailyActivityMetric('appts'); setIsReportedDropdownOpen(false); }}>
+                                    Appointments
+                                </div>
+                                <div className="dropdown-item" onClick={() => { setDailyActivityMetric('sits'); setIsReportedDropdownOpen(false); }}>
+                                    Sits
+                                </div>
+                                <div className="dropdown-item" onClick={() => { setDailyActivityMetric('sales'); setIsReportedDropdownOpen(false); }}>
+                                    Sales
+                                </div>
+                                <div className="dropdown-item" onClick={() => { setDailyActivityMetric('refs'); setIsReportedDropdownOpen(false); }}>
+                                    Referrals
+                                </div>
+                                <div className="dropdown-item" onClick={() => { setDailyActivityMetric('refAlp'); setIsReportedDropdownOpen(false); }}>
+                                    Ref ALP
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <button 
+                        className={isCodes ? 'data-source-btn active' : 'data-source-btn'}
+                        onClick={() => {
+                            setIsDailyActivity(false);
+                            setIsCodes(true);
+                            setIsVIPs(false);
+                        }}
+                    >
+                        Codes
+                    </button>
+                    <button 
+                        className={isVIPs ? 'data-source-btn active' : 'data-source-btn'}
+                        onClick={() => {
+                            setIsDailyActivity(false);
+                            setIsCodes(false);
+                            setIsVIPs(true);
+                            // Switch to MTD if currently on Weekly since VIPs doesn't support weekly
+                            if (reportType === 'Weekly Recap') {
+                                setReportType('MTD Recap');
+                            }
+                        }}
+                    >
+                        VIPs
+                    </button>
+                </div>
+            </div>
+
             {/* Filter Controls */}
             <div className="leaderboard-filters">
                 <div className="leaderboard-filters-left">
-                    {/* Experience Filter */}
+                    {/* Experience Filter - Hide when VIPs or Codes is active */}
+                    {!isVIPs && !isCodes && (
                     <div className="experience-filter-container">
                         <span 
                             className={experienceFilter === 'all' ? 'selected' : 'unselected'} 
@@ -878,9 +1957,14 @@ const LeaderboardPage = () => {
                             Veteran
                         </span>
                     </div>
+                    )}
+                    </div>
 
-                    {/* Report Type Filter */}
+                {/* Report Type Filter - Centered - Hide Week option when VIPs is active */}
+                <div className="leaderboard-filters-center">
                     <div className="tabs-filter-container">
+                        {!isVIPs && (
+                        <>
                         <span 
                             className={reportType === 'Weekly Recap' ? 'selected' : 'unselected'} 
                             onClick={() => setReportType('Weekly Recap')}
@@ -888,6 +1972,8 @@ const LeaderboardPage = () => {
                             Week
                         </span>
                         <span className="separator">|</span>
+                        </>
+                        )}
                         <span 
                             className={reportType === 'MTD Recap' ? 'selected' : 'unselected'} 
                             onClick={() => setReportType('MTD Recap')}
@@ -902,23 +1988,11 @@ const LeaderboardPage = () => {
                             YTD
                         </span>
                     </div>
-
-                    {/* YTD December Toggle - Only show when YTD is selected */}
-                    {reportType === 'YTD Recap' && (
-                        <div className="december-toggle-container">
-                            <span 
-                                className={includePrevDecember ? 'selected' : 'unselected'} 
-                                onClick={() => setIncludePrevDecember(!includePrevDecember)}
-                                title="Include December from previous year"
-                            >
-                                +Prev Dec
-                            </span>
-                        </div>
-                    )}
                 </div>
 
                 <div className="leaderboard-filters-right">
-                    {/* Toggle Controls */}
+                    {/* Toggle Controls - Hide when Daily Activity, Codes, or VIPs is active */}
+                    {!isDailyActivity && !isCodes && !isVIPs && (
                     <div className="toggle-container">
                         <span 
                             className={isF6 ? 'selected' : 'unselected'} 
@@ -941,6 +2015,7 @@ const LeaderboardPage = () => {
                             Gross
                         </span>
                     </div>
+                    )}
 
                     {/* Filter Button */}
                     <div className="filter-button-container">
@@ -953,6 +2028,19 @@ const LeaderboardPage = () => {
                             customContentOnly={true}
                         />
                     </div>
+
+                    {/* YTD December Toggle - Only show when YTD is selected and not in Daily Activity, Codes, or VIPs mode */}
+                    {reportType === 'YTD Recap' && !isDailyActivity && !isCodes && !isVIPs && (
+                        <div className="december-toggle-container">
+                            <span 
+                                className={includePrevDecember ? 'selected' : 'unselected'} 
+                                onClick={() => setIncludePrevDecember(!includePrevDecember)}
+                                title="Include December from previous year"
+                            >
+                                +Prev Dec
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -995,9 +2083,13 @@ const LeaderboardPage = () => {
                         } else {
                             // Handle regular format (Weekly/YTD)
                             const date = typeof dateItem === 'string' ? dateItem : dateItem.value;
+                            
                             return (
                                 <option key={date} value={date}>
-                                    {formatToMMDDYYYY(date)}
+                                    {(isDailyActivity || isCodes || isVIPs) ? 
+                                        (isYYYYFormat(date) ? date : isMMYYYYFormat(date) ? date : formatWeeklyRange(date)) 
+                                        : formatToMMDDYYYY(date)
+                                    }
                                 </option>
                             );
                         }
@@ -1014,10 +2106,26 @@ const LeaderboardPage = () => {
                 <div className="leaderboard-main-row">
                     <Leaderboard
                         data={leaderboardData.all.data}
-                        title="Top Producers"
+                        title={
+                            isDailyActivity 
+                                ? `Top Producers - ${formatMetricName(dailyActivityMetric)}`
+                                : isCodes 
+                                    ? "Top Producers - Direct Codes"
+                                    : isVIPs
+                                        ? "Top Producers - VIPs"
+                                        : "Top Producers"
+                        }
                         nameField="name"
                         valueField="value"
-                        formatValue={formatValue}
+                        formatValue={
+                            isDailyActivity 
+                                ? formatDailyActivityValue 
+                                : isCodes 
+                                    ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
+                                    : isVIPs
+                                        ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
+                                        : formatValue
+                        }
                         loading={leaderboardData.all.loading}
                         variant="detailed"
                         showTrophies={true}
@@ -1037,10 +2145,26 @@ const LeaderboardPage = () => {
                 <div className="leaderboard-row">
                     <Leaderboard
                         data={leaderboardData.sa.data}
-                        title="Top SAs"
+                        title={
+                            isDailyActivity 
+                                ? `Top SAs - ${formatMetricName(dailyActivityMetric)}` 
+                                : isCodes 
+                                    ? "Top SAs - Codes"
+                                    : isVIPs
+                                        ? "Top SAs - VIPs"
+                                        : "Top SAs"
+                        }
                         nameField="name"
                         valueField="value"
-                        formatValue={formatValue}
+                        formatValue={
+                            isDailyActivity 
+                                ? formatDailyActivityValue 
+                                : isCodes 
+                                    ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
+                                    : isVIPs
+                                        ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
+                                        : formatValue
+                        }
                         loading={leaderboardData.sa.loading}
                         variant="detailed"
                         showProfilePicture={true}
@@ -1054,10 +2178,26 @@ const LeaderboardPage = () => {
                     />
                     <Leaderboard
                         data={leaderboardData.ga.data}
-                        title="Top GAs"
+                        title={
+                            isDailyActivity 
+                                ? `Top GAs - ${formatMetricName(dailyActivityMetric)}` 
+                                : isCodes 
+                                    ? "Top GAs - Codes"
+                                    : isVIPs
+                                        ? "Top GAs - VIPs"
+                                        : "Top GAs"
+                        }
                         nameField="name"
                         valueField="value"
-                        formatValue={formatValue}
+                        formatValue={
+                            isDailyActivity 
+                                ? formatDailyActivityValue 
+                                : isCodes 
+                                    ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
+                                    : isVIPs
+                                        ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
+                                        : formatValue
+                        }
                         loading={leaderboardData.ga.loading}
                         variant="detailed"
                         showProfilePicture={true}
@@ -1074,10 +2214,26 @@ const LeaderboardPage = () => {
                 <div className="leaderboard-row">
                     <Leaderboard
                         data={leaderboardData.mga.data}
-                        title="Top MGAs"
+                        title={
+                            isDailyActivity 
+                                ? `Top MGAs - ${formatMetricName(dailyActivityMetric)}` 
+                                : isCodes 
+                                    ? "Top MGAs - Codes"
+                                    : isVIPs
+                                        ? "Top MGAs - VIPs"
+                                        : "Top MGAs"
+                        }
                         nameField="name"
                         valueField="value"
-                        formatValue={formatValue}
+                        formatValue={
+                            isDailyActivity 
+                                ? formatDailyActivityValue 
+                                : isCodes 
+                                    ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
+                                    : isVIPs
+                                        ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
+                                        : formatValue
+                        }
                         loading={leaderboardData.mga.loading}
                         variant="detailed"
                         showProfilePicture={true}
@@ -1089,6 +2245,8 @@ const LeaderboardPage = () => {
                         formatAchievementBadge={formatAchievementBadge}
                         achievementColors={achievementColors}
                     />
+                    {/* Only show RGA leaderboard when not in Daily Activity, Codes, or VIPs mode */}
+                    {!isDailyActivity && !isCodes && !isVIPs && (
                     <Leaderboard
                         data={leaderboardData.rga.data}
                         title="Top RGAs"
@@ -1106,6 +2264,7 @@ const LeaderboardPage = () => {
                         formatAchievementBadge={formatAchievementBadge}
                         achievementColors={achievementColors}
                     />
+                    )}
                 </div>
             </div>
         </div>

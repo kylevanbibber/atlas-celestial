@@ -648,4 +648,65 @@ router.get('/licensed-states', async (req, res) => {
     }
 });
 
+// Send second pack to a user
+router.post('/second-pack', async (req, res) => {
+    try {
+        const { userId } = req.body;
+        
+        if (!userId) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'User ID is required' 
+            });
+        }
+
+        // Get user details
+        const user = await query(
+            'SELECT lagnname FROM activeusers WHERE id = ? LIMIT 1',
+            [userId]
+        );
+
+        if (user.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'User not found' 
+            });
+        }
+
+        const { lagnname } = user[0];
+        const now = new Date();
+
+        // Check if there's already a leads_released record for this user
+        const existingRecord = await query(
+            'SELECT * FROM leads_released WHERE userId = ? LIMIT 1',
+            [userId]
+        );
+
+        if (existingRecord.length > 0) {
+            // Update existing record to mark second pack as sent
+            await query(
+                'UPDATE leads_released SET sent = 1, sent_date = ?, last_updated = ?, type = ? WHERE userId = ?',
+                [now, now, 'Second Pack', userId]
+            );
+        } else {
+            // Create new record for second pack
+            await query(
+                'INSERT INTO leads_released (userId, lagnname, type, sent, sent_date, last_updated) VALUES (?, ?, ?, ?, ?, ?)',
+                [userId, lagnname, 'Second Pack', 1, now, now]
+            );
+        }
+
+        res.status(200).json({ 
+            success: true, 
+            message: 'Second pack marked as sent successfully' 
+        });
+    } catch (error) {
+        console.error('Error sending second pack:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error' 
+        });
+    }
+});
+
 module.exports = router; 

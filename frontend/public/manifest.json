@@ -1,6 +1,6 @@
 {
   "short_name": "Atlas",
-  "name": "Atlas",
+  "name": "Atlas Notification App",
   "icons": [
     {
       "src": "favicon.ico",
@@ -23,13 +23,28 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "theme_color": "#000000",
   "background_color": "#ffffff",
-  "description": "Atlas - Your Notification App",
+  "description": "Atlas - Your Notification App with Push Notifications",
   "dir": "ltr",
   "lang": "en-US",
   "prefer_related_applications": false,
   "related_applications": [],
-  "categories": ["productivity"]
+  "categories": ["productivity", "utilities"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Notifications",
+      "short_name": "Notifications",
+      "description": "View your notifications",
+      "url": "/notifications",
+      "icons": [
+        {
+          "src": "logo192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
 }

@@ -25,7 +25,7 @@ const ComparisonText = ({
   // Handle cases where previous value is undefined or null
   if (previousValue === undefined || previousValue === null) {
     return (
-      <span className={`card-change neutral ${className}`}>
+      <span className={`comparison-text-change neutral ${className}`}>
         No comparison data
       </span>
     );
@@ -103,7 +103,7 @@ const ComparisonText = ({
   }
 
   return (
-    <span className={`card-change ${comparisonType} ${className}`}>
+    <span className={`comparison-text-change ${comparisonType} ${className}`}>
       {getTrendIcon()}
       {displayText}
     </span>

@@ -14,10 +14,21 @@ const RefEntry = () => {
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [monthOptions, setMonthOptions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedTab, setSelectedTab] = useState(user?.firstName || "All");
+  const [selectedTab, setSelectedTab] = useState("All");
   const [adminNames, setAdminNames] = useState([]);
   const [trueRefFilter, setTrueRefFilter] = useState("all");
   const [currentUserData, setCurrentUserData] = useState(null);
+  const [savingNewRow, setSavingNewRow] = useState(false);
+  const [unsavedChanges, setUnsavedChanges] = useState(false);
+
+  // Debug logging for unsavedChanges state
+  useEffect(() => {
+    console.log("RefEntry - unsavedChanges state changed:", {
+      unsavedChanges,
+      timestamp: new Date().toISOString(),
+      stackTrace: new Error().stack
+    });
+  }, [unsavedChanges]);
 
   // Format date for display
   const formatDateForDisplay = (date) => {
@@ -45,9 +56,16 @@ const RefEntry = () => {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  const rowIdToDelete = row.original.id || row.original.uuid;
+                  console.log("RefEntry - Delete button clicked:", {
+                    rowOriginal: row.original,
+                    rowIdToDelete,
+                    rowOriginalId: row.original.id,
+                    rowOriginalUuid: row.original.uuid
+                  });
                   const confirmDelete = window.confirm("Are you sure you want to delete this row?");
                   if (confirmDelete) {
-                    handleDeleteRow(row.original.id || row.original.uuid);
+                    handleDeleteRow(rowIdToDelete);
                   }
                 }}
                 onMouseEnter={() => setDeleteHover(true)}
@@ -114,9 +132,35 @@ const RefEntry = () => {
         Header: "Agent Name",
         accessor: "agentName",
         width: 150,
-        DropdownOptions: ["", ...agentOptions.map(agent => agent.lagnname)],
+        DropdownOptions: ["", ...Array.from(new Set(agentOptions.map(agent => agent.lagnname)))],
         dropdownBackgroundColor: (value) => {
           return value ? "#f8f9fa" : "#e9ecef"; // Light background for selected, grey for blank
+        },
+        // Add custom cell renderer to log dropdown changes
+        Cell: ({ value, row, column }) => {
+          console.log("RefEntry - Agent dropdown cell rendering:", {
+            currentValue: value,
+            rowId: row.original.uuid || row.original.id,
+            agentOptions: agentOptions.map(a => ({ id: a.id, lagnname: a.lagnname }))
+          });
+          return value || "";
+        },
+        // Add onChange handler for debugging
+        onDropdownChange: (rowId, field, newValue) => {
+          console.log("RefEntry - Agent dropdown changed:", {
+            rowId,
+            field,
+            newValue,
+            timestamp: new Date().toISOString()
+          });
+          
+          // Find the agent that matches the selected name
+          const matchedAgent = agentOptions.find(agent => agent.lagnname === newValue);
+          console.log("RefEntry - Matched agent for dropdown selection:", {
+            selectedName: newValue,
+            matchedAgent,
+            allAgents: agentOptions
+          });
         }
       },
       {
@@ -237,10 +281,9 @@ const RefEntry = () => {
   // Update selected tab if it's no longer visible
   useEffect(() => {
     if (visibleAdminTabs.length > 0 && !visibleAdminTabs.includes(selectedTab)) {
-      const currentUserName = currentUserData?.screen_name || user?.firstName || user?.screen_name || "Unknown";
-      setSelectedTab(visibleAdminTabs.includes(currentUserName) ? currentUserName : "All");
+      setSelectedTab("All");
     }
-  }, [visibleAdminTabs, selectedTab, currentUserData?.screen_name, user?.firstName, user?.screen_name]);
+  }, [visibleAdminTabs, selectedTab]);
 
   // Fetch current user's activeusers data
   useEffect(() => {
@@ -352,9 +395,9 @@ const RefEntry = () => {
           setAdminNames(sortedTabs);
           console.log("RefEntry - Admin tabs loaded:", sortedTabs);
 
-          // Set default tab to current user
+          // Ensure a valid default tab; prefer 'All'
           if (!sortedTabs.includes(selectedTab)) {
-            setSelectedTab(sortedTabs.includes(userName) ? userName : "All");
+            setSelectedTab("All");
           }
         }
       } catch (error) {
@@ -395,11 +438,14 @@ const RefEntry = () => {
 
         if (data.success) {
           const updatedData = data.data.map((row) => {
-            const matchedAgent = agentOptions.find(agent => agent.lagnname === row.lagnname);
+            // Trust the agent_id from database, but find the matching agent for display purposes
+            const matchedAgent = agentOptions.find(agent => agent.id === row.agent_id);
 
             return {
               ...row,
-              agent_id: matchedAgent ? matchedAgent.id : row.agent_id || null,
+              // Keep the original agent_id from database - don't override it
+              agent_id: row.agent_id,
+              // Use the matched agent's lagnname for display, fallback to stored lagnname
               agentName: matchedAgent ? matchedAgent.lagnname : row.lagnname || "",
               created_at: row.created_at ? row.created_at.slice(0, 7) : currentMonth,
             };
@@ -419,29 +465,125 @@ const RefEntry = () => {
 
   // Handle cell updates from DataTable
   const handleCellUpdate = async (rowId, field, value) => {
+    // Log every single cell update call
+    console.log("RefEntry - handleCellUpdate ENTRY POINT:", {
+      rowId,
+      field,
+      value,
+      valueType: typeof value,
+      timestamp: new Date().toISOString(),
+      isAgentField: field === "agentName"
+    });
+    
     try {
+      console.log("RefEntry - handleCellUpdate called:", {
+        rowId,
+        field,
+        value,
+        valueType: typeof value
+      });
+      
+      console.log("RefEntry - Current tableData:", tableData.map(row => ({
+        uuid: row.uuid,
+        id: row.id,
+        mappedId: row.uuid || row.id || 'NO_ID'
+      })));
+      
+      // Find the row to update - check both uuid and id fields
+      const rowToUpdate = tableData.find(row => 
+        row.uuid === rowId || 
+        row.id === rowId || 
+        (row.uuid || row.id) === rowId
+      );
+      
+      if (!rowToUpdate) {
+        console.error("RefEntry - Row not found for update:", rowId);
+        console.error("RefEntry - Available rows:", tableData.map(row => ({
+          uuid: row.uuid,
+          id: row.id,
+          mappedId: row.uuid || row.id,
+          client_name: row.client_name
+        })));
+        return;
+      }
+
+      console.log("RefEntry - Found row to update:", {
+        uuid: rowToUpdate.uuid,
+        id: rowToUpdate.id,
+        currentFieldValue: rowToUpdate[field],
+        newFieldValue: value,
+        fullRowBefore: rowToUpdate
+      });
+
       // Update local state optimistically
       setTableData(prevData => {
         return prevData.map(row => {
-          if (row.uuid === rowId || row.id === rowId) {
+          // Check all possible ID matches
+          const isMatchingRow = row.uuid === rowId || 
+                               row.id === rowId || 
+                               (row.uuid || row.id) === rowId;
+          
+          if (isMatchingRow) {
             const updatedRow = { ...row, [field]: value };
+
+            console.log("RefEntry - Updating row field:", {
+              field,
+              oldValue: row[field],
+              newValue: value,
+              rowId: row.uuid || row.id
+            });
 
             // Business logic: if trial is set to "Y", automatically set true_ref to "N"
             if (field === "trial" && value === "Y") {
+              console.log("RefEntry - Auto-setting true_ref to 'N' because trial is 'Y'");
               updatedRow.true_ref = "N";
             }
 
             // Special handling for agent selection
             if (field === "agentName") {
+              console.log("RefEntry - Processing agent selection:", {
+                selectedAgentName: value,
+                availableAgents: agentOptions.map(a => ({ id: a.id, lagnname: a.lagnname }))
+              });
+              
               const matchedAgent = agentOptions.find(agent => agent.lagnname === value);
               if (matchedAgent) {
+                console.log("RefEntry - Found matching agent:", {
+                  agentId: matchedAgent.id,
+                  lagnname: matchedAgent.lagnname,
+                  fullAgent: matchedAgent
+                });
                 updatedRow.agent_id = matchedAgent.id;
                 updatedRow.lagnname = matchedAgent.lagnname;
-                // Note: matchedAgent.admin_id is now available from activeusers table
-                // You can choose to store this as additional info if needed:
-                // updatedRow.agent_admin_id = matchedAgent.admin_id;
+                
+                console.log("RefEntry - Updated row with agent data:", {
+                  agent_id: updatedRow.agent_id,
+                  lagnname: updatedRow.lagnname,
+                  agentName: updatedRow.agentName
+                });
+              } else {
+                console.warn("RefEntry - No matching agent found for:", value);
+                console.log("RefEntry - Available agent options:", agentOptions);
               }
             }
+
+            // Mark existing rows as modified (new rows already don't have IDs)
+            if (row.id) {
+              console.log("RefEntry - Marking existing row as modified:", row.id);
+              updatedRow.isModified = true;
+            } else {
+              console.log("RefEntry - Row is new (no ID), not marking as modified");
+            }
+
+            console.log("RefEntry - Final updated row:", {
+              uuid: updatedRow.uuid,
+              id: updatedRow.id,
+              agent_id: updatedRow.agent_id,
+              lagnname: updatedRow.lagnname,
+              agentName: updatedRow.agentName,
+              isModified: updatedRow.isModified,
+              fullUpdatedRow: updatedRow
+            });
 
             return updatedRow;
           }
@@ -449,52 +591,65 @@ const RefEntry = () => {
         });
       });
 
-      // Save to backend
-      const rowToUpdate = tableData.find(row => row.uuid === rowId || row.id === rowId);
-      if (rowToUpdate) {
-        const updatedRow = {
-          ...rowToUpdate,
-          [field]: value,
-          lagnname: field === "agentName" ? value : rowToUpdate.lagnname,
-        };
+      // Mark as having unsaved changes (no longer need to check if row is saved)
+      console.log("RefEntry - Setting unsavedChanges to true");
+      setUnsavedChanges(true);
+      console.log("RefEntry - Cell updated in frontend state, marked as unsaved");
 
-        // Apply business logic for backend too
-        if (field === "trial" && value === "Y") {
-          updatedRow.true_ref = "N";
-        }
-
-        // Special handling for agent selection in backend save
-        if (field === "agentName") {
-          const matchedAgent = agentOptions.find(agent => agent.lagnname === value);
-          if (matchedAgent) {
-            updatedRow.agent_id = matchedAgent.id;
-            updatedRow.lagnname = matchedAgent.lagnname;
-            // Note: matchedAgent.admin_id is now available if needed:
-            // updatedRow.agent_admin_id = matchedAgent.admin_id;
-          }
-        }
-
-        await api.post("/refvalidation/save", [updatedRow]);
-      }
     } catch (error) {
-      console.error("Error updating cell:", error);
+      console.error("RefEntry - Error updating cell:", error);
+      console.error("RefEntry - Error details:", {
+        rowId,
+        field,
+        value,
+        message: error.message,
+        stack: error.stack
+      });
       // Revert optimistic update on error
       setTableData(prevData => [...prevData]);
+      alert("Failed to update cell. Please try again.");
     }
+  };
+
+  // Check if a row has all required fields filled
+  const isRowComplete = (row) => {
+    const hasAgent = row.agent_id && row.agent_id !== null;
+    const hasLagnname = row.lagnname && row.lagnname.trim() !== "";
+    
+    return hasAgent && hasLagnname;
+  };
+
+  // Check if there are any incomplete unsaved rows
+  const hasIncompleteRows = () => {
+    const unsavedRows = tableData.filter(row => !row.id || row.isModified);
+    return unsavedRows.some(row => !isRowComplete(row));
   };
 
   // Add new row
   const handleAddNew = () => {
+    console.log("RefEntry - handleAddNew called");
+    console.log("RefEntry - canAddRow():", canAddRow());
+    console.log("RefEntry - selectedMonth:", selectedMonth);
+    console.log("RefEntry - currentMonth:", currentMonth);
+    
+    if (!canAddRow()) {
+      console.warn("RefEntry - Cannot add row for selected month:", selectedMonth);
+      alert("You can only add new records for the current month or previous month.");
+      return;
+    }
+    
     // Use activeusers data if available, fallback to auth context
     const adminName = currentUserData?.screen_name || user?.firstName || user?.screen_name || "Unknown Admin";
     const adminId = currentUserData?.admin_id || user?.userId || null;
     
-    console.log("RefEntry - Creating new row with:", {
+    console.log("RefEntry - Creating new row with admin data:", {
       currentUserData,
       adminName,
       adminId,
       fallbackUserId: user?.userId,
-      fallbackFirstName: user?.firstName
+      fallbackFirstName: user?.firstName,
+      selectedMonth,
+      currentTableDataLength: tableData.length
     });
 
     const today = new Date().toLocaleDateString("en-US", {
@@ -517,50 +672,110 @@ const RefEntry = () => {
       trial: "",
       date_app_checked: today,
       notes: "",
-      created_at: currentMonth,
+      created_at: new Date().toISOString(),
       admin_name: adminName,
       admin_id: adminId,
     };
 
-    setTableData(prev => [newRow, ...prev]);
+    console.log("RefEntry - New row created:", JSON.stringify(newRow, null, 2));
 
-    // Update admin names if this admin isn't already in the tabs
-    setAdminNames(prevAdmins => {
-      if (!prevAdmins.includes(adminName)) {
-        return ["All", ...prevAdmins.filter(admin => admin !== "All"), adminName].sort();
-      }
-      return prevAdmins;
+    // Add to frontend state only - don't save to backend immediately like old system
+    setTableData(prev => {
+      const newData = [newRow, ...prev];
+      console.log("RefEntry - Table data updated with new row:");
+      console.log("RefEntry - Previous table data length:", prev.length);
+      console.log("RefEntry - New table data length:", newData.length);
+      console.log("RefEntry - New row added at index 0:", newData[0]);
+      return newData;
     });
+    
+    // Mark as having unsaved changes
+    console.log("RefEntry - Setting unsavedChanges to true for new row");
+    setUnsavedChanges(true);
+    console.log("RefEntry - handleAddNew completed successfully");
   };
 
   // Delete row
   const handleDeleteRow = async (rowId) => {
-    const rowToDelete = tableData.find(row => row.uuid === rowId || row.id === rowId);
+    console.log("RefEntry - handleDeleteRow called with rowId:", rowId);
+    console.log("RefEntry - Current tableData for delete:", tableData.map(row => ({
+      uuid: row.uuid,
+      id: row.id,
+      originalId: row.id,
+      client_name: row.client_name
+    })));
+    
+    // Find the row to delete - check multiple ID fields
+    const rowToDelete = tableData.find(row => 
+      row.uuid === rowId || 
+      row.id === rowId ||
+      String(row.id) === String(rowId) ||  // Handle number vs string comparison
+      String(row.uuid) === String(rowId)
+    );
+
+    console.log("RefEntry - Row search result:", {
+      searchingFor: rowId,
+      searchingForType: typeof rowId,
+      foundRow: rowToDelete,
+      availableRows: tableData.map(row => ({
+        uuid: row.uuid,
+        id: row.id,
+        idType: typeof row.id,
+        uuidType: typeof row.uuid
+      }))
+    });
 
     if (!rowToDelete) {
-      console.error("Row does not exist:", rowId);
+      console.error("RefEntry - Row does not exist:", rowId);
+      console.error("RefEntry - Available row IDs:", tableData.map(row => ({ 
+        uuid: row.uuid, 
+        id: row.id,
+        client_name: row.client_name 
+      })));
       return;
     }
+
+    console.log("RefEntry - Found row to delete:", {
+      uuid: rowToDelete.uuid,
+      id: rowToDelete.id,
+      client_name: rowToDelete.client_name
+    });
 
     const deleteId = rowToDelete.uuid || rowToDelete.id;
 
     if (!deleteId) {
+      console.log("RefEntry - Row has no ID, removing from frontend only");
       // Row has no ID, just remove from frontend
-      setTableData(prev => prev.filter(row => row.uuid !== rowId));
+      setTableData(prev => prev.filter(row => 
+        row.uuid !== rowId && 
+        row.id !== rowId &&
+        String(row.id) !== String(rowId) &&
+        String(row.uuid) !== String(rowId)
+      ));
       return;
     }
 
     try {
+      console.log("RefEntry - Attempting to delete row with ID:", deleteId);
       const response = await api.delete(`/refvalidation/delete/${deleteId}`);
       const data = response.data;
 
       if (data.success) {
-        setTableData(prev => prev.filter(row => row.uuid !== rowId && row.id !== rowId));
+        console.log("RefEntry - Successfully deleted row from backend");
+        setTableData(prev => prev.filter(row => 
+          row.uuid !== rowId && 
+          row.id !== rowId &&
+          String(row.id) !== String(rowId) &&
+          String(row.uuid) !== String(rowId) &&
+          row.uuid !== deleteId &&
+          row.id !== deleteId
+        ));
+        console.log("RefEntry - Row removed from frontend state");
       } else {
-        console.error("Failed to delete row:", data.message);
+        console.error("RefEntry - Failed to delete row:", data.message);
       }
     } catch (error) {
-      console.error("Error deleting row:", error);
+      console.error("RefEntry - Error deleting row:", error);
     }
   };
 
@@ -579,7 +794,16 @@ const RefEntry = () => {
     prevMonth.setMonth(prevMonth.getMonth() - 1);
     const prevMonthFormatted = prevMonth.toISOString().slice(0, 7);
     
-    return selectedMonth === currentMonth || selectedMonth === prevMonthFormatted;
+    const canAdd = selectedMonth === currentMonth || selectedMonth === prevMonthFormatted;
+    
+    console.log("RefEntry - canAddRow check:", {
+      selectedMonth,
+      currentMonth,
+      prevMonthFormatted,
+      canAdd
+    });
+    
+    return canAdd;
   };
 
   // Handle refresh
@@ -640,6 +864,191 @@ const RefEntry = () => {
     ...arrowButtonStyle,
     color: '#ccc',
     cursor: 'not-allowed',
+  };
+
+  // Handle saving all changes
+  const handleSaveChanges = async () => {
+    if (!unsavedChanges) {
+      console.log("RefEntry - No unsaved changes to save");
+      return;
+    }
+
+    try {
+      console.log("RefEntry - Starting save process...");
+      console.log("RefEntry - Current tableData:", tableData);
+      setSavingNewRow(true);
+
+      // Get all rows that need to be saved (new rows and modified existing rows)
+      const rowsToSave = tableData.filter(row => !row.id || row.isModified);
+      
+      console.log("RefEntry - All table data:", JSON.stringify(tableData, null, 2));
+      console.log("RefEntry - Filtered rows to save:", JSON.stringify(rowsToSave, null, 2));
+      console.log("RefEntry - Number of rows to save:", rowsToSave.length);
+      
+      if (rowsToSave.length === 0) {
+        console.log("RefEntry - No rows to save");
+        setUnsavedChanges(false);
+        return;
+      }
+
+      // Validate rows before saving
+      const invalidRows = [];
+      rowsToSave.forEach((row, index) => {
+        const errors = [];
+        
+        // Check required fields
+        if (!row.agent_id || row.agent_id === null) {
+          errors.push("Agent must be selected");
+        }
+        
+        if (!row.lagnname || row.lagnname.trim() === "") {
+          errors.push("Agent name (lagnname) is missing");
+        }
+        
+        if (errors.length > 0) {
+          invalidRows.push({
+            index: index + 1,
+            uuid: row.uuid,
+            errors: errors,
+            row: row
+          });
+        }
+      });
+      
+      if (invalidRows.length > 0) {
+        console.error("RefEntry - Validation failed for rows:", invalidRows);
+        
+        // Create a user-friendly error message
+        const incompleteCount = invalidRows.length;
+        const pluralRow = incompleteCount === 1 ? "row" : "rows";
+        const pluralNeed = incompleteCount === 1 ? "needs" : "need";
+        
+        let errorMessage = `Cannot save - ${incompleteCount} ${pluralRow} ${pluralNeed} to be completed:\n\n`;
+        
+        invalidRows.forEach(invalid => {
+          errorMessage += `Row ${invalid.index} is missing:\n`;
+          invalid.errors.forEach(error => {
+            errorMessage += `  • ${error}\n`;
+          });
+          errorMessage += "\n";
+        });
+        
+        errorMessage += "Please complete all required fields:\n";
+        errorMessage += "• Select an agent from the dropdown\n";
+        errorMessage += "• Make sure agent information is properly filled\n\n";
+        errorMessage += "Then click 'Save Changes' again.";
+        
+        alert(errorMessage);
+        return;
+      }
+
+      console.log("RefEntry - All rows passed validation");
+
+      // Log each row being saved with detailed info
+      rowsToSave.forEach((row, index) => {
+        console.log(`RefEntry - Row ${index + 1} to save:`, {
+          uuid: row.uuid,
+          id: row.id,
+          agent_id: row.agent_id,
+          lagnname: row.lagnname,
+          agentName: row.agentName,
+          true_ref: row.true_ref,
+          client_name: row.client_name,
+          isModified: row.isModified,
+          fullRow: row
+        });
+      });
+
+      console.log("RefEntry - About to send POST request to /refvalidation/save");
+      console.log("RefEntry - Request payload:", JSON.stringify(rowsToSave, null, 2));
+
+      const response = await api.post("/refvalidation/save", rowsToSave);
+      const data = response.data;
+
+      console.log("RefEntry - Received response from save:", data);
+      console.log("RefEntry - Response success:", data.success);
+      console.log("RefEntry - Response message:", data.message);
+      console.log("RefEntry - Saved rows from response:", data.savedRows);
+
+      if (data.success && data.savedRows) {
+        console.log("RefEntry - Successfully saved", data.savedRows.length, "rows");
+        
+        // Log the saved rows details
+        data.savedRows.forEach((savedRow, index) => {
+          console.log(`RefEntry - Saved row ${index + 1} from response:`, {
+            uuid: savedRow.uuid,
+            id: savedRow.id,
+            agent_id: savedRow.agent_id,
+            lagnname: savedRow.lagnname,
+            fullSavedRow: savedRow
+          });
+        });
+        
+        // Update table data with saved rows (which now have IDs)
+        setTableData(prevData => {
+          const savedDataMap = new Map(data.savedRows.map(row => [row.uuid, row]));
+          
+          console.log("RefEntry - savedDataMap:", savedDataMap);
+          
+          const updatedData = prevData.map(row => {
+            if (savedDataMap.has(row.uuid)) {
+              const mergedRow = { ...row, ...savedDataMap.get(row.uuid), isModified: false };
+              console.log("RefEntry - Updating row:", {
+                originalUuid: row.uuid,
+                originalId: row.id,
+                savedData: savedDataMap.get(row.uuid),
+                mergedRow: mergedRow
+              });
+              return mergedRow;
+            }
+            return row;
+          });
+          
+          console.log("RefEntry - Updated table data after save:", updatedData);
+          return updatedData;
+        });
+
+        setUnsavedChanges(false);
+        console.log("RefEntry - All changes saved successfully, unsavedChanges set to false");
+      } else {
+        console.error("RefEntry - Save failed:", data);
+        throw new Error(data.message || "Failed to save changes");
+      }
+    } catch (error) {
+      console.error("RefEntry - Error saving changes:", error);
+      console.error("RefEntry - Error details:", {
+        message: error.message,
+        stack: error.stack,
+        response: error.response?.data
+      });
+      alert("Failed to save changes. Please try again.");
+    } finally {
+      console.log("RefEntry - Save process completed, setting savingNewRow to false");
+      setSavingNewRow(false);
+    }
+  };
+
+  // Handle canceling all unsaved changes
+  const handleCancelChanges = () => {
+    if (!unsavedChanges) {
+      console.log("RefEntry - No unsaved changes to cancel");
+      return;
+    }
+
+    if (window.confirm("Are you sure you want to cancel all unsaved changes? This action cannot be undone.")) {
+      console.log("RefEntry - Canceling all unsaved changes");
+      
+      // Remove all unsaved rows and revert modifications
+      setTableData(prevData => {
+        return prevData.filter(row => row.id); // Keep only saved rows (with IDs)
+      });
+      
+      setUnsavedChanges(false);
+      console.log("RefEntry - All unsaved changes canceled");
+      
+      // Refresh data from server to get clean state
+      handleRefresh();
+    }
   };
 
   if (isLoading) {
@@ -765,41 +1174,94 @@ const RefEntry = () => {
         ))}
       </div>
 
+      {/* Add New Row Restriction Message */}
+      {!canAddRow() && (
+        <div style={{
+          backgroundColor: "#fff3cd",
+          border: "1px solid #ffeaa7",
+          color: "#856404",
+          padding: "10px",
+          marginBottom: "15px",
+          borderRadius: "5px",
+          fontSize: "14px"
+        }}>
+          <strong>Note:</strong> You can only add new records for the current month ({new Date().toISOString().slice(0, 7)}) or previous month. 
+          Please switch to a valid month to add new records.
+        </div>
+      )}
+
+      {/* Saving New Row Indicator */}
+      {savingNewRow && (
+        <div style={{
+          backgroundColor: "#d1ecf1",
+          border: "1px solid #bee5eb",
+          color: "#0c5460",
+          padding: "10px",
+          marginBottom: "15px",
+          borderRadius: "5px",
+          fontSize: "14px"
+        }}>
+          <strong>Saving...</strong> Adding new row to database. Please wait.
+        </div>
+      )}
+
       {/* DataTable */}
-      <DataTable
-        columns={columns}
-        data={filteredData}
-        onCellUpdate={handleCellUpdate}
-        onAddNew={canAddRow() ? handleAddNew : null}
-        onDelete={handleDelete}
-        onRefresh={handleRefresh}
-        entityName="refvalidation record"
-        defaultSortBy="created_at"
-        defaultSortOrder="desc"
-        disablePagination={false}
-        actionBarButtons={{
-          addNew: canAddRow(),
-          import: false,
-          export: false,
-          delete: true,
-          archive: false,
-          sendEmail: false,
-          toggleArchived: false,
-          refresh: true,
-          reassign: false
-        }}
-        rowClassNames={
-          // Apply row colors based on true_ref value
-          filteredData.reduce((acc, row) => {
-            if (row.true_ref === "Y") {
-              acc[row.id] = "true-ref-y";
-            } else if (row.true_ref === "N") {
-              acc[row.id] = "true-ref-n";
-            }
-            return acc;
-          }, {})
-        }
-      />
+      {(() => {
+        const canAdd = canAddRow();
+        console.log("RefEntry - Rendering DataTable with:", {
+          canAddRow: canAdd,
+          savingNewRow,
+          addNewButtonEnabled: canAdd && !savingNewRow,
+          onAddNewDefined: !!handleAddNew,
+          selectedMonth,
+          currentMonth,
+          filteredDataLength: filteredData.length,
+          unsavedChanges,
+          saveChangesButtonEnabled: unsavedChanges,
+          onSaveChangesDefined: !!(unsavedChanges ? handleSaveChanges : undefined),
+          actionBarButtons: {
+            addNew: canAdd && !savingNewRow,
+            import: false,
+            export: false,
+            delete: true,
+            saveChanges: unsavedChanges,
+            cancelChanges: unsavedChanges,
+            refresh: true
+          }
+        });
+        
+        return (
+          <DataTable
+            columns={columns}
+            data={filteredData}
+            onCellUpdate={handleCellUpdate}
+            onAddNew={canAdd && !savingNewRow ? handleAddNew : undefined}
+            onDelete={handleDelete}
+            onRefresh={handleRefresh}
+            onSaveChanges={unsavedChanges ? handleSaveChanges : undefined}
+            onCancelChanges={unsavedChanges ? handleCancelChanges : undefined}
+            entityName="refvalidation record"
+            defaultSortBy="date_app_checked"
+            defaultSortOrder="desc"
+            disablePagination={false}
+            autoSave={false}
+            actionBarButtons={{
+              addNew: canAdd && !savingNewRow,
+              import: false,
+              export: false,
+              delete: true,
+              saveChanges: unsavedChanges,
+              cancelChanges: unsavedChanges,
+              refresh: true
+            }}
+            rowColorFunction={(row) => {
+              if (row.true_ref === "Y") return "#d4edda";
+              if (row.true_ref === "N") return "#f8d7da";
+              return "#fff";
+            }}
+          />
+        );
+      })()}
 
       {/* Row color styles */}
       <style>

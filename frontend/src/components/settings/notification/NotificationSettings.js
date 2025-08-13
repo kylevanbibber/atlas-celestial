@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNotifications } from '../../../context/NotificationContext';
+import { useNotificationContext } from '../../../context/NotificationContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../../../api';
@@ -7,6 +7,7 @@ import NotificationToggle from './NotificationToggle';
 import NotificationHistory from './NotificationHistory';
 import NotificationSchedule from './NotificationSchedule';
 import AdminNotifications from './AdminNotifications';
+import NotificationDiagnostic from './NotificationDiagnostic';
 
 const NotificationSettings = () => {
   const navigate = useNavigate();
@@ -14,15 +15,20 @@ const NotificationSettings = () => {
     pushEnabled, 
     subscribeToPushNotifications, 
     unsubscribeFromPushNotifications,
-    notifications,
-    loading,
-    error: notificationError,
-    dismissNotification,
-    wsConnected,
-    markAsRead,
-    fetchNotifications,
     forceRefreshSubscription,
-  } = useNotifications();
+    cleanupStaleSubscription,
+    notifications,
+    fetchNotifications,
+    markAsRead,
+    dismissNotification,
+    isLoading: loading,
+    error: notificationError,
+    wsConnected,
+    isIOSPWA,
+    isIOSSafari,
+    isPushSupported,
+    getNotificationSupportMessage
+  } = useNotificationContext();
   const { isAdmin: isAdminFromContext, user } = useAuth();
   
   // Check if user is admin with teamRole="app" - should have access to admin notifications
@@ -39,7 +45,7 @@ const NotificationSettings = () => {
     finalIsAdmin: isAdmin,
     adminNotificationsVisible: isAdmin
   });
-  const [permission, setPermission] = useState('default');
+  const [permission, setPermission] = useState(Notification.permission);
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [error, setError] = useState(null);
   const [isCheckingForNew, setIsCheckingForNew] = useState(false);
@@ -64,31 +70,66 @@ const NotificationSettings = () => {
     // Check if user has a subscription in the database
     const checkSubscriptionStatus = async () => {
       try {
+        console.log('🔍 Checking subscription status for user...');
         const response = await api.get('/notifications/subscription-status');
-        console.log('Subscription status:', response.data);
+        console.log('📊 Subscription status response:', response.data);
         
         if (response.data.hasSubscription) {
+          console.log('✅ User has subscription in database');
           setHasDbSubscription(true);
           
           // If user has a subscription in DB but not in browser and permission is granted,
-          // attempt to recreate the browser subscription
+          // this indicates a subscription mismatch that needs to be fixed
           if (!pushEnabled && Notification.permission === 'granted') {
-            console.log('DB subscription exists but browser subscription missing - recreating');
-            setIsSubscribing(true);
-            try {
-              await subscribeToPushNotifications();
-            } finally {
-              setIsSubscribing(false);
+            console.log('⚠️ SUBSCRIPTION MISMATCH: DB has subscription but browser does not');
+            
+            // Check if there's actually a browser subscription
+            if ('serviceWorker' in navigator && 'PushManager' in window) {
+              try {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                if (registrations.length > 0) {
+                  const subscription = await registrations[0].pushManager.getSubscription();
+                  if (!subscription) {
+                    console.log('🔧 No browser subscription found - offering to fix mismatch');
+                    setError({
+                      type: 'warning',
+                      message: 'Your notification subscription is out of sync. Click "Fix Subscription Mismatch" to restore notifications.',
+                      action: 'fix_mismatch'
+                    });
+                  }
+                }
+              } catch (err) {
+                console.error('Error checking browser subscription:', err);
+              }
             }
+          } else if (!pushEnabled && Notification.permission === 'default') {
+            console.log('📋 DB subscription exists but permission not granted yet');
+            setError({
+              type: 'info', 
+              message: 'You previously had notifications enabled. Click the toggle to restore them.'
+            });
+          } else if (pushEnabled) {
+            console.log('✅ Both DB and browser subscriptions are active');
+            setError(null);
           }
+        } else {
+          console.log('ℹ️ No subscription found in database');
+          setHasDbSubscription(false);
+          setError(null);
         }
       } catch (err) {
-        console.error('Error checking subscription status:', err);
+        console.error('❌ Error checking subscription status:', err);
+        setError({
+          type: 'error',
+          message: 'Unable to check notification status: ' + (err.response?.data?.error || err.message)
+        });
       }
     };
     
-    checkSubscriptionStatus();
-  }, [isAdmin, pushEnabled, subscribeToPushNotifications]);
+    if (user?.userId) {
+      checkSubscriptionStatus();
+    }
+  }, [user?.userId, pushEnabled]);
 
   // Update ref when notifications change
   useEffect(() => {
@@ -126,10 +167,50 @@ const NotificationSettings = () => {
     return () => clearInterval(checkInterval);
   }, [wsConnected]);
 
+  // Check for updates to notification permission
+  useEffect(() => {
+    const checkPermission = () => {
+      setPermission(Notification.permission);
+    };
+    
+    // Check periodically for permission changes
+    const checkInterval = setInterval(checkPermission, 1000);
+
+    return () => clearInterval(checkInterval);
+  }, []);
+
+  // Show appropriate message for iOS users
+  const getIOSMessage = () => {
+    if (isIOSSafari) {
+      return {
+        type: 'info',
+        message: getNotificationSupportMessage()
+      };
+    }
+    if (isIOSPWA && !pushEnabled && permission === 'default') {
+      return {
+        type: 'info', 
+        message: 'Tap "Enable Notifications" below to receive push notifications on your iPhone.'
+      };
+    }
+    if (isIOSPWA && permission === 'denied') {
+      return {
+        type: 'warning',
+        message: 'Notifications are disabled. Go to iPhone Settings > Atlas > Notifications to enable them.'
+      };
+    }
+    return null;
+  };
+
   const handleToggleNotifications = async () => {
     try {
       setError(null);
       setIsSubscribing(true);
+      
+      if (!isPushSupported) {
+        setError({ type: 'error', message: getNotificationSupportMessage() });
+        return;
+      }
       
       if (!pushEnabled) {
         // Request permission first
@@ -142,18 +223,32 @@ const NotificationSettings = () => {
           console.log('Permission granted, subscribing to push notifications...');
           const success = await subscribeToPushNotifications();
           if (!success) {
-            setError('Failed to enable notifications. Please try again.');
+            setError({ type: 'error', message: 'Failed to enable notifications. Please try again.' });
+          } else {
+            setError({ type: 'success', message: 'Notifications enabled successfully!' });
           }
-        } else {
-          setError('Notification permission denied');
+        } else if (permission === 'denied') {
+          if (isIOSPWA) {
+            setError({ 
+              type: 'error', 
+              message: 'Notifications were denied. You can enable them in iPhone Settings > Atlas > Notifications.' 
+            });
+          } else {
+            setError({ type: 'error', message: 'Notification permission denied. Please enable in your browser settings.' });
+          }
         }
       } else {
         console.log('Unsubscribing from push notifications...');
-        await unsubscribeFromPushNotifications();
+        const success = await unsubscribeFromPushNotifications();
+        if (success) {
+          setError({ type: 'success', message: 'Notifications disabled successfully.' });
+        } else {
+          setError({ type: 'error', message: 'Failed to disable notifications. Please try again.' });
+        }
       }
     } catch (err) {
       console.error('Error toggling notifications:', err);
-      setError('An error occurred while updating notification settings');
+      setError({ type: 'error', message: 'An error occurred while updating notification settings' });
     } finally {
       setIsSubscribing(false);
     }
@@ -234,24 +329,104 @@ const NotificationSettings = () => {
     }
   }, [isAdmin]);
 
+  const handleFixSubscriptionMismatch = async () => {
+    try {
+      setError(null);
+      setIsSubscribing(true);
+      
+      console.log('🔧 Attempting to fix subscription mismatch...');
+      const success = await forceRefreshSubscription();
+      
+      if (success) {
+        setError({ 
+          type: 'success', 
+          message: 'Subscription mismatch fixed! Notifications should now work properly.' 
+        });
+      } else {
+        setError({ 
+          type: 'error', 
+          message: 'Failed to fix subscription mismatch. Please try toggling notifications off and on.' 
+        });
+      }
+    } catch (err) {
+      console.error('Error fixing subscription mismatch:', err);
+      setError({ 
+        type: 'error', 
+        message: 'An error occurred while fixing the subscription mismatch.' 
+      });
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
+
   return (
     <div className="settings-section">
       {error && (
-        <div className={`settings-alert ${error.type === 'success' ? 'settings-alert-success' : 'settings-alert-error'}`}>
-          {error.message}
+        <div className={`settings-alert ${error.type === 'success' ? 'settings-alert-success' : error.type === 'warning' ? 'settings-alert-warning' : 'settings-alert-error'}`}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>{error.message}</span>
+            {error.action === 'fix_mismatch' && (
+              <button 
+                onClick={handleFixSubscriptionMismatch}
+                disabled={isSubscribing}
+                style={{
+                  marginLeft: '10px',
+                  padding: '6px 12px',
+                  backgroundColor: '#ffc107',
+                  color: '#212529',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+              >
+                {isSubscribing ? 'Fixing...' : 'Fix Subscription Mismatch'}
+              </button>
+            )}
+          </div>
         </div>
       )}
       
-      <NotificationToggle
-        pushEnabled={pushEnabled}
-        permission={permission}
-        isSubscribing={isSubscribing}
-        onToggle={handleToggleNotifications}
-        onTest={handleTestNotification}
-        hasDbSubscription={hasDbSubscription}
-        forceRefreshSubscription={forceRefreshSubscription}
-      />
+      <h2>Notification Settings</h2>
+        
+        {/* iOS-specific messaging */}
+        {getIOSMessage() && (
+          <div className={`alert alert-${getIOSMessage().type}`} style={{ marginBottom: '20px' }}>
+            <div className="alert-content">
+              <span className="alert-icon">
+                {getIOSMessage().type === 'info' && '📱'}
+                {getIOSMessage().type === 'warning' && '⚠️'}
+                {getIOSMessage().type === 'error' && '❌'}
+              </span>
+              <span>{getIOSMessage().message}</span>
+            </div>
+          </div>
+        )}
 
+        {/* Push Notifications */}
+        <div className="setting-section">
+    
+          <div className="setting-item">
+       
+            <div className="setting-control">
+              {isPushSupported ? (
+                <NotificationToggle
+                  pushEnabled={pushEnabled}
+                  permission={permission}
+                  isSubscribing={isSubscribing}
+                  onToggle={handleToggleNotifications}
+                  onTest={handleTestNotification}
+                  hasDbSubscription={hasDbSubscription}
+                  forceRefreshSubscription={forceRefreshSubscription}
+                />
+              ) : (
+                <span className="not-supported">Not Available</span>
+              )}
+            </div>
+          </div>
+        </div>
+      
       <NotificationHistory
         notifications={notifications}
         loading={loading || isCheckingForNew}
@@ -266,6 +441,11 @@ const NotificationSettings = () => {
         <>
           <AdminNotifications />
         </>
+      )}
+      
+      {/* Diagnostic component for troubleshooting - show for admins or during development */}
+      {(isAdmin || process.env.NODE_ENV === 'development') && (
+        <NotificationDiagnostic />
       )}
     </div>
   );

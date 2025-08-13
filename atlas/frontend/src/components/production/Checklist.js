@@ -642,11 +642,9 @@ const handleAgentSelection = async (event) => {
   // Show loading state if user data is not available
   if (!user || !userId || !userRole || isLoading) {
     return (
-      <div className="checklist-container">
-        <div className="loading-state">
-          <FaSpinner className="spinner" style={{ animation: 'spin 1s linear infinite', marginRight: '12px', fontSize: '1.5rem' }} />
-          <p>Loading checklist data...</p>
-        </div>
+      <div className="route-loading" role="alert" aria-busy="true">
+        <div className="spinner"></div>
+        <p>Loading checklist data...</p>
       </div>
     );
   }

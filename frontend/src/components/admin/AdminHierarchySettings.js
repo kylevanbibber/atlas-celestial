@@ -86,10 +86,14 @@ const AdminHierarchySettings = () => {
       
       if (response.data.success) {
         // Create a single "RGA hierarchy" object from the user data
+        const incomingData = response.data.data || [];
+        const activeOnly = Array.isArray(incomingData)
+          ? incomingData.filter(u => (u.Active || '').toLowerCase() === 'y')
+          : [];
         const userHierarchyData = {
           rgaId: response.data.agnName || user.userId,
           rgaName: response.data.agnName || user.userId,
-          hierarchyData: response.data.data || []
+          hierarchyData: activeOnly
         };
         
         // Process the hierarchy data
@@ -138,7 +142,12 @@ const AdminHierarchySettings = () => {
       
       if (response.data.success) {
         // Process received hierarchies
-        const hierarchies = response.data.data;
+        const hierarchies = (response.data.data || []).map(h => ({
+          ...h,
+          hierarchyData: Array.isArray(h.hierarchyData)
+            ? h.hierarchyData.filter(u => (u.Active || '').toLowerCase() === 'y')
+            : []
+        }));
         
         // Process the hierarchies to build the tree structure
         const processedHierarchies = processHierarchyData(hierarchies);
@@ -1522,7 +1531,7 @@ const AdminHierarchySettings = () => {
         'RGA', 'User ID', 'Name', 'Role', 'Email', 'Phone', 
         'Active', 'Redeemed', 'Released', 'ESID',
         'SA', 'GA', 'MGA', 'RGA',
-        'License States', '4mo Retention', '13mo Retention', 'Retention As Of'
+        'License States', '4mo Retention', 'Retention As Of'
       ]);
       
       // Add data rows
@@ -1535,7 +1544,6 @@ const AdminHierarchySettings = () => {
           
           // Format retention rates from PNP data
           const fourMonthRate = user.pnp_data?.curr_mo_4mo_rate || '';
-          const thirteenMonthRate = user.pnp_data?.proj_plus_1 || '';
           const retentionDate = user.pnp_data?.pnp_date ? formatDateForDisplay(user.pnp_data.pnp_date) : '';
           
           csvData.push([
@@ -1555,7 +1563,6 @@ const AdminHierarchySettings = () => {
             user.rga || '',
             licenseStates,
             fourMonthRate,
-            thirteenMonthRate,
             retentionDate
           ]);
         });
@@ -1757,18 +1764,12 @@ const AdminHierarchySettings = () => {
           </div>
           
           {/* PNP data section */}
-          {node.pnp_data && (node.pnp_data.curr_mo_4mo_rate || node.pnp_data.proj_plus_1) && (
+          {node.pnp_data && node.pnp_data.curr_mo_4mo_rate && (
             <div className="hierarchy-pnp-data">
               {node.pnp_data.curr_mo_4mo_rate && (
                 <div className="pnp-stat">
                   <span className="pnp-label">4mo Ret:</span>
                   <span className="pnp-value">{node.pnp_data.curr_mo_4mo_rate}%</span>
-                </div>
-              )}
-              {node.pnp_data.proj_plus_1 && (
-                <div className="pnp-stat">
-                  <span className="pnp-label">13mo Ret:</span>
-                  <span className="pnp-value">{node.pnp_data.proj_plus_1}%</span>
                 </div>
               )}
               {node.pnp_data.pnp_date && (
@@ -1858,13 +1859,9 @@ const AdminHierarchySettings = () => {
   // Main render function
   if (loading) {
     return (
-      <div className="settings-section">
-        <div className="settings-card">
-          <div className="hierarchy-loading">
-            <FiLoader className="spinner" />
-            <span>Loading hierarchy data...</span>
-          </div>
-        </div>
+      <div className="route-loading" role="alert" aria-busy="true">
+        <div className="spinner"></div>
+        <span>Loading hierarchy data...</span>
       </div>
     );
   }

@@ -380,4 +380,209 @@ router.get("/all", async (req, res) => {
     }
 });
 
+// GET /api/dailyActivity/filtered - Get filtered daily activity records with MGA table joins
+router.get("/filtered", async (req, res) => {
+    try {
+        const { startDate, endDate, MGA_NAME, rga, tree } = req.query;
+        
+        console.log(`[GET /dailyActivity/filtered] Request received with filters - startDate: ${startDate}, endDate: ${endDate}, MGA_NAME: ${MGA_NAME}, rga: ${rga}, tree: ${tree}`);
+
+        let queryStr = `
+            SELECT 
+                da.*,
+                m.rga,
+                m.tree,
+                au.clname as userRole
+            FROM Daily_Activity da
+            LEFT JOIN MGAs m 
+                ON da.MGA = m.lagnname
+            LEFT JOIN activeusers au 
+                ON da.userId = au.id
+        `;
+        
+        const params = [];
+        const conditions = [];
+
+        // Date filtering
+        if (startDate && endDate) {
+            conditions.push('da.reportDate BETWEEN ? AND ?');
+            params.push(startDate, endDate);
+        }
+
+        // MGA filtering - include both direct MGA match and self-reporting
+        if (MGA_NAME) {
+            conditions.push('(da.MGA = ? OR da.agent = ?)');
+            params.push(MGA_NAME, MGA_NAME);
+        }
+
+        // RGA filtering - include both MGA table RGA match and self-reporting
+        if (rga) {
+            conditions.push('(m.rga = ? OR da.agent = ?)');
+            params.push(rga, rga);
+        }
+
+        // Tree filtering - include both MGA table tree match and self-reporting
+        if (tree) {
+            conditions.push('(m.tree = ? OR da.agent = ?)');
+            params.push(tree, tree);
+        }
+
+        // Add WHERE clause if there are conditions
+        if (conditions.length > 0) {
+            queryStr += ' WHERE ' + conditions.join(' AND ');
+        }
+
+        queryStr += ' ORDER BY da.reportDate DESC';
+
+        console.log(`[GET /dailyActivity/filtered] Executing query: ${queryStr}`);
+        console.log(`[GET /dailyActivity/filtered] Parameters:`, params);
+
+        const result = await query(queryStr, params);
+
+        console.log(`[GET /dailyActivity/filtered] Query returned ${result.length} records`);
+
+        res.status(200).json({ success: true, data: result });
+    } catch (err) {
+        console.error('Error fetching filtered daily activity data', err);
+        res.status(500).json({ success: false, message: 'Error fetching filtered daily activity data' });
+    }
+});
+
+// GET /api/dailyActivity/codes - Get filtered associates (codes) data with MGA table joins
+router.get("/codes", async (req, res) => {
+    try {
+        const { startDate, endDate, MGA_NAME, rga, tree } = req.query;
+        
+        console.log(`[GET /dailyActivity/codes] Request received with filters - startDate: ${startDate}, endDate: ${endDate}, MGA_NAME: ${MGA_NAME}, rga: ${rga}, tree: ${tree}`);
+
+        let queryStr = `
+            SELECT 
+                a.*,
+                m.rga as mga_rga,
+                m.tree as mga_tree
+            FROM associates a
+            LEFT JOIN MGAs m 
+                ON a.MGA = m.lagnname
+        `;
+        
+        const params = [];
+        const conditions = [];
+
+        // Date filtering based on PRODDATE
+        if (startDate && endDate) {
+            conditions.push('a.PRODDATE BETWEEN ? AND ?');
+            params.push(startDate, endDate);
+        }
+
+        // MGA filtering - include both direct MGA match and self-reporting
+        if (MGA_NAME) {
+            conditions.push('(a.MGA = ? OR a.LagnName = ?)');
+            params.push(MGA_NAME, MGA_NAME);
+        }
+
+        // RGA filtering - include both MGA table RGA match and self-reporting
+        if (rga) {
+            conditions.push('(m.rga = ? OR a.LagnName = ?)');
+            params.push(rga, rga);
+        }
+
+        // Tree filtering - include both MGA table tree match and self-reporting
+        if (tree) {
+            conditions.push('(m.tree = ? OR a.LagnName = ?)');
+            params.push(tree, tree);
+        }
+
+        // Add WHERE clause if there are conditions
+        if (conditions.length > 0) {
+            queryStr += ' WHERE ' + conditions.join(' AND ');
+        }
+
+        queryStr += ' ORDER BY a.PRODDATE DESC';
+
+        console.log(`[GET /dailyActivity/codes] Executing query: ${queryStr}`);
+        console.log(`[GET /dailyActivity/codes] Parameters:`, params);
+
+        const result = await query(queryStr, params);
+
+        console.log(`[GET /dailyActivity/codes] Query returned ${result.length} records`);
+
+        res.status(200).json({ success: true, data: result });
+    } catch (err) {
+        console.error('Error fetching codes data', err);
+        res.status(500).json({ success: false, message: 'Error fetching codes data' });
+    }
+});
+
+// GET /api/dailyActivity/vips - Get filtered VIPs data with MGA table joins
+router.get("/vips", async (req, res) => {
+    try {
+        const { period, month, year, MGA_NAME, rga, tree } = req.query;
+        
+        console.log(`[GET /dailyActivity/vips] Request received with filters - period: ${period}, month: ${month}, year: ${year}, MGA_NAME: ${MGA_NAME}, rga: ${rga}, tree: ${tree}`);
+
+        let queryStr = `
+            SELECT 
+                v.*,
+                m.rga as mga_rga,
+                m.tree as mga_tree
+            FROM VIPs v
+            LEFT JOIN MGAs m 
+                ON v.mga = m.lagnname
+        `;
+        
+        const params = [];
+        const conditions = [];
+
+        // Date filtering based on vip_month and period
+        if (period && year) {
+            if (period === 'mtd' && month) {
+                // MTD: Filter for specific month and year
+                conditions.push('YEAR(v.vip_month) = ? AND MONTH(v.vip_month) = ?');
+                params.push(year, month);
+            } else if (period === 'ytd') {
+                // YTD: Filter for year to date
+                conditions.push('YEAR(v.vip_month) = ? AND v.vip_month <= NOW()');
+                params.push(year);
+            }
+        }
+
+        // MGA filtering - include both direct MGA match and self-reporting
+        if (MGA_NAME) {
+            conditions.push('(v.mga = ? OR v.lagnname = ?)');
+            params.push(MGA_NAME, MGA_NAME);
+        }
+
+        // RGA filtering - include both MGA table RGA match and self-reporting
+        if (rga) {
+            conditions.push('(m.rga = ? OR v.lagnname = ?)');
+            params.push(rga, rga);
+        }
+
+        // Tree filtering - include both MGA table tree match and self-reporting
+        if (tree) {
+            conditions.push('(m.tree = ? OR v.lagnname = ?)');
+            params.push(tree, tree);
+        }
+
+        // Add WHERE clause if there are conditions
+        if (conditions.length > 0) {
+            queryStr += ' WHERE ' + conditions.join(' AND ');
+        }
+
+        queryStr += ' ORDER BY v.vip_month DESC';
+
+        console.log(`[GET /dailyActivity/vips] Executing query: ${queryStr}`);
+        console.log(`[GET /dailyActivity/vips] Parameters:`, params);
+
+        const result = await query(queryStr, params);
+
+        console.log(`[GET /dailyActivity/vips] Query returned ${result.length} records`);
+
+        res.status(200).json({ success: true, data: result });
+    } catch (err) {
+        console.error('Error fetching VIPs data', err);
+        res.status(500).json({ success: false, message: 'Error fetching VIPs data' });
+    }
+});
+
 module.exports = router; 

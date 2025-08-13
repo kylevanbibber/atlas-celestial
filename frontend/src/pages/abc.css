@@ -1666,7 +1666,6 @@
   }
   
   .view-toggle button {
-    background: var(--secondary-color);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
     padding: 0.5rem 1rem;

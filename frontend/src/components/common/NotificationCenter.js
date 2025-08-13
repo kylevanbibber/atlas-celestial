@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useNotifications } from '../../context/NotificationContext';
-import { BsBell, BsBellFill, BsCheck2All, BsTrash, BsX, BsGear, BsBellSlash } from 'react-icons/bs';
+import { useNotificationContext } from '../../context/NotificationContext';
+import { BsBell, BsBellFill, BsCheck2All, BsGear, BsTrash, BsX, BsArrowClockwise } from 'react-icons/bs';
 import { FiInfo, FiCheckCircle, FiAlertTriangle, FiAlertCircle } from 'react-icons/fi';
 import { DateTime } from 'luxon';
 import api from '../../api';
@@ -91,16 +91,21 @@ const NotificationItem = ({ notification, onRead, onDismiss }) => {
 const NotificationCenter = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [testingNotification, setTestingNotification] = useState(false);
+  const [hasInitiallyFetched, setHasInitiallyFetched] = useState(false);
   const {
-    notifications,
+    notifications = [],
     unreadCount,
-    loading,
-    error,
-    fetchNotifications,
     markAsRead,
     markAllAsRead,
-    dismissNotification
-  } = useNotifications();
+    dismissNotification,
+    dismissAllNotifications,
+    fetchNotifications,
+    forceRefreshNotifications, // ✨ Add force refresh function
+    isLoading: loading,
+    error,
+    lastFetched,
+    wsConnected
+  } = useNotificationContext();
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
   
@@ -119,24 +124,69 @@ const NotificationCenter = () => {
   
   const toggleDropdown = () => {
     if (!isOpen) {
-      // When opening, fetch notifications
-      fetchNotifications();
+      // ✨ OPTIMIZED: Only fetch if we need to
+      const shouldFetchResult = shouldFetchNotifications();
+      
+      if (shouldFetchResult.should) {
+        console.log('🔄 [NOTIFICATION-CENTER] Fetching notifications because:', shouldFetchResult.reason);
+        fetchNotifications();
+      } else {
+        console.log('⚡ [NOTIFICATION-CENTER] Using cached notifications - instant display!');
+      }
+      
+      setHasInitiallyFetched(true);
     }
     setIsOpen(!isOpen);
+  };
+  
+  // Helper function to determine if we should fetch notifications
+  const shouldFetchNotifications = () => {
+    // Always fetch on first open
+    if (!hasInitiallyFetched) {
+      return { should: true, reason: 'first time opening' };
+    }
+    
+    // If we have no notifications and no error, fetch
+    if (notifications.length === 0 && !error) {
+      return { should: true, reason: 'no notifications in cache' };
+    }
+    
+    // If WebSocket is disconnected and data is old, fetch
+    if (!wsConnected && lastFetched) {
+      const timeSinceLastFetch = Date.now() - lastFetched.getTime();
+      const fiveMinutes = 5 * 60 * 1000;
+      
+      if (timeSinceLastFetch > fiveMinutes) {
+        return { should: true, reason: 'WebSocket disconnected and data is stale (>5min)' };
+      }
+    }
+    
+    // If there's an error and we don't have cached data, try to fetch
+    if (error && notifications.length === 0) {
+      return { should: true, reason: 'error state with no cached data' };
+    }
+    
+    // Otherwise, use cached data for instant display
+    return { should: false, reason: 'using cached data' };
   };
   
   const handleTestNotification = async () => {
     setTestingNotification(true);
     try {
       await api.post('/notifications/test');
-      // Refresh notifications after test
-      fetchNotifications();
+      // ✨ OPTIMIZED: Don't fetch here since WebSocket will update instantly
+      console.log('🧪 [TEST] Test notification sent - WebSocket will handle real-time update');
     } catch (error) {
       console.error('Failed to send test notification:', error);
+      // Only fetch on error as fallback
+      fetchNotifications();
     } finally {
       setTestingNotification(false);
     }
   };
+  
+  // Determine if we should show loading state
+  const showLoading = loading && notifications.length === 0;
   
   return (
     <div className="notification-center" ref={dropdownRef}>
@@ -152,25 +202,45 @@ const NotificationCenter = () => {
       {isOpen && (
         <div className="notification-dropdown">
           <div className="notification-header-bar">
-            <h3>Notifications</h3>
+            <h3>
+              Notifications
+              {wsConnected && (
+                <span className="connection-indicator connected" title="Real-time connected">
+                  ●
+                </span>
+              )}
+            </h3>
             <div className="notification-actions">
               <button 
                 className="notification-action-btn mark-all-read" 
                 onClick={markAllAsRead}
                 disabled={unreadCount === 0}
+                title="Mark all as read"
               >
                 <BsCheck2All size={16} />
-                <span>Read All</span>
               </button>
               <button 
-                className="notification-action-btn view-all" 
-                onClick={() => { navigate('/settings?section=notifications'); setIsOpen(false); }}
+                className="notification-action-btn clear-all" 
+                onClick={dismissAllNotifications}
+                disabled={notifications.filter(n => !n.is_dismissed).length === 0}
+                title="Clear all notifications"
               >
-                <span>View All</span>
+                <BsTrash size={16} />
+              </button>
+              <button 
+                className="notification-action-btn refresh" 
+                onClick={() => {
+                  console.log('🔄 [MANUAL] Manual refresh requested');
+                  forceRefreshNotifications();
+                }}
+                title="Refresh notifications"
+              >
+                <BsArrowClockwise size={16} />
               </button>
               <button
                 className="notification-action-btn settings"
                 onClick={() => { navigate('/settings?section=notifications'); setIsOpen(false); }}
+                title="Notification settings"
               >
                 <BsGear size={16} />
               </button>
@@ -178,9 +248,9 @@ const NotificationCenter = () => {
           </div>
           
           <div className="notification-list">
-            {loading ? (
+            {showLoading ? (
               <div className="notification-loading">Loading notifications...</div>
-            ) : error ? (
+            ) : error && notifications.length === 0 ? (
               <div className="notification-error">Failed to load notifications</div>
             ) : notifications.length === 0 ? (
               <div className="notification-empty">No notifications</div>

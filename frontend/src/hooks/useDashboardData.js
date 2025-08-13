@@ -13,22 +13,71 @@ import { getApiEndpoints } from '../config/dashboardConfig';
  * Helper function to calculate Monday-Sunday date range for current week
  */
 const getCurrentWeekRange = () => {
+  // Use UTC to avoid timezone issues
   const today = new Date();
-  const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  console.log(`🔍 [getCurrentWeekRange] Today (local): ${today.toDateString()}`);
+  console.log(`🔍 [getCurrentWeekRange] Today (UTC): ${today.toUTCString()}`);
+  
+  const dayOfWeek = today.getUTCDay(); // 0 = Sunday, 1 = Monday, etc.
+  console.log(`🔍 [getCurrentWeekRange] Day of week (UTC): ${dayOfWeek} (0=Sunday, 1=Monday, etc.)`);
+  
   const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Days to go back to Monday
+  console.log(`🔍 [getCurrentWeekRange] Days to go back to Monday: ${daysToMonday}`);
   
+  // Calculate Monday of current week (UTC)
   const monday = new Date(today);
-  monday.setDate(today.getDate() - daysToMonday);
-  monday.setHours(0, 0, 0, 0);
+  monday.setUTCDate(today.getUTCDate() - daysToMonday);
+  monday.setUTCHours(0, 0, 0, 0);
+  console.log(`🔍 [getCurrentWeekRange] Monday (UTC): ${monday.toUTCString()}`);
   
+  // Calculate Sunday of current week (UTC)
   const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  sunday.setUTCHours(23, 59, 59, 999);
+  console.log(`🔍 [getCurrentWeekRange] Sunday (UTC): ${sunday.toUTCString()}`);
   
+  // Format as YYYY-MM-DD to match Daily_Activity.reportDate format
   const startDate = monday.toISOString().split('T')[0];
   const endDate = sunday.toISOString().split('T')[0];
   
+  console.log(`🔍 [getCurrentWeekRange] Final range: ${startDate} to ${endDate}`);
+  
   return { startDate, endDate };
+};
+
+/**
+ * Helper function to get current month date range (first day to last day of current month)
+ */
+const getCurrentMonthRange = () => {
+  // Use UTC to avoid timezone issues
+  const today = new Date();
+  const year = today.getUTCFullYear();
+  const month = today.getUTCMonth();
+  
+  // First day of current month (UTC)
+  const firstDay = new Date(Date.UTC(year, month, 1));
+  
+  // Last day of current month (UTC)
+  const lastDay = new Date(Date.UTC(year, month + 1, 0));
+  
+  // Format as YYYY-MM-DD to match Daily_Activity.reportDate format
+  const startDate = firstDay.toISOString().split('T')[0];
+  const endDate = lastDay.toISOString().split('T')[0];
+  
+  console.log(`🔍 [getCurrentMonthRange] Current month range: ${startDate} to ${endDate}`);
+  
+  return { startDate, endDate };
+};
+
+/**
+ * Helper function to get the actual current month (for "This Month" section)
+ */
+const getCurrentMonth = () => {
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth() + 1; // 1-indexed
+  const currentYear = currentDate.getFullYear();
+  
+  return { currentMonth, currentYear };
 };
 
 /**
@@ -576,7 +625,10 @@ export const useDashboardData = (userRole, user) => {
   const [associatesData, setAssociatesData] = useState([]);
   const [hiresData, setHiresData] = useState([]);
   const [dailyActivityData, setDailyActivityData] = useState({ totalRefAlp: 0, totalAlp: 0, totalRefs: 0, agentCount: 0 });
-  const [refSalesData, setRefSalesData] = useState({ totalRefSales: 0 });
+  const [dailyActivityLoading, setDailyActivityLoading] = useState(false);
+  const [refSalesData, setRefSalesData] = useState({ totalRefSales: 0, previousMonthRefSales: 0 });
+  const [currentMonthRefSalesData, setCurrentMonthRefSalesData] = useState({ totalRefSales: 0 });
+  const [ytdRefSalesData, setYtdRefSalesData] = useState({ ytdRefSales: 0, previousYearYtdRefSales: 0 });
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
 
@@ -585,7 +637,7 @@ export const useDashboardData = (userRole, user) => {
   const [codesAndHiresMetrics, setCodesAndHiresMetrics] = useState({});
 
   /**
-   * Fetch data for the current user role
+   * Fetch main dashboard data (not dependent on date range)
    */
   const fetchDashboardData = useCallback(async () => {
     if (!userRole || !user?.lagnname) return;
@@ -600,33 +652,31 @@ export const useDashboardData = (userRole, user) => {
 
       const lagnName = user.lagnname;
       
-      console.log(`🔍 [Dashboard] Fetching data for ${userRole} - ${lagnName}`);
+      console.log(`🔍 [Dashboard] Fetching main data for ${userRole} - ${lagnName}`);
       
       // Handle different parameter structures for different roles
-      let weeklyYtdResponse, monthlyAlpResponse, associatesResponse, vipsResponse, hiresResponse, dailyActivityResponse;
+      let weeklyYtdResponse, monthlyAlpResponse, associatesResponse, vipsResponse, hiresResponse;
       
       if (userRole === 'SGA') {
         // SGA uses different endpoints and parameters
         const effectiveAgnName = lagnName || 'ARIAS SIMON A';
         const queryRole = (userRole === "RGA" || userRole === "SGA") ? "MGA" : userRole;
         
-        [weeklyYtdResponse, monthlyAlpResponse, associatesResponse, vipsResponse, hiresResponse, dailyActivityResponse] = await Promise.all([
+        [weeklyYtdResponse, monthlyAlpResponse, associatesResponse, vipsResponse, hiresResponse] = await Promise.all([
           api.get(`${endpoints.weeklyYtd}?value=${effectiveAgnName}`),
           api.get(`${endpoints.monthlyAlp}?value=${effectiveAgnName}`),
           api.get(`${endpoints.associates}?column=${queryRole}&value=${effectiveAgnName}`),
           api.get(`${endpoints.vips}?column=${queryRole}&value=${effectiveAgnName}`),
-          api.get(`${endpoints.hires}?value=${effectiveAgnName}`),
-          api.get(`${endpoints.dailyActivity}?startDate=${selectedDateRange.startDate}&endDate=${selectedDateRange.endDate}`)
+          api.get(`${endpoints.hires}?value=${effectiveAgnName}`)
         ]);
       } else {
         // MGA, RGA, SA, GA, AGT all use MGA endpoints with lagnName parameter
-        [weeklyYtdResponse, monthlyAlpResponse, associatesResponse, vipsResponse, hiresResponse, dailyActivityResponse] = await Promise.all([
+        [weeklyYtdResponse, monthlyAlpResponse, associatesResponse, vipsResponse, hiresResponse] = await Promise.all([
           api.get(`${endpoints.weeklyYtd}?lagnName=${lagnName}`),
           api.get(`${endpoints.monthlyAlp}?lagnName=${lagnName}`),
           api.get(`${endpoints.associates}?lagnName=${lagnName}`),
           api.get(`${endpoints.vips}?lagnName=${lagnName}`),
-          api.get(`${endpoints.hires}?lagnName=${lagnName}`),
-          api.get(`${endpoints.dailyActivity}?lagnName=${lagnName}&startDate=${selectedDateRange.startDate}&endDate=${selectedDateRange.endDate}`)
+          api.get(`${endpoints.hires}?lagnName=${lagnName}`)
         ]);
       }
 
@@ -639,7 +689,6 @@ export const useDashboardData = (userRole, user) => {
         setAssociatesData(associatesResponse?.data?.data || []);
         setVipsData(vipsResponse?.data?.data || []);
         setHiresData(hiresResponse?.data?.data || []);
-        setDailyActivityData(dailyActivityResponse?.data || { totalRefAlp: 0, totalAlp: 0, totalRefs: 0, agentCount: 0 });
       } else {
         // MGA, RGA, SA, GA all use same response structure
         setWeeklyYtdData(weeklyYtdResponse?.data?.data || []);
@@ -647,30 +696,127 @@ export const useDashboardData = (userRole, user) => {
         setAssociatesData(associatesResponse?.data?.data || []);
         setVipsData(vipsResponse?.data?.data || []);
         setHiresData(hiresResponse?.data?.data || []);
-        setDailyActivityData(dailyActivityResponse?.data || { totalRefAlp: 0, totalAlp: 0, totalRefs: 0, agentCount: 0 });
       }
 
       // Fetch ref sales for the reporting month (different API calls for different roles)
       const { reportingMonth, reportingYear } = getReportingMonth();
-      let refSalesResponse;
+      let refSalesResponse, reportingMonthPreviousRefSalesResponse;
+      
+      // Calculate the month before the reporting month for "Last Month Performance" comparison
+      const reportingPreviousMonth = reportingMonth === 1 ? 12 : reportingMonth - 1;
+      const reportingPreviousYear = reportingMonth === 1 ? reportingYear - 1 : reportingYear;
       
       if (userRole === 'SGA') {
         // SGA doesn't use lagnName parameter
         refSalesResponse = await api.get(`${endpoints.refSales}?month=${reportingMonth}&year=${reportingYear}`);
+        reportingMonthPreviousRefSalesResponse = await api.get(`${endpoints.refSales}?month=${reportingPreviousMonth}&year=${reportingPreviousYear}`);
       } else {
         // Other roles (MGA, RGA, SA, GA, AGT) use lagnName parameter
         refSalesResponse = await api.get(`${endpoints.refSales}?month=${reportingMonth}&year=${reportingYear}&lagnName=${lagnName}`);
+        reportingMonthPreviousRefSalesResponse = await api.get(`${endpoints.refSales}?month=${reportingPreviousMonth}&year=${reportingPreviousYear}&lagnName=${lagnName}`);
       }
       
-      setRefSalesData(refSalesResponse?.data || { totalRefSales: 0 });
+      setRefSalesData({
+        totalRefSales: refSalesResponse?.data?.totalRefSales || 0,
+        previousMonthRefSales: reportingMonthPreviousRefSalesResponse?.data?.totalRefSales || 0
+      });
 
-      console.log(`🔍 [Dashboard] Data fetched successfully for ${userRole}`);
+      // Fetch current month ref sales for "This Month" section
+      const { currentMonth, currentYear } = getCurrentMonth();
+      let currentMonthRefSalesResponse, previousMonthRefSalesResponse;
+      
+      // Calculate previous month
+      const previousMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+      const previousMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+      
+      if (userRole === 'SGA') {
+        // SGA doesn't use lagnName parameter
+        currentMonthRefSalesResponse = await api.get(`${endpoints.refSales}?month=${currentMonth}&year=${currentYear}`);
+        previousMonthRefSalesResponse = await api.get(`${endpoints.refSales}?month=${previousMonth}&year=${previousMonthYear}`);
+      } else {
+        // Other roles (MGA, RGA, SA, GA, AGT) use lagnName parameter
+        currentMonthRefSalesResponse = await api.get(`${endpoints.refSales}?month=${currentMonth}&year=${currentYear}&lagnName=${lagnName}`);
+        previousMonthRefSalesResponse = await api.get(`${endpoints.refSales}?month=${previousMonth}&year=${previousMonthYear}&lagnName=${lagnName}`);
+      }
+      
+      setCurrentMonthRefSalesData({
+        totalRefSales: currentMonthRefSalesResponse?.data?.totalRefSales || 0,
+        previousMonthRefSales: previousMonthRefSalesResponse?.data?.totalRefSales || 0
+      });
+
+      // Fetch YTD ref sales data (current year and previous year for comparison)
+      const ytdCurrentYear = new Date().getFullYear();
+      const ytdPreviousYear = ytdCurrentYear - 1;
+      
+      // Calculate YTD ref sales by fetching each month from January to current month
+      let ytdRefSales = 0;
+      let previousYearYtdRefSales = 0;
+      
+      for (let month = 1; month <= reportingMonth; month++) {
+        try {
+          let currentYearResponse, previousYearResponse;
+          
+          if (userRole === 'SGA') {
+            // SGA doesn't use lagnName parameter
+            currentYearResponse = await api.get(`${endpoints.refSales}?month=${month}&year=${ytdCurrentYear}`);
+            previousYearResponse = await api.get(`${endpoints.refSales}?month=${month}&year=${ytdPreviousYear}`);
+          } else {
+            // Other roles use lagnName parameter
+            currentYearResponse = await api.get(`${endpoints.refSales}?month=${month}&year=${ytdCurrentYear}&lagnName=${lagnName}`);
+            previousYearResponse = await api.get(`${endpoints.refSales}?month=${month}&year=${ytdPreviousYear}&lagnName=${lagnName}`);
+          }
+          
+          ytdRefSales += currentYearResponse?.data?.totalRefSales || 0;
+          previousYearYtdRefSales += previousYearResponse?.data?.totalRefSales || 0;
+        } catch (monthError) {
+          console.warn(`Failed to fetch ref sales for month ${month}:`, monthError);
+        }
+      }
+      
+      setYtdRefSalesData({ ytdRefSales, previousYearYtdRefSales });
+
+      console.log(`🔍 [Dashboard] Main data fetched successfully for ${userRole}`);
 
     } catch (err) {
       console.error(`Error fetching dashboard data for ${userRole}:`, err);
       setError('Failed to load dashboard data');
     } finally {
       setLoading(false);
+    }
+  }, [userRole, user?.lagnname]); // Removed selectedDateRange dependency
+
+  /**
+   * Fetch daily activity data separately (dependent on date range)
+   */
+  const fetchDailyActivityData = useCallback(async () => {
+    if (!userRole || !user?.lagnname) return;
+
+    try {
+      setDailyActivityLoading(true);
+      const endpoints = getApiEndpoints(userRole);
+      
+      if (!endpoints) return;
+
+      const lagnName = user.lagnname;
+      
+      console.log(`🔍 [Dashboard] Fetching daily activity data for ${userRole} - ${selectedDateRange.startDate} to ${selectedDateRange.endDate}`);
+      
+      let dailyActivityResponse;
+      
+      if (userRole === 'SGA') {
+        dailyActivityResponse = await api.get(`${endpoints.dailyActivity}?startDate=${selectedDateRange.startDate}&endDate=${selectedDateRange.endDate}`);
+      } else {
+        dailyActivityResponse = await api.get(`${endpoints.dailyActivity}?lagnName=${lagnName}&startDate=${selectedDateRange.startDate}&endDate=${selectedDateRange.endDate}`);
+      }
+      
+      setDailyActivityData(dailyActivityResponse?.data || { totalRefAlp: 0, totalAlp: 0, totalRefs: 0, agentCount: 0 });
+
+      console.log(`🔍 [Dashboard] Daily activity data fetched successfully`);
+
+    } catch (err) {
+      console.error(`Error fetching daily activity data:`, err);
+    } finally {
+      setDailyActivityLoading(false);
     }
   }, [userRole, user?.lagnname, selectedDateRange]);
 
@@ -901,6 +1047,10 @@ export const useDashboardData = (userRole, user) => {
   }, [fetchDashboardData]);
 
   useEffect(() => {
+    fetchDailyActivityData(); // Fetch daily activity data separately
+  }, [fetchDailyActivityData]);
+
+  useEffect(() => {
     fetchLeaderboardData();
   }, [fetchLeaderboardData]);
 
@@ -912,23 +1062,37 @@ export const useDashboardData = (userRole, user) => {
 
   // Format date range helper
   const formatDateRange = (startDate, endDate) => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    console.log(`🔍 [formatDateRange] Input - Start: ${startDate}, End: ${endDate}`);
+    
+    // Parse dates as UTC to avoid timezone issues
+    const start = new Date(startDate + 'T00:00:00.000Z');
+    const end = new Date(endDate + 'T00:00:00.000Z');
+    
+    console.log(`🔍 [formatDateRange] Parsed UTC - Start: ${start.toUTCString()}, End: ${end.toUTCString()}`);
     
     const formatDate = (date) => {
+      // Use UTC methods to format to avoid timezone shifts
       return date.toLocaleDateString('en-US', { 
         month: 'short', 
-        day: 'numeric' 
+        day: 'numeric',
+        timeZone: 'UTC'
       });
     };
     
-    return `${formatDate(start)} - ${formatDate(end)}`;
+    const formattedStart = formatDate(start);
+    const formattedEnd = formatDate(end);
+    const result = `${formattedStart} - ${formattedEnd}`;
+    
+    console.log(`🔍 [formatDateRange] Final formatted result: ${result}`);
+    
+    return result;
   };
 
   return {
     // Loading states
     loading,
     error,
+    dailyActivityLoading,
     leaderboardLoading,
     
     // Date range
@@ -943,6 +1107,8 @@ export const useDashboardData = (userRole, user) => {
     hiresData,
     dailyActivityData,
     refSalesData,
+    currentMonthRefSalesData,
+    ytdRefSalesData,
     leaderboardData,
     
     // Computed metrics
@@ -955,6 +1121,10 @@ export const useDashboardData = (userRole, user) => {
     
     // Refetch functions
     refetchData: fetchDashboardData,
+    refetchDailyActivity: fetchDailyActivityData,
     refetchLeaderboard: fetchLeaderboardData
   };
 };
+
+// Export helper functions for use in components
+export { getCurrentWeekRange, getCurrentMonthRange };

@@ -8,19 +8,11 @@ import TrainingSidebar from '../components/training/TrainingSidebar';
 import Release from '../components/production/release/Release';
 import { ProgressProvider } from '../components/production/release/ProgressContext';
 
-console.log('🎓 Training.js: File is being loaded!');
-
 // Main Training page component
 const Training = () => {
-  console.log('🎓 Training.js: Training component is rendering');
-  console.log('🎓 Training.js: Current URL:', window.location.href);
-  
   const [activeSection, setActiveSection] = useState('release');
   const navigate = useNavigate();
   const location = useLocation();
-  
-  console.log('🎓 Training.js: Initial activeSection:', activeSection);
-  console.log('🎓 Training.js: Current location.search:', location.search);
   
   // Parse the section from URL if available
   useEffect(() => {
@@ -47,19 +39,14 @@ const Training = () => {
   
   // Render the selected training section
   const renderTrainingSection = () => {
-    console.log('🎓 Training.js: renderTrainingSection called with activeSection:', activeSection);
-    console.log('🎓 Training.js: About to render section:', activeSection);
-    
     switch (activeSection) {
       case 'release':
-        console.log('🎓 Training.js: Rendering Release component');
         return (
           <ProgressProvider>
             <Release />
           </ProgressProvider>
         );
       default:
-        console.log('🎓 Training.js: Default case - rendering Release');
         return (
           <ProgressProvider>
             <Release />

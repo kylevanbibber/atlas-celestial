@@ -151,5 +151,12 @@ export const NameFormats = {
   // "John"
   FIRST_ONLY: (lagnname) => formatLagnname(lagnname, { 
     firstNameOnly: true 
-  })
+  }),
+
+  // "John S" (first name + last initial)
+  FIRST_LAST_INITIAL: (lagnname) => {
+    const { first, last } = parseLagnname(lagnname);
+    if (!last) return first;
+    return `${first} ${last.charAt(0).toUpperCase()}.`;
+  }
 }; 

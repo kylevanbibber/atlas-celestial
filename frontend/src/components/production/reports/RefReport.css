@@ -194,7 +194,7 @@
   box-shadow: 0 4px 12px var(--shadow-color, rgba(0, 0, 0, 0.1));
 }
 
-.card-icon {
+.ref-report-card-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -206,11 +206,11 @@
   flex-shrink: 0;
 }
 
-.card-content {
+.ref-report-card-content {
   flex: 1;
 }
 
-.card-content h3 {
+.ref-report-card-content h3 {
   margin: 0 0 8px 0;
   font-size: 14px;
   font-weight: 500;
@@ -219,7 +219,7 @@
   letter-spacing: 0.5px;
 }
 
-.card-value {
+.ref-report-card-value {
   margin: 0 0 4px 0;
   font-size: 24px;
   font-weight: 700;
@@ -227,24 +227,24 @@
   line-height: 1;
 }
 
-.card-change {
+.ref-report-card-change {
   font-size: 12px;
   font-weight: 500;
   padding: 2px 6px;
   border-radius: 4px;
 }
 
-.card-change.positive {
+.ref-report-card-change.positive {
   background: #f0fdf4;
   color: #16a34a;
 }
 
-.card-change.negative {
+.ref-report-card-change.negative {
   background: #fef2f2;
   color: #dc2626;
 }
 
-.card-change.neutral {
+.ref-report-card-change.neutral {
   background: var(--bg-secondary, #f9fafb);
   color: var(--text-secondary, #6b7280);
 }
@@ -410,12 +410,12 @@
 }
 
 /* Dark mode support for cards and components */
-[data-theme="dark"] .card-change.positive {
+[data-theme="dark"] .ref-report-card-change.positive {
   background: rgba(16, 185, 129, 0.2);
   color: #10b981;
 }
 
-[data-theme="dark"] .card-change.negative {
+[data-theme="dark"] .ref-report-card-change.negative {
   background: rgba(239, 68, 68, 0.2);
   color: #ef4444;
 }
@@ -433,7 +433,7 @@
   box-shadow: 0 4px 12px var(--shadow-color, rgba(0, 0, 0, 0.4));
 }
 
-[data-theme="dark"] .card-icon {
+[data-theme="dark"] .ref-report-card-icon {
   background: rgba(59, 130, 246, 0.2);
   color: var(--button-primary-bg, #60a5fa);
 }
@@ -501,12 +501,12 @@
     padding: 16px;
   }
 
-  .card-icon {
+  .ref-report-card-icon {
     width: 40px;
     height: 40px;
   }
 
-  .card-value {
+  .ref-report-card-value {
     font-size: 20px;
   }
 
@@ -528,7 +528,7 @@
     gap: 12px;
   }
 
-  .card-content {
+  .ref-report-card-content {
     width: 100%;
   }
 

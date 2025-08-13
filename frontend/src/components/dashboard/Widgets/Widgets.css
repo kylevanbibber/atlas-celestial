@@ -349,6 +349,40 @@
   font-size: 0.9rem;
 }
 
+/* Name format responsive display for LeaderboardWidget */
+.person-name .desktop-name {
+  display: inline;
+}
+
+.person-name .mobile-name {
+  display: none;
+}
+
+/* On smaller screens, show mobile name format */
+@media (max-width: 768px) {
+  .person-name .desktop-name {
+    display: none;
+  }
+  
+  .person-name .mobile-name {
+    display: inline;
+  }
+}
+
+/* MGA line styles for LeaderboardWidget */
+.mga-line {
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mga-info {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6b7280);
+  font-weight: 500;
+}
+
 .person-production {
   font-size: 0.8rem;
   color: #6c757d;

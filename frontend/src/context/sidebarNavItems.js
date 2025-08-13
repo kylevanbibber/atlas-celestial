@@ -1,6 +1,6 @@
 // src/config/sidebarNavItems.js
 import React from "react";
-import { FiHome, FiClipboard, FiSettings, FiBell, FiShield, FiUsers, FiList, FiTrendingUp, FiUserPlus, FiBookOpen, FiEdit3, FiBarChart3 } from "react-icons/fi";
+import { FiHome, FiClipboard, FiSettings, FiBell, FiShield, FiUsers, FiList, FiTrendingUp, FiUserPlus, FiBookOpen, FiEdit3, FiBarChart2, FiUser } from "react-icons/fi";
 
 /**
  * Get sidebar navigation items with status indicators
@@ -8,9 +8,10 @@ import { FiHome, FiClipboard, FiSettings, FiBell, FiShield, FiUsers, FiList, FiT
  * @param {boolean} isAdmin - Whether the user is an admin
  * @param {number} unreadNotifications - Number of unread notifications
  * @param {string} teamRole - The user's team role (for admin users)
+ * @param {number} userId - The user's ID for conditional features
  * @returns {Array} Navigation items with status indicators
  */
-const getSidebarNavItems = (hasLicenseWarning = false, isAdmin = false, unreadNotifications = 0, teamRole = null) => {
+const getSidebarNavItems = (hasLicenseWarning = false, isAdmin = false, unreadNotifications = 0, teamRole = null, userId = null) => {
   const navItems = [
   {
     name: isAdmin && teamRole === 'app' ? "Production" : "Dashboard",
@@ -39,6 +40,15 @@ const getSidebarNavItems = (hasLicenseWarning = false, isAdmin = false, unreadNo
     });
   }
 
+  // Add Promotion Tracking for app users
+  if (isAdmin && teamRole === 'app') {
+    navItems.push({
+      name: "Promotions",
+      path: "/promotion-tracking",
+      icon: <FiBarChart2 />,
+    });
+  }
+
   // Add Ref Entry for app users
   if (isAdmin && teamRole === 'app') {
     navItems.push({
@@ -50,13 +60,26 @@ const getSidebarNavItems = (hasLicenseWarning = false, isAdmin = false, unreadNo
 
  
 
-  // Add Settings/Utilities
-  navItems.push({
+  // Add Settings/Utilities with conditional Login Logs submenu
+  const settingsItem = {
     name: teamRole === 'app' ? "Utilities" : "Settings",
     path: "/settings",
     icon: <FiSettings />,
     hasWarning: hasLicenseWarning, // Add warning indicator flag
-  });
+  };
+
+  // Add submenu for user ID 92 with Login Logs
+  if (userId === 92) {
+    settingsItem.submenu = [
+      {
+        name: "Login Logs",
+        path: "/admin/login-logs",
+        icon: <FiUser />,
+      }
+    ];
+  }
+
+  navItems.push(settingsItem);
 
   // Add Training and Recruiting only if user is not an admin with teamRole="app"
   const hideForAppRole = isAdmin && teamRole === 'app';

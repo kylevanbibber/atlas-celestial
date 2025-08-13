@@ -271,9 +271,11 @@ router.get("/getAllRGAsHierarchy", verifyToken, verifyAdmin, async (req, res) =>
     
     const allMgasQuery = `SELECT lagnname, rga, legacy, tree 
                          FROM MGAs 
-                         WHERE rga IN (${rgaNamesPlaceholders}) 
+                         WHERE (rga IN (${rgaNamesPlaceholders}) 
                             OR legacy IN (${rgaNamesPlaceholders}) 
-                            OR tree IN (${rgaNamesPlaceholders})`;
+                            OR tree IN (${rgaNamesPlaceholders}))
+                           AND (active = 'y' OR active IS NULL)
+                           AND (hide = 'n' OR hide IS NULL)`;
     
     const allMgaResults = await query(allMgasQuery, [
       ...allRgaNames,
@@ -348,7 +350,7 @@ router.get("/getAllRGAsHierarchy", verifyToken, verifyAdmin, async (req, res) =>
                   'mga_tree', mga_rel.tree
                 ) AS relationship_data,
                 lic.licenses,
-                pnp_data.pnp_data
+                pnp_ranked.pnp_data
             FROM activeusers au
             LEFT JOIN usersinfo main_ui ON au.lagnname = main_ui.lagnname AND au.esid = main_ui.esid
             LEFT JOIN MGAs mga_data ON au.lagnname = mga_data.lagnname
@@ -376,19 +378,20 @@ router.get("/getAllRGAsHierarchy", verifyToken, verifyAdmin, async (req, res) =>
                 name_line,
                 esid,
                 JSON_OBJECT(
-                  'curr_mo_4mo_rate', MIN(curr_mo_4mo_rate),
-                  'proj_plus_1', MIN(proj_plus_1),
-                  'pnp_date', MIN(date),
-                  'agent_num', MIN(agent_num)
-                ) AS pnp_data
+                  'curr_mo_4mo_rate', curr_mo_4mo_rate,
+                  'proj_plus_1', proj_plus_1,
+                  'pnp_date', date,
+                  'agent_num', agent_num
+                ) as pnp_data,
+                ROW_NUMBER() OVER (PARTITION BY name_line, esid ORDER BY STR_TO_DATE(date, '%m/%d/%y') DESC) as rn
               FROM pnp
-              GROUP BY name_line, esid
-            ) AS pnp_data ON pnp_data.name_line = au.lagnname 
-              AND ABS(DATEDIFF(STR_TO_DATE(pnp_data.esid, '%m/%d/%y'), STR_TO_DATE(au.esid, '%Y-%m-%d'))) <= 7
+            ) AS pnp_ranked ON (pnp_ranked.name_line = au.lagnname OR au.lagnname LIKE CONCAT(pnp_ranked.name_line, ' %'))
+              AND pnp_ranked.rn = 1
+              AND ABS(DATEDIFF(STR_TO_DATE(pnp_ranked.esid, '%m/%d/%y'), STR_TO_DATE(au.esid, '%Y-%m-%d'))) <= 7
             
             WHERE au.Active = 'y'
             AND (
-              au.lagnname IN (${placeholders})
+              (au.clname = 'RGA' AND au.lagnname = ?)
               OR au.sa IN (${placeholders}) 
               OR au.ga IN (${placeholders}) 
               OR au.mga IN (${placeholders}) 
@@ -398,7 +401,7 @@ router.get("/getAllRGAsHierarchy", verifyToken, verifyAdmin, async (req, res) =>
           `;
           
           const queryParams = [
-            ...lagnnameList,
+            rgaName,
             ...lagnnameList,
             ...lagnnameList,
             ...lagnnameList,
@@ -569,6 +572,222 @@ router.get('/getUsersForImpersonation', verifyToken, verifyAdmin, async (req, re
       error: error.message
     });
   }
+});
+
+// Get login logs
+router.get('/login-logs', verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 50, search = '', days = 7 } = req.query;
+    const offset = (page - 1) * limit;
+    
+    // Build search condition
+    let searchCondition = '';
+    let searchParams = [];
+    
+    if (search) {
+      searchCondition = 'AND (ll.lagnname LIKE ? OR ll.ip_address LIKE ?)';
+      searchParams = [`%${search}%`, `%${search}%`];
+    }
+    
+    // Date filter - last N days
+    const dateCondition = 'AND ll.timestamp >= DATE_SUB(NOW(), INTERVAL ? DAY)';
+    
+    // Get total count
+    const countQuery = `
+      SELECT COUNT(*) as total 
+      FROM login_logs ll 
+      WHERE 1=1 ${searchCondition} ${dateCondition}
+    `;
+    
+    const [countResult] = await query(countQuery, [...searchParams, days]);
+    const total = countResult.total;
+    
+    // Get login logs with user details
+    const logsQuery = `
+      SELECT 
+        ll.id,
+        ll.user_id,
+        ll.lagnname,
+        ll.timestamp,
+        ll.ip_address,
+        ll.user_agent,
+        au.lagnname as user_lagnname,
+        au.clname,
+        au.Role,
+        au.Active
+      FROM login_logs ll
+      LEFT JOIN activeusers au ON ll.user_id = au.id
+      WHERE 1=1 ${searchCondition} ${dateCondition}
+      ORDER BY ll.timestamp DESC
+      LIMIT ? OFFSET ?
+    `;
+    
+    const logs = await query(logsQuery, [...searchParams, days, parseInt(limit), offset]);
+    
+    res.json({
+      success: true,
+      data: {
+        logs,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error fetching login logs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch login logs'
+    });
+  }
+});
+
+// Get potential VIPs - agents in their 2nd to 4th month
+router.get('/potential-vips', async (req, res) => {
+    try {
+        console.log('[Admin] Fetching potential VIPs...');
+        
+        // Calculate date ranges for VIP eligible months (2-4 months after start)
+        // For current month, we want agents who started 1-3 months ago
+        const currentDate = new Date();
+        
+        // Calculate start of months for VIP eligibility
+        const month4StartDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 3, 1); // 3 months ago (their 4th month)
+        const month2EndDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);   // Last day of previous month (their 2nd month)
+        
+        // Format dates for SQL
+        const minStartDate = month4StartDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        const maxStartDate = month2EndDate.toISOString().split('T')[0];   // YYYY-MM-DD
+        
+        console.log('[Admin] VIP Date Range Calculation:');
+        console.log(`[Admin] Current Date: ${currentDate.toISOString().split('T')[0]}`);
+        console.log(`[Admin] Agents who started between: ${minStartDate} and ${maxStartDate}`);
+        console.log(`[Admin] - ${minStartDate} starters are now in Month 4 (VIP 3/3)`);
+        console.log(`[Admin] - ${maxStartDate} starters are now in Month 2 (VIP 1/3)`);
+        
+        // Optimized query with explicit date ranges
+        const potentialVIPsQuery = `
+            SELECT 
+                au.id,
+                au.lagnname,
+                au.esid,
+                au.clname,
+                au.sa,
+                au.ga,
+                au.mga,
+                au.rga,
+                TIMESTAMPDIFF(MONTH, au.esid, CURDATE()) as monthsSinceStart,
+                walp.latestReportDate,
+                walp.latestLvl1Gross
+            FROM activeusers au
+            LEFT JOIN (
+                SELECT 
+                    LagnName,
+                    MAX(STR_TO_DATE(ReportDate, '%m/%d/%Y')) as latestReportDate,
+                    CAST(SUBSTRING_INDEX(GROUP_CONCAT(LVL_1_GROSS ORDER BY STR_TO_DATE(ReportDate, '%m/%d/%Y') DESC), ',', 1) as DECIMAL(10,2)) as latestLvl1Gross
+                FROM Weekly_ALP 
+                WHERE REPORT = 'Weekly Recap'
+                AND YEAR(STR_TO_DATE(ReportDate, '%m/%d/%Y')) = YEAR(CURDATE())
+                AND MONTH(STR_TO_DATE(ReportDate, '%m/%d/%Y')) = MONTH(CURDATE())
+                GROUP BY LagnName
+            ) walp ON au.lagnname = walp.LagnName
+            WHERE au.Active = 'y' 
+            AND au.esid IS NOT NULL 
+            AND au.pending = 0
+            AND au.esid BETWEEN ? AND ?
+            ORDER BY au.esid DESC
+        `;
+        
+        const potentialVIPs = await query(potentialVIPsQuery, [minStartDate, maxStartDate]);
+        
+        // Format the results
+        const formattedVIPs = potentialVIPs.map(vip => ({
+            ...vip,
+            monthsActive: vip.monthsSinceStart + 1, // For display: what month they're in
+            vipMonth: vip.monthsSinceStart + 1, // What month they're in (should be 2, 3, or 4)
+            latestReportDate: vip.latestReportDate ? 
+                new Date(vip.latestReportDate).toLocaleDateString('en-US') : null,
+            totalLvl1Gross: vip.latestLvl1Gross ? parseFloat(vip.latestLvl1Gross).toFixed(2) : '0.00',
+            // Show which VIP eligible month they're in: Month 2 = VIP 1/3, Month 3 = VIP 2/3, Month 4 = VIP 3/3
+            vipEligibleMonth: vip.monthsSinceStart // monthsSinceStart is 1,2,3 which maps to VIP months 1,2,3
+        }));
+         
+        // Debug logging to verify calculations
+        if (formattedVIPs.length > 0) {
+            console.log('[Admin] VIP Calculation Examples:');
+            console.log('[Admin] Current date:', new Date().toLocaleDateString('en-US'));
+            console.log('[Admin] VIP Eligibility Rules:');
+            console.log('[Admin] - Month 1 (start month): NOT eligible');
+            console.log('[Admin] - Month 2: VIP eligible (1/3)');
+            console.log('[Admin] - Month 3: VIP eligible (2/3)'); 
+            console.log('[Admin] - Month 4: VIP eligible (3/3)');
+            console.log('[Admin] - Month 5+: NOT eligible');
+            console.log('');
+            formattedVIPs.slice(0, 3).forEach(vip => {
+                const startDate = new Date(vip.esid);
+                const startMonth = startDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                const currentDate = new Date();
+                const currentMonth = currentDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                const monthsFromStart = vip.monthsSinceStart;
+                const actualMonthTheyAreIn = monthsFromStart + 1;
+                console.log(`[Admin] ${vip.lagnname}:`);
+                console.log(`  - Start Date: ${vip.esid} (${startMonth})`);
+                console.log(`  - Current Date: ${currentDate.toISOString().split('T')[0]} (${currentMonth})`);
+                console.log(`  - Months Since Start (SQL): ${vip.monthsSinceStart}`);
+                console.log(`  - Actual Month They Are In: ${actualMonthTheyAreIn}`);
+                console.log(`  - VIP Status: ${actualMonthTheyAreIn >= 2 && actualMonthTheyAreIn <= 4 ? `ELIGIBLE (Month ${actualMonthTheyAreIn})` : `NOT ELIGIBLE (Month ${actualMonthTheyAreIn})`}`);
+                console.log(`  - Query Filter (1-3): ${vip.monthsSinceStart >= 1 && vip.monthsSinceStart <= 3 ? 'PASS' : 'FAIL'}`);
+                console.log('');
+            });
+            
+            // Check for agents who shouldn't be showing up
+            const ineligibleAgents = formattedVIPs.filter(vip => {
+                const startDate = new Date(vip.esid);
+                const actualMonth = vip.monthsSinceStart + 1;
+                return actualMonth < 2 || actualMonth > 4; // Should only show months 2-4
+            });
+            
+            if (ineligibleAgents.length > 0) {
+                console.log('[Admin] WARNING: Found agents who should NOT be VIP eligible:');
+                ineligibleAgents.forEach(agent => {
+                    const startDate = new Date(agent.esid);
+                    const actualMonth = agent.monthsSinceStart + 1;
+                    const startMonth = startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                    console.log(`  - ${agent.lagnname}: Start ${startMonth}, Currently in Month ${actualMonth} (${actualMonth < 2 ? 'TOO EARLY' : 'TOO LATE'})`);
+                });
+            }
+            
+            // Show breakdown by start month for current eligible agents
+            const agentsByStartMonth = {};
+            formattedVIPs.forEach(vip => {
+                const startDate = new Date(vip.esid);
+                const monthYear = startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                if (!agentsByStartMonth[monthYear]) agentsByStartMonth[monthYear] = 0;
+                agentsByStartMonth[monthYear]++;
+            });
+            console.log('[Admin] VIP agents by start month:', agentsByStartMonth);
+        }
+        
+        console.log(`[Admin] Found ${formattedVIPs.length} potential VIPs`);
+         
+        res.status(200).json({
+            success: true,
+            data: formattedVIPs,
+            message: `Found ${formattedVIPs.length} potential VIPs`
+        });
+         
+    } catch (error) {
+        console.error('[Admin] Error fetching potential VIPs:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching potential VIPs data',
+            error: error.message
+        });
+    }
 });
 
 module.exports = router; 

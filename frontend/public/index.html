@@ -52,20 +52,25 @@
     <!-- OneSignal Web Push Notifications Setup -->
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     <script>
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  OneSignalDeferred.push(async function(OneSignal) {
-    await OneSignal.init({
-      appId: "c5dcde70-c2fd-4b3f-8544-175b57a256b4",
-      safari_web_id: "web.onesignal.auto.512e7622-1d45-4df4-947f-a5316fda3b8e",
-      notifyButton: {
-        enable: true,
-      },
-    });
-        
-        // Log OneSignal initialization status for debugging
-        console.log('OneSignal initialization complete');
-        console.log('Available OneSignal methods:', Object.keys(OneSignal));
+  // Only initialize OneSignal if NOT running as PWA (standalone mode)
+  if (window.matchMedia('(display-mode: browser)').matches) {
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({
+        appId: "c5dcde70-c2fd-4b3f-8544-175b57a256b4",
+        safari_web_id: "web.onesignal.auto.512e7622-1d45-4df4-947f-a5316fda3b8e",
+        notifyButton: {
+          enable: true,
+        },
       });
+          
+          // Log OneSignal initialization status for debugging
+          console.log('OneSignal initialization complete');
+          console.log('Available OneSignal methods:', Object.keys(OneSignal));
+        });
+  } else {
+    console.log('PWA mode detected - OneSignal disabled, using native Web Push');
+  }
     </script>
     
     <title>Atlas</title>

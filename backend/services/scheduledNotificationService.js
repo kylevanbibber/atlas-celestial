@@ -319,11 +319,15 @@ async function getScheduledNotifications(filters = {}) {
 async function processDueNotifications() {
   try {
     logger.info('Processing due notifications...');
+    console.log('🔔 [PROCESSOR] Starting processDueNotifications...');
     
     // Get current time
     const now = new Date();
+    console.log('🔔 [PROCESSOR] Current time (UTC):', now.toISOString());
+    console.log('🔔 [PROCESSOR] Current time (Local):', now.toLocaleString());
     
     // Find notifications that are due and not paused
+    // Note: We need to handle timezone properly here
     const dueNotifications = await db.query(
       `SELECT * FROM scheduled_notifications 
        WHERE scheduled_for <= ? 
@@ -333,6 +337,20 @@ async function processDueNotifications() {
     );
     
     logger.info(`Found ${dueNotifications.length} notifications to process`);
+    console.log(`🔔 [PROCESSOR] Found ${dueNotifications.length} due notifications`);
+    
+    // Debug: Show all scheduled notifications for context with timezone info
+    const allScheduled = await db.query('SELECT id, title, scheduled_for, is_sent, is_paused FROM scheduled_notifications ORDER BY scheduled_for DESC LIMIT 5');
+    console.log('🔔 [PROCESSOR] Recent scheduled notifications:');
+    allScheduled.forEach(n => {
+      const scheduledDate = new Date(n.scheduled_for);
+      console.log(`  ID ${n.id}: "${n.title}"`);
+      console.log(`    DB value: ${n.scheduled_for}`);
+      console.log(`    Parsed as: ${scheduledDate.toISOString()} (UTC)`);
+      console.log(`    Local time: ${scheduledDate.toLocaleString()}`);
+      console.log(`    Is due? ${scheduledDate <= now} (is_sent: ${n.is_sent}, is_paused: ${n.is_paused})`);
+      console.log('');
+    });
     
     // Track statistics
     const stats = {
@@ -368,29 +386,65 @@ async function processDueNotifications() {
           ? notification.metadata 
           : JSON.stringify(notification.metadata || {});
         
-        // Send notification - transfer the scheduled_for and metadata to preserve the original schedule info
-        // Also use the scheduled time as the created_at time to fix timezone issues
-        await notificationService.createNotification({
-          title: notification.title,
-          message: notification.message,
-          type: notification.type,
-          user_id: notification.user_id,
-          target_group: notification.target_group,
-          link_url: notification.link_url,
-          metadata: metadataToTransfer, // Ensure metadata is properly transferred
-          scheduled_for: originalScheduledFor, // Transfer the original scheduled time
-          created_at: originalScheduledFor  // Use scheduled time as created time to fix timezone issues
-        });
+        // Send notification using the same logic as immediate notifications
+        // Instead of duplicating push notification logic, use the same internal function
+        console.log(`🔔 [PROCESSOR] Creating notification for ID ${notification.id}...`);
         
-        logger.info(`Successfully created regular notification from scheduled notification ${notification.id}`);
+        try {
+          // Import the internal notification creation function
+          const { createNotificationInternal } = require('../routes/notifications');
+          
+          // Create the notification data in the same format as immediate notifications
+          const notificationData = {
+            title: notification.title,
+            message: notification.message,
+            type: notification.type,
+            user_id: notification.user_id,
+            target_group: notification.target_group,
+            link_url: notification.link_url,
+            metadata: metadataToTransfer,
+            scheduled_for: originalScheduledFor,
+            created_at: originalScheduledFor
+          };
+          
+          console.log(`🔔 [PROCESSOR] Sending notification via internal route for scheduled ID ${notification.id}`);
+          
+          // Call the same internal function that immediate notifications use
+          // This will handle database creation, push notifications, and WebSocket notifications
+          const createdNotification = await createNotificationInternal(notificationData);
+          
+          console.log(`✅ [PROCESSOR] Successfully sent notification from scheduled ID ${notification.id} via internal route`);
+          
+        } catch (internalError) {
+          console.error(`❌ [PROCESSOR] Error sending notification via internal route for scheduled ID ${notification.id}:`, internalError);
+          
+          // Fallback to the old method if internal route fails
+          console.log(`🔔 [PROCESSOR] Falling back to direct creation for scheduled ID ${notification.id}`);
+          
+          const createdNotification = await notificationService.createNotification({
+            title: notification.title,
+            message: notification.message,
+            type: notification.type,
+            user_id: notification.user_id,
+            target_group: notification.target_group,
+            link_url: notification.link_url,
+            metadata: metadataToTransfer,
+            scheduled_for: originalScheduledFor,
+            created_at: originalScheduledFor
+          });
+          
+          console.log(`🔔 [PROCESSOR] Fallback creation completed for scheduled ID ${notification.id}`);
+        }
         
         // Handle recurrence if applicable
         if (metadata.recurrence) {
           logger.info(`Notification ${notification.id} has recurrence pattern: ${metadata.recurrence.pattern}`);
+          console.log(`🔔 [PROCESSOR] Handling recurrence for ID ${notification.id}: ${metadata.recurrence.pattern}`);
           await handleRecurrence(notification, metadata.recurrence);
         } else {
           // Mark as sent for one-time notifications without changing the scheduled_for time
           logger.info(`Marking one-time notification ${notification.id} as sent (preserving original scheduled_for time)`);
+          console.log(`🔔 [PROCESSOR] Marking one-time notification ${notification.id} as sent`);
           await db.query(
             'UPDATE scheduled_notifications SET is_sent = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
             [notification.id]

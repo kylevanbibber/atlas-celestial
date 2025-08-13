@@ -113,6 +113,14 @@ export const AuthProvider = ({ children }) => {
   const [originalAdminUser, setOriginalAdminUser] = useState(null);
   const [impersonatedUser, setImpersonatedUser] = useState(null);
 
+  // Initialize window impersonation state
+  useEffect(() => {
+    window.__IMPERSONATION_STATE__ = {
+      isImpersonating: isImpersonating,
+      impersonatedUserId: impersonatedUser?.userId || null
+    };
+  }, [isImpersonating, impersonatedUser]);
+
   /**
    * Get user ID from token
    * @param {string} tokenToUse - The JWT token
@@ -427,6 +435,12 @@ export const AuthProvider = ({ children }) => {
           _originalAdminId: originalAdminUser?.userId || user?.userId
         });
         
+        // Expose impersonation state to window for API interceptor
+        window.__IMPERSONATION_STATE__ = {
+          isImpersonating: true,
+          impersonatedUserId: targetUserData.userId
+        };
+        
         return { success: true };
       } else {
         throw new Error(response.data.message || 'Impersonation failed');
@@ -453,6 +467,12 @@ export const AuthProvider = ({ children }) => {
     setImpersonatedUser(null);
     setOriginalAdminUser(null);
     setError(null);
+    
+    // Clear impersonation state from window
+    window.__IMPERSONATION_STATE__ = {
+      isImpersonating: false,
+      impersonatedUserId: null
+    };
   }, [isImpersonating, originalAdminUser]);
 
   /**

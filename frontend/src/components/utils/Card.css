@@ -10,8 +10,14 @@
     border-radius: 10px;
     box-shadow: 0 2px 4px var(--shadow-color);
     transition: box-shadow 0.3s ease, background-color 0.3s ease;
-    margin: 10px;
+    margin: 0; /* Remove default margin to prevent spacing issues */
     border: 1px solid var(--border-color);
+  }
+
+  /* Dashboard-specific card styling */
+  .dashboard-card.custom-card {
+    margin: 0; /* Ensure dashboard cards have no margin */
+    width: 100%; /* Fill grid cell completely */
   }
   
   .custom-card:hover {
@@ -95,54 +101,194 @@
     background-color: rgba(107, 114, 128, 0.1);
   }
 
+  /* Comparison text change styles (for ComparisonText component) */
+  .comparison-text-change {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+  }
+
+  .comparison-text-change.positive {
+    color: #059669;
+    background-color: rgba(5, 150, 105, 0.1);
+  }
+
+  .comparison-text-change.negative {
+    color: #dc2626;
+    background-color: rgba(220, 38, 38, 0.1);
+  }
+
+  .comparison-text-change.neutral {
+    color: var(--text-secondary);
+    background-color: rgba(107, 114, 128, 0.1);
+  }
+
   /* Dark theme adjustments for card change */
   [data-theme="dark"] .card-change.positive {
     color: #10b981;
-    background-color: rgba(16, 185, 129, 0.15);
+    background-color: rgba(16, 185, 129, 0.2);
   }
 
   [data-theme="dark"] .card-change.negative {
     color: #ef4444;
-    background-color: rgba(239, 68, 68, 0.15);
+    background-color: rgba(239, 68, 68, 0.2);
   }
 
   [data-theme="dark"] .card-change.neutral {
     color: var(--text-secondary);
-    background-color: rgba(156, 163, 175, 0.15);
+    background-color: rgba(107, 114, 128, 0.2);
+  }
+
+  /* Dark theme adjustments for comparison text change */
+  [data-theme="dark"] .comparison-text-change.positive {
+    color: #10b981;
+    background-color: rgba(16, 185, 129, 0.2);
+  }
+
+  [data-theme="dark"] .comparison-text-change.negative {
+    color: #ef4444;
+    background-color: rgba(239, 68, 68, 0.2);
+  }
+
+  [data-theme="dark"] .comparison-text-change.neutral {
+    color: var(--text-secondary);
+    background-color: rgba(107, 114, 128, 0.2);
   }
   
   /* Responsive adjustments */
-  @media (max-width: 710px) {
+  @media (max-width: 768px) {
     .custom-card {
-      width: 100%;
       text-align: center;
+      margin: 0;
+      padding: 8px; /* Reduce padding to save space */
+      box-sizing: border-box;
+      /* Remove flex properties that might conflict with container layout */
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+    }
+  
+    /* Dashboard cards on mobile should respect container sizing */
+    .dashboard-card.custom-card {
+      margin: 0 !important;
+      padding: 8px !important;
+      box-sizing: border-box !important;
+      /* Let the container control the sizing */
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      flex: none !important; /* Don't interfere with container flex rules */
     }
   
     .custom-card-header {
       flex-direction: column;
       align-items: center;
-      gap: 10px;
+      gap: 6px; /* Slightly reduce gap for better fit */
     }
   
     .custom-card-header h5 {
-      font-size: 1.2rem;
+      font-size: 0.9rem; /* Reduce font size for better fit on mobile */
+      margin: 0;
+      padding: 0;
+      text-align: center;
+      line-height: 1.2;
     }
   
     .custom-value {
-      font-size: 1.8rem;
+      font-size: 1.4rem; /* Reduce font size for better fit */
+      margin: 4px 0; /* Reduce margin */
+      line-height: 1.1;
     }
   
     .custom-subtext {
-      font-size: 0.8rem;
+      font-size: 0.7rem; /* Reduce font size for better fit */
+      margin: 2px 0;
+      line-height: 1.2;
     }
 
     .card-change {
-      font-size: 0.75rem;
+      font-size: 0.65rem; /* Reduce font size for better fit */
+      padding: 1px 4px; /* Reduce padding for mobile */
     }
   
     .donut-container {
       position: static;
-      margin: 10px 0 0;
+      margin: 6px 0 0; /* Reduce margin */
+      width: 45px !important; /* Reduce donut size for mobile */
+      height: 45px !important;
+    }
+
+    .custom-card-body {
+      margin-top: 30px; /* Reduce top margin */
+    }
+  }
+
+  /* Extra small screens - further optimizations */
+  @media (max-width: 480px) {
+    .custom-card {
+      margin: 0;
+      padding: 6px; /* Further reduce padding */
+      box-sizing: border-box;
+    }
+  
+    .dashboard-card.custom-card {
+      margin: 0 !important;
+      padding: 6px !important;
+      box-sizing: border-box !important;
+    }
+
+    .custom-card-header h5 {
+      font-size: 0.8rem; /* Further reduce for very small screens */
+      line-height: 1.1;
+    }
+
+    .custom-value {
+      font-size: 1.2rem; /* Further reduce for very small screens */
+      margin: 2px 0;
+    }
+
+    .custom-subtext {
+      font-size: 0.65rem; /* Further reduce for very small screens */
+      margin: 1px 0;
+    }
+
+    .card-change {
+      font-size: 0.6rem;
+      padding: 1px 3px;
+    }
+
+    .donut-container {
+      width: 40px !important; /* Even smaller donut for very small screens */
+      height: 40px !important;
+      margin: 4px 0 0;
+    }
+
+    .custom-card-body {
+      margin-top: 20px; /* Further reduce margin */
+    }
+  }
+
+  /* Landscape mobile optimization */
+  @media (max-width: 768px) and (orientation: landscape) {
+    .custom-card-header h5 {
+      font-size: 0.85rem;
+    }
+
+    .custom-value {
+      font-size: 1.3rem;
+    }
+
+    .custom-subtext {
+      font-size: 0.68rem;
+    }
+
+    .donut-container {
+      width: 42px !important;
+      height: 42px !important;
     }
   }
   

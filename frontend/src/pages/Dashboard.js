@@ -17,44 +17,47 @@ const Dashboard = () => {
 
   console.log(`🔍 [Dashboard] Rendering dashboard for user role: ${userRole}`);
 
-  // If no user or role, show loading/error state
+  // If no user or role, show error state (not loading since UnifiedDashboard handles loading)
   if (!user) {
-      return (
-        <div className="dashboard-container padded-content-sm">
-            <div className="dashboard-cards-wrapper">
-          <div className="loading-message">Loading user data...</div>
+    return (
+      <div className="dashboard-container padded-content-sm">
+        <div className="dashboard-cards-wrapper">
+          <div className="error-message">
+            <h3>Authentication Error</h3>
+            <p>Unable to load user data. Please refresh the page or contact support.</p>
+          </div>
         </div>
       </div>
     );
   }
 
   if (!userRole) {
-      return (
-        <div className="dashboard-container padded-content-sm">
-            <div className="dashboard-cards-wrapper">
+    return (
+      <div className="dashboard-container padded-content-sm">
+        <div className="dashboard-cards-wrapper">
           <div className="error-message">
             <h3>Access Error</h3>
             <p>User role not found. Please contact support.</p>
-            </div>
           </div>
         </div>
-      );
-    }
+      </div>
+    );
+  }
 
   if (!user.lagnname) {
-      return (
-        <div className="dashboard-container padded-content-sm">
-            <div className="dashboard-cards-wrapper">
+    return (
+      <div className="dashboard-container padded-content-sm">
+        <div className="dashboard-cards-wrapper">
           <div className="error-message">
             <h3>Configuration Error</h3>
             <p>User agency name not found. Please contact support.</p>
-            </div>
           </div>
         </div>
-      );
-    }
+      </div>
+    );
+  }
 
-  // Render the unified dashboard
+  // Let UnifiedDashboard handle all loading states
   return <UnifiedDashboard userRole={userRole} user={user} />;
 };
 

@@ -6,7 +6,7 @@ import getSidebarNavItems from "../../context/sidebarNavItems";
 import { useTeamStyles } from "../../context/TeamStyleContext";
 import { useLicenseWarning } from "../../context/LicenseWarningContext";
 import { AuthContext, useAuth } from "../../context/AuthContext";
-import { useNotifications } from "../../context/NotificationContext";
+import { useNotificationContext } from '../../context/NotificationContext';
 import ContextMenuPortal from "./ContextMenuPortal";
 import "./Sidebar.css";
 import Logo from "../Layout/Logo";
@@ -17,7 +17,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
   const { teamName } = useTeamStyles();
   const { hasWarning: licenseWarning } = useLicenseWarning();
   const { user, hasPermission } = useAuth();
-  const { unreadCount } = useNotifications();
+  const { unreadCount } = useNotificationContext();
   
   // Check if user is admin using the hasPermission function
   const isAdmin = hasPermission('admin');
@@ -29,7 +29,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
   const shouldShowLicenseWarning = teamRole !== "app" ? licenseWarning : false;
   
   // Get sidebar items with warning indicators based on license status
-  const navItems = getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole);
+  const navItems = getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole, user?.userId);
   
   // Track which item (if any) currently shows its submenu
   const [submenuVisible, setSubmenuVisible] = useState(null);

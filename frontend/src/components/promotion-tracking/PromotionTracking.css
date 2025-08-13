@@ -1,0 +1,297 @@
+.promotion-tracking-container {
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    background-color: var(--bg-primary);
+    min-height: 100vh;
+}
+
+.promotion-tracking-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.promotion-tracking-main {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.section-card {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--border-color);
+}
+
+.section-card h2 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 0.5rem;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 0.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.section-header h2 {
+    margin: 0;
+    border: none;
+    padding: 0;
+}
+
+.agent-type-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.tab-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    min-width: 100px;
+}
+
+.tab-btn:hover {
+    background: var(--bg-secondary);
+    border-color: var(--primary-color);
+    color: var(--text-primary);
+}
+
+.tab-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.month-navigation {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 200px;
+}
+
+.month-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.month-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.month-values {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    background: var(--bg-tertiary);
+    padding: 0.25rem 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.month-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.month-nav-btn {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    min-width: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.month-nav-btn:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--primary-color);
+    transform: translateY(-1px);
+}
+
+.threshold-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.threshold-requirements {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.threshold-requirements span {
+    font-size: 0.85rem;
+}
+
+.threshold-requirements span:first-child {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.currency-value {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.mga-info {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    border: 2px dashed var(--border-color);
+}
+
+.empty-state p {
+    margin: 0 0 1.5rem 0;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: white;
+    text-align: center;
+    display: inline-block;
+    min-width: 100px;
+}
+
+.error-message {
+    text-align: center;
+    padding: 3rem;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    border: 1px solid var(--error-color);
+}
+
+.error-message h2 {
+    color: var(--error-color);
+    margin: 0 0 1rem 0;
+}
+
+.error-message p {
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.loading-message {
+    text-align: center;
+    padding: 3rem;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--border-color);
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .promotion-tracking-container {
+        padding: 1rem;
+    }
+    
+    .section-card {
+        padding: 1.5rem;
+    }
+    
+    .section-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+    
+    .agent-type-tabs {
+        justify-content: center;
+        margin-bottom: 0.5rem;
+    }
+    
+    .month-navigation {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .month-controls {
+        justify-content: center;
+    }
+    
+    .threshold-info {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .section-card {
+        padding: 1rem;
+    }
+    
+    .month-controls {
+        gap: 0.25rem;
+    }
+    
+    .month-nav-btn {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.8rem;
+        min-width: 35px;
+    }
+    
+    .month-nav-btn.current-btn {
+        min-width: 50px;
+    }
+} 

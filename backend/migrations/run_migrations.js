@@ -50,7 +50,8 @@ connection.connect(async err => {
       'create_licensed_states_table.sql',
       'create_leads_released_table.sql',
       'add_notification_reads_table.sql',
-      'notification_preferences.sql'
+      'notification_preferences.sql',
+      'standardize_notification_reads.sql'
     ];
     
     for (const sqlFile of sqlMigrations) {

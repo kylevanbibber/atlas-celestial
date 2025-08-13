@@ -5,16 +5,17 @@
  * It works for all user roles (SGA, MGA, RGA, SA, GA) by using the dashboard configuration.
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardSection from './DashboardSection';
 import Leaderboard from '../utils/Leaderboard';
 import { getDashboardConfig, DASHBOARD_SECTIONS } from '../../config/dashboardConfig';
-import { useDashboardData } from '../../hooks/useDashboardData';
+import { useDashboardData, getCurrentWeekRange, getCurrentMonthRange } from '../../hooks/useDashboardData';
 import '../../pages/Dashboard.css';
 
 const UnifiedDashboard = ({ userRole, user }) => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('thisWeek');
   
   // Get configuration for this user role
   const config = getDashboardConfig(userRole);
@@ -23,6 +24,7 @@ const UnifiedDashboard = ({ userRole, user }) => {
   const {
     loading,
     error,
+    dailyActivityLoading,
     leaderboardLoading,
     selectedDateRange,
     setSelectedDateRange,
@@ -30,10 +32,23 @@ const UnifiedDashboard = ({ userRole, user }) => {
     codesAndHiresMetrics,
     dailyActivityData,
     refSalesData,
+    currentMonthRefSalesData,
+    ytdRefSalesData,
     leaderboardData,
     formatCurrency,
     formatDateRange
   } = useDashboardData(userRole, user);
+
+  // Update date range when tab changes
+  useEffect(() => {
+    if (activeTab === 'thisWeek') {
+      const weekRange = getCurrentWeekRange();
+      setSelectedDateRange(weekRange);
+    } else if (activeTab === 'thisMonth') {
+      const monthRange = getCurrentMonthRange();
+      setSelectedDateRange(monthRange);
+    }
+  }, [activeTab, setSelectedDateRange]);
 
   // If no configuration found for this role, show default message
   if (!config) {
@@ -54,10 +69,9 @@ const UnifiedDashboard = ({ userRole, user }) => {
   // Show loading state
   if (loading) {
     return (
-      <div className="dashboard-container padded-content-sm">
-        <div className="dashboard-cards-wrapper">
-          <div className="loading-message">Loading dashboard data...</div>
-        </div>
+      <div className="route-loading" role="alert" aria-busy="true">
+        <div className="spinner"></div>
+        <p>Loading dashboard data...</p>
       </div>
     );
   }
@@ -67,9 +81,11 @@ const UnifiedDashboard = ({ userRole, user }) => {
     return (
       <div className="dashboard-container padded-content-sm">
         <div className="dashboard-cards-wrapper">
-          <div className="error-message">
-            <h3>Error Loading Dashboard</h3>
-            <p>{error}</p>
+          <div className="card-container">
+            <div className="dashboard-card error-card">
+              <h3>Error Loading Dashboard</h3>
+              <p>{error}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -77,23 +93,42 @@ const UnifiedDashboard = ({ userRole, user }) => {
   }
 
   /**
-   * Get data object for a specific section
+   * Get section data based on section type
    */
   const getSectionData = (sectionType) => {
     switch (sectionType) {
       case DASHBOARD_SECTIONS.YTD_PERFORMANCE:
+        return {
+          // ALP metrics
+          ...alpMetrics,
+          // Codes and Hires metrics
+          ...codesAndHiresMetrics,
+          // YTD Ref Sales data
+          ytdRefSales: ytdRefSalesData.ytdRefSales || 0,
+          previousYearYtdRefSales: ytdRefSalesData.previousYearYtdRefSales || 0
+        };
       case DASHBOARD_SECTIONS.LAST_MONTH_PERFORMANCE:
         return {
+          // ALP metrics
           ...alpMetrics,
+          // Codes and Hires metrics
           ...codesAndHiresMetrics,
-          totalRefSales: refSalesData.totalRefSales || 0
+          // Last Month Ref Sales data
+          totalRefSales: refSalesData.totalRefSales || 0,
+          previousMonthRefSales: refSalesData.previousMonthRefSales || 0
         };
       case DASHBOARD_SECTIONS.REPORTED_ACTIVITY:
         return {
+          // Daily activity data - keep as numbers to avoid NaN formatting issues
           totalAlp: dailyActivityData.totalAlp || 0,
           totalRefAlp: dailyActivityData.totalRefAlp || 0,
           totalRefs: dailyActivityData.totalRefs || 0,
-          agentCount: dailyActivityData.agentCount || 0
+          agentCount: dailyActivityData.agentCount || 0,
+          // Current month ref sales data
+          totalRefSales: currentMonthRefSalesData.totalRefSales || 0,
+          previousMonthRefSales: currentMonthRefSalesData.previousMonthRefSales || 0,
+          // Include loading state for conditional rendering
+          dailyActivityLoading
         };
       default:
         return {};
@@ -101,19 +136,11 @@ const UnifiedDashboard = ({ userRole, user }) => {
   };
 
   /**
-   * Get section title based on section type and data
+   * Get section title based on section type
    */
   const getSectionTitle = (sectionType) => {
-    switch (sectionType) {
-      case DASHBOARD_SECTIONS.YTD_PERFORMANCE:
-        return 'YTD Performance';
-      case DASHBOARD_SECTIONS.LAST_MONTH_PERFORMANCE:
-        return `Last Month Performance`;
-      case DASHBOARD_SECTIONS.REPORTED_ACTIVITY:
-        return 'Reported Activity';
-      default:
-        return 'Dashboard Section';
-    }
+    // No section headers needed anymore
+    return '';
   };
 
   /**
@@ -121,45 +148,72 @@ const UnifiedDashboard = ({ userRole, user }) => {
    */
   const formatLeaderboardValue = (value) => {
     if (typeof value === 'number') {
-      return formatCurrency(value);
+      return value.toLocaleString();
     }
-    return value?.toString() || '0';
+    return value || '0';
   };
 
   /**
-   * Navigation handlers
+   * Get sections to display based on active tab
    */
-  const handleLeaderboardClick = () => {
-    navigate('/production?section=leaderboard');
+  const getSectionsForTab = (tab) => {
+    switch (tab) {
+      case 'thisWeek':
+        return [DASHBOARD_SECTIONS.REPORTED_ACTIVITY];
+      case 'thisMonth':
+        return [DASHBOARD_SECTIONS.REPORTED_ACTIVITY];
+      case 'lastMonth':
+        return [DASHBOARD_SECTIONS.LAST_MONTH_PERFORMANCE];
+      case 'ytd':
+        return [DASHBOARD_SECTIONS.YTD_PERFORMANCE];
+      default:
+        return [];
+    }
   };
 
-  const handleYtdPerformanceClick = () => {
-    navigate('/production?section=leaderboard');
-  };
-
-  const handleLastMonthPerformanceClick = () => {
-    navigate('/production?section=leaderboard');
-  };
-
-  const handleReportedActivityClick = () => {
-    navigate('/production?section=daily-activity');
-  };
+  const sectionsToShow = getSectionsForTab(activeTab);
 
   return (
     <div className="dashboard-container padded-content-sm">
+      {/* Navigation Buttons */}
+      <div className="dashboard-nav-buttons">
+        <button 
+          className={`time-button ${activeTab === 'thisWeek' ? 'active' : ''}`}
+          onClick={() => setActiveTab('thisWeek')}
+        >
+          This Week
+        </button>
+        <button 
+          className={`time-button ${activeTab === 'thisMonth' ? 'active' : ''}`}
+          onClick={() => setActiveTab('thisMonth')}
+        >
+          This Month
+        </button>
+        <button 
+          className={`time-button ${activeTab === 'lastMonth' ? 'active' : ''}`}
+          onClick={() => setActiveTab('lastMonth')}
+        >
+          Last Month
+        </button>
+        <button 
+          className={`time-button ${activeTab === 'ytd' ? 'active' : ''}`}
+          onClick={() => setActiveTab('ytd')}
+        >
+          YTD
+        </button>
+      </div>
+
       <div className="dashboard-layout">
         <div className="dashboard-main-content">
           <div className="dashboard-cards-wrapper">
-            {config.sections.map((sectionType) => {
-              // Skip leaderboard section as it's rendered separately
-              if (sectionType === DASHBOARD_SECTIONS.LEADERBOARD) return null;
-
+            {sectionsToShow.map((sectionType) => {
               const sectionCards = config.cards[sectionType];
               if (!sectionCards || sectionCards.length === 0) return null;
 
               const sectionData = getSectionData(sectionType);
               const sectionTitle = getSectionTitle(sectionType);
-              const showDateSelector = sectionType === DASHBOARD_SECTIONS.REPORTED_ACTIVITY;
+              // Show date selector only for "This Week" tab when in REPORTED_ACTIVITY section
+              const showDateSelector = sectionType === DASHBOARD_SECTIONS.REPORTED_ACTIVITY && activeTab === 'thisWeek';
 
               return (
                 <DashboardSection
@@ -172,12 +226,6 @@ const UnifiedDashboard = ({ userRole, user }) => {
                   selectedDateRange={selectedDateRange}
                   setSelectedDateRange={setSelectedDateRange}
                   showDateSelector={showDateSelector}
-                  onClick={
-                    sectionType === DASHBOARD_SECTIONS.YTD_PERFORMANCE ? handleYtdPerformanceClick :
-                    sectionType === DASHBOARD_SECTIONS.LAST_MONTH_PERFORMANCE ? handleLastMonthPerformanceClick :
-                    sectionType === DASHBOARD_SECTIONS.REPORTED_ACTIVITY ? handleReportedActivityClick :
-                    null
-                  }
                 />
               );
             })}
@@ -188,7 +236,7 @@ const UnifiedDashboard = ({ userRole, user }) => {
         {config.sections.includes(DASHBOARD_SECTIONS.LEADERBOARD) && (
           <div className="dashboard-sidebar">
             <div className="leaderboard-section">
-              <div onClick={handleLeaderboardClick} style={{ cursor: 'pointer' }}>
+              <div onClick={() => navigate('/production?section=leaderboard')} style={{ cursor: 'pointer' }}>
                 <Leaderboard
                   data={leaderboardData}
                   title={config.leaderboard.title}

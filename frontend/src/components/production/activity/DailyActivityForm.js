@@ -9,6 +9,34 @@ import "./DailyActivityForm.css";
 const DailyActivityForm = () => {
   const { user, loading: authLoading } = useContext(AuthContext);
   
+  // Utility function to get today's date in Eastern Time
+  const getTodayEastern = () => {
+    const now = new Date();
+    const easternTimeString = now.toLocaleString("en-US", {
+      timeZone: "America/New_York",
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    
+    // Parse the MM/DD/YYYY format and convert to YYYY-MM-DD
+    const [month, day, year] = easternTimeString.split('/');
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  };
+
+  // Helper function to get Monday of the week for any date
+  const getMondayOfWeek = (dateInput) => {
+    // Handle both string dates and Date objects
+    const date = typeof dateInput === 'string' 
+      ? new Date(dateInput + 'T00:00:00') 
+      : new Date(dateInput);
+    
+    const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const monday = new Date(date);
+    monday.setDate(date.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+    return monday.toISOString().split('T')[0];
+  };
+  
   const [selectedRange, setSelectedRange] = useState("week"); // week, month, ytd
   const [dateRows, setDateRows] = useState([]);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -304,32 +332,19 @@ const DailyActivityForm = () => {
       selectedRange
     });
 
-    // Helper function to get Monday of the week for any date
-    const getMondayOfWeek = (dateStr) => {
-      const date = new Date(dateStr + 'T00:00:00');
-      const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-      const monday = new Date(date);
-      monday.setDate(date.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-      const mondayStr = monday.toISOString().split('T')[0];
-      
-      return mondayStr;
-    };
-
     // Pre-calculate today's date to avoid repeated calculations
-    const today = new Date().toISOString().split("T")[0];
+    const today = getTodayEastern();
 
-    // Helper function to check if a row has any data - optimized version
+    // Helper function to check if a row exists in the database or has edited data
     const hasAnyData = (row, editedRow) => {
-      // Check all possible data fields efficiently
-      const fields = ['calls', 'appts', 'sits', 'sales', 'alp', 'refs', 'refAppt', 'refSit', 'refSale', 'refAlp'];
+      // Check if we have a database record (row from activityData)
+      const hasDbRecord = row && Object.keys(row).length > 0;
       
-      for (const field of fields) {
-        const value = editedRow[field] !== undefined ? editedRow[field] : row[field];
-        if (value !== '' && value !== null && value !== undefined) {
-          return true;
-        }
-      }
-      return false;
+      // Check if we have any edited values for this date
+      const hasEditedData = editedRow && Object.keys(editedRow).length > 0;
+      
+      // Return true if either database record exists OR we have edited data
+      return hasDbRecord || hasEditedData;
     };
 
     // First, create all daily rows with optimized data checking
@@ -511,7 +526,7 @@ const DailyActivityForm = () => {
   const updateRowClassNames = () => {
     if (!tableData.length) return;
     
-    const today = new Date().toISOString().split("T")[0];
+    const today = getTodayEastern();
     const newRowClassNames = {};
     
     tableData.forEach(row => {
@@ -550,7 +565,8 @@ const DailyActivityForm = () => {
 
   const generateDateRows = () => {
     let start, end, dates = [];
-    const today = new Date();
+    const todayEastern = getTodayEastern(); // YYYY-MM-DD string in Eastern time
+    const todayDate = new Date(); // Date object for calculations
     const viewingDate = new Date(currentDate);
 
     if (selectedRange === "week") {
@@ -572,84 +588,94 @@ const DailyActivityForm = () => {
             date.setDate(start.getDate() + i);
             dates.push(date.toISOString().split("T")[0]);
         }
+        
+        // Reverse for newest to oldest (Sunday to Monday)
+        dates.reverse();
     } else if (selectedRange === "month") {
         // Ensure month start and end use correct date formatting (no timezone shift)
         start = new Date(viewingDate.getFullYear(), viewingDate.getMonth(), 1);
-        end = new Date(viewingDate.getFullYear(), viewingDate.getMonth() + 1, 0); // Last day of month
+        end = new Date(viewingDate.getFullYear(), viewingDate.getMonth() + 1, 0);
 
-     
-
-        // Populate month range from first to last day
-        let current = new Date(start);
-        while (current <= end) {
-            dates.push(current.toISOString().split("T")[0]); // Ensure format is YYYY-MM-DD
-            current.setDate(current.getDate() + 1);
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            dates.push(d.toISOString().split("T")[0]);
         }
+        
+        // Reverse for newest to oldest
+        dates.reverse();
     } else if (selectedRange === "ytd") {
         // YTD: From January 1st of selected year to today (if current year) or end of year (if past year)
         start = new Date(viewingDate.getFullYear(), 0, 1);
-        if (viewingDate.getFullYear() === today.getFullYear()) {
-            end = today;
+        if (viewingDate.getFullYear() === todayDate.getFullYear()) {
+            // For current year, go up to today (Eastern time)
+            end = new Date(todayEastern);
         } else {
             end = new Date(viewingDate.getFullYear(), 11, 31);
         }
-        
- 
-        
-        while (start <= end) {
-            dates.push(start.toISOString().split("T")[0]);
-            start.setDate(start.getDate() + 1);
+
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            dates.push(d.toISOString().split("T")[0]);
         }
+        
+        // Reverse for newest to oldest
+        dates.reverse();
     }
 
-    setDateRows(dates.reverse()); // Reverse to show newest dates first
+    setDateRows(dates);
   };
 
   const generateDropdownOptions = () => {
     const options = [];
-    const today = new Date();
+    const todayEastern = getTodayEastern(); // YYYY-MM-DD string in Eastern time
+    const todayDate = new Date(todayEastern + 'T00:00:00'); // Use Eastern date for calculations
 
     if (selectedRange === "week") {
-        // Generate weeks from the current week backward
-        let start = new Date(today);
-        start.setDate(start.getDate() - (start.getDay() === 0 ? 6 : start.getDay() - 1)); // Set to Monday
-
-        while (start >= new Date(today.getFullYear(), 0, 1)) { // Stop at first week of the year
-            let end = new Date(start);
-            end.setDate(start.getDate() + 6); // Sunday
+        const currentWeekStartStr = getMondayOfWeek(todayEastern); // Pass Eastern date string
+        const currentWeekStart = new Date(currentWeekStartStr + 'T00:00:00'); // Convert string to Date object
+        
+        for (let i = 0; i < 52; i++) { // Show 52 weeks
+            const weekStart = new Date(currentWeekStart);
+            weekStart.setDate(currentWeekStart.getDate() - (i * 7));
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
 
             options.push({
-                value: start.toISOString(),
-                label: `${start.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" })} - 
-                        ${end.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" })}`
+                value: weekStart.toISOString(),
+                label: `Week of ${weekStart.toLocaleDateString()} - ${weekEnd.toLocaleDateString()}`
             });
-
-            start.setDate(start.getDate() - 7); // Move back one week
         }
     } else if (selectedRange === "month") {
         // Generate months from current month backward
-        let start = new Date(today.getFullYear(), today.getMonth(), 1);
+        let month = todayDate.getMonth();
+        let year = todayDate.getFullYear();
 
-        while (start.getFullYear() >= today.getFullYear() - 1) { // Stop at Jan of last year
-            let end = new Date(start.getFullYear(), start.getMonth() + 1, 0); // Last day of the month
-
-            options.push({
-                value: start.toISOString(),
-                label: `${start.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`
+        for (let i = 0; i < 24; i++) { // Last 24 months
+            const monthStart = new Date(year, month, 1);
+            const monthName = monthStart.toLocaleDateString("en-US", { 
+                month: "long", 
+                year: "numeric" 
             });
 
-            start.setMonth(start.getMonth() - 1); // Move back one month
+            options.push({
+                value: monthStart.toISOString(),
+                label: monthName
+            });
+
+            month--;
+            if (month < 0) {
+                month = 11;
+                year--;
+            }
         }
     } else if (selectedRange === "ytd") {
         // Generate years from current year backward
-        let year = today.getFullYear();
+        let year = todayDate.getFullYear();
 
-        while (year >= today.getFullYear() - 4) { // Last 5 years
+        while (year >= todayDate.getFullYear() - 4) { // Last 5 years
             options.push({
                 value: new Date(year, 0, 1).toISOString(),
-                label: `${year}`
+                label: `${year} YTD`
             });
-            year--; // Move back one year
+            year--;
         }
     }
 
@@ -1468,8 +1494,8 @@ const DailyActivityForm = () => {
                 className={selectedRange === "month" ? "selected" : "unselected"} 
                 onClick={() => {
                   setSelectedRange("month");
-                  const today = new Date();
-                  setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1)); // Reset to current month
+                  const todayDate = new Date();
+                  setCurrentDate(new Date(todayDate.getFullYear(), todayDate.getMonth(), 1)); // Reset to current month
                 }}
             >
                 MTD
@@ -1479,8 +1505,8 @@ const DailyActivityForm = () => {
                 className={selectedRange === "ytd" ? "selected" : "unselected"} 
                 onClick={() => {
                   setSelectedRange("ytd");
-                  const today = new Date();
-                  setCurrentDate(new Date(today.getFullYear(), 0, 1)); // Reset to current year
+                  const todayDate = new Date();
+                  setCurrentDate(new Date(todayDate.getFullYear(), 0, 1)); // Reset to current year
                 }}
             >
                 YTD

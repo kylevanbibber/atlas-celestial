@@ -42,13 +42,33 @@ function verifyToken(req, res, next) {
       console.error("[verifyToken] Error verifying token:", err);
       return res.status(500).send({ auth: false, message: 'Failed to authenticate token.' });
     }
-    req.userId = decoded.id || decoded.userId;
-    req.user = {
-      userId: decoded.id || decoded.userId,
-      lagnname: decoded.lagnname,
-      clname: decoded.clname,
-      Role: decoded.Role
-    };
+    
+    // Check for impersonation header
+    const impersonatedUserId = req.headers['x-impersonated-user-id'];
+    
+    if (impersonatedUserId) {
+      // Use impersonated user ID but keep original admin info for authorization
+      req.userId = impersonatedUserId;
+      req.user = {
+        userId: impersonatedUserId,
+        lagnname: decoded.lagnname, // Keep admin info for auth purposes
+        clname: decoded.clname,
+        Role: decoded.Role,
+        _isImpersonating: true,
+        _originalAdminId: decoded.id || decoded.userId
+      };
+      console.log(`[Auth] Impersonation detected: Admin ${decoded.id || decoded.userId} accessing as user ${impersonatedUserId}`);
+    } else {
+      // Normal user access
+      req.userId = decoded.id || decoded.userId;
+      req.user = {
+        userId: decoded.id || decoded.userId,
+        lagnname: decoded.lagnname,
+        clname: decoded.clname,
+        Role: decoded.Role
+      };
+    }
+    
     next();
   });
 }

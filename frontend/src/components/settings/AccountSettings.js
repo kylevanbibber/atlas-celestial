@@ -386,7 +386,12 @@ const AccountSettings = () => {
   };
 
   if (authLoading || pageLoading) {
-    return <div className="settings-section">Loading...</div>;
+    return (
+      <div className="route-loading" role="alert" aria-busy="true">
+        <div className="spinner"></div>
+        <p>Loading...</p>
+      </div>
+    );
   }
 
   return (

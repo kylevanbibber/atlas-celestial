@@ -17,12 +17,15 @@ const Dashboard = () => {
 
   console.log(`🔍 [Dashboard] Rendering dashboard for user role: ${userRole}`);
 
-  // If no user or role, show loading/error state
+  // If no user or role, show error state (not loading since UnifiedDashboard handles loading)
   if (!user) {
     return (
       <div className="dashboard-container padded-content-sm">
         <div className="dashboard-cards-wrapper">
-          <div className="loading-message">Loading user data...</div>
+          <div className="error-message">
+            <h3>Authentication Error</h3>
+            <p>Unable to load user data. Please refresh the page or contact support.</p>
+          </div>
         </div>
       </div>
     );
@@ -54,7 +57,7 @@ const Dashboard = () => {
     );
   }
 
-  // Render the unified dashboard
+  // Let UnifiedDashboard handle all loading states
   return <UnifiedDashboard userRole={userRole} user={user} />;
 };
 
