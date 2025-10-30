@@ -1,0 +1,150 @@
+/* Team Dashboard Styles */
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.dashboard-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+}
+
+.view-mode-toggle {
+  display: inline-flex;
+  gap: 8px;
+  background: var(--secondary-background, #f5f7fa);
+  border: 1px solid var(--border-color, #e0e0e0);
+  padding: 6px;
+  border-radius: 8px;
+}
+
+.view-mode-toggle .toggle-btn {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #666);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.view-mode-toggle .toggle-btn:hover {
+  background: var(--hover-background, #e8eaf0);
+  color: var(--text-primary, #333);
+}
+
+.view-mode-toggle .toggle-btn.active {
+  background: var(--primary-color, #007bff);
+  color: white;
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);
+}
+
+/* Time Period Selector */
+.time-period-selector {
+  display: inline-flex;
+  gap: 6px;
+  background: var(--secondary-background, #f5f7fa);
+  border: 1px solid var(--border-color, #e0e0e0);
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.period-btn {
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #666);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.period-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary, #333);
+}
+
+.period-btn.active {
+  background: var(--primary-color, #007bff);
+  color: white;
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.15);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .time-period-selector {
+    width: 100%;
+  }
+
+  .period-btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  .view-mode-toggle {
+    width: 100%;
+  }
+
+  .view-mode-toggle .toggle-btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  .dashboard-title {
+    font-size: 24px;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .dashboard-title {
+    color: var(--text-primary, #e0e0e0);
+  }
+
+  .time-period-selector {
+    background: var(--secondary-background, #2a2a2a);
+    border-color: var(--border-color, #444);
+  }
+
+  .period-btn {
+    color: var(--text-secondary, #aaa);
+  }
+
+  .period-btn:hover {
+    background: var(--hover-background, #3a3a3a);
+    color: var(--text-primary, #e0e0e0);
+  }
+
+  .view-mode-toggle {
+    background: var(--secondary-background, #2a2a2a);
+    border-color: var(--border-color, #444);
+  }
+
+  .view-mode-toggle .toggle-btn {
+    color: var(--text-secondary, #aaa);
+  }
+
+  .view-mode-toggle .toggle-btn:hover {
+    background: var(--hover-background, #3a3a3a);
+    color: var(--text-primary, #e0e0e0);
+  }
+}
+

@@ -17,12 +17,19 @@
 
 /* Mobile responsive */
 @media (max-width: 768px) {
+  /* Hide secondary sidebar on mobile - handled by returning null in component */
   .training-container {
     flex-direction: column;
   }
   
+  .training-content {
+    width: 100%;
+    padding: 15px;
+    box-sizing: border-box;
+  }
+  
   .padded-content {
-    padding: 1rem;
+    padding: 0;
   }
 }
 

@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { AuthContext } from '../../context/AuthContext';
 import DataTable from '../utils/DataTable';
+import { FiDownload } from 'react-icons/fi';
 import api from '../../api';
+import * as XLSX from 'xlsx';
 import './PromotionTracking.css';
 
 const PromotionTracking = () => {
@@ -11,6 +13,11 @@ const PromotionTracking = () => {
     const [promotionData, setPromotionData] = useState(null);
     const [selectedMonths, setSelectedMonths] = useState([]);
     const [agentType, setAgentType] = useState('GA'); // 'GA' or 'SA'
+    const [trackingPeriod, setTrackingPeriod] = useState('2month'); // '1month' or '2month'
+    const [netEnabled, setNetEnabled] = useState(true); // Enable/disable NET requirement
+    const [isPreparedForExport, setIsPreparedForExport] = useState(false);
+    const [customNetThreshold, setCustomNetThreshold] = useState(''); // overrides NET requirement when provided
+    const [customF6Threshold, setCustomF6Threshold] = useState('');   // overrides F6 requirement when provided
 
     // Check if user has app admin permissions
     const isAppAdmin = user?.Role === 'Admin' && user?.teamRole === 'app';
@@ -22,44 +29,77 @@ const PromotionTracking = () => {
             return;
         }
 
-        // Initialize with current month and previous month
+        // Initialize months based on tracking period
         const now = new Date();
         const currentMonth = now.getMonth() + 1;
         const currentYear = now.getFullYear();
-        const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-        const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
         
-        const month1 = `${String(prevMonth).padStart(2, '0')}/${prevYear}`;
-        const month2 = `${String(currentMonth).padStart(2, '0')}/${currentYear}`;
-        
-        setSelectedMonths([month1, month2]);
-    }, [isAppAdmin]);
+        if (trackingPeriod === '1month') {
+            const month = `${String(currentMonth).padStart(2, '0')}/${currentYear}`;
+            console.log(`🏆 Initializing 1-month mode with: ${month}`);
+            setSelectedMonths([month]);
+        } else {
+            const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+            const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+            
+            const month1 = `${String(prevMonth).padStart(2, '0')}/${prevYear}`;
+            const month2 = `${String(currentMonth).padStart(2, '0')}/${currentYear}`;
+            console.log(`🏆 Initializing 2-month mode with: [${month1}, ${month2}]`);
+            
+            setSelectedMonths([month1, month2]);
+        }
+    }, [isAppAdmin, trackingPeriod]);
 
     useEffect(() => {
-        if (selectedMonths.length === 2) {
+        console.log('🏆 selectedMonths or trackingPeriod changed:', { selectedMonths, trackingPeriod });
+        if ((trackingPeriod === '1month' && selectedMonths.length === 1) || 
+            (trackingPeriod === '2month' && selectedMonths.length === 2)) {
+            console.log('🏆 Triggering fetchPromotionData due to month/period change');
             fetchPromotionData();
+        } else {
+            console.log('🏆 Conditions not met for fetching data:', {
+                trackingPeriod,
+                selectedMonthsLength: selectedMonths.length,
+                expectedLength: trackingPeriod === '1month' ? 1 : 2
+            });
         }
-    }, [selectedMonths]);
+    }, [selectedMonths, trackingPeriod]);
 
     useEffect(() => {
-        if (selectedMonths.length === 2) {
+        console.log('🏆 agentType or netEnabled changed:', { agentType, netEnabled });
+        if ((trackingPeriod === '1month' && selectedMonths.length === 1) || 
+            (trackingPeriod === '2month' && selectedMonths.length === 2)) {
+            console.log('🏆 Triggering fetchPromotionData due to agentType/netEnabled change');
             fetchPromotionData();
         }
-    }, [agentType]);
+    }, [agentType, netEnabled]);
 
     const fetchPromotionData = async () => {
         try {
             setLoading(true);
+            
+            // Debug logging to verify correct data is being sent
+            console.log(`🏆 Fetching promotion data for ${trackingPeriod} mode:`, {
+                months: selectedMonths,
+                agentType: agentType,
+                trackingPeriod: trackingPeriod
+            });
+            
             const response = await api.get('/verify/promotion-tracking', {
                 params: { 
                     months: selectedMonths,
-                    agentType: agentType
+                    agentType: agentType,
+                    trackingPeriod: trackingPeriod // Send tracking period to backend
                 }
             });
             
             if (response.data.success) {
                 setPromotionData(response.data.data);
-                console.log('🏆 Promotion data loaded:', response.data.data);
+                console.log('🏆 Promotion data loaded successfully:', {
+                    agentCount: response.data.data?.agents?.length || 0,
+                    months: selectedMonths,
+                    period: trackingPeriod
+                });
             } else {
                 setError(response.data.message || 'Failed to load promotion data');
             }
@@ -72,45 +112,90 @@ const PromotionTracking = () => {
     };
 
     const navigateMonths = (direction) => {
-        if (selectedMonths.length !== 2) return;
-        
-        const [month1, month2] = selectedMonths;
-        const [month1Num, year1] = month1.split('/').map(Number);
-        const [month2Num, year2] = month2.split('/').map(Number);
-        
-        let newMonth1, newMonth2;
-        
-        if (direction === 'backward') {
-            // Go back one month
-            if (month1Num === 1) {
-                newMonth1 = 12;
-                newMonth2 = month1Num;
-            } else {
-                newMonth1 = month1Num - 1;
-                newMonth2 = month1Num;
+        if (trackingPeriod === '1month') {
+            if (selectedMonths.length !== 1) {
+                console.warn('🏆 1-month mode navigation: Expected 1 month, got:', selectedMonths);
+                return;
             }
-            const newYear1 = month1Num === 1 ? year1 - 1 : year1;
-            const newYear2 = year1;
             
-            newMonth1 = `${String(newMonth1).padStart(2, '0')}/${newYear1}`;
-            newMonth2 = `${String(newMonth2).padStart(2, '0')}/${newYear2}`;
+            const [currentMonth] = selectedMonths;
+            const [monthNum, year] = currentMonth.split('/').map(Number);
+            
+            let newMonth, newYear;
+            
+            if (direction === 'backward') {
+                if (monthNum === 1) {
+                    newMonth = 12;
+                    newYear = year - 1;
+                } else {
+                    newMonth = monthNum - 1;
+                    newYear = year;
+                }
+            } else {
+                if (monthNum === 12) {
+                    newMonth = 1;
+                    newYear = year + 1;
+                } else {
+                    newMonth = monthNum + 1;
+                    newYear = year;
+                }
+            }
+            
+            const newMonthStr = `${String(newMonth).padStart(2, '0')}/${newYear}`;
+            console.log(`🏆 1-month navigation ${direction}:`, {
+                from: currentMonth,
+                to: newMonthStr
+            });
+            setSelectedMonths([newMonthStr]);
         } else {
-            // Go forward one month
-            if (month2Num === 12) {
-                newMonth1 = month2Num;
-                newMonth2 = 1;
-            } else {
-                newMonth1 = month2Num;
-                newMonth2 = month2Num + 1;
+            // 2-month logic (existing)
+            if (selectedMonths.length !== 2) {
+                console.warn('🏆 2-month mode navigation: Expected 2 months, got:', selectedMonths);
+                return;
             }
-            const newYear1 = year2;
-            const newYear2 = month2Num === 12 ? year2 + 1 : year2;
             
-            newMonth1 = `${String(newMonth1).padStart(2, '0')}/${newYear1}`;
-            newMonth2 = `${String(newMonth2).padStart(2, '0')}/${newYear2}`;
+            const [month1, month2] = selectedMonths;
+            const [month1Num, year1] = month1.split('/').map(Number);
+            const [month2Num, year2] = month2.split('/').map(Number);
+            
+            let newMonth1, newMonth2;
+            
+            if (direction === 'backward') {
+                // Go back one month
+                if (month1Num === 1) {
+                    newMonth1 = 12;
+                    newMonth2 = month1Num;
+                } else {
+                    newMonth1 = month1Num - 1;
+                    newMonth2 = month1Num;
+                }
+                const newYear1 = month1Num === 1 ? year1 - 1 : year1;
+                const newYear2 = year1;
+                
+                newMonth1 = `${String(newMonth1).padStart(2, '0')}/${newYear1}`;
+                newMonth2 = `${String(newMonth2).padStart(2, '0')}/${newYear2}`;
+            } else {
+                // Go forward one month
+                if (month2Num === 12) {
+                    newMonth1 = month2Num;
+                    newMonth2 = 1;
+                } else {
+                    newMonth1 = month2Num;
+                    newMonth2 = month2Num + 1;
+                }
+                const newYear1 = year2;
+                const newYear2 = month2Num === 12 ? year2 + 1 : year2;
+                
+                newMonth1 = `${String(newMonth1).padStart(2, '0')}/${newYear1}`;
+                newMonth2 = `${String(newMonth2).padStart(2, '0')}/${newYear2}`;
+            }
+            
+            console.log(`🏆 2-month navigation ${direction}:`, {
+                from: [month1, month2],
+                to: [newMonth1, newMonth2]
+            });
+            setSelectedMonths([newMonth1, newMonth2]);
         }
-        
-        setSelectedMonths([newMonth1, newMonth2]);
     };
 
     const getStatusPriority = (status) => {
@@ -150,28 +235,60 @@ const PromotionTracking = () => {
     };
 
     const getStatus = (netLvl3Total, f6Lvl3Total, netThreshold, f6Threshold) => {
-        if (netLvl3Total >= netThreshold && f6Lvl3Total >= f6Threshold) return 'Ready for Promotion';
-        if (netLvl3Total >= netThreshold * 0.8 && f6Lvl3Total >= f6Threshold * 0.8) return 'Near Goal';
+        if (netEnabled) {
+            if (netLvl3Total >= netThreshold && f6Lvl3Total >= f6Threshold) return 'Ready for Promotion';
+            if (netLvl3Total >= netThreshold * 0.8 && f6Lvl3Total >= f6Threshold * 0.8) return 'Near Goal';
+        } else {
+            // Only check F6 when NET is disabled
+            if (f6Lvl3Total >= f6Threshold) return 'Ready for Promotion';
+            if (f6Lvl3Total >= f6Threshold * 0.8) return 'Near Goal';
+        }
         return 'In Progress';
     };
 
     const getStatusColor = (netLvl3Total, f6Lvl3Total, netThreshold, f6Threshold) => {
-        if (netLvl3Total >= netThreshold && f6Lvl3Total >= f6Threshold) return '#28a745';
-        if (netLvl3Total >= netThreshold * 0.8 && f6Lvl3Total >= f6Threshold * 0.8) return '#ffc107';
+        if (netEnabled) {
+            if (netLvl3Total >= netThreshold && f6Lvl3Total >= f6Threshold) return '#28a745';
+            if (netLvl3Total >= netThreshold * 0.8 && f6Lvl3Total >= f6Threshold * 0.8) return '#ffc107';
+        } else {
+            // Only check F6 when NET is disabled
+            if (f6Lvl3Total >= f6Threshold) return '#28a745';
+            if (f6Lvl3Total >= f6Threshold * 0.8) return '#ffc107';
+        }
         return '#dc3545';
     };
 
     const getRequirements = () => {
+        let baseThresholds;
+        
         if (agentType === 'SA') {
-            return {
+            baseThresholds = {
                 netLvl3Threshold: 50000,
                 f6Lvl3Threshold: 25000
             };
+        } else {
+            // Default to GA requirements
+            baseThresholds = {
+                netLvl3Threshold: 120000,
+                f6Lvl3Threshold: 60000
+            };
         }
-        // Default to GA requirements
+
+        // Adjust for 1-month period (halve defaults)
+        if (trackingPeriod === '1month') {
+            baseThresholds = {
+                netLvl3Threshold: baseThresholds.netLvl3Threshold / 2,
+                f6Lvl3Threshold: baseThresholds.f6Lvl3Threshold / 2
+            };
+        }
+
+        // Apply custom overrides if provided (treat custom as final period targets)
+        const netOverride = customNetThreshold !== '' && !isNaN(Number(customNetThreshold)) ? Number(customNetThreshold) : null;
+        const f6Override = customF6Threshold !== '' && !isNaN(Number(customF6Threshold)) ? Number(customF6Threshold) : null;
+
         return {
-            netLvl3Threshold: 120000,
-            f6Lvl3Threshold: 60000
+            netLvl3Threshold: netOverride !== null ? netOverride : baseThresholds.netLvl3Threshold,
+            f6Lvl3Threshold: f6Override !== null ? f6Override : baseThresholds.f6Lvl3Threshold
         };
     };
 
@@ -184,12 +301,142 @@ const PromotionTracking = () => {
         }).format(amount);
     };
 
+    // XLSX Export function
+    const handleXLSXExport = async () => {
+        setIsPreparedForExport(true);
+        
+        try {
+            console.log('📊 Starting Promotion Tracking XLSX export...');
+            
+            if (!promotionData || !promotionData.agents || promotionData.agents.length === 0) {
+                console.warn('⚠️ No promotion data available for export');
+                window.alert('No promotion data available for export.');
+                return;
+            }
+            
+            // Create a new workbook
+            const workbook = XLSX.utils.book_new();
+            
+            // Prepare data for export
+            const sortedAgents = sortAgentsByStatus(promotionData.agents);
+            const requirements = getRequirements();
+            
+            // Transform data for export
+            const exportData = sortedAgents.map(agent => {
+                const netLvl3Total = parseFloat(agent.lvl_2_net_total);
+                const f6Lvl3Total = parseFloat(agent.lvl_2_f6_net_total);
+                const status = getStatus(netLvl3Total, f6Lvl3Total, requirements.netLvl3Threshold, requirements.f6Lvl3Threshold);
+                
+                const baseData = {
+                    'Agent': agent.LagnName,
+                    'F6 NET': f6Lvl3Total,
+                    'MGA': agent.mga || 'N/A',
+                    'Status': status
+                };
+                
+                // Add NET column if enabled
+                if (netEnabled) {
+                    return {
+                        'Agent': baseData.Agent,
+                        'NET ALP': netLvl3Total,
+                        'F6 NET': baseData['F6 NET'],
+                        'MGA': baseData.MGA,
+                        'Status': baseData.Status
+                    };
+                }
+                
+                return baseData;
+            });
+            
+            // Define headers based on NET enabled/disabled
+            const headers = netEnabled 
+                ? ['Agent', 'NET ALP', 'F6 NET', 'MGA', 'Status']
+                : ['Agent', 'F6 NET', 'MGA', 'Status'];
+            
+            // Create data rows
+            const dataRows = exportData.map(item => 
+                netEnabled 
+                    ? [item.Agent, item['NET ALP'], item['F6 NET'], item.MGA, item.Status]
+                    : [item.Agent, item['F6 NET'], item.MGA, item.Status]
+            );
+            
+            // Create sheet data
+            const sheetData = [headers, ...dataRows];
+            const sheet = XLSX.utils.aoa_to_sheet(sheetData);
+            
+            // Apply formatting
+            const range = XLSX.utils.decode_range(sheet['!ref']);
+            
+            // Format header row
+            for (let col = range.s.c; col <= range.e.c; col++) {
+                const cellRef = XLSX.utils.encode_cell({ r: 0, c: col });
+                if (sheet[cellRef]) {
+                    sheet[cellRef].s = {
+                        font: { bold: true, color: { rgb: "FFFFFF" } },
+                        fill: { bgColor: { indexed: 64 }, fgColor: { rgb: "366092" } },
+                        alignment: { horizontal: "center", vertical: "center" },
+                        border: {
+                            top: { style: "thin" },
+                            bottom: { style: "thin" },
+                            left: { style: "thin" },
+                            right: { style: "thin" }
+                        }
+                    };
+                }
+            }
+            
+            // Set column widths
+            const colWidths = headers.map(header => {
+                if (header === 'Agent') return { wch: 25 };
+                if (header === 'MGA') return { wch: 20 };
+                if (header === 'Status') return { wch: 18 };
+                if (header.includes('NET')) return { wch: 15 };
+                return { wch: 12 };
+            });
+            sheet['!cols'] = colWidths;
+            
+            // Create Excel Table with filters
+            const tableRange = XLSX.utils.encode_range({
+                s: { c: 0, r: 0 },
+                e: { c: headers.length - 1, r: dataRows.length }
+            });
+            
+            // Add autofilter
+            sheet['!autofilter'] = { ref: tableRange };
+            
+            // Freeze header row
+            sheet['!freeze'] = { xSplit: 0, ySplit: 1 };
+            
+            // Create sheet name based on agent type and tracking period
+            const sheetName = `${agentType}_Promotion_${trackingPeriod}`;
+            
+            // Add worksheet to workbook
+            XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+            
+            // Generate filename
+            const periodStr = trackingPeriod === '1month' ? selectedMonths[0] : selectedMonths.join('_');
+            const netStr = netEnabled ? 'NET_F6' : 'F6_Only';
+            const filename = `Promotion_Tracking_${agentType}_${netStr}_${periodStr.replace(/[\/]/g, '-')}_${trackingPeriod}.xlsx`;
+            
+            // Write and download the file
+            XLSX.writeFile(workbook, filename);
+            
+            console.log(`✅ Promotion Tracking XLSX export completed: ${filename}`);
+            
+        } catch (error) {
+            console.error('❌ Promotion Tracking XLSX export failed:', error);
+            window.alert('Failed to export XLSX file. Please try again.');
+        } finally {
+            setIsPreparedForExport(false);
+        }
+    };
+
     // Memoized columns for DataTable - must be at top level before any conditional returns
     const columns = useMemo(() => {
         const requirements = getRequirements();
         const isSA = agentType === 'SA';
         
-        return [
+        const baseColumns = [
             {
                 Header: 'Agent',
                 accessor: 'LagnName',
@@ -199,19 +446,29 @@ const PromotionTracking = () => {
                     </div>
                 ),
                 width: 200
-            },
-            {
+            }
+        ];
+
+        // Add NET column only if enabled
+        if (netEnabled) {
+            baseColumns.push({
                 Header: isSA ? 'LVL 2 NET' : 'NET ALP',
-                accessor: isSA ? 'lvl_2_net_total' : 'lvl_2_net_total',
+                accessor: 'lvl_2_net_total',
                 Cell: ({ value }) => <span className="currency-value">{formatCurrency(value)}</span>,
                 width: 150
-            },
-            {
-                Header: isSA ? 'LVL 2 F6 NET' : 'F6 NET',
-                accessor: isSA ? 'lvl_2_f6_net_total' : 'lvl_2_f6_net_total',
-                Cell: ({ value }) => <span className="currency-value">{formatCurrency(value)}</span>,
-                width: 150
-            },
+            });
+        }
+
+        // Always add F6 column
+        baseColumns.push({
+            Header: isSA ? 'LVL 2 F6 NET' : 'F6 NET',
+            accessor: 'lvl_2_f6_net_total',
+            Cell: ({ value }) => <span className="currency-value">{formatCurrency(value)}</span>,
+            width: 150
+        });
+
+        // Add MGA and Status columns
+        baseColumns.push(
             {
                 Header: 'MGA',
                 accessor: 'mga',
@@ -242,9 +499,11 @@ const PromotionTracking = () => {
                     );
                 },
                 width: 150
-            },
-        ];
-    }, [agentType]);
+            }
+        );
+        
+        return baseColumns;
+    }, [agentType, netEnabled, trackingPeriod]);
 
     if (error) {
         return (
@@ -277,24 +536,70 @@ const PromotionTracking = () => {
                             <div className="section-card">
                                 <div className="section-header">
                                     <h2>Promotions</h2>
-                                    <div className="agent-type-tabs">
-                                        <button 
-                                            className={`tab-btn ${agentType === 'GA' ? 'active' : ''}`}
-                                            onClick={() => setAgentType('GA')}
-                                        >
-                                            GA Agents
-                                        </button>
-                                        <button 
-                                            className={`tab-btn ${agentType === 'SA' ? 'active' : ''}`}
-                                            onClick={() => setAgentType('SA')}
-                                        >
-                                            SA Agents
-                                        </button>
+                                    
+                                    {/* Control Buttons Row */}
+                                    <div className="controls-row">
+                                        <div className="agent-type-tabs">
+                                            <button 
+                                                className={`tab-btn ${agentType === 'GA' ? 'active' : ''}`}
+                                                onClick={() => setAgentType('GA')}
+                                            >
+                                                GA Agents
+                                            </button>
+                                            <button 
+                                                className={`tab-btn ${agentType === 'SA' ? 'active' : ''}`}
+                                                onClick={() => setAgentType('SA')}
+                                            >
+                                                SA Agents
+                                            </button>
+                                        </div>
+
+                                        <div className="tracking-controls">
+                                            <div className="period-toggle">
+                                                <span className="toggle-label">Period:</span>
+                                                <button 
+                                                    className={`toggle-btn ${trackingPeriod === '1month' ? 'active' : ''}`}
+                                                    onClick={() => setTrackingPeriod('1month')}
+                                                >
+                                                    1 Month
+                                                </button>
+                                                <button 
+                                                    className={`toggle-btn ${trackingPeriod === '2month' ? 'active' : ''}`}
+                                                    onClick={() => setTrackingPeriod('2month')}
+                                                >
+                                                    2 Months
+                                                </button>
+                                            </div>
+
+                                            <div className="net-toggle">
+                                                <span className="toggle-label">NET:</span>
+                                                <button 
+                                                    className={`toggle-btn ${netEnabled ? 'active enabled' : 'disabled'}`}
+                                                    onClick={() => setNetEnabled(!netEnabled)}
+                                                >
+                                                    {netEnabled ? 'Enabled' : 'Disabled'}
+                                                </button>
+                                            </div>
+
+                                            <div className="export-controls">
+                                                <button 
+                                                    onClick={handleXLSXExport}
+                                                    disabled={isPreparedForExport || !promotionData || promotionData.agents.length === 0}
+                                                    className={`export-btn ${isPreparedForExport ? 'exporting' : ''}`}
+                                                    title="Export promotion tracking data to Excel"
+                                                >
+                                                    <FiDownload className={isPreparedForExport ? 'spinning' : ''} />
+                                                    {isPreparedForExport ? 'Exporting...' : 'Export'}
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div className="month-navigation">
                                         <div className="month-display">
                                             <span className="month-label">Tracking Period:</span>
-                                            <span className="month-values">{selectedMonths.join(' & ')}</span>
+                                            <span className="month-values">
+                                                {trackingPeriod === '1month' ? selectedMonths[0] : selectedMonths.join(' & ')}
+                                            </span>
                                         </div>
                                         <div className="month-controls">
                                             <button 
@@ -315,9 +620,53 @@ const PromotionTracking = () => {
                                     </div>
                                     <div className="threshold-info">
                                         <div className="threshold-requirements">
-                                            <span><strong>Promotion Requirements:</strong></span>
-                                            <span>Net LVL 3: {formatCurrency(getRequirements().netLvl3Threshold)}</span>
+                                            <span><strong>Promotion Requirements {trackingPeriod === '1month' ? '(1 Month)' : '(2 Months)'}:</strong></span>
+                                            {netEnabled && (
+                                                <span>Net LVL 3: {formatCurrency(getRequirements().netLvl3Threshold)}</span>
+                                            )}
                                             <span>F6 LVL 3: {formatCurrency(getRequirements().f6Lvl3Threshold)}</span>
+                                            {!netEnabled && (
+                                                <span className="net-disabled-note">(NET requirement disabled)</span>
+                                            )}
+                                        </div>
+
+                                        <div className="threshold-overrides">
+                                            {netEnabled && (
+                                                <div className="override-control">
+                                                    <label htmlFor="custom-net-threshold">Custom NET</label>
+                                                    <input
+                                                        id="custom-net-threshold"
+                                                        type="number"
+                                                        min="0"
+                                                        step="1000"
+                                                        placeholder="Override NET"
+                                                        value={customNetThreshold}
+                                                        onChange={(e) => setCustomNetThreshold(e.target.value)}
+                                                    />
+                                                </div>
+                                            )}
+                                            <div className="override-control">
+                                                <label htmlFor="custom-f6-threshold">Custom F6</label>
+                                                <input
+                                                    id="custom-f6-threshold"
+                                                    type="number"
+                                                    min="0"
+                                                    step="1000"
+                                                    placeholder="Override F6"
+                                                    value={customF6Threshold}
+                                                    onChange={(e) => setCustomF6Threshold(e.target.value)}
+                                                />
+                                            </div>
+                                            {(customNetThreshold !== '' || customF6Threshold !== '') && (
+                                                <button
+                                                    type="button"
+                                                    className="clear-overrides-btn"
+                                                    onClick={() => { setCustomNetThreshold(''); setCustomF6Threshold(''); }}
+                                                    title="Clear custom thresholds"
+                                                >
+                                                    Reset
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

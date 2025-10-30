@@ -1,0 +1,990 @@
+.notification-schedule-container {
+  margin-bottom: 24px;
+}
+
+.notification-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.notification-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  background-color: var(--button-primary-bg, #3e7bfa);
+  color: var(--button-primary-text, white);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  gap: 6px;
+}
+
+.settings-button:hover {
+  background-color: var(--button-primary-hover, #2c5cc5);
+}
+
+.settings-button:active {
+  transform: translateY(1px);
+}
+
+.settings-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.settings-button-secondary {
+  background-color: transparent;
+  color: var(--button-primary-bg, #3e7bfa);
+  border: 1px solid var(--button-primary-bg, #3e7bfa);
+}
+
+.settings-button-secondary:hover {
+  background-color: var(--button-primary-bg-light, rgba(62, 123, 250, 0.1));
+}
+
+.settings-button-icon {
+  padding: 8px;
+  min-width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background-color: var(--card-bg, white);
+  border: 1px solid var(--border-color, #e0e4e8);
+  color: var(--text-secondary, #666);
+  transition: all 0.2s ease;
+}
+
+.settings-button-icon:hover {
+  background-color: var(--hover-bg, rgba(0, 0, 0, 0.05));
+  color: var(--text-primary, #333);
+}
+
+.settings-button-icon svg {
+  margin: 0;
+  font-size: 16px;
+}
+
+.schedule-notification-form {
+  background-color: var(--card-secondary-bg, #f5f7fa);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border-color, #e0e4e8);
+}
+
+.schedule-notification-form h4 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  color: var(--text-primary, #333);
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.form-row .form-group {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: var(--text-secondary, #444);
+  font-size: 14px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--input-border, #ddd);
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: var(--input-bg, #fff);
+  color: var(--text-primary, #333);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* Checkbox styling */
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.checkbox-group input[type="checkbox"] {
+  width: auto;
+  margin-right: 8px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+  margin-bottom: 0;
+  cursor: pointer;
+  color: var(--text-primary, #333);
+}
+
+/* Recurrence section */
+.recurrence-section {
+  background-color: var(--card-accent-bg, #edf2fa);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 16px;
+  border: 1px dashed var(--border-accent, #c0d3f0);
+}
+
+.recurrence-summary {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  background-color: var(--card-bg, #fff);
+  border-radius: 4px;
+  font-size: 14px;
+  color: var(--text-secondary, #555);
+  margin-top: 8px;
+}
+
+.number-input-group {
+  display: flex;
+  align-items: center;
+}
+
+.number-input-group input {
+  width: 60px;
+  text-align: center;
+}
+
+.input-suffix {
+  margin-left: 8px;
+  font-size: 14px;
+  color: var(--text-secondary, #555);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.spinner-sm {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.scheduled-notifications-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.scheduled-notification-item {
+  background-color: var(--card-bg, white);
+  border: 1px solid var(--border-color, #e0e4e8);
+  border-radius: 6px;
+  padding: 16px;
+  box-shadow: 0 2px 4px var(--shadow-color, rgba(0,0,0,0.05));
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.scheduled-notification-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px var(--shadow-color, rgba(0,0,0,0.1));
+}
+
+.scheduled-notification-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.notification-type-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.badge-info {
+  background-color: var(--info-color-light, #e3f2fd);
+  color: var(--info-color, #0277bd);
+}
+
+.badge-success {
+  background-color: var(--success-color-light, #e8f5e9);
+  color: var(--success-color, #2e7d32);
+}
+
+.badge-warning {
+  background-color: var(--warning-color-light, #fff3e0);
+  color: var(--warning-color, #ef6c00);
+}
+
+.badge-error {
+  background-color: var(--error-color-light, #ffebee);
+  color: var(--error-color, #c62828);
+}
+
+.scheduled-notification-datetime,
+.scheduled-notification-target,
+.scheduled-notification-repeat,
+.scheduled-notification-link {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-secondary, #666);
+  margin-bottom: 6px;
+}
+
+.scheduled-notification-title {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: var(--text-primary, #333);
+}
+
+.scheduled-notification-message {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: var(--text-secondary, #555);
+  line-height: 1.4;
+}
+
+.scheduled-notifications-empty {
+  padding: 24px;
+  text-align: center;
+  background-color: var(--card-secondary-bg, #f9f9f9);
+  border-radius: 6px;
+  color: var(--text-secondary, #666);
+}
+
+.notification-section-footer {
+  margin-top: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.settings-help-text {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-secondary, #666);
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .form-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .notification-section-footer {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  
+  .notification-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .notification-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* Days of week selector for daily pattern */
+.days-of-week-selector {
+  margin: 12px 0;
+}
+
+.days-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.day-checkbox {
+  display: flex;
+  align-items: center;
+  background-color: var(--card-secondary-bg, #f5f7fa);
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.day-checkbox input[type="checkbox"] {
+  width: auto;
+  margin-right: 4px;
+}
+
+.day-checkbox label {
+  margin-bottom: 0;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--text-primary, #333);
+}
+
+.day-checkbox:hover {
+  background-color: var(--hover-bg, #e7f0ff);
+}
+
+.day-checkbox input[type="checkbox"]:checked + label {
+  color: var(--primary-color, #3e7bfa);
+}
+
+/* Responsiveness for days of week selector */
+@media (max-width: 600px) {
+  .days-checkboxes {
+    justify-content: space-between;
+  }
+  
+  .day-checkbox {
+    padding: 4px 6px;
+    flex: 0 0 calc(33.3% - 8px);
+    justify-content: center;
+    margin-bottom: 8px;
+  }
+}
+
+/* Status badges - base styles moved to App.css */
+
+.status-processing {
+  background-color: var(--warning-color-light);
+  color: var(--warning-color-dark);
+  border: 1px solid var(--warning-color);
+}
+
+.status-completed {
+  background-color: var(--success-color-light);
+  color: var(--success-color-dark);
+  border: 1px solid var(--success-color);
+}
+
+.status-paused {
+  background-color: var(--gray-200, #e9ecef);
+  color: var(--gray-700, #495057);
+  border: 1px solid var(--gray-400, #ced4da);
+}
+
+.status-scheduled {
+  background-color: var(--info-color-light);
+  color: var(--info-color-dark);
+  border: 1px solid var(--info-color);
+}
+
+.scheduled-notification-debug {
+  margin-top: 10px;
+  padding-top: 5px;
+  border-top: 1px dashed #eee;
+  color: #999;
+  font-size: 10px;
+  display: none;
+}
+
+/* Remove the debug display on hover */
+.scheduled-notification-item:hover .scheduled-notification-debug {
+  display: block;
+}
+
+/* Add styles for edit and delete buttons */
+.notification-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color-light, #eee);
+}
+
+.card-action-button {
+  background: none;
+  border: none;
+  padding: 6px;
+  margin-left: 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-secondary, #666);
+  transition: all 0.2s ease;
+}
+
+.card-action-button:hover {
+  background-color: var(--hover-bg, #f0f2f5);
+  color: var(--primary-color, #3e7bfa);
+}
+
+.card-action-button:first-child:hover {
+  color: var(--primary-dark, #2c5cc5);
+}
+
+.card-action-button:last-child:hover {
+  color: var(--error-color, #d32f2f);
+}
+
+/* Delete confirmation */
+.delete-confirm {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-secondary, #666);
+}
+
+.delete-confirm span {
+  margin-right: 8px;
+  font-weight: 500;
+}
+
+.confirm-yes, .confirm-no {
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: none;
+  margin-left: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.confirm-yes {
+  background-color: var(--error-color, #d32f2f);
+  color: white;
+}
+
+.confirm-yes:hover {
+  background-color: var(--error-color-dark, #b71c1c);
+}
+
+.confirm-no {
+  background-color: var(--button-secondary-bg, #f0f2f5);
+  color: var(--text-primary, #333);
+}
+
+.confirm-no:hover {
+  background-color: var(--button-secondary-hover, #e0e0e0);
+}
+
+/* Add styles for active filters */
+.active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  background-color: var(--card-secondary-bg, #f8f9fa);
+  border-radius: 4px;
+  margin-bottom: 15px;
+}
+
+.filter-tag {
+  display: flex;
+  align-items: center;
+  background-color: var(--tag-bg, #e9ecef);
+  padding: 4px 10px;
+  border-radius: 30px;
+  font-size: 13px;
+  gap: 5px;
+  color: var(--text-secondary, #666);
+}
+
+.filter-tag button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  color: var(--text-secondary, #666);
+}
+
+.clear-filters-button {
+  background-color: var(--error-color-light, #f8d7da);
+  color: var(--error-color-dark, #721c24);
+  border: none;
+  padding: 4px 10px;
+  border-radius: 30px;
+  cursor: pointer;
+  font-size: 13px;
+  margin-left: auto;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.clear-filters-button:hover {
+  background-color: var(--error-color, #dc3545);
+  color: white;
+}
+
+/* Sort controls */
+.sort-controls {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.sort-button {
+  background: none;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #666;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sort-button:hover {
+  background-color: rgba(0,0,0,0.05);
+}
+
+.sort-button.active {
+  color: var(--primary-color, #3e7bfa);
+  font-weight: 500;
+}
+
+/* Use existing filter menu styles */
+.filter-menu-container {
+  position: relative;
+  z-index: 100;
+}
+
+/* Remove custom filter styles we no longer need */
+.notification-filters {
+  margin-bottom: 20px;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.filter-group {
+  /* Remove this section as we're using the existing FilterMenu component */
+}
+
+.filter-group label {
+  /* Remove this section as we're using the existing FilterMenu component */
+}
+
+.filter-group select,
+.filter-group input {
+  /* Remove this section as we're using the existing FilterMenu component */
+}
+
+.search-input-wrapper {
+  /* Remove this section as we're using the existing FilterMenu component */
+}
+
+.search-icon {
+  /* Remove this section as we're using the existing FilterMenu component */
+}
+
+.filter-clear-button {
+  /* Remove this section as we're using the existing FilterMenu component */
+}
+
+.filter-buttons-row {
+  /* Remove this section as we're using the existing FilterMenu component */
+}
+
+.sort-options {
+  /* Remove this section as we're using the existing FilterMenu component */
+}
+
+.sort-options span {
+  /* Remove this section as we're using the existing FilterMenu component */
+}
+
+.notification-count {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--text-secondary, #666);
+}
+
+.text-button {
+  background: none;
+  border: none;
+  color: var(--primary-color, #3e7bfa);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  text-decoration: underline;
+  margin-left: 8px;
+  transition: color 0.2s ease;
+}
+
+.text-button:hover {
+  color: var(--primary-dark, #2c5cc5);
+}
+
+/* Responsive styles for filters */
+@media (max-width: 768px) {
+  .filter-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .filter-group {
+    min-width: 100%;
+  }
+  
+  .sort-options {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .sort-options span {
+    margin-bottom: 4px;
+  }
+}
+
+/* Add styles for search and filter components */
+.search-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.search-box {
+  position: relative;
+  flex-grow: 1;
+}
+
+/* Remove the redundant settings-button-icon definition */
+.search-filter-row .settings-button-icon + .settings-button-icon {
+  margin-left: 0;
+}
+
+/* Adjust for two icons in the schedule button */
+.settings-button-icon svg + svg {
+  margin-left: -4px;
+}
+
+.icon-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Remove margin between buttons in the same row */
+.search-filter-row .settings-button + .settings-button {
+  margin-left: 0;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 32px 8px 10px;
+  border: 1px solid var(--input-border, #ddd);
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: var(--input-bg, #fff);
+  color: var(--text-primary, #333);
+}
+
+.search-icon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted, #888);
+}
+
+.clear-search {
+  position: absolute;
+  right: 32px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: var(--text-muted, #aaa);
+}
+
+.clear-search:hover {
+  color: var(--text-secondary, #666);
+}
+
+.date-range-filter {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.date-inputs {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  position: relative;
+}
+
+.date-input-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.date-input-group label {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.date-input {
+  padding: 6px 8px;
+  border: 1px solid var(--input-border, #ddd);
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: var(--input-bg, #fff);
+  color: var(--text-primary, #333);
+}
+
+.clear-dates-button {
+  background: none;
+  border: none;
+  padding: 3px;
+  cursor: pointer;
+  color: var(--text-muted, #aaa);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clear-dates-button:hover {
+  color: var(--text-secondary, #666);
+}
+
+/* Style updates for active filters */
+.active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  background-color: var(--card-secondary-bg, #f8f9fa);
+  border-radius: 4px;
+  margin-bottom: 15px;
+}
+
+.filter-tag {
+  display: flex;
+  align-items: center;
+  background-color: var(--tag-bg, #e9ecef);
+  padding: 4px 10px;
+  border-radius: 30px;
+  font-size: 13px;
+  gap: 5px;
+  color: var(--text-secondary, #666);
+}
+
+.filter-tag button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  color: var(--text-secondary, #666);
+}
+
+.sort-option-button {
+  transition: all 0.2s ease;
+}
+
+.sort-option-button.active {
+  font-weight: 500;
+}
+
+.sort-option-button:hover {
+  background-color: var(--hover-bg, rgba(0, 0, 0, 0.05)) !important;
+}
+
+/* Mobile styles for filter menu */
+@media (max-width: 768px) {
+  .filter-menu-container.expandable .filter-menu-content {
+    position: fixed;
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+    animation: slideUp 0.3s ease-out;
+    z-index: 1000;
+    margin: 0;
+  }
+  
+  .filter-menu-container.expandable .filter-menu-backdrop {
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+  }
+  
+  .filter-menu-container.expandable.open .filter-menu-backdrop {
+    display: block;
+  }
+  
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+  
+  .filter-menu-toggle {
+    padding: 8px;
+    min-width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* Adjust search filter row for mobile */
+@media (max-width: 576px) {
+  .search-filter-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .search-box {
+    flex: 1 1 100%;
+    order: -1;
+    margin-bottom: 8px;
+  }
+  
+  .settings-button-icon {
+    flex: 0 0 auto;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .form-actions .settings-button {
+    width: 100%;
+  }
+  
+  .target-preview {
+    flex-direction: column;
+  }
+  
+  .target-preview .settings-button {
+    width: 100%;
+  }
+  
+  .day-checkbox {
+    flex: 1 1 calc(33.33% - 8px);
+    justify-content: center;
+  }
+  
+  .scheduled-notifications-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Add a transition for smooth dark mode switching */
+.notification-schedule-container * {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Ensure proper dark mode for query builder loading state */
+.query-builder-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  text-align: center;
+  color: var(--text-secondary, #666);
+}
+
+.spinner {
+  display: inline-block;
+  width: 30px;
+  height: 30px;
+  border: 3px solid var(--spinner-color-light, rgba(62, 123, 250, 0.2));
+  border-radius: 50%;
+  border-top-color: var(--primary-color, #3e7bfa);
+  animation: spin 1s ease-in-out infinite;
+  margin-bottom: 15px;
+}
+
+/* Style the target preview section */
+.target-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.target-user-count {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: var(--success-color-light, #e8f5e9);
+  color: var(--success-color, #2e7d32);
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.target-user-count strong {
+  font-weight: 600;
+} 

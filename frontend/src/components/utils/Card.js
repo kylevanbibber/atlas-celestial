@@ -31,7 +31,13 @@ const Card = ({
   showPercentage = false,
   comparisonFormat = 'number',
   comparisonLabel,
-  showComparison = false
+  showComparison = false,
+  // Date range display
+  dateRange = "",
+  // Click handler and custom styles
+  onClick,
+  style,
+  children
 }) => {
   const { theme } = useContext(ThemeContext);
   const textColor = theme === 'dark' ? '#f0f0f0' : '#333333';
@@ -205,7 +211,15 @@ const Card = ({
   };
 
   return (
-    <div className="custom-card" style={{ position: "relative", overflow: "hidden" }}>
+    <div 
+      className="custom-card" 
+      style={{ 
+        position: "relative", 
+        overflow: "hidden",
+        ...style // Merge custom styles
+      }}
+      onClick={onClick}
+    >
       {backgroundImage && (
         <div
           className="background-overlay"
@@ -263,9 +277,26 @@ const Card = ({
             </div>
           )}
         </div>
-        <div className="custom-card-body">
-          <p className="custom-value">{value}</p>
-          {getSubText() && <p className="custom-subtext">{getSubText()}</p>}
+      <div className="custom-card-body">
+          {children ? (
+            children
+          ) : (
+            <>
+              <p className="custom-value">{value}</p>
+              {getSubText() && <p className="custom-subtext">{getSubText()}</p>}
+              {dateRange && (
+                <p className="custom-date-range" style={{ 
+                  fontSize: '0.8em', 
+                  color: textColor + '88', // Semi-transparent
+                  marginTop: '4px',
+                  marginBottom: '0',
+                  fontStyle: 'italic'
+                }}>
+                  {dateRange}
+                </p>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

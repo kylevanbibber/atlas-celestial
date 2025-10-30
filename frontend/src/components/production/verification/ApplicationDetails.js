@@ -65,13 +65,17 @@ function ApplicationDetails({ row, data, onClose, parseInsuredInfo, isDiscrepanc
     // Use row prop if provided, otherwise use data prop (from RightDetails)
     const verificationData = row || data;
     
-    // Check if user is admin with teamRole="app" - show copy button
-    const isAppAdmin = user?.Role === 'Admin' && user?.teamRole === 'app';
+    // Check if user has app management permissions (teamRole="app" OR Role="Admin")
+    const hasAppManagementPermissions = user?.teamRole === 'app' || user?.Role === 'Admin';
+    
+    // Legacy compatibility - keeping isAppAdmin for existing code
+    const isAppAdmin = hasAppManagementPermissions;
     
     // Debug logging for app admin detection
     console.log('🏭 ApplicationDetails: Debug info', {
         userRole: user?.Role,
         teamRole: user?.teamRole,
+        hasAppManagementPermissions,
         isAppAdmin,
         clientName: verificationData?.client_name
     });

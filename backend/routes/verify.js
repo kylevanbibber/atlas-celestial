@@ -927,13 +927,27 @@ router.get('/promotion-tracking', async (req, res) => {
             return res.status(401).json({ success: false, message: 'Invalid authorization token' });
         }
 
-        // Get the months from query parameters or use default past two months
+        // Normalize months param and tracking period
+        const trackingPeriod = req.query.trackingPeriod || '2month';
+        const rawMonths = req.query.months;
+        let months = [];
+        if (Array.isArray(rawMonths)) {
+            months = rawMonths;
+        } else if (typeof rawMonths === 'string') {
+            // Support single month sent as string
+            months = [rawMonths];
+        }
+
         let month1, month2;
-        
-        if (req.query.months && Array.isArray(req.query.months) && req.query.months.length === 2) {
-            // Use months from frontend
-            month1 = req.query.months[0];
-            month2 = req.query.months[1];
+        const useSingleMonth = (trackingPeriod === '1month' && months.length >= 1) || months.length === 1;
+
+        if (useSingleMonth) {
+            // Use just the one month provided
+            month1 = months[0];
+        } else if (months.length === 2) {
+            // Use two months from frontend
+            month1 = months[0];
+            month2 = months[1];
         } else {
             // Default to past two months
             const now = new Date();
@@ -957,9 +971,7 @@ router.get('/promotion-tracking', async (req, res) => {
             }
             
             // Format months as MM/YYYY
-            const formatMonth = (month, year) => {
-                return `${month.toString().padStart(2, '0')}/${year}`;
-            };
+            const formatMonth = (month, year) => `${month.toString().padStart(2, '0')}/${year}`;
             
             month1 = formatMonth(twoMonthsAgo, twoMonthsAgoYear);
             month2 = formatMonth(prevMonth, prevYear);
@@ -969,51 +981,95 @@ router.get('/promotion-tracking', async (req, res) => {
         const agentType = req.query.agentType || 'GA';
         const isSA = agentType === 'SA';
 
-        console.log('🏆 Promotion tracking months:', { month1, month2, agentType });
 
-        // Query for promotion tracking data based on agent type
+        // Build query for promotion tracking data based on agent type and period length
         let promotionQuery;
+        let queryParams = [];
         if (isSA) {
-            // SA agents use LVL_2_NET and LVL_2_F6_NET
-            promotionQuery = `
-                SELECT
-                    m.LagnName,
-                    COALESCE(SUM(m.LVL_2_NET), 0) AS lvl_2_net_total,
-                    COALESCE(SUM(m.LVL_2_F6_NET), 0) AS lvl_2_f6_net_total,
-                    COALESCE(SUM(m.LVL_2_NET + m.LVL_2_F6_NET), 0) AS combined_total,
-                    a.lagnname,
-                    a.clname AS currentLevel,
-                    a.mga
-                FROM Monthly_ALP AS m
-                JOIN activeusers AS a ON m.LagnName = a.lagnname
-                WHERE a.clname = 'SA'
-                    AND a.Active = 'y'
-                    AND m.Month IN (?, ?)
-                GROUP BY m.LagnName, a.lagnname, a.clname, a.mga
-                ORDER BY combined_total DESC, m.LagnName
-            `;
+            // SA agents use LVL_2_* fields
+            if (useSingleMonth) {
+                promotionQuery = `
+                    SELECT
+                        m.LagnName,
+                        COALESCE(SUM(m.LVL_2_NET), 0) AS lvl_2_net_total,
+                        COALESCE(SUM(m.LVL_2_F6_NET), 0) AS lvl_2_f6_net_total,
+                        COALESCE(SUM(m.LVL_2_NET + m.LVL_2_F6_NET), 0) AS combined_total,
+                        a.lagnname,
+                        a.clname AS currentLevel,
+                        a.mga
+                    FROM Monthly_ALP AS m
+                    JOIN activeusers AS a ON m.LagnName = a.lagnname
+                    WHERE a.clname = 'SA'
+                        AND a.Active = 'y'
+                        AND m.Month = ?
+                    GROUP BY m.LagnName, a.lagnname, a.clname, a.mga
+                    ORDER BY combined_total DESC, m.LagnName
+                `;
+                queryParams = [month1];
+            } else {
+                promotionQuery = `
+                    SELECT
+                        m.LagnName,
+                        COALESCE(SUM(m.LVL_2_NET), 0) AS lvl_2_net_total,
+                        COALESCE(SUM(m.LVL_2_F6_NET), 0) AS lvl_2_f6_net_total,
+                        COALESCE(SUM(m.LVL_2_NET + m.LVL_2_F6_NET), 0) AS combined_total,
+                        a.lagnname,
+                        a.clname AS currentLevel,
+                        a.mga
+                    FROM Monthly_ALP AS m
+                    JOIN activeusers AS a ON m.LagnName = a.lagnname
+                    WHERE a.clname = 'SA'
+                        AND a.Active = 'y'
+                        AND m.Month IN (?, ?)
+                    GROUP BY m.LagnName, a.lagnname, a.clname, a.mga
+                    ORDER BY combined_total DESC, m.LagnName
+                `;
+                queryParams = [month1, month2];
+            }
         } else {
-            // GA agents use LVL_3_NET and LVL_3_F6_NET
-            promotionQuery = `
-                SELECT
-                    m.LagnName,
-                    COALESCE(SUM(m.LVL_3_NET), 0) AS lvl_2_net_total,
-                    COALESCE(SUM(m.LVL_3_F6_NET), 0) AS lvl_2_f6_net_total,
-                    COALESCE(SUM(m.LVL_3_NET + m.LVL_3_F6_NET), 0) AS combined_total,
-                    a.lagnname,
-                    a.clname AS currentLevel,
-                    a.mga
-                FROM Monthly_ALP AS m
-                JOIN activeusers AS a ON m.LagnName = a.lagnname
-                WHERE a.clname = 'GA'
-                    AND a.Active = 'y'
-                    AND m.Month IN (?, ?)
-                GROUP BY m.LagnName, a.lagnname, a.clname, a.mga
-                ORDER BY combined_total DESC, m.LagnName
-            `;
+            // GA agents use LVL_3_* fields
+            if (useSingleMonth) {
+                promotionQuery = `
+                    SELECT
+                        m.LagnName,
+                        COALESCE(SUM(m.LVL_3_NET), 0) AS lvl_2_net_total,
+                        COALESCE(SUM(m.LVL_3_F6_NET), 0) AS lvl_2_f6_net_total,
+                        COALESCE(SUM(m.LVL_3_NET + m.LVL_3_F6_NET), 0) AS combined_total,
+                        a.lagnname,
+                        a.clname AS currentLevel,
+                        a.mga
+                    FROM Monthly_ALP AS m
+                    JOIN activeusers AS a ON m.LagnName = a.lagnname
+                    WHERE a.clname = 'GA'
+                        AND a.Active = 'y'
+                        AND m.Month = ?
+                    GROUP BY m.LagnName, a.lagnname, a.clname, a.mga
+                    ORDER BY combined_total DESC, m.LagnName
+                `;
+                queryParams = [month1];
+            } else {
+                promotionQuery = `
+                    SELECT
+                        m.LagnName,
+                        COALESCE(SUM(m.LVL_3_NET), 0) AS lvl_2_net_total,
+                        COALESCE(SUM(m.LVL_3_F6_NET), 0) AS lvl_2_f6_net_total,
+                        COALESCE(SUM(m.LVL_3_NET + m.LVL_3_F6_NET), 0) AS combined_total,
+                        a.lagnname,
+                        a.clname AS currentLevel,
+                        a.mga
+                    FROM Monthly_ALP AS m
+                    JOIN activeusers AS a ON m.LagnName = a.lagnname
+                    WHERE a.clname = 'GA'
+                        AND a.Active = 'y'
+                        AND m.Month IN (?, ?)
+                    GROUP BY m.LagnName, a.lagnname, a.clname, a.mga
+                    ORDER BY combined_total DESC, m.LagnName
+                `;
+                queryParams = [month1, month2];
+            }
         }
 
-        const promotionResults = await db.query(promotionQuery, [month1, month2]);
+        const promotionResults = await db.query(promotionQuery, queryParams);
 
         // Calculate statistics
         const totalAgents = promotionResults.length;
@@ -1050,8 +1106,8 @@ router.get('/promotion-tracking', async (req, res) => {
                     netLvl3Threshold,
                     f6Lvl3Threshold
                 },
-                months: [month1, month2],
-                selectedMonths: [month1, month2],
+                months: useSingleMonth ? [month1] : [month1, month2],
+                selectedMonths: useSingleMonth ? [month1] : [month1, month2],
                 agentType: agentType
             }
         });

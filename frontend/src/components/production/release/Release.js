@@ -23,48 +23,18 @@ const Release = () => {
   const isAdmin = user?.clname === 'Admin' || user?.Role === 'Admin';
   const isManager = ['SA', 'GA', 'MGA', 'RGA'].includes(user?.clname);
 
-  // Admins and Managers get tabs to switch between table & checklist
-  if (isAdmin || isManager) {
-    return (
-      <ProgressProvider>
-        <div className="release">
-          <div className="tabs">
-            <input
-              type="radio"
-              id="table"
-              name="view_type"
-              value="table"
-              checked={view === 'table'}
-              onChange={() => setView('table')}
-            />
-            <label htmlFor="table">Table</label>
+  // Combined view: show checklist above table only for AGT; managers/admins see only table
+  const isAgent = user?.clname === 'AGT';
 
-            <input
-              type="radio"
-              id="checklist"
-              name="view_type"
-              value="checklist"
-              checked={view === 'checklist'}
-              onChange={() => setView('checklist')}
-            />
-            <label htmlFor="checklist">Checklist</label>
-          </div>
-
-          {/* Render only the selected view */}
-          {view === 'table' ? (
-            <AgentProgressTable />
-          ) : view === 'checklist' ? (
-            <Checklist />
-          ) : null}
-        </div>
-      </ProgressProvider>
-    );
-  }
-
-  // Non-admins only see the checklist
   return (
     <ProgressProvider>
-      <Checklist />
+      <div className="release">
+        {isAgent ? (
+          <Checklist />
+        ) : (
+          <AgentProgressTable />
+        )}
+      </div>
     </ProgressProvider>
   );
 };

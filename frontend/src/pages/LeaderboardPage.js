@@ -3,6 +3,7 @@ import Select from 'react-select';
 import { FiFilter } from 'react-icons/fi';
 import Leaderboard from '../components/utils/Leaderboard';
 import FilterMenu from '../components/common/FilterMenu';
+import { useAuth } from '../context/AuthContext';
 import api from '../api';
 import './LeaderboardPage.css';
 
@@ -120,6 +121,7 @@ const combineYTDWithDecember = (ytdData, decemberData) => {
 };
 
 const LeaderboardPage = () => {
+    const { user } = useAuth();
     const [isF6, setIsF6] = useState(false);
     const [experienceFilter, setExperienceFilter] = useState('all');
     const [netOrGross, setNetOrGross] = useState('net');
@@ -134,6 +136,10 @@ const LeaderboardPage = () => {
     const [isCodes, setIsCodes] = useState(false);
     // Add VIPs toggle state
     const [isVIPs, setIsVIPs] = useState(false);
+    // Add Ref Sales toggle state
+    const [isRefSales, setIsRefSales] = useState(false);
+    // Add MORE toggle state
+    const [isMORE, setIsMORE] = useState(false);
     
     // Add dropdown state for Reported button
     const [isReportedDropdownOpen, setIsReportedDropdownOpen] = useState(false);
@@ -163,6 +169,11 @@ const LeaderboardPage = () => {
         mga: { data: [], loading: true },
         rga: { data: [], loading: true }
     });
+
+    // Allowed lagnnames (Active = 'y' and managerActive = 'y') for client-side filtering
+    const [allowedNames, setAllowedNames] = useState(new Set());
+    // Allowed user IDs for sources that link to userId
+    const [allowedIds, setAllowedIds] = useState(new Set());
 
     // Previous period data for rank comparison
     const [previousLeaderboardData, setPreviousLeaderboardData] = useState({
@@ -481,8 +492,8 @@ const LeaderboardPage = () => {
     // Fetch report dates
     const fetchReportDates = async () => {
         try {
-            // For Daily_Activity, Codes, or VIPs mode, generate date ranges based on report type
-            if (isDailyActivity || isCodes || isVIPs) {
+            // For Daily_Activity, Codes, VIPs, Ref Sales, or MORE mode, generate date ranges based on report type
+            if (isDailyActivity || isCodes || isVIPs || isRefSales || isMORE) {
                 if (reportType === 'MTD Recap') {
                     // Generate last 12 months in MM/YYYY format for MTD
                     const months = [];
@@ -510,7 +521,7 @@ const LeaderboardPage = () => {
                     setDefaultDate(years[0]); // Most recent year
                     setSelectedDate(years[0]);
                 } else {
-                    // Handle Weekly mode differently for VIPs vs Daily_Activity/Codes
+                    // Handle Weekly mode differently for VIPs vs Daily_Activity/Codes/MORE
                     if (isVIPs) {
                         // For VIPs in Weekly mode, default to current month (MM/YYYY format) since VIPs doesn't support weekly
                         const today = new Date();
@@ -518,6 +529,19 @@ const LeaderboardPage = () => {
                         setReportDates([currentMonth]);
                         setDefaultDate(currentMonth);
                         setSelectedDate(currentMonth);
+                    } else if (isMORE) {
+                        // For MORE in Weekly mode, fetch unique MORE_Date values from the backend
+                        if (reportType === 'Weekly Recap') {
+                            fetchMoreWeeklyDates();
+                            return; // Exit early since fetchMoreWeeklyDates will handle setting dates
+                        } else {
+                            // For non-weekly MORE modes, this shouldn't happen, but handle gracefully
+                            console.warn('MORE mode in non-weekly report type, this should not happen');
+                            setReportDates([]);
+                            setDefaultDate('');
+                            setSelectedDate('');
+                            return;
+                        }
                     } else {
                         // Generate last 12 weeks of Monday-Sunday ranges for Weekly (Daily_Activity and Codes only)
                         const weeks = [];
@@ -556,6 +580,36 @@ const LeaderboardPage = () => {
             }
         } catch (error) {
             console.error('Error fetching report dates:', error);
+        }
+    };
+
+    // Fetch MORE weekly dates from backend
+    const fetchMoreWeeklyDates = async () => {
+        try {
+            const response = await api.get('/more/all-amore-data');
+            
+            if (response.data.success && response.data.data) {
+                // Get unique MORE_Date values directly from the data
+                const uniqueDates = [...new Set(response.data.data.map(item => item.MORE_Date))];
+                
+                // Sort dates in descending order (most recent first)
+                const sortedDates = uniqueDates.sort((a, b) => new Date(b) - new Date(a));
+                
+                setReportDates(sortedDates);
+                if (sortedDates.length > 0) {
+                    setDefaultDate(sortedDates[0]); // Most recent date
+                    setSelectedDate(sortedDates[0]);
+                }
+            } else {
+                setReportDates([]);
+                setDefaultDate('');
+                setSelectedDate('');
+            }
+        } catch (error) {
+            console.error('Error fetching MORE weekly dates:', error);
+            setReportDates([]);
+            setDefaultDate('');
+            setSelectedDate('');
         }
     };
 
@@ -853,6 +907,298 @@ const LeaderboardPage = () => {
                 }));
             }
             return; // Exit early for VIPs data
+        }
+
+        // Handle Ref Sales data source
+        if (isRefSales) {
+            try {
+                setLeaderboardData(prev => ({
+                    ...prev,
+                    [key]: { ...prev[key], loading: true }
+                }));
+
+                // Build parameters for ref sales leaderboard
+                const params = {
+                    hierarchy_level: key === 'all' ? 'all' : key,
+                    sort_by: 'true_refs'
+                };
+
+                // Add date range parameters based on report type
+                if (reportType === 'Weekly Recap') {
+                    // For weekly, use the selected date as the week start and calculate the range
+                    const weekRange = getWeeklyDateRange(new Date(selectedDate));
+                    params.start_date = weekRange.startDate;
+                    params.end_date = weekRange.endDate;
+                } else if (reportType === 'MTD Recap' && isMMYYYYFormat(selectedDate)) {
+                    // For monthly, convert MM/YYYY to date range
+                    const monthRange = getMonthlyDateRange(selectedDate);
+                    params.start_date = monthRange.startDate;
+                    params.end_date = monthRange.endDate;
+                } else if (reportType === 'YTD Recap' && isYYYYFormat(selectedDate)) {
+                    // For yearly, convert YYYY to date range
+                    const yearRange = getYearlyDateRange(selectedDate);
+                    params.start_date = yearRange.startDate;
+                    params.end_date = yearRange.endDate;
+                } else {
+                    // Default to current month if date format is invalid
+                    const today = new Date();
+                    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+                    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    params.start_date = firstDay.toISOString().split('T')[0];
+                    params.end_date = lastDay.toISOString().split('T')[0];
+                }
+
+                // Add team filter if selected
+                if (selectedMGA?.value) {
+                    params.team = selectedMGA.value;
+                }
+
+                // Fetch data from ref-report dashboard endpoint
+                const response = await api.get('/ref-report/dashboard', { params });
+                
+                if (response.data && response.data.data && response.data.data.leaderboard) {
+                    const refSalesData = response.data.data.leaderboard;
+                    
+                    // Process and format the data for Leaderboard component
+                    const processedData = refSalesData.map((item, index) => ({
+                        name: item.name || 'Unknown',
+                        value: item.true_refs || 0,
+                        secondaryValue: item.conversion_rate || 0,
+                        rank: index + 1,
+                        profile_picture: item.profile_picture,
+                        mgaLastName: item.mgaLastName,
+                        clname: item.level || item.clname,
+                        // Add other fields needed by Leaderboard component
+                        total_refs: item.total_refs || 0,
+                        conversion_rate: item.conversion_rate || 0,
+                        agent_count: item.agent_count || 0
+                    }));
+
+                    setLeaderboardData(prev => ({
+                        ...prev,
+                        [key]: { data: processedData, loading: false }
+                    }));
+                } else {
+                    setLeaderboardData(prev => ({
+                        ...prev,
+                        [key]: { data: [], loading: false }
+                    }));
+                }
+            } catch (error) {
+                console.error(`Error fetching Ref Sales ${key} leaderboard data:`, error);
+                setLeaderboardData(prev => ({
+                    ...prev,
+                    [key]: { data: [], loading: false }
+                }));
+            }
+            return; // Exit early for Ref Sales data
+        }
+
+        // Handle MORE data source
+        if (isMORE) {
+            try {
+                setLeaderboardData(prev => ({
+                    ...prev,
+                    [key]: { ...prev[key], loading: true }
+                }));
+
+                // Fetch all MORE data (same as MoreReport.js)
+                const response = await api.get('/more/all-amore-data');
+                
+                if (response.data && response.data.success && response.data.data) {
+                    let moreData = response.data.data;
+                    
+                    // Apply date filtering based on report type
+                    let filteredData;
+                    
+                    if (reportType === 'Weekly Recap') {
+                        // For weekly, filter by exact MORE_Date match
+                        filteredData = moreData.filter(item => {
+                            return item.MORE_Date === selectedDate;
+                        });
+                    } else if (reportType === 'MTD Recap' && isMMYYYYFormat(selectedDate)) {
+                        // For monthly, convert MM/YYYY to date range
+                        const [month, year] = selectedDate.split('/');
+                        const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+                        const endDate = new Date(parseInt(year), parseInt(month), 0);
+                        
+                        filteredData = moreData.filter(item => {
+                            const itemDate = new Date(item.MORE_Date);
+                            return itemDate >= startDate && itemDate <= endDate;
+                        });
+                    } else if (reportType === 'YTD Recap' && isYYYYFormat(selectedDate)) {
+                        // For yearly, use full year range
+                        const year = parseInt(selectedDate);
+                        const startDate = new Date(year, 0, 1);
+                        const endDate = new Date(year, 11, 31);
+                        
+                        filteredData = moreData.filter(item => {
+                            const itemDate = new Date(item.MORE_Date);
+                            return itemDate >= startDate && itemDate <= endDate;
+                        });
+                    } else {
+                        // Default to current month
+                        const today = new Date();
+                        const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                        const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                        
+                        filteredData = moreData.filter(item => {
+                            const itemDate = new Date(item.MORE_Date);
+                            return itemDate >= startDate && itemDate <= endDate;
+                        });
+                    }
+                    
+                    // Group data based on hierarchy level (same logic as MoreReport.js)
+                    let groupedData = {};
+                    
+                    if (key === 'mga' || key === 'all') {
+                        // Group by MGA (same as MoreReport.js)
+                        groupedData = filteredData.reduce((acc, item) => {
+                            const mgaKey = item.MGA;
+                            if (!acc[mgaKey]) {
+                                acc[mgaKey] = {
+                                    name: mgaKey,
+                                    MGA: mgaKey,
+                                    RGA: item.RGA,
+                                    Legacy: item.Legacy,
+                                    Tree: item.Tree,
+                                    Total_Hires: 0,
+                                    PR_Hires: 0,
+                                    Total_Set: 0,
+                                    Total_Show: 0,
+                                    Finals_Set: 0,
+                                    Finals_Show: 0,
+                                    clname: 'MGA'
+                                };
+                            }
+                            acc[mgaKey].Total_Hires += item.Total_Hires || 0;
+                            acc[mgaKey].PR_Hires += item.PR_Hires || 0;
+                            acc[mgaKey].Total_Set += item.Total_Set || 0;
+                            acc[mgaKey].Total_Show += item.Total_Show || 0;
+                            acc[mgaKey].Finals_Set += item.Finals_Set || 0;
+                            acc[mgaKey].Finals_Show += item.Finals_Show || 0;
+                            return acc;
+                        }, {});
+                    } else if (key === 'rga') {
+                        // Group by RGA - include both their MGAs' data (RGA column) AND their own personal data (MGA column)
+                        groupedData = {};
+                        
+                        // First pass: collect all unique RGA names
+                        const allRGAs = new Set();
+                        filteredData.forEach(item => {
+                            if (item.RGA) allRGAs.add(item.RGA);
+                        });
+                        
+                        console.log('🎯 MORE RGA Leaderboard - Found RGAs:', Array.from(allRGAs));
+                        
+                        // Initialize RGA entries
+                        allRGAs.forEach(rgaName => {
+                            groupedData[rgaName] = {
+                                name: rgaName,
+                                RGA: rgaName,
+                                MGA: rgaName, // RGA is also an MGA
+                                Legacy: null,
+                                Tree: null,
+                                Total_Hires: 0,
+                                PR_Hires: 0,
+                                Total_Set: 0,
+                                Total_Show: 0,
+                                Finals_Set: 0,
+                                Finals_Show: 0,
+                                clname: 'RGA'
+                            };
+                        });
+                        
+                        // Second pass: aggregate data for each RGA
+                        filteredData.forEach(item => {
+                            const rgaName = item.RGA;
+                            const mgaName = item.MGA;
+                            
+                            // Add data where this item's RGA matches (their MGAs' data)
+                            if (rgaName && groupedData[rgaName]) {
+                                groupedData[rgaName].Total_Hires += item.Total_Hires || 0;
+                                groupedData[rgaName].PR_Hires += item.PR_Hires || 0;
+                                groupedData[rgaName].Total_Set += item.Total_Set || 0;
+                                groupedData[rgaName].Total_Show += item.Total_Show || 0;
+                                groupedData[rgaName].Finals_Set += item.Finals_Set || 0;
+                                groupedData[rgaName].Finals_Show += item.Finals_Show || 0;
+                                
+                                // Update hierarchy info from first item
+                                if (!groupedData[rgaName].Legacy) {
+                                    groupedData[rgaName].Legacy = item.Legacy;
+                                    groupedData[rgaName].Tree = item.Tree;
+                                }
+                            }
+                            
+                            // Also add data where this item's MGA matches an RGA name (RGA's own personal data)
+                            if (mgaName && groupedData[mgaName]) {
+                                console.log(`📊 Adding RGA personal data: ${mgaName} +${item.Total_Hires || 0} hires`);
+                                groupedData[mgaName].Total_Hires += item.Total_Hires || 0;
+                                groupedData[mgaName].PR_Hires += item.PR_Hires || 0;
+                                groupedData[mgaName].Total_Set += item.Total_Set || 0;
+                                groupedData[mgaName].Total_Show += item.Total_Show || 0;
+                                groupedData[mgaName].Finals_Set += item.Finals_Set || 0;
+                                groupedData[mgaName].Finals_Show += item.Finals_Show || 0;
+                            }
+                        });
+                    } else {
+                        // For SA/GA levels, return empty data since MORE only supports MGA/RGA
+                        setLeaderboardData(prev => ({
+                            ...prev,
+                            [key]: { data: [], loading: false }
+                        }));
+                        return;
+                    }
+                    
+                    // Convert to array and sort by Total_Hires, then by Total_Set (same as MoreReport.js)
+                    const sortedLeaderboard = Object.values(groupedData)
+                        .sort((a, b) => {
+                            if (b.Total_Hires !== a.Total_Hires) {
+                                return b.Total_Hires - a.Total_Hires;
+                            }
+                            return b.Total_Set - a.Total_Set;
+                        });
+                    
+                    // Add ranks and format for Leaderboard component
+                    const processedData = sortedLeaderboard.map((item, index) => ({
+                        name: item.name || 'Unknown',
+                        value: item.Total_Hires || 0,
+                        secondaryValue: item.PR_Hires || 0,
+                        rank: index + 1,
+                        profile_picture: item.profile_picture,
+                        mgaLastName: item.mgaLastName,
+                        clname: item.clname,
+                        // Add other MORE-specific fields
+                        Total_Set: item.Total_Set || 0,
+                        Total_Show: item.Total_Show || 0,
+                        Finals_Set: item.Finals_Set || 0,
+                        Finals_Show: item.Finals_Show || 0,
+                        PR_Hires: item.PR_Hires || 0,
+                        Total_Hires: item.Total_Hires || 0,
+                        MGA: item.MGA,
+                        RGA: item.RGA,
+                        Legacy: item.Legacy,
+                        Tree: item.Tree
+                    }));
+
+                    setLeaderboardData(prev => ({
+                        ...prev,
+                        [key]: { data: processedData, loading: false }
+                    }));
+                } else {
+                    setLeaderboardData(prev => ({
+                        ...prev,
+                        [key]: { data: [], loading: false }
+                    }));
+                }
+            } catch (error) {
+                console.error(`Error fetching MORE ${key} leaderboard data:`, error);
+                setLeaderboardData(prev => ({
+                    ...prev,
+                    [key]: { data: [], loading: false }
+                }));
+            }
+            return; // Exit early for MORE data
         }
         
         // Determine if we should use Monthly_ALP or Weekly_ALP (existing logic)
@@ -1366,6 +1712,18 @@ const LeaderboardPage = () => {
 
     // Process VIPs data to match the Leaderboard component format
     const processVIPsData = (data, key) => {
+        // DEBUG: Log raw VIP data being processed
+        console.log(`🔍 [VIP Debug] Processing VIPs data for key: ${key}`, {
+            dataLength: data.length,
+            sampleData: data.slice(0, 3).map(row => ({
+                lagnname: row.lagnname,
+                mga: row.mga,
+                sa: row.sa,
+                ga: row.ga,
+                vip_month: row.vip_month
+            }))
+        });
+        
         if (key === 'all') {
             // For "all" leaderboard, aggregate all manager types with hierarchical counting
             const managerMap = new Map();
@@ -1452,16 +1810,29 @@ const LeaderboardPage = () => {
             
             // Aggregate data for each unique hierarchy value
             const aggregatedData = uniqueHierarchyValues.map(hierarchyValue => {
-                // Find all rows where either:
-                // 1. The hierarchy column matches this value, OR
-                // 2. The lagnname column matches this value (for self-reporting)
+                // Find all rows where the hierarchy column matches this value
+                // Do NOT include self-reporting to avoid double counting
                 const relatedRows = data.filter(row => 
-                    (row[hierarchyColumn] && row[hierarchyColumn].trim() === hierarchyValue) ||
-                    (row.lagnname && row.lagnname.trim() === hierarchyValue)
+                    row[hierarchyColumn] && row[hierarchyColumn].trim() === hierarchyValue
                 );
                 
                 // Count the VIPs for this hierarchy value
                 const vipCount = relatedRows.length;
+                
+                // DEBUG: Log the count for MGA table
+                if (hierarchyName === 'MGA') {
+                    console.log(`🔍 [VIP Debug] ${hierarchyName} ${hierarchyValue}:`, {
+                        totalDataRows: data.length,
+                        relatedRowsCount: relatedRows.length,
+                        relatedRows: relatedRows.map(row => ({
+                            lagnname: row.lagnname,
+                            mga: row.mga,
+                            vip_month: row.vip_month
+                        })),
+                        hierarchyColumn: hierarchyColumn,
+                        searchValue: hierarchyValue
+                    });
+                }
                 
                 // Get additional info from the first related row for display purposes
                 const firstRow = relatedRows[0] || {};
@@ -1685,27 +2056,75 @@ const LeaderboardPage = () => {
     // Load data when filters change
     useEffect(() => {
         if ((selectedDate && reportDates.length > 0) || (isVIPs && selectedDate)) {
-            fetchLeaderboardData('getweeklyall', 'all');
-            fetchLeaderboardData('getweeklysa', 'sa');
-            fetchLeaderboardData('getweeklyga', 'ga');
-            fetchLeaderboardData('getweeklymga', 'mga');
-            // Only fetch RGA data when not in Daily Activity, Codes, or VIPs mode
-            if (!isDailyActivity && !isCodes && !isVIPs) {
-            fetchLeaderboardData('getweeklyrga', 'rga');
+            if (isMORE) {
+                // For MORE, only fetch MGA and RGA data
+                fetchLeaderboardData('getweeklyall', 'mga'); // Use 'mga' as the main leaderboard for MORE
+                fetchLeaderboardData('getweeklyrga', 'rga');
+            } else {
+                // For other data sources, fetch all hierarchy levels
+                fetchLeaderboardData('getweeklyall', 'all');
+                fetchLeaderboardData('getweeklysa', 'sa');
+                fetchLeaderboardData('getweeklyga', 'ga');
+                fetchLeaderboardData('getweeklymga', 'mga');
+                // Only fetch RGA data when not in Daily Activity, Codes, VIPs, or Ref Sales mode
+                if (!isDailyActivity && !isCodes && !isVIPs && !isRefSales) {
+                    fetchLeaderboardData('getweeklyrga', 'rga');
+                }
+            }
         }
-        }
-    }, [selectedDate, reportType, selectedMGA, selectedRGA, selectedTree, isF6, netOrGross, experienceFilter, reportDates, includePrevDecember, isDailyActivity, dailyActivityMetric, isCodes, isVIPs]);
+    }, [selectedDate, reportType, selectedMGA, selectedRGA, selectedTree, isF6, netOrGross, experienceFilter, reportDates, includePrevDecember, isDailyActivity, dailyActivityMetric, isCodes, isVIPs, isRefSales, isMORE]);
 
     // Initialize data and refetch when reportType changes
     useEffect(() => {
         fetchReportDates();
         fetchUniqueMGAOptions();
+        // Fetch allowed names once (or when auth/session changes if needed)
+        fetchAllowedNamesAndIds();
         
         // Reset December toggle when switching away from YTD
         if (reportType !== 'YTD Recap') {
             setIncludePrevDecember(false);
         }
-    }, [reportType, isDailyActivity, isCodes, isVIPs]);
+    }, [reportType, isDailyActivity, isCodes, isVIPs, isRefSales, isMORE]);
+
+    const fetchAllowedNamesAndIds = async () => {
+        try {
+            // Prefer endpoint that exposes Active and managerActive
+            // Fallback to admin or auth endpoints if needed
+            const response = await api.get('/auth/activeusers', { params: { active: 'y', managerActive: 'y' } });
+            const rows = Array.isArray(response.data) ? response.data : (response.data.users || response.data.data || []);
+            const names = rows
+                .filter(r => (r.Active === 'y' || r.active === 'y') && (r.managerActive === 'y' || r.manageractive === 'y'))
+                .map(r => r.lagnname)
+                .filter(Boolean);
+            setAllowedNames(new Set(names.map(n => String(n).toLowerCase().trim())));
+            const ids = rows
+                .map(r => r.id)
+                .filter((v) => v !== null && v !== undefined)
+                .map(String);
+            setAllowedIds(new Set(ids));
+        } catch (e) {
+            try {
+                // Secondary attempt: users active listing without Active flag; still capture managerActive
+                const response2 = await api.get('/users/active');
+                const rows2 = Array.isArray(response2.data) ? response2.data : [];
+                const names2 = rows2
+                    .filter(r => (r.managerActive === 'y' || r.manageractive === 'y'))
+                    .map(r => r.lagnname)
+                    .filter(Boolean);
+                setAllowedNames(new Set(names2.map(n => String(n).toLowerCase().trim())));
+                const ids2 = rows2
+                    .map(r => r.id)
+                    .filter((v) => v !== null && v !== undefined)
+                    .map(String);
+                setAllowedIds(new Set(ids2));
+            } catch (_) {
+                // As last resort, leave set empty (no extra filtering beyond backend/row flags)
+                setAllowedNames(new Set());
+                setAllowedIds(new Set());
+            }
+        }
+    };
 
     // Reset all filters
     const resetAllFilters = () => {
@@ -1848,11 +2267,13 @@ const LeaderboardPage = () => {
             <div className="data-source-selection">
                 <div className="data-source-buttons">
                     <button 
-                        className={!isDailyActivity && !isCodes && !isVIPs ? 'data-source-btn active' : 'data-source-btn'}
+                        className={!isDailyActivity && !isCodes && !isVIPs && !isRefSales && !isMORE ? 'data-source-btn active' : 'data-source-btn'}
                         onClick={() => {
                             setIsDailyActivity(false);
                             setIsCodes(false);
                             setIsVIPs(false);
+                            setIsRefSales(false);
+                            setIsMORE(false);
                         }}
                     >
                         Official ALP
@@ -1864,6 +2285,8 @@ const LeaderboardPage = () => {
                                 setIsDailyActivity(true);
                                 setIsCodes(false);
                                 setIsVIPs(false);
+                                setIsRefSales(false);
+                                setIsMORE(false);
                             }}
                         >
                             <span>Reported {formatMetricName(dailyActivityMetric)}</span>
@@ -1909,6 +2332,8 @@ const LeaderboardPage = () => {
                             setIsDailyActivity(false);
                             setIsCodes(true);
                             setIsVIPs(false);
+                            setIsRefSales(false);
+                            setIsMORE(false);
                         }}
                     >
                         Codes
@@ -1919,6 +2344,8 @@ const LeaderboardPage = () => {
                             setIsDailyActivity(false);
                             setIsCodes(false);
                             setIsVIPs(true);
+                            setIsRefSales(false);
+                            setIsMORE(false);
                             // Switch to MTD if currently on Weekly since VIPs doesn't support weekly
                             if (reportType === 'Weekly Recap') {
                                 setReportType('MTD Recap');
@@ -1927,14 +2354,38 @@ const LeaderboardPage = () => {
                     >
                         VIPs
                     </button>
+                    <button 
+                        className={isRefSales ? 'data-source-btn active' : 'data-source-btn'}
+                        onClick={() => {
+                            setIsDailyActivity(false);
+                            setIsCodes(false);
+                            setIsVIPs(false);
+                            setIsRefSales(true);
+                            setIsMORE(false);
+                        }}
+                    >
+                        Ref Sales
+                    </button>
+                    <button 
+                        className={isMORE ? 'data-source-btn active' : 'data-source-btn'}
+                        onClick={() => {
+                            setIsDailyActivity(false);
+                            setIsCodes(false);
+                            setIsVIPs(false);
+                            setIsRefSales(false);
+                            setIsMORE(true);
+                        }}
+                    >
+                        M.O.R.E.
+                    </button>
                 </div>
             </div>
 
             {/* Filter Controls */}
             <div className="leaderboard-filters">
                 <div className="leaderboard-filters-left">
-                    {/* Experience Filter - Hide when VIPs or Codes is active */}
-                    {!isVIPs && !isCodes && (
+                    {/* Experience Filter - Hide when VIPs, Codes, Ref Sales, or MORE is active */}
+                    {!isVIPs && !isCodes && !isRefSales && !isMORE && (
                     <div className="experience-filter-container">
                         <span 
                             className={experienceFilter === 'all' ? 'selected' : 'unselected'} 
@@ -1962,7 +2413,7 @@ const LeaderboardPage = () => {
 
                 {/* Report Type Filter - Centered - Hide Week option when VIPs is active */}
                 <div className="leaderboard-filters-center">
-                    <div className="tabs-filter-container">
+                    <div className={`tabs-filter-container ${isVIPs ? 'vips-mode' : ''}`}>
                         {!isVIPs && (
                         <>
                         <span 
@@ -1991,8 +2442,8 @@ const LeaderboardPage = () => {
                 </div>
 
                 <div className="leaderboard-filters-right">
-                    {/* Toggle Controls - Hide when Daily Activity, Codes, or VIPs is active */}
-                    {!isDailyActivity && !isCodes && !isVIPs && (
+                    {/* Toggle Controls - Hide when Daily Activity, Codes, VIPs, Ref Sales, or MORE is active */}
+                    {!isDailyActivity && !isCodes && !isVIPs && !isRefSales && !isMORE && (
                     <div className="toggle-container">
                         <span 
                             className={isF6 ? 'selected' : 'unselected'} 
@@ -2029,8 +2480,8 @@ const LeaderboardPage = () => {
                         />
                     </div>
 
-                    {/* YTD December Toggle - Only show when YTD is selected and not in Daily Activity, Codes, or VIPs mode */}
-                    {reportType === 'YTD Recap' && !isDailyActivity && !isCodes && !isVIPs && (
+                    {/* YTD December Toggle - Only show when YTD is selected and not in Daily Activity, Codes, VIPs, Ref Sales, or MORE mode */}
+                    {reportType === 'YTD Recap' && !isDailyActivity && !isCodes && !isVIPs && !isRefSales && !isMORE && (
                         <div className="december-toggle-container">
                             <span 
                                 className={includePrevDecember ? 'selected' : 'unselected'} 
@@ -2052,48 +2503,63 @@ const LeaderboardPage = () => {
                     onChange={(e) => setSelectedDate(e.target.value)}
                     className="date-select"
                 >
-                    {reportDates.map((dateItem, index) => {
+                    {reportDates && reportDates.length > 0 ? reportDates.map((dateItem, index) => {
+                        // Safety check for undefined/null dateItem
+                        if (!dateItem) {
+                            console.warn('Undefined dateItem at index:', index);
+                            return null;
+                        }
+
                         // Handle grouped format (MTD)
                         if (typeof dateItem === 'object' && dateItem.type) {
                             if (dateItem.isHeader) {
                                 return (
                                     <option 
                                         key={`header-${index}`} 
-                                        value={dateItem.value}
+                                        value={dateItem.value || ''}
                                         style={{ 
                                             fontWeight: 'bold', 
                                             backgroundColor: '#f0f0f0',
                                             fontSize: '14px'
                                         }}
                                     >
-                                        {dateItem.label}
+                                        {dateItem.label || 'Unknown'}
                                     </option>
                                 );
                             } else {
                                 return (
                                     <option 
                                         key={`date-${index}`} 
-                                        value={dateItem.value}
+                                        value={dateItem.value || ''}
                                         style={{ paddingLeft: '20px' }}
                                     >
-                                        &#8195;{dateItem.label}
+                                        &#8195;{dateItem.label || 'Unknown'}
                                     </option>
                                 );
                             }
                         } else {
                             // Handle regular format (Weekly/YTD)
-                            const date = typeof dateItem === 'string' ? dateItem : dateItem.value;
+                            const date = typeof dateItem === 'string' ? dateItem : (dateItem && dateItem.value ? dateItem.value : '');
+                            
+                            if (!date) {
+                                console.warn('No valid date found for dateItem:', dateItem);
+                                return null;
+                            }
                             
                             return (
                                 <option key={date} value={date}>
-                                    {(isDailyActivity || isCodes || isVIPs) ? 
-                                        (isYYYYFormat(date) ? date : isMMYYYYFormat(date) ? date : formatWeeklyRange(date)) 
-                                        : formatToMMDDYYYY(date)
+                                    {isMORE ? 
+                                        date // Display MORE_Date as-is
+                                        : (isDailyActivity || isCodes || isVIPs || isRefSales) ? 
+                                            (isYYYYFormat(date) ? date : isMMYYYYFormat(date) ? date : formatWeeklyRange(date)) 
+                                            : formatToMMDDYYYY(date)
                                     }
                                 </option>
                             );
                         }
-                    })}
+                    }).filter(Boolean) : (
+                        <option value="">Loading dates...</option>
+                    )}
                 </select>
                 <button className="arrow-change-button" onClick={handlePreviousDate}>&gt;</button>
             </div>
@@ -2102,10 +2568,11 @@ const LeaderboardPage = () => {
 
             {/* Leaderboards */}
             <div className="leaderboards-container">
-                {/* Top Producers - spans full width */}
-                <div className="leaderboard-main-row">
-                    <Leaderboard
-                        data={leaderboardData.all.data}
+                {/* Top Producers - spans full width - hide for MORE mode since we show MGA/RGA below */}
+                {!isMORE && (
+                    <div className="leaderboard-main-row">
+                        <Leaderboard
+                            data={leaderboardData.all.data}
                         title={
                             isDailyActivity 
                                 ? `Top Producers - ${formatMetricName(dailyActivityMetric)}`
@@ -2113,10 +2580,24 @@ const LeaderboardPage = () => {
                                     ? "Top Producers - Direct Codes"
                                     : isVIPs
                                         ? "Top Producers - VIPs"
-                                        : "Top Producers"
+                                        : isRefSales
+                                            ? "Top Producers - Ref Sales"
+                                            : isMORE
+                                                ? "Top MGAs - M.O.R.E. Hires"
+                                                : "Top Producers"
                         }
                         nameField="name"
                         valueField="value"
+                        allowedNames={allowedNames}
+                        allowedIds={allowedIds}
+                        rawNameField={
+                            isDailyActivity ? 'name' :
+                            isCodes ? 'name' :
+                            isVIPs ? 'name' :
+                            isRefSales ? 'name' :
+                            isMORE ? 'name' :
+                            'name'
+                        }
                         formatValue={
                             isDailyActivity 
                                 ? formatDailyActivityValue 
@@ -2124,9 +2605,13 @@ const LeaderboardPage = () => {
                                     ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
                                     : isVIPs
                                         ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
-                                        : formatValue
+                                        : isRefSales
+                                            ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
+                                            : isMORE
+                                                ? (value) => `${value || 0} hires`
+                                                : formatValue
                         }
-                        loading={leaderboardData.all.loading}
+                        loading={isMORE ? leaderboardData.mga.loading : leaderboardData.all.loading}
                         variant="detailed"
                         showTrophies={true}
                         showProfilePicture={true}
@@ -2138,10 +2623,64 @@ const LeaderboardPage = () => {
                         formatAchievementBadge={formatAchievementBadge}
                         achievementColors={achievementColors}
                         className="main-leaderboard"
+                        currentUser={user}
+                        showScrollButtons={true}
                     />
                 </div>
+                )}
                 
                 {/* Other leaderboards - 2 per row */}
+                {isMORE ? (
+                    // For MORE, show both MGA and RGA leaderboards with responsive layout
+                    <div className="more-leaderboard-container">
+                        <Leaderboard
+                            data={leaderboardData.mga.data}
+                            title="Top MGAs - M.O.R.E. Hires"
+                            nameField="name"
+                            valueField="value"
+                            allowedNames={allowedNames}
+                            allowedIds={allowedIds}
+                            rawNameField={'name'}
+                            formatValue={(value) => `${value || 0} hires`}
+                            loading={leaderboardData.mga.loading}
+                            variant="detailed"
+                            showProfilePicture={true}
+                            profilePictureField="profile_picture"
+                            showLevelBadge={true}
+                            showMGA={true}
+                            hierarchyLevel="mga"
+                            formatMovementIndicator={formatMovementIndicator}
+                            formatAchievementBadge={formatAchievementBadge}
+                            achievementColors={achievementColors}
+                            currentUser={user}
+                            showScrollButtons={true}
+                        />
+                        <Leaderboard
+                            data={leaderboardData.rga.data}
+                            title="Top RGAs - M.O.R.E. Hires"
+                            nameField="name"
+                            valueField="value"
+                            allowedNames={allowedNames}
+                            allowedIds={allowedIds}
+                            rawNameField={'name'}
+                            formatValue={(value) => `${value || 0} hires`}
+                            loading={leaderboardData.rga.loading}
+                            variant="detailed"
+                            showProfilePicture={true}
+                            profilePictureField="profile_picture"
+                            showLevelBadge={true}
+                            showMGA={true}
+                            hierarchyLevel="rga"
+                            formatMovementIndicator={formatMovementIndicator}
+                            formatAchievementBadge={formatAchievementBadge}
+                            achievementColors={achievementColors}
+                            currentUser={user}
+                            showScrollButtons={true}
+                        />
+                    </div>
+                ) : (
+                    // For other data sources, show all hierarchy levels
+                    <>
                 <div className="leaderboard-row">
                     <Leaderboard
                         data={leaderboardData.sa.data}
@@ -2152,10 +2691,15 @@ const LeaderboardPage = () => {
                                     ? "Top SAs - Codes"
                                     : isVIPs
                                         ? "Top SAs - VIPs"
-                                        : "Top SAs"
+                                        : isRefSales
+                                            ? "Top SAs - Ref Sales"
+                                            : "Top SAs"
                         }
                         nameField="name"
                         valueField="value"
+                        allowedNames={allowedNames}
+                        allowedIds={allowedIds}
+                        rawNameField={'name'}
                         formatValue={
                             isDailyActivity 
                                 ? formatDailyActivityValue 
@@ -2163,7 +2707,11 @@ const LeaderboardPage = () => {
                                     ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
                                     : isVIPs
                                         ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
-                                        : formatValue
+                                        : isRefSales
+                                            ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
+                                            : isMORE
+                                                ? (value) => `${value || 0} hires`
+                                                : formatValue
                         }
                         loading={leaderboardData.sa.loading}
                         variant="detailed"
@@ -2175,6 +2723,8 @@ const LeaderboardPage = () => {
                         formatMovementIndicator={formatMovementIndicator}
                         formatAchievementBadge={formatAchievementBadge}
                         achievementColors={achievementColors}
+                        currentUser={user}
+                        showScrollButtons={true}
                     />
                     <Leaderboard
                         data={leaderboardData.ga.data}
@@ -2185,10 +2735,17 @@ const LeaderboardPage = () => {
                                     ? "Top GAs - Codes"
                                     : isVIPs
                                         ? "Top GAs - VIPs"
-                                        : "Top GAs"
+                                        : isRefSales
+                                            ? "Top GAs - Ref Sales"
+                                            : isMORE
+                                                ? "Top GAs - M.O.R.E. Hires"
+                                                : "Top GAs"
                         }
                         nameField="name"
                         valueField="value"
+                        allowedNames={allowedNames}
+                        allowedIds={allowedIds}
+                        rawNameField={'name'}
                         formatValue={
                             isDailyActivity 
                                 ? formatDailyActivityValue 
@@ -2196,7 +2753,11 @@ const LeaderboardPage = () => {
                                     ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
                                     : isVIPs
                                         ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
-                                        : formatValue
+                                        : isRefSales
+                                            ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
+                                            : isMORE
+                                                ? (value) => `${value || 0} hires`
+                                                : formatValue
                         }
                         loading={leaderboardData.ga.loading}
                         variant="detailed"
@@ -2208,6 +2769,8 @@ const LeaderboardPage = () => {
                         formatMovementIndicator={formatMovementIndicator}
                         formatAchievementBadge={formatAchievementBadge}
                         achievementColors={achievementColors}
+                        currentUser={user}
+                        showScrollButtons={true}
                     />
                 </div>
                 
@@ -2221,10 +2784,17 @@ const LeaderboardPage = () => {
                                     ? "Top MGAs - Codes"
                                     : isVIPs
                                         ? "Top MGAs - VIPs"
-                                        : "Top MGAs"
+                                        : isRefSales
+                                            ? "Top MGAs - Ref Sales"
+                                            : isMORE
+                                                ? "Top MGAs - M.O.R.E. Hires"
+                                                : "Top MGAs"
                         }
                         nameField="name"
                         valueField="value"
+                        allowedNames={allowedNames}
+                        allowedIds={allowedIds}
+                        rawNameField={'name'}
                         formatValue={
                             isDailyActivity 
                                 ? formatDailyActivityValue 
@@ -2232,7 +2802,11 @@ const LeaderboardPage = () => {
                                     ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
                                     : isVIPs
                                         ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
-                                        : formatValue
+                                        : isRefSales
+                                            ? (value) => new Intl.NumberFormat('en-US').format(value || 0)
+                                            : isMORE
+                                                ? (value) => `${value || 0} hires`
+                                                : formatValue
                         }
                         loading={leaderboardData.mga.loading}
                         variant="detailed"
@@ -2244,14 +2818,19 @@ const LeaderboardPage = () => {
                         formatMovementIndicator={formatMovementIndicator}
                         formatAchievementBadge={formatAchievementBadge}
                         achievementColors={achievementColors}
+                        currentUser={user}
+                        showScrollButtons={true}
                     />
-                    {/* Only show RGA leaderboard when not in Daily Activity, Codes, or VIPs mode */}
-                    {!isDailyActivity && !isCodes && !isVIPs && (
+                    {/* Only show RGA leaderboard when not in Daily Activity, Codes, VIPs, Ref Sales, or MORE mode */}
+                    {!isDailyActivity && !isCodes && !isVIPs && !isRefSales && !isMORE && (
                     <Leaderboard
                         data={leaderboardData.rga.data}
                         title="Top RGAs"
                         nameField="name"
                         valueField="value"
+                        allowedNames={allowedNames}
+                        allowedIds={allowedIds}
+                        rawNameField={'name'}
                         formatValue={formatValue}
                         loading={leaderboardData.rga.loading}
                         variant="detailed"
@@ -2263,9 +2842,13 @@ const LeaderboardPage = () => {
                         formatMovementIndicator={formatMovementIndicator}
                         formatAchievementBadge={formatAchievementBadge}
                         achievementColors={achievementColors}
+                        currentUser={user}
+                        showScrollButtons={true}
                     />
                     )}
                 </div>
+                    </>
+                )}
             </div>
         </div>
     );

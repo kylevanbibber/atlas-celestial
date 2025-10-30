@@ -33,8 +33,11 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
     // Check if user is admin
     const isAdmin = user?.Role === 'Admin';
     
-    // Check if user is admin with teamRole="app" - show all data and enable context menu
-    const isAppAdmin = user?.Role === 'Admin' && user?.teamRole === 'app';
+    // Check if user has app management permissions (teamRole="app" OR Role="Admin")
+    const hasAppManagementPermissions = user?.teamRole === 'app' || user?.Role === 'Admin';
+    
+    // Legacy compatibility - keeping isAppAdmin for existing code
+    const isAppAdmin = hasAppManagementPermissions;
     
     // Debug logging for app admin detection
     console.log('🏭 VerifyTable: Context menu access check', {
@@ -112,6 +115,8 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
         try {
             if (!user?.userId) {
                 setError('User ID not found');
+                // Prevent indefinite spinner if userId is missing
+                setLoading(false);
                 return;
             }
 
@@ -137,12 +142,23 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
                 console.log('[VerifyTable] Current user ID:', user?.userId);
                 console.log('[VerifyTable] Team IDs from hierarchy:', teamIds);
                 console.log('[VerifyTable] All allowed activeusers.id list:', allAllowedIds);
+                // If nothing to filter by and not app admin, stop loading to avoid spinner
+                if (!isAppAdmin && allAllowedIds.length === 0) {
+                    setLoading(false);
+                }
             } else {
-                setError('Failed to fetch hierarchy information');
                 console.warn('[VerifyTable] /auth/searchByUserId error:', response.data.message);
+                // Fallback: allow self-only if hierarchy fetch fails
+                const fallbackIds = user?.userId ? [user.userId] : [];
+                setUserIds(fallbackIds);
+                // Clear loading so data fetch can proceed
+                setLoading(false);
             }
         } catch (err) {
-            setError('Error fetching hierarchy information: ' + err.message);
+            console.warn('[VerifyTable] Error fetching hierarchy information, falling back to self-only:', err.message);
+            const fallbackIds = user?.userId ? [user.userId] : [];
+            setUserIds(fallbackIds);
+            setLoading(false);
         }
     };
 
@@ -162,7 +178,11 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
             if (verifyResult.success) {
                 // For app admins, show all data. For others, filter by hierarchy
                 const allRows = Array.isArray(verifyResult.data) ? verifyResult.data : [];
-                console.log('[VerifyTable] /verify/all full data:', allRows);
+                console.log('[VerifyTable] 📊 /verify/all full data:', {
+                    totalRows: allRows.length,
+                    sampleRow: allRows[0],
+                    allRowIds: allRows.map(r => r.application_id || r.id)
+                });
 
                 const filteredData = isAppAdmin 
                     ? allRows 
@@ -173,17 +193,22 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
                     const diagnostics = allRows.map(r => ({
                         application_id: r.application_id || r.id,
                         userId: r.userId,
+                        userIdType: typeof r.userId,
+                        inAllowedSet: allowedIdsSet.has(String(r.userId)),
                         matches: r.userId !== undefined && r.userId !== null && allowedIdsSet.has(String(r.userId))
                     }));
                     const matchedCount = diagnostics.filter(d => d.matches).length;
-                    console.log('[VerifyTable] Hierarchy filter diagnostics (full):', diagnostics);
-                    console.log('[VerifyTable] Hierarchy filter summary:', {
+                    console.log('[VerifyTable] 🔍 Hierarchy filter diagnostics:', diagnostics);
+                    console.log('[VerifyTable] 📊 Hierarchy filter summary:', {
+                        isAppAdmin,
+                        allowedIdsArray: Array.from(allowedIdsSet),
                         allowedIdsSize: allowedIdsSet.size,
                         totalFetched: allRows.length,
                         filteredCount: filteredData.length,
                         matchedCount: matchedCount
                     });
                 }
+                console.log('[VerifyTable] ✅ Setting verifyData with', filteredData.length, 'rows');
                 setVerifyData(filteredData);
             } else {
                 setError('Failed to fetch verification data');
@@ -552,14 +577,25 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
                 return [];
         }
         
-        // Add displayStatus to each row based on the tab
-        return data.map(row => ({
+        console.log(`[VerifyTable] 📋 Tab "${activeTab}" raw data:`, {
+            rawDataLength: data.length,
+            verifyDataLength: verifyData.length,
+            verifyClientDataLength: verifyClientData.length,
+            isArchiveView,
+            isAdmin,
+            sampleRawRow: data[0]
+        });
+        
+        // Add displayStatus to each row - always use the actual row status if available
+        const mappedData = data.map(row => ({
             ...row,
-            displayStatus: activeTab === 'queued' || activeTab === 'unverified' 
-                ? (row.status || displayStatus) // Use actual status for queued/unverified
-                : displayStatus // Use tab-specific status for verified/discrepancy
+            displayStatus: row.status || displayStatus // Use row's actual status, fallback to tab status
         }));
-    }, [activeTab, getQueuedData, getUnverifiedData, getVerifiedData, getDiscrepancyData]);
+        
+        console.log(`[VerifyTable] ✅ Tab "${activeTab}" after mapping:`, mappedData.length, 'rows');
+        
+        return mappedData;
+    }, [activeTab, getQueuedData, getUnverifiedData, getVerifiedData, getDiscrepancyData, verifyData.length, verifyClientData.length, isArchiveView, isAdmin]);
 
     // Pre-indexed search data for ultra-fast filtering
     const searchIndex = useMemo(() => {
@@ -568,7 +604,9 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
             searchableText: [
                 row.agent_name || '',
                 row.client_name || '',
-                row.application_id || ''
+                row.application_id || '',
+                row.client_phoneNumber || '',
+                row.client_email || ''
             ].join(' ').toLowerCase()
         }));
     }, [currentTabData]);
@@ -586,16 +624,31 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
     }, [searchIndex, currentTabData, debouncedSearchTerm]);
 
     // Memoized data with IDs for DataTable
-    const dataWithIds = useMemo(() => 
-        currentData.map(row => ({
+    const dataWithIds = useMemo(() => {
+        const mapped = currentData.map(row => ({
             ...row,
             id: row.application_id || row.id,
             isProcessing: processingRows[row.application_id || row.id] || false
-        })), [currentData, processingRows]
-    );
+        }));
+        console.log(`[VerifyTable] 🔍 Data pipeline for tab "${activeTab}":`, {
+            currentTabDataLength: currentTabData.length,
+            currentDataLength: currentData.length,
+            dataWithIdsLength: mapped.length,
+            searchTerm: debouncedSearchTerm,
+            sampleRow: mapped[0]
+        });
+        return mapped;
+    }, [currentData, processingRows, activeTab, currentTabData.length, debouncedSearchTerm]);
 
     // Archive function to handle archiving applications
     const handleArchiveApplication = useCallback(async (applicationId) => {
+        // Only allow users with app management permissions to archive
+        if (!hasAppManagementPermissions) {
+            console.warn('🚫 VerifyTable: Archive access denied - user lacks app management permissions');
+            toast.error('You do not have permission to archive applications');
+            return;
+        }
+        
         try {
             const response = await api.put('/verify/archive', {
                 application_id: applicationId
@@ -613,10 +666,17 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
         } catch (error) {
             console.error('Error archiving application:', error);
         }
-    }, []);
+    }, [hasAppManagementPermissions]);
 
     // Unarchive function to handle unarchiving applications
     const handleUnarchiveApplication = useCallback(async (applicationId) => {
+        // Only allow users with app management permissions to unarchive
+        if (!hasAppManagementPermissions) {
+            console.warn('🚫 VerifyTable: Unarchive access denied - user lacks app management permissions');
+            toast.error('You do not have permission to unarchive applications');
+            return;
+        }
+        
         try {
             const response = await api.put('/verify/unarchive', {
                 application_id: applicationId
@@ -634,11 +694,18 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
         } catch (error) {
             console.error('Error unarchiving application:', error);
         }
-    }, []);
+    }, [hasAppManagementPermissions]);
 
     // Send Early function (for queued applications) - sends all queued emails
     const handleSendEarly = useCallback(async () => {
         console.log('🚀 Bulk send early called - will send ALL queued applications');
+        
+        // Only allow users with app management permissions to send early
+        if (!hasAppManagementPermissions) {
+            console.warn('🚫 VerifyTable: Send early access denied - user lacks app management permissions');
+            toast.error('You do not have permission to send verification emails early');
+            return;
+        }
         
         try {
             const response = await api.post('/verify/send-queued');
@@ -656,11 +723,18 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
             console.error('Error sending early:', error);
             toast.error(`Error sending verification emails: ${error.message}`);
         }
-    }, [isArchiveView]);
+    }, [isArchiveView, hasAppManagementPermissions]);
 
     // Individual Send Early function for a specific application
     const handleSendEarlyIndividual = useCallback(async (applicationId) => {
         console.log('🚀 Individual send early called for application:', applicationId);
+        
+        // Only allow users with app management permissions to send early
+        if (!hasAppManagementPermissions) {
+            console.warn('🚫 VerifyTable: Individual send early access denied - user lacks app management permissions');
+            toast.error('You do not have permission to send verification emails early');
+            return;
+        }
         
         try {
             const response = await api.post(`/verify/send-early/${applicationId}`);
@@ -678,13 +752,14 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
             console.error('Error sending early:', error);
             toast.error(`Error sending verification email: ${error.message}`);
         }
-    }, [isArchiveView]);
+    }, [isArchiveView, hasAppManagementPermissions]);
 
     // Resend function (for unverified applications)
     const handleResend = useCallback(async (applicationId) => {
-        // Only allow app admins to resend
-        if (!isAppAdmin) {
-            console.warn('🚫 VerifyTable: Resend access denied - user is not app admin');
+        // Only allow users with app management permissions to resend
+        if (!hasAppManagementPermissions) {
+            console.warn('🚫 VerifyTable: Resend access denied - user lacks app management permissions');
+            toast.error('You do not have permission to resend verification emails');
             return;
         }
 
@@ -710,7 +785,7 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
         } catch (error) {
             console.error('Error resending:', error);
         }
-    }, [verifyData, isAppAdmin]);
+    }, [verifyData, hasAppManagementPermissions]);
 
     // Helper function to refresh tab data when applications change status
     const refreshTabData = useCallback(() => {
@@ -721,6 +796,13 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
 
     // Bulk action functions
     const handleBulkArchive = useCallback(async () => {
+        // Only allow users with app management permissions to bulk archive
+        if (!hasAppManagementPermissions) {
+            console.warn('🚫 VerifyTable: Bulk archive access denied - user lacks app management permissions');
+            toast.error('You do not have permission to archive applications');
+            return;
+        }
+        
         const selectedIds = Object.keys(selectedRows);
         if (selectedIds.length === 0) {
             toast.error('No applications selected');
@@ -814,9 +896,16 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
             // Clear all processing states on error
             setProcessingRows({});
         }
-    }, [selectedRows, verifyData, clearSelection, refreshTabData]);
+    }, [selectedRows, verifyData, clearSelection, refreshTabData, hasAppManagementPermissions]);
 
     const handleBulkSendEarly = useCallback(async () => {
+        // Only allow users with app management permissions to bulk send early
+        if (!hasAppManagementPermissions) {
+            console.warn('🚫 VerifyTable: Bulk send early access denied - user lacks app management permissions');
+            toast.error('You do not have permission to send verification emails early');
+            return;
+        }
+        
         const selectedIds = Object.keys(selectedRows);
         if (selectedIds.length === 0) {
             toast.error('No applications selected');
@@ -908,9 +997,16 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
             // Clear all processing states on error
             setProcessingRows({});
         }
-    }, [selectedRows, verifyData, clearSelection, refreshTabData]);
+    }, [selectedRows, verifyData, clearSelection, refreshTabData, hasAppManagementPermissions]);
 
     const handleBulkResend = useCallback(async () => {
+        // Only allow users with app management permissions to bulk resend
+        if (!hasAppManagementPermissions) {
+            console.warn('🚫 VerifyTable: Bulk resend access denied - user lacks app management permissions');
+            toast.error('You do not have permission to resend verification emails');
+            return;
+        }
+        
         const selectedIds = Object.keys(selectedRows);
         if (selectedIds.length === 0) {
             toast.error('No applications selected');
@@ -1009,7 +1105,7 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
             // Clear all processing states on error
             setProcessingRows({});
         }
-    }, [selectedRows, verifyData, clearSelection, refreshTabData]);
+    }, [selectedRows, verifyData, clearSelection, refreshTabData, hasAppManagementPermissions]);
 
     // Helper function to get selected applications data
     const getSelectedApplications = useCallback(() => {
@@ -1201,29 +1297,33 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
         const options = [];
 
         if (isArchiveView) {
-            // When viewing archived applications, show unarchive option
-            options.push({
-                label: 'Unarchive',
-                icon: '📤',
-                onClick: () => handleUnarchiveApplication(row.application_id || row.id),
-                className: 'menu-item-unarchive'
-            });
+            // When viewing archived applications, show unarchive option (only for authorized users)
+            if (hasAppManagementPermissions) {
+                options.push({
+                    label: 'Unarchive',
+                    icon: '📤',
+                    onClick: () => handleUnarchiveApplication(row.application_id || row.id),
+                    className: 'menu-item-unarchive'
+                });
+            }
         } else {
             // When viewing current applications, show context-specific options
             
             // Add tab-specific options first
             if (activeTab === 'queued') {
-                // Add individual send early option for each row (this is what users expect)
-                options.push({
-                    label: 'Send This Application Only',
-                    icon: '📧',
-                    onClick: () => {
-                        if (window.confirm(`Send verification email for application ${row.application_id || row.id} only?`)) {
-                            handleSendEarlyIndividual(row.application_id || row.id);
-                        }
-                    },
-                    className: 'menu-item-send-early-individual'
-                });
+                // Add individual send early option for each row (only for authorized users)
+                if (hasAppManagementPermissions) {
+                    options.push({
+                        label: 'Send This Application Only',
+                        icon: '📧',
+                        onClick: () => {
+                            if (window.confirm(`Send verification email for application ${row.application_id || row.id} only?`)) {
+                                handleSendEarlyIndividual(row.application_id || row.id);
+                            }
+                        },
+                        className: 'menu-item-send-early-individual'
+                    });
+                }
             } else if (activeTab === 'unverified') {
                 // Only show resend option for app admins
                 if (isAppAdmin) {
@@ -1254,13 +1354,15 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
                 });
             }
 
-            // Always show archive option for current applications
-            options.push({
-                label: 'Archive',
-                icon: '📁',
-                onClick: () => handleArchiveApplication(row.application_id || row.id),
-                className: 'menu-item-archive'
-            });
+            // Show archive option for current applications (only for authorized users)
+            if (hasAppManagementPermissions) {
+                options.push({
+                    label: 'Archive',
+                    icon: '📁',
+                    onClick: () => handleArchiveApplication(row.application_id || row.id),
+                    className: 'menu-item-archive'
+                });
+            }
         }
 
         console.log('🔍 Context menu options generated:', {
@@ -1279,34 +1381,44 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
         }
 
         return options;
-    }, [handleArchiveApplication, handleUnarchiveApplication, handleSendEarly, handleResend, handleCopyVerifiedDetails, handleCopyDiscrepancyDetails, isArchiveView, activeTab, isAppAdmin, handleSendEarlyIndividual]);
+    }, [handleArchiveApplication, handleUnarchiveApplication, handleSendEarly, handleResend, handleCopyVerifiedDetails, handleCopyDiscrepancyDetails, isArchiveView, activeTab, isAppAdmin, handleSendEarlyIndividual, hasAppManagementPermissions]);
 
     // Memoized DataTable component to prevent unnecessary re-renders
-    const MemoizedDataTable = useMemo(() => (
-        <DataTable
-            columns={columns}
-            data={dataWithIds}
-            entityName="applications"
-            archivedView={isArchiveView}
-            disablePagination={false}
-            disableCellEditing={true}
-            showActionBar={false}
-            onRowClick={handleRowClick}
-            enableRowContextMenu={isAppAdmin} // Only enable context menu for app admins
-            getRowContextMenuOptions={isAppAdmin ? getRowContextMenuOptions : undefined}
-            // Mass selection
-            onSelectionChange={handleSelectionChange}
-            // Add totals for queued applications
-            showTotals={activeTab === 'queued'}
-            totalsPosition="bottom"
-            totalsColumns={['total_annual_premium']}
-            totalsLabel="Total Annual Premium"
-            totalsLabelColumn="client_name"
-            // Performance optimizations
-            initialPageSize={50}
-            pageSizeOptions={[25, 50, 100, 200]}
-        />
-    ), [columns, dataWithIds, isArchiveView, handleRowClick, activeTab, getRowContextMenuOptions, isAppAdmin, handleSelectionChange]);
+    const MemoizedDataTable = useMemo(() => {
+        console.log('[VerifyTable] 🎯 Rendering DataTable with:', {
+            columnsCount: columns.length,
+            dataCount: dataWithIds.length,
+            activeTab,
+            firstColumn: columns[0],
+            firstDataRow: dataWithIds[0]
+        });
+        
+        return (
+            <DataTable
+                columns={columns}
+                data={dataWithIds}
+                entityName="applications"
+                archivedView={isArchiveView}
+                disablePagination={false}
+                disableCellEditing={true}
+                showActionBar={false}
+                onRowClick={handleRowClick}
+                enableRowContextMenu={isAppAdmin} // Only enable context menu for app admins
+                getRowContextMenuOptions={isAppAdmin ? getRowContextMenuOptions : undefined}
+                // Mass selection
+                onSelectionChange={handleSelectionChange}
+                // Add totals for queued applications
+                showTotals={activeTab === 'queued'}
+                totalsPosition="bottom"
+                totalsColumns={['total_annual_premium']}
+                totalsLabel="Total Annual Premium"
+                totalsLabelColumn="client_name"
+                // Performance optimizations
+                initialPageSize={50}
+                pageSizeOptions={[25, 50, 100, 200]}
+            />
+        );
+    }, [columns, dataWithIds, isArchiveView, handleRowClick, activeTab, getRowContextMenuOptions, isAppAdmin, handleSelectionChange]);
 
     // Memoized tab counts to prevent recalculation on every render
     const tabCounts = useMemo(() => ({
@@ -1507,8 +1619,8 @@ const VerifyTableComponent = React.forwardRef(({ onOpenRightPanel }, ref) => {
                             </button>
                         )}
 
-                        {/* Bulk Action Buttons - Only show when rows are selected */}
-                        {Object.keys(selectedRows).length > 0 && (
+                        {/* Bulk Action Buttons - Only show when rows are selected and user has permissions */}
+                        {Object.keys(selectedRows).length > 0 && hasAppManagementPermissions && (
                             <>
                                 {/* Bulk Archive Button */}
                                 <button

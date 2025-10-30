@@ -28,6 +28,19 @@
   --hover-color: #00558c;
   --shadow-color: rgba(0, 0, 0, 0.1);
   
+  /* Additional theme variables for consistency */
+  --background-color: #f5f7fa;
+  --card-background: #ffffff;
+  --secondary-background: #f5f7fa;
+  --primary-color: #00558c;
+  --primary-color-dark: #004070;
+  --primary-hover: #003d63;
+  --hover-background: #e8eaed;
+  --success-color: #27ae60;
+  --success-background: #f0f8f0;
+  --danger-color: #e74c3c;
+  --danger-background: rgba(231, 76, 60, 0.1);
+  
   /* Safe area variables for mobile devices with fallbacks */
   --safe-area-inset-top: env(safe-area-inset-top, 0);
   --safe-area-inset-right: env(safe-area-inset-right, 0);
@@ -63,6 +76,19 @@
   --input-text: #f0f0f0;
   --hover-color: #4da3ff;
   --shadow-color: rgba(0, 0, 0, 0.4);
+  
+  /* Additional theme variables for consistency */
+  --background-color: #1a1a1a;
+  --card-background: #242424;
+  --secondary-background: #1e1e1e;
+  --primary-color: #0077cc;
+  --primary-color-dark: #0066b3;
+  --primary-hover: #0088dd;
+  --hover-background: #2a2a2a;
+  --success-color: #2ecc71;
+  --success-background: rgba(46, 204, 113, 0.15);
+  --danger-color: #e74c3c;
+  --danger-background: rgba(231, 76, 60, 0.15);
 }
 
 * {
@@ -80,6 +106,36 @@ body {
   /* Ensure body respects safe areas */
   padding-left: var(--safe-area-inset-left);
   padding-right: var(--safe-area-inset-right);
+  
+  /* Prevent all zoom behaviors including triple-tap */
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+}
+
+/* Comprehensive zoom prevention */
+html {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* Re-enable text selection where needed */
+input,
+textarea,
+.selectable-text {
+  -webkit-user-select: text;
+  user-select: text;
+  touch-action: manipulation;
 }
 
 /* Headings */
@@ -474,6 +530,55 @@ form {
   .padded-content-lg {
     padding: 15px;
   }
+
+  /* Mobile-specific comprehensive zoom prevention */
+  html, body {
+    touch-action: manipulation !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    overflow-x: hidden;
+  }
+  
+  /* Prevent zoom on all containers */
+  .app-container,
+  .main-content,
+  .page-content,
+  .login-container,
+  .login-card {
+    touch-action: manipulation !important;
+    -webkit-touch-callout: none !important;
+  }
+  
+  /* Disable text selection on mobile except inputs */
+  * {
+    -webkit-user-select: none !important;
+    user-select: none !important;
+  }
+  
+  /* Re-enable for inputs */
+  input, textarea {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+  }
+
+  /* Prevent zoom on input focus by ensuring font-size is at least 16px */
+  .form-group input,
+  .form-group select,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  textarea {
+    font-size: 16px !important;
+  }
+  
+  /* Adjust padding to compensate for larger font */
+  .form-group input,
+  .form-group select {
+    padding: 12px 8px;
+  }
 }
 
 /* Utility class for adding padding to page content */
@@ -597,4 +702,120 @@ form {
   font-weight: 500;
   font-size: 0.85rem;
   color: white;
+}
+
+/* ==============================================
+   Global Status Badge Styles - Consolidated
+   ============================================== */
+
+/* Status badges container */
+.status-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  min-width: 80px;
+}
+
+/* Base status badge styles */
+.status-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+/* Hierarchy status badges (tree view) */
+.hierarchy-status-badge {
+  font-size: 0.7rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background-color: var(--sidebar-hover);
+  color: var(--text-secondary);
+}
+
+/* Status badge variants - Standard states */
+.status-badge.active,
+.hierarchy-status-badge.active {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-badge.inactive,
+.hierarchy-status-badge.inactive {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.status-badge.redeemed,
+.hierarchy-status-badge.redeemed {
+  background-color: #cce5ff;
+  color: #004085;
+}
+
+.status-badge.released,
+.hierarchy-status-badge.released {
+  background-color: #d1ecf1;
+  color: #0c5460;
+}
+
+.status-badge.f6,
+.hierarchy-status-badge.f6 {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-badge.vip-eligible,
+.hierarchy-status-badge.vip-eligible {
+  background-color: #d6d8db;
+  color: #383d41;
+}
+
+.status-badge.rfc,
+.hierarchy-status-badge.rfc {
+  background-color: #8a2be2;
+  color: white;
+}
+
+/* Status badge variants - Progress states */
+.status-badge.passed {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-badge.pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+/* Status badge variants - Visibility states */
+.status-badge.visible {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.status-badge.hidden {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+/* Status badge tooltip support */
+.status-badge-tooltip,
+.license-badge-tooltip {
+  cursor: pointer;
+}
+
+/* Dynamic tooltip for status badges */
+.dynamic-tooltip {
+  position: fixed;
+  background-color: #333;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  z-index: 10000;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
 } 
+

@@ -10,7 +10,8 @@ const ImportModal = ({
   columns,
   showToast,
   existingData = [],
-  users = [], 
+  users = [],
+  title = "Import Data", 
 }) => {
   const [fileData, setFileData] = useState([]);
   const [headers, setHeaders] = useState([]);
@@ -43,6 +44,7 @@ const ImportModal = ({
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
       if (jsonData.length) {
         const fileHeaders = jsonData[0].map(header => header.trim());
+        console.log("File Headers:", fileHeaders);
         setHeaders(fileHeaders);
         setFileData(jsonData.slice(1));
         const fields =
@@ -58,6 +60,7 @@ const ImportModal = ({
           );
           defaultMapping[header] = match || "";
         });
+        console.log("Default Mapping:", defaultMapping);
         setMapping(defaultMapping);
       }
     };
@@ -65,6 +68,7 @@ const ImportModal = ({
   };
 
   const handleMappingChange = (fileHeader, newField) => {
+    console.log(`Mapping change - File header: ${fileHeader}, New field: ${newField}`);
     setMapping((prevMapping) => ({
       ...prevMapping,
       [fileHeader]: newField,
@@ -79,6 +83,9 @@ const ImportModal = ({
         const targetField = mapping[trimmedHeader];
         if (targetField) {
           const cellValue = row[index];
+          if (trimmedHeader.toLowerCase() === "phone") {
+            console.log(`Raw value for phone:`, cellValue);
+          }
           rowObj[targetField] = cellValue !== undefined ? cellValue : "";
         }
       });
@@ -87,20 +94,30 @@ const ImportModal = ({
       }
       return rowObj;
     });
+    console.log("Transformed Data (rows to be inserted):", transformedData);
     return transformedData;
   };
 
   const checkDuplicates = (data) => {
+    console.log("Existing data for duplicate checking:", existingData);
     const existingEmails = existingData.map(item => item.email);
+    console.log("Existing Emails:", existingEmails);
+
     const dupes = [];
     data.forEach((row, index) => {
-      if (row.email && row.name) {
+      console.log(`Checking new row index ${index}:`, row);
+      if (row.email && row.name && row.phone) {
         existingData.forEach((item) => {
+          console.log(
+            `Comparing new row email (${row.email}) with existing email (${item.email})`
+          );
           if (
             item.email &&
             item.name &&
+            item.phone &&
             item.email.toLowerCase() === row.email.toLowerCase() &&
-            item.name.toLowerCase() === row.name.toLowerCase()
+            item.name.toLowerCase() === row.name.toLowerCase() &&
+            item.phone.toLowerCase() === row.phone.toLowerCase()
           ) {
             let differences = false;
             for (const key in row) {
@@ -116,16 +133,25 @@ const ImportModal = ({
                 }
               }
             }
+            console.log(
+              `Found duplicate for row ${index} with existing item id ${item.id}. Differences found: ${differences}`
+            );
             dupes.push({ index, existingId: item.id, row, differences });
           }
         });
       }
     });
+    console.log("Duplicates Found:", dupes);
     return dupes;
   };
 
   const handleSubmit = () => {
+    console.log("Handle Submit triggered");
+    console.log("Current table data (existing data):", existingData);
     const transformed = transformData();
+    console.log("Transformed data in handleSubmit:", transformed);
+    console.log("Is transformed array?", Array.isArray(transformed));
+    
     const dupes = checkDuplicates(transformed);
 
     if (dupes.length > 0) {
@@ -133,32 +159,42 @@ const ImportModal = ({
       dupes.forEach(({ index, differences }) => {
         defaultActions[index] = differences ? "update" : "skip";
       });
+      console.log("Default Duplicate Actions:", defaultActions);
       setDuplicateActions(defaultActions);
       setDuplicates(dupes);
       setFinalData(null);
+      console.log("Duplicate review required. Waiting for user action on duplicate rows.");
     } else {
+      console.log("No duplicates found. Proceeding with import.");
+      console.log("About to call onImport with:", transformed);
       onImport(transformed);
       onClose();
     }
   };
 
   const handleFinalSubmit = () => {
+    console.log("Finalizing import with duplicate actions:", duplicateActions);
     const transformed = transformData();
+    console.log("Transformed data in handleFinalSubmit:", transformed);
+    console.log("Is transformed array in final submit?", Array.isArray(transformed));
   
     const finalImportData = transformed.reduce((acc, row, idx) => {
       if (duplicateActions.hasOwnProperty(idx)) {
         const action = duplicateActions[idx];
         if (action === "skip") {
-          return acc;
+          console.log(`Skipping row ${idx} as per user action.`);
         } else if (action === "update" || action === "insert") {
           const { _duplicateAction, ...rest } = row;
           acc.push(rest);
-          return acc;
+        } else {
+          // Handle unexpected action values
+          console.warn(`Unexpected action ${action} for row ${idx}, including row anyway`);
+          acc.push(row);
         }
       } else {
         acc.push(row);
-        return acc;
       }
+      return acc;
     }, []);
   
     const totalRows = transformed.length;
@@ -169,6 +205,9 @@ const ImportModal = ({
     }, 0);
     const insertedCount = totalRows - skippedCount;
   
+    console.log("Final Import Data (after duplicate review):", finalImportData);
+    console.log("Is finalImportData array?", Array.isArray(finalImportData));
+  
     if (typeof showToast === "function") {
       showToast(
         `Import completed: ${skippedCount} row${skippedCount !== 1 ? "s" : ""} skipped, ${insertedCount} row${insertedCount !== 1 ? "s" : ""} inserted.`,
@@ -177,15 +216,18 @@ const ImportModal = ({
     }
   
     if (finalImportData.length === 0) {
+      console.log("No new rows to import after duplicate review.");
       onClose();
       return;
     }
   
+    console.log("About to call onImport with:", finalImportData);
     onImport(finalImportData);
     onClose();
   };
 
   const handleDuplicateActionChange = (index, action) => {
+    console.log(`Duplicate action change - Row index: ${index}, Action: ${action}`);
     setDuplicateActions((prev) => ({ ...prev, [index]: action }));
   };
 
@@ -194,7 +236,7 @@ const ImportModal = ({
       {isOpen && (
         <div className="import-modal-overlay">
           <div className="import-modal">
-            <h3>Import Users</h3>
+            <h3>{title}</h3>
             <button className="close-button" onClick={onClose}>
               ×
             </button>
@@ -214,60 +256,82 @@ const ImportModal = ({
                     <option value="">-- Select User --</option>
                     {users.map((user) => (
                       <option key={user.id} value={user.id}>
-                        {user.name}
+                        {user.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : user.name || user.lagnname}
                       </option>
                     ))}
                   </select>
                 </div>
-                <h4>Map Columns</h4>
-                {headers.map((header) => (
-                  <div key={header} className="mapping-row">
-                    <div className="file-header">{header}</div>
-                    <select
-                      value={mapping[header] || ""}
-                      onChange={(e) => handleMappingChange(header, e.target.value)}
-                      className={mapping[header] ? "matched" : "unmatched"}
-                    >
-                      <option value="">-- Select Field --</option>
-                      {columns.map((col) => (
-                        <option key={col.accessor} value={col.accessor}>
-                          {col.Header}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
+                <h4>Map File Columns to Database Fields</h4>
+                {headers.map((header) => {
+                  const usedFields = Object.entries(mapping)
+                    .filter(([key, value]) => key !== header && value)
+                    .map(([_, value]) => value);
+                  return (
+                    <div key={header} className="mapping-row">
+                      <span className="file-header">{header}</span>
+                      <select
+                        value={mapping[header]}
+                        onChange={(e) =>
+                          handleMappingChange(header, e.target.value)
+                        }
+                        className={mapping[header] ? "matched" : "unmatched"}
+                      >
+                        <option value="">-- Select Field --</option>
+                        {(availableFields && availableFields.length > 0
+                          ? availableFields
+                          : columns
+                          ? columns.map((col) => col.Header)
+                          : []
+                        ).map((field) => (
+                          <option
+                            key={field}
+                            value={field}
+                            disabled={usedFields.includes(field)}
+                          >
+                            {field}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
-            {duplicates.length > 0 ? (
+            {headers.length > 0 && duplicates.length === 0 && (
+              <button className="submit-button" onClick={handleSubmit}>
+                Import Data
+              </button>
+            )}
+            {duplicates.length > 0 && (
               <div className="duplicate-review">
-                <h4>Duplicate Review</h4>
-                {duplicates.map(({ index, row, differences }) => (
+                <h4>Duplicate Records Found</h4>
+                <p>
+                  For rows detected as duplicates (based on email, name, and phone), choose an action:
+                  <br />
+                  <strong>Skip</strong> (ignore) or <strong>Insert as New</strong> (create a new record anyway).
+                </p>
+                {duplicates.map(({ index, existingId, row, differences }) => (
                   <div key={index} className="duplicate-row">
-                    <div>
-                      <strong>Row {index + 1}:</strong> {row.name} ({row.email})
-                    </div>
+                    <span>
+                      Row {index + 1} (Email: {row.email}, Name: {row.name}, Phone: {row.phone}){" "}
+                      {differences ? "(Differences found)" : "(No differences)"}
+                    </span>
                     <select
-                      value={duplicateActions[index] || "skip"}
+                      value={duplicateActions[index] || (differences ? "update" : "skip")}
                       onChange={(e) =>
                         handleDuplicateActionChange(index, e.target.value)
                       }
                     >
                       <option value="skip">Skip</option>
-                      <option value="update">Update</option>
                       <option value="insert">Insert as New</option>
                     </select>
                   </div>
                 ))}
                 <button className="submit-button" onClick={handleFinalSubmit}>
-                  Import with Selected Actions
+                  Finalize Import
                 </button>
               </div>
-            ) : (
-              <button className="submit-button" onClick={handleSubmit}>
-                Import
-              </button>
             )}
           </div>
         </div>

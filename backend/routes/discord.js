@@ -158,7 +158,7 @@ router.get('/callback', async (req, res) => {
     const decoded = jwt.verify(stateToken, process.env.JWT_SECRET || 'default_secret');
     userId = decoded.id || decoded.userId;
   } catch (err) {
-    console.error('State token verification failed', err);
+
     return res.status(403).json({ auth: false, message: 'Invalid token' });
   }
 
@@ -212,7 +212,7 @@ router.get('/callback', async (req, res) => {
     const frontUrl = front.startsWith('http') ? front : `http://${front}`;
     return res.redirect(`${frontUrl}/settings?section=discord&discord=linked`);
   } catch (err) {
-    console.error('OAuth callback error', err);
+
     const front = process.env.FRONTEND_URL || 'localhost:3000';
     const frontUrl = front.startsWith('http') ? front : `http://${front}`;
     return res.redirect(`${frontUrl}/settings?section=discord&discord=error`);
@@ -231,7 +231,7 @@ router.get('/status', authMiddleware, async (req, res) => {
     const { discord_id } = rows[0];
     res.json({ linked: !!discord_id, discord_id });
   } catch (error) {
-    console.error('Error checking Discord status:', error);
+
     res.status(500).json({ error: 'Failed to check Discord status' });
   }
 });
@@ -241,44 +241,133 @@ router.post('/unlink', authMiddleware, async (req, res) => {
   try {
     // Determine user ID from middleware
     const userId = req.userId || req.user?.userId || req.user?.id;
+    
+
+    
+    // Clear ALL Discord-related fields to ensure complete unlinking
     await db.query(
-      'UPDATE activeusers SET discord_id = NULL, discord_token = NULL WHERE id = ?',
+      'UPDATE activeusers SET discord_id = NULL, discord_token = NULL, discord_refresh = NULL, discord_expiry = NULL WHERE id = ?',
       [userId]
     );
     
+
     res.json({ success: true, message: 'Discord account unlinked' });
   } catch (error) {
-    console.error('Error unlinking Discord:', error);
+
     res.status(500).json({ error: 'Failed to unlink Discord account' });
   }
 });
+
+// Helper function to refresh Discord token
+const refreshDiscordToken = async (userId, refreshToken) => {
+  try {
+
+    
+    const tokenRes = await axios.post(
+      'https://discord.com/api/oauth2/token',
+      new URLSearchParams({
+        client_id: process.env.CLIENT_ID,
+        client_secret: process.env.CLIENT_SECRET,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken
+      }).toString(),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+
+    const { access_token, refresh_token: new_refresh_token, expires_in } = tokenRes.data;
+
+    // Compute new expiry timestamp
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const expiry = nowSeconds + expires_in;
+
+    // Update database with new tokens
+    await db.query(
+      `UPDATE activeusers 
+       SET discord_token = ?, 
+           discord_refresh = ?, 
+           discord_expiry = ? 
+       WHERE id = ?`,
+      [access_token, new_refresh_token || refreshToken, expiry, userId]
+    );
+
+
+    
+    return {
+      access_token,
+      refresh_token: new_refresh_token || refreshToken,
+      expiry
+    };
+  } catch (error) {
+
+    
+    // If refresh fails, the refresh token is likely invalid - unlink Discord
+    await db.query(
+      'UPDATE activeusers SET discord_token = NULL, discord_refresh = NULL, discord_expiry = NULL WHERE id = ?',
+      [userId]
+    );
+    
+    throw new Error('Discord refresh token expired - please relink your account');
+  }
+};
+
+// Helper function to get valid Discord token (with auto-refresh)
+const getValidDiscordToken = async (userId) => {
+  // Get user's Discord token data
+  const users = await db.query(
+    'SELECT discord_token, discord_refresh, discord_expiry FROM activeusers WHERE id = ?',
+    [userId]
+  );
+  
+  if (!users || users.length === 0 || !users[0].discord_token) {
+    throw new Error('Discord not linked');
+  }
+
+  let discordToken = users[0].discord_token;
+  const refreshToken = users[0].discord_refresh;
+  const expiry = users[0].discord_expiry;
+  
+  // Check if token is expired or will expire soon (within 1 hour)
+  const now = Math.floor(Date.now() / 1000);
+  const oneHour = 3600;
+  
+  if (expiry && expiry < (now + oneHour)) {
+
+    
+    if (!refreshToken) {
+      throw new Error('Discord token expired and no refresh token available - please relink');
+    }
+    
+    try {
+      const refreshResult = await refreshDiscordToken(userId, refreshToken);
+      discordToken = refreshResult.access_token;
+
+    } catch (refreshError) {
+      throw new Error(refreshError.message);
+    }
+  }
+  
+  return discordToken;
+};
 
 // 5) Get user's Discord servers
 router.get('/guilds', authMiddleware, async (req, res) => {
   try {
     const userId = req.userId || req.user?.userId || req.user?.id;
     
-    // Get user's Discord token
-    const users = await db.query(
-      'SELECT discord_token, discord_expiry FROM activeusers WHERE id = ?',
-      [userId]
-    );
-    
-    if (!users || users.length === 0 || !users[0].discord_token) {
-      return res.status(401).json({ error: 'Discord not linked' });
-    }
-    
-    // Check if token is expired
-    const now = Math.floor(Date.now() / 1000);
-    if (users[0].discord_expiry && users[0].discord_expiry < now) {
-      return res.status(401).json({ error: 'Discord token expired' });
+    // Get valid Discord token (auto-refreshes if needed)
+    let discordToken;
+    try {
+      discordToken = await getValidDiscordToken(userId);
+    } catch (tokenError) {
+      // Return 400 (not 401) to avoid triggering frontend auto-logout
+      return res.status(400).json({ error: tokenError.message, discordAuthError: true });
     }
     
     try {
-      // Get user's guilds with rate limiting
+      // Get user's guilds with rate limiting (using potentially refreshed token)
       const guildsRes = await discordApi.get('https://discord.com/api/users/@me/guilds', {
         headers: {
-          'Authorization': `Bearer ${users[0].discord_token}`
+          'Authorization': `Bearer ${discordToken}`
         }
       });
       
@@ -290,7 +379,7 @@ router.get('/guilds', authMiddleware, async (req, res) => {
       
       res.json({ guilds });
     } catch (discordError) {
-      console.error('Discord API error:', discordError.response?.data || discordError.message);
+
       
       if (discordError.response?.status === 401) {
         // Token is invalid, unlink Discord
@@ -298,13 +387,14 @@ router.get('/guilds', authMiddleware, async (req, res) => {
           'UPDATE activeusers SET discord_token = NULL, discord_refresh = NULL, discord_expiry = NULL WHERE id = ?',
           [userId]
         );
-        return res.status(401).json({ error: 'Discord token invalid, please relink your account' });
+        // Return 400 (not 401) to avoid triggering frontend auto-logout
+        return res.status(400).json({ error: 'Discord token invalid, please relink your account', discordAuthError: true });
       }
       
       throw discordError;
     }
   } catch (error) {
-    console.error('Error fetching Discord guilds:', error);
+
     res.status(500).json({ error: 'Failed to fetch Discord servers' });
   }
 });
@@ -328,7 +418,7 @@ router.get('/guilds/:guildId/channels', authMiddleware, async (req, res) => {
       
       res.json({ channels });
     } catch (discordError) {
-      console.error('Discord API error fetching channels:', discordError.response?.data || discordError.message);
+
       
       if (discordError.response?.status === 403) {
         return res.status(403).json({ error: 'Bot does not have permission to view channels in this server' });
@@ -341,7 +431,7 @@ router.get('/guilds/:guildId/channels', authMiddleware, async (req, res) => {
       throw discordError;
     }
   } catch (error) {
-    console.error('Error fetching guild channels:', error);
+
     res.status(500).json({ error: 'Failed to fetch channels' });
   }
 });
@@ -357,7 +447,7 @@ router.get('/guilds/configured', authMiddleware, async (req, res) => {
 
     res.json({ guilds });
   } catch (error) {
-    console.error('Error fetching configured guilds:', error);
+
     res.status(500).json({ error: 'Failed to fetch configured servers' });
   }
 });
@@ -395,7 +485,7 @@ router.post('/guilds/configure', authMiddleware, async (req, res) => {
 
     res.json({ success: true, message: 'Server configured successfully' });
   } catch (error) {
-    console.error('Error configuring guild:', error);
+
     res.status(500).json({ error: 'Failed to configure server' });
   }
 });
@@ -426,7 +516,7 @@ router.post('/guilds/:guildId/bot', authMiddleware, async (req, res) => {
 
     res.json({ success: true, message: 'Bot flag set' });
   } catch (error) {
-    console.error('Error setting bot_added:', error);
+
     res.status(500).json({ error: 'Failed to update bot_added flag' });
   }
 });
@@ -458,7 +548,7 @@ router.delete('/guilds/:guildId/bot', authMiddleware, async (req, res) => {
 
     res.json({ success: true, message: 'Configuration removed.' });
   } catch (error) {
-    console.error('Error clearing bot_added / deleting row:', error);
+
     res.status(500).json({ error: 'Failed to remove configuration' });
   }
 });
@@ -469,7 +559,7 @@ router.get('/bot/guilds', authMiddleware, async (req, res) => {
     // Add delay if we've recently been rate limited
     if (global.discordRateLimitUntil && global.discordRateLimitUntil > Date.now()) {
       const waitTime = Math.ceil((global.discordRateLimitUntil - Date.now()) / 1000);
-      console.log(`Waiting ${waitTime}s due to Discord rate limit`);
+
       await new Promise(resolve => setTimeout(resolve, waitTime * 1000));
     }
     
@@ -489,18 +579,18 @@ router.get('/bot/guilds', authMiddleware, async (req, res) => {
         const retryAfter = apiError.response.data.retry_after || 1; // Default to 1 second if not provided
         global.discordRateLimitUntil = Date.now() + (retryAfter * 1000);
         
-        console.log(`Discord rate limit hit. Retry after ${retryAfter}s`);
+
         
         // Return empty guild list instead of error
         res.json({ guild_ids: [], rate_limited: true, retry_after: retryAfter });
       } else {
         // For other errors, log and return empty array
-        console.error('Error fetching bot guilds:', apiError);
+
         res.json({ guild_ids: [], error: apiError.message });
       }
     }
   } catch (error) {
-    console.error('Error in bot guilds endpoint:', error);
+
     res.status(500).json({ error: 'Failed to fetch bot guilds' });
   }
 });
@@ -533,15 +623,15 @@ router.delete('/bot/guilds/:guildId', authMiddleware, async (req, res) => {
     // 3) Try to remove the bot from the Discord server (optional, may fail due to permissions)
     try {
       await discordApi.delete(`https://discord.com/api/guilds/${guildId}`);
-      console.log(`Bot removed from guild ${guildId}`);
+
     } catch (discordError) {
-      console.log(`Could not remove bot from Discord guild ${guildId}:`, discordError.message);
+
       // Don't fail the request if Discord API call fails
     }
 
     res.json({ success: true, message: 'Bot removed from server.' });
   } catch (error) {
-    console.error('Error removing bot from guild:', error);
+
     res.status(500).json({ error: 'Failed to remove bot from server' });
   }
 });
@@ -563,7 +653,7 @@ router.post('/bot/sync', authMiddleware, async (req, res) => {
       res.status(500).json({ error: 'Synchronization function not available' });
     }
   } catch (error) {
-    console.error('Error triggering bot sync:', error);
+
     res.status(500).json({ error: 'Failed to trigger bot synchronization' });
   }
 });
@@ -620,7 +710,7 @@ router.post('/reminders', authMiddleware, async (req, res) => {
             }
           }
         } catch (apiError) {
-          console.warn('Could not fetch guild/channel names from Discord API:', apiError.message);
+
         }
       }
 
@@ -652,10 +742,10 @@ router.post('/reminders', authMiddleware, async (req, res) => {
         
         if (channel && channel.isTextBased()) {
           await channel.send(message);
-          console.log(`Sent immediate reminder to channel ${channel_id}`);
+
         }
       } catch (immediateError) {
-        console.error('Error sending immediate reminder:', immediateError);
+
         // Don't fail the request, just log the error
       }
     }
@@ -669,7 +759,7 @@ router.post('/reminders', authMiddleware, async (req, res) => {
       reminder: createdReminder
     });
   } catch (error) {
-    console.error('Error creating reminder:', error);
+
     res.status(500).json({ error: 'Failed to create reminder' });
   }
 });
@@ -686,7 +776,7 @@ router.get('/reminders', authMiddleware, async (req, res) => {
 
     res.json({ reminders });
   } catch (error) {
-    console.error('Error fetching reminders:', error);
+
     res.status(500).json({ error: 'Failed to fetch reminders' });
   }
 });
@@ -744,7 +834,7 @@ router.put('/reminders/:id', authMiddleware, async (req, res) => {
       reminder: updatedReminder[0]
     });
   } catch (error) {
-    console.error('Error updating reminder:', error);
+
     res.status(500).json({ error: 'Failed to update reminder' });
   }
 });
@@ -765,7 +855,7 @@ router.delete('/reminders/:id', authMiddleware, async (req, res) => {
 
     res.json({ success: true, message: 'Reminder deleted successfully' });
   } catch (error) {
-    console.error('Error deleting reminder:', error);
+
     res.status(500).json({ error: 'Failed to delete reminder' });
   }
 });
@@ -807,7 +897,7 @@ router.post('/reminders/:id/test', authMiddleware, async (req, res) => {
         });
       }
       
-      console.log(`[TEST] Bot is ready. User: ${client.user?.tag}, Ready since: ${client.readyAt}`);
+
       
       // Try to fetch the channel
       const channel = await client.channels.fetch(reminder.channel_id);
@@ -824,14 +914,14 @@ router.post('/reminders/:id/test', authMiddleware, async (req, res) => {
       
       res.json({ success: true, message: 'Test reminder sent successfully' });
     } catch (discordError) {
-      console.error('Discord API error when sending test reminder:', discordError);
+
       res.status(500).json({ 
         error: 'Failed to send test reminder', 
         details: discordError.message || 'Discord API error'
       });
     }
   } catch (error) {
-    console.error('Error sending test reminder:', error);
+
     res.status(500).json({ error: 'Failed to process test reminder request' });
   }
 });
@@ -875,7 +965,7 @@ router.post('/test-message', authMiddleware, async (req, res) => {
         });
       }
       
-      console.log(`[TEST] Bot is ready. User: ${client.user?.tag}, Ready since: ${client.readyAt}`);
+
       
       // Try to fetch the channel
       const channel = await client.channels.fetch(channel_id);
@@ -892,14 +982,14 @@ router.post('/test-message', authMiddleware, async (req, res) => {
       
       res.json({ success: true, message: 'Test message sent successfully' });
     } catch (discordError) {
-      console.error('Discord API error when sending test message:', discordError);
+
       res.status(500).json({ 
         error: 'Failed to send test message', 
         details: discordError.message || 'Discord API error'
       });
     }
   } catch (error) {
-    console.error('Error sending test message:', error);
+
     res.status(500).json({ error: 'Failed to process test message request' });
   }
 });
@@ -910,7 +1000,7 @@ router.get('/rate-limit-status', authMiddleware, async (req, res) => {
     const status = discordApi.getRateLimitStatus();
     res.json(status);
   } catch (error) {
-    console.error('Error getting rate limit status:', error);
+
     res.status(500).json({ error: 'Failed to get rate limit status' });
   }
 });
@@ -950,14 +1040,14 @@ router.get('/managers', authMiddleware, async (req, res) => {
     // Combine all managers
     const managers = [...mgaManagers, ...rgaManagers, ...treeManagers];
     
-    console.log('MGA Managers:', mgaManagers);
-    console.log('RGA Managers:', rgaManagers);
-    console.log('Tree Managers:', treeManagers);
-    console.log('All Managers:', managers);
+
+
+
+
     
     res.json({ managers });
   } catch (error) {
-    console.error('Error fetching managers:', error);
+
     res.status(500).json({ error: 'Failed to fetch managers' });
   }
 });
@@ -965,8 +1055,8 @@ router.get('/managers', authMiddleware, async (req, res) => {
 // Create a new leaderboard
 router.post('/leaderboards', authMiddleware, async (req, res) => {
   try {
-    // Add logging to see what data is being received
-    console.log('Received leaderboard creation request:', req.body);
+    console.log('📊 Creating leaderboard with data:', req.body);
+    console.log('👤 User ID:', req.userId, req.user);
     
     const { 
       guild_id, 
@@ -980,44 +1070,23 @@ router.post('/leaderboards', authMiddleware, async (req, res) => {
       top_count,
       guild_name,
       channel_name,
-      manager_id // New field for admin users to specify which manager
+      manager_id, // New field for admin users to specify which manager
+      week_start_day // monday or wednesday
     } = req.body;
     const createdBy = req.userId || req.user?.userId || req.user?.id;
+    
+    console.log('✅ Parsed data:', { guild_id, channel_id, cron_expr, metrics, data_period, scope, createdBy });
 
-    // Log the extracted values
-    console.log('Extracted values:', {
-      guild_id,
-      channel_id,
-      cron_expr,
-      metric_type,
-      leaderboard_type,
-      metrics,
-      data_period,
-      scope,
-      top_count,
-      guild_name,
-      channel_name,
-      manager_id,
-      createdBy
-    });
+
 
     // Validate required fields
     if (!guild_id || !channel_id || !cron_expr || !metrics || !Array.isArray(metrics) || metrics.length === 0) {
-      console.log('Validation failed:', {
-        guild_id: !!guild_id,
-        channel_id: !!channel_id,
-        cron_expr: !!cron_expr,
-        metrics: metrics,
-        isArray: Array.isArray(metrics),
-        length: metrics ? metrics.length : 0
-      });
       return res.status(400).json({ error: 'Missing required fields or metrics' });
     }
     
     // Validate cron expression
     const cron = require('node-cron');
     if (!cron.validate(cron_expr)) {
-      console.log('Invalid cron expression:', cron_expr);
       return res.status(400).json({ error: 'Invalid cron expression' });
     }
 
@@ -1105,7 +1174,7 @@ router.post('/leaderboards', authMiddleware, async (req, res) => {
             }
           }
         } catch (apiError) {
-          console.warn('Could not fetch guild/channel names from Discord API:', apiError.message);
+
         }
       }
 
@@ -1115,27 +1184,34 @@ router.post('/leaderboards', authMiddleware, async (req, res) => {
     }
 
     // Insert new leaderboard
+    const insertData = [
+      effectiveManagerId,
+      createdBy, 
+      guild_id, 
+      guildNameToUse, 
+      channel_id, 
+      channelNameToUse, 
+      cron_expr, 
+      metric_type || 'activity_leaderboard',
+      leaderboard_type || 'activity',
+      JSON.stringify(metrics),
+      JSON.stringify(data_period || ['daily']),
+      week_start_day || 'monday',
+      scope || 'mga_team',
+      top_count || 10
+    ];
+    
+    console.log('💾 Inserting leaderboard with values:', insertData);
+    
     const result = await db.query(
       `INSERT INTO discord_leaderboards (
         manager_id, created_by, guild_id, guild_name, channel_id, channel_name, 
-        cron_expr, metric_type, leaderboard_type, metrics, data_period, scope, top_count, is_active
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-      [
-        effectiveManagerId,
-        createdBy, 
-        guild_id, 
-        guildNameToUse, 
-        channel_id, 
-        channelNameToUse, 
-        cron_expr, 
-        metric_type || 'activity_leaderboard',
-        leaderboard_type || 'activity',
-        JSON.stringify(metrics),
-        JSON.stringify(data_period || ['daily']),
-        scope || 'mga_team',
-        top_count || 10
-      ]
+        cron_expr, metric_type, leaderboard_type, metrics, data_period, week_start_day, scope, top_count, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      insertData
     );
+    
+    console.log('✨ Leaderboard created with ID:', result.insertId);
 
     // Get the created leaderboard to return in the response
     const leaderboards = await db.query(
@@ -1150,7 +1226,7 @@ router.post('/leaderboards', authMiddleware, async (req, res) => {
       try {
         createdLeaderboard.metrics = JSON.parse(createdLeaderboard.metrics);
       } catch (e) {
-        console.warn('Error parsing metrics JSON:', e);
+
         createdLeaderboard.metrics = ['sales'];
       }
     }
@@ -1160,7 +1236,7 @@ router.post('/leaderboards', authMiddleware, async (req, res) => {
       try {
         createdLeaderboard.data_period = JSON.parse(createdLeaderboard.data_period);
       } catch (e) {
-        console.warn('Error parsing data_period JSON:', e);
+
         createdLeaderboard.data_period = ['daily'];
       }
     } else {
@@ -1177,7 +1253,10 @@ router.post('/leaderboards', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating leaderboard:', error);
-    res.status(500).json({ error: 'Failed to create leaderboard' });
+    res.status(500).json({ 
+      error: 'Failed to create leaderboard',
+      details: error.message 
+    });
   }
 });
 
@@ -1233,7 +1312,7 @@ const parsedLeaderboards = leaderboards.map(leaderboard => {
     try {
       leaderboard.metrics = JSON.parse(leaderboard.metrics);
     } catch (e) {
-      console.warn('Error parsing metrics JSON:', e);
+
       leaderboard.metrics = ['sales'];
     }
   } else {
@@ -1245,7 +1324,7 @@ const parsedLeaderboards = leaderboards.map(leaderboard => {
     try {
       leaderboard.data_period = JSON.parse(leaderboard.data_period);
     } catch (e) {
-      console.warn('Error parsing data_period JSON:', e);
+
       leaderboard.data_period = ['daily'];
     }
   } else {
@@ -1258,7 +1337,7 @@ const parsedLeaderboards = leaderboards.map(leaderboard => {
 // Add the missing closing brace and return statement:
 res.json({ leaderboards: parsedLeaderboards });
 } catch (error) {
-  console.error('Error fetching leaderboards:', error);
+
   res.status(500).json({ error: 'Failed to fetch leaderboards' });
 }
 });
@@ -1276,7 +1355,8 @@ router.put('/leaderboards/:id', authMiddleware, async (req, res) => {
       metric_type, 
       leaderboard_type,
       metrics, 
-      data_period, 
+      data_period,
+      week_start_day, 
       scope, 
       top_count, 
       is_active,
@@ -1379,6 +1459,7 @@ router.put('/leaderboards/:id', authMiddleware, async (req, res) => {
            leaderboard_type = COALESCE(?, leaderboard_type),
            metrics = COALESCE(?, metrics),
            data_period = COALESCE(?, data_period),
+           week_start_day = COALESCE(?, week_start_day),
            scope = COALESCE(?, scope),
            top_count = COALESCE(?, top_count),
            is_active = COALESCE(?, is_active)
@@ -1394,6 +1475,7 @@ router.put('/leaderboards/:id', authMiddleware, async (req, res) => {
         leaderboard_type,
         metrics ? JSON.stringify(metrics) : null,
         data_period ? JSON.stringify(data_period) : null,
+        week_start_day,
         scope,
         top_count, 
         is_active, 
@@ -1414,7 +1496,7 @@ router.put('/leaderboards/:id', authMiddleware, async (req, res) => {
       try {
         updatedLeaderboard.metrics = JSON.parse(updatedLeaderboard.metrics);
       } catch (e) {
-        console.warn('Error parsing metrics JSON:', e);
+
         updatedLeaderboard.metrics = ['sales'];
       }
     }
@@ -1424,7 +1506,7 @@ router.put('/leaderboards/:id', authMiddleware, async (req, res) => {
       try {
         updatedLeaderboard.data_period = JSON.parse(updatedLeaderboard.data_period);
       } catch (e) {
-        console.warn('Error parsing data_period JSON:', e);
+
         updatedLeaderboard.data_period = ['daily'];
       }
     } else {
@@ -1440,7 +1522,7 @@ router.put('/leaderboards/:id', authMiddleware, async (req, res) => {
       leaderboard: updatedLeaderboard
     });
   } catch (error) {
-    console.error('Error updating leaderboard:', error);
+
     res.status(500).json({ error: 'Failed to update leaderboard' });
   }
 });
@@ -1489,7 +1571,7 @@ router.delete('/leaderboards/:id', authMiddleware, async (req, res) => {
 
     res.json({ success: true, message: 'Leaderboard deleted successfully' });
   } catch (error) {
-    console.error('Error deleting leaderboard:', error);
+
     res.status(500).json({ error: 'Failed to delete leaderboard' });
   }
 });
@@ -1554,7 +1636,7 @@ router.post('/leaderboards/:id/test', authMiddleware, async (req, res) => {
         });
       }
       
-      console.log(`[TEST] Bot is ready. User: ${client.user?.tag}, Ready since: ${client.readyAt}`);
+
       
       // Try to fetch the channel
       const channel = await client.channels.fetch(leaderboard.channel_id);
@@ -1583,40 +1665,34 @@ router.post('/leaderboards/:id/test', authMiddleware, async (req, res) => {
       
       res.json({ success: true, message: 'Test leaderboard sent successfully' });
     } catch (discordError) {
-      console.error('Discord API error when sending test leaderboard:', discordError);
+
       res.status(500).json({ 
         error: 'Failed to send test leaderboard', 
         details: discordError.message || 'Discord API error'
       });
     }
   } catch (error) {
-    console.error('Error sending test leaderboard:', error);
+
     res.status(500).json({ error: 'Failed to process test leaderboard request' });
   }
 });
 // Helper function to generate leaderboard message
 async function generateLeaderboardMessage(leaderboard) {
   try {
-    console.log(`[LEADERBOARD] Generating leaderboard message for leaderboard ID: ${leaderboard.id}`);
-    console.log(`[LEADERBOARD] Leaderboard config:`, {
-      manager_id: leaderboard.manager_id,
-      scope: leaderboard.scope,
-      leaderboard_type: leaderboard.leaderboard_type,
-      data_period: leaderboard.data_period,
-      metrics: leaderboard.metrics,
-      top_count: leaderboard.top_count
-    });
+
+
+
     
     // Check leaderboard type and delegate to appropriate handler
     if (leaderboard.leaderboard_type === 'production') {
-      console.log(`[LEADERBOARD] Generating production leaderboard`);
+
       return await generateProductionLeaderboardMessage(leaderboard);
     } else {
-      console.log(`[LEADERBOARD] Generating activity leaderboard`);
+
       return await generateActivityLeaderboardMessage(leaderboard);
     }
   } catch (error) {
-    console.error('[LEADERBOARD] Error generating leaderboard message:', error);
+
     throw error;
   }
 }
@@ -1630,7 +1706,7 @@ async function generateActivityLeaderboardMessage(leaderboard) {
       try {
         metrics = JSON.parse(metrics);
       } catch (e) {
-        console.warn('[LEADERBOARD] Error parsing metrics JSON:', e);
+
         metrics = ['sales'];
       }
     }
@@ -1639,7 +1715,7 @@ async function generateActivityLeaderboardMessage(leaderboard) {
       metrics = ['sales'];
     }
 
-    console.log(`[LEADERBOARD] Parsed metrics:`, metrics);
+
 
     // Parse data_period if it's a JSON string
     let dataPeriods = leaderboard.data_period;
@@ -1647,7 +1723,7 @@ async function generateActivityLeaderboardMessage(leaderboard) {
       try {
         dataPeriods = JSON.parse(dataPeriods);
       } catch (e) {
-        console.warn('[LEADERBOARD] Error parsing data_period JSON:', e);
+
         dataPeriods = ['daily'];
       }
     }
@@ -1656,15 +1732,15 @@ async function generateActivityLeaderboardMessage(leaderboard) {
       dataPeriods = ['daily'];
     }
 
-    console.log(`[LEADERBOARD] Parsed data periods:`, dataPeriods);
+
 
     // Get users based on scope
     const userIds = await getUsersForScope(leaderboard.manager_id, leaderboard.scope);
     
-    console.log(`[LEADERBOARD] Retrieved ${userIds.length} user IDs for scope processing`);
+
     
     if (userIds.length === 0) {
-      console.log(`[LEADERBOARD] No users found for scope, returning empty message`);
+
       return `${leaderboard.data_period.charAt(0).toUpperCase() + leaderboard.data_period.slice(1)} Leaderboard Update\n\nNo users found for the selected scope.`;
     }
 
@@ -1672,10 +1748,10 @@ async function generateActivityLeaderboardMessage(leaderboard) {
     const leaderboardsByPeriodAndMetric = {};
     
     for (const metric of metrics) {
-      console.log(`[LEADERBOARD] Processing metric: ${metric}`);
+
       
       for (const period of dataPeriods) {
-        console.log(`[LEADERBOARD] Processing period: ${period}`);
+
         
         // Initialize period object if it doesn't exist
         if (!leaderboardsByPeriodAndMetric[period]) {
@@ -1683,15 +1759,15 @@ async function generateActivityLeaderboardMessage(leaderboard) {
         }
         
         // Get date range based on data period
-        const dateRange = getDateRangeForPeriod(period);
-        console.log(`[LEADERBOARD] Date range for ${period}:`, dateRange);
+        const dateRange = getDateRangeForPeriod(period, leaderboard.week_start_day);
+
         
         const leaderboardData = await getLeaderboardData(userIds, metric, dateRange, leaderboard.top_count, leaderboard.scope);
-        console.log(`[LEADERBOARD] Leaderboard data for ${metric} (${period}):`, leaderboardData);
+
         
         if (leaderboardData.length > 0) {
           const metricName = getMetricDisplayName(metric);
-          const periodName = getPeriodDisplayName(period, dateRange);
+          const periodName = getPeriodDisplayName(period, dateRange, leaderboard.week_start_day);
           let section = `${periodName}\n${metricName}\n`;
           
           leaderboardData.forEach((entry, index) => {
@@ -1722,9 +1798,9 @@ async function generateActivityLeaderboardMessage(leaderboard) {
           });
           
           leaderboardsByPeriodAndMetric[period][metric] = section;
-          console.log(`[LEADERBOARD] Added section for ${metric} (${period})`);
+
         } else {
-          console.log(`[LEADERBOARD] No data found for metric: ${metric} (${period})`);
+
         }
       }
     }
@@ -1733,7 +1809,7 @@ async function generateActivityLeaderboardMessage(leaderboard) {
     const allSections = Object.values(leaderboardsByPeriodAndMetric)
       .map(periodData => Object.values(periodData)).flat();
     if (allSections.length === 0) {
-      console.log(`[LEADERBOARD] No leaderboard sections generated, returning empty activity message`);
+
       return `Leaderboard Update\n\nNo activity data found for the selected period(s).`;
     }
 
@@ -1753,22 +1829,22 @@ async function generateActivityLeaderboardMessage(leaderboard) {
     }
     
     if (messages.length === 0) {
-      console.log(`[LEADERBOARD] No messages generated, returning empty activity message`);
+
       return `Leaderboard Update\n\nNo activity data found for the selected period(s).`;
     }
     
     if (messages.length === 1) {
       // Single message, return as string for backwards compatibility
-      console.log(`[LEADERBOARD] Single message generated:`, messages[0]);
+
       return messages[0];
     } else {
       // Multiple messages, return as array
-      console.log(`[LEADERBOARD] Generated ${messages.length} separate messages`);
+
       return messages;
     }
     
   } catch (error) {
-    console.error('[LEADERBOARD] Error generating leaderboard message:', error);
+
     throw error;
   }
 }
@@ -1776,11 +1852,11 @@ async function generateActivityLeaderboardMessage(leaderboard) {
 // Helper function to get users based on scope
 async function getUsersForScope(managerId, scope) {
   try {
-    console.log(`[LEADERBOARD] Getting users for scope: ${scope}, managerId: ${managerId}`);
+
     
     switch (scope) {
       case 'mga_team':
-        console.log(`[LEADERBOARD] Processing MGA team scope for manager ID: ${managerId}`);
+
         
         // Get manager's lagnname
         const managerResult = await db.query(
@@ -1788,15 +1864,15 @@ async function getUsersForScope(managerId, scope) {
           [managerId]
         );
         
-        console.log(`[LEADERBOARD] Manager query result:`, managerResult);
+
         
         if (!managerResult || managerResult.length === 0) {
-          console.warn(`[LEADERBOARD] Manager not found for ID: ${managerId}`);
+
           return [];
         }
         
         const lagnname = managerResult[0].lagnname;
-        console.log(`[LEADERBOARD] Manager lagnname: ${lagnname}`);
+
         
         // Get all users where mga = manager's lagnname
         const teamResult = await db.query(
@@ -1804,15 +1880,15 @@ async function getUsersForScope(managerId, scope) {
           [lagnname]
         );
         
-        console.log(`[LEADERBOARD] Team query result for mga='${lagnname}':`, teamResult);
+
         
         const teamUserIds = teamResult.map(user => user.id);
-        console.log(`[LEADERBOARD] Final team user IDs array:`, teamUserIds);
+
         
         return teamUserIds;
         
       case 'rga_team':
-        console.log(`[LEADERBOARD] Processing RGA team scope for manager ID: ${managerId}`);
+
         
         // Get manager's lagnname from activeusers
         const rgaManagerResult = await db.query(
@@ -1820,15 +1896,15 @@ async function getUsersForScope(managerId, scope) {
           [managerId]
         );
         
-        console.log(`[LEADERBOARD] RGA Manager query result:`, rgaManagerResult);
+
         
         if (!rgaManagerResult || rgaManagerResult.length === 0) {
-          console.warn(`[LEADERBOARD] RGA Manager not found for ID: ${managerId}`);
+
           return [];
         }
         
         const rgaLagnname = rgaManagerResult[0].lagnname;
-        console.log(`[LEADERBOARD] RGA Manager lagnname: ${rgaLagnname}`);
+
         
         // Step 1: Get the RGA manager's own team members (same as MGA team logic)
         const rgaOwnTeamResult = await db.query(
@@ -1836,7 +1912,7 @@ async function getUsersForScope(managerId, scope) {
           [rgaLagnname]
         );
         
-        console.log(`[LEADERBOARD] RGA manager's own team members:`, rgaOwnTeamResult);
+
         
         const allTeamUserIds = rgaOwnTeamResult.map(user => user.id);
         
@@ -1848,13 +1924,13 @@ async function getUsersForScope(managerId, scope) {
           [rgaLagnname]
         );
         
-        console.log(`[LEADERBOARD] MGA managers under RGA ${rgaLagnname}:`, mgaManagersResult);
+
         
         if (mgaManagersResult && mgaManagersResult.length > 0) {
           // Step 3: For each MGA manager, get all their team members
           for (const mgaManager of mgaManagersResult) {
             const mgaLagnname = mgaManager.lagnname;
-            console.log(`[LEADERBOARD] Getting team members for MGA: ${mgaLagnname}`);
+
             
             // Get all users where mga = MGA manager's lagnname (same as MGA team logic)
             const teamResult = await db.query(
@@ -1862,19 +1938,19 @@ async function getUsersForScope(managerId, scope) {
               [mgaLagnname]
             );
             
-            console.log(`[LEADERBOARD] Team members for MGA ${mgaLagnname}:`, teamResult);
+
             
             const teamUserIds = teamResult.map(user => user.id);
             allTeamUserIds.push(...teamUserIds);
           }
         }
         
-        console.log(`[LEADERBOARD] Final RGA team user IDs array (total: ${allTeamUserIds.length}):`, allTeamUserIds);
+
         
         return allTeamUserIds;
         
       case 'family_tree':
-        console.log(`[LEADERBOARD] Processing family tree scope for manager ID: ${managerId}`);
+
         
         // Get manager's lagnname from activeusers
         const treeManagerResult = await db.query(
@@ -1882,15 +1958,15 @@ async function getUsersForScope(managerId, scope) {
           [managerId]
         );
         
-        console.log(`[LEADERBOARD] Tree Manager query result:`, treeManagerResult);
+
         
         if (!treeManagerResult || treeManagerResult.length === 0) {
-          console.warn(`[LEADERBOARD] Tree Manager not found for ID: ${managerId}`);
+
           return [];
         }
         
         const treeLagnname = treeManagerResult[0].lagnname;
-        console.log(`[LEADERBOARD] Tree Manager lagnname: ${treeLagnname}`);
+
         
         // Step 1: Get the Tree manager's own team members (same as MGA team logic)
         const treeOwnTeamResult = await db.query(
@@ -1898,7 +1974,7 @@ async function getUsersForScope(managerId, scope) {
           [treeLagnname]
         );
         
-        console.log(`[LEADERBOARD] Tree manager's own team members:`, treeOwnTeamResult);
+
         
         const allTreeUserIds = treeOwnTeamResult.map(user => user.id);
         
@@ -1910,13 +1986,13 @@ async function getUsersForScope(managerId, scope) {
           [treeLagnname]
         );
         
-        console.log(`[LEADERBOARD] MGA managers in tree ${treeLagnname}:`, treeMgaManagersResult);
+
         
         if (treeMgaManagersResult && treeMgaManagersResult.length > 0) {
           // Step 3: For each MGA manager in the tree, get all their team members
           for (const mgaManager of treeMgaManagersResult) {
             const mgaLagnname = mgaManager.lagnname;
-            console.log(`[LEADERBOARD] Getting team members for MGA in tree: ${mgaLagnname}`);
+
             
             // Get all users where mga = MGA manager's lagnname (same as MGA team logic)
             const teamResult = await db.query(
@@ -1924,51 +2000,56 @@ async function getUsersForScope(managerId, scope) {
               [mgaLagnname]
             );
             
-            console.log(`[LEADERBOARD] Team members for MGA ${mgaLagnname}:`, teamResult);
+
             
             const teamUserIds = teamResult.map(user => user.id);
             allTreeUserIds.push(...teamUserIds);
           }
         }
         
-        console.log(`[LEADERBOARD] Final Tree team user IDs array (total: ${allTreeUserIds.length}):`, allTreeUserIds);
+
         
         return allTreeUserIds;
         
       case 'agency_tree':
-        console.log(`[LEADERBOARD] Processing agency tree scope (fallback to MGA team)`);
+
         // For agency tree, get all users under the manager's hierarchy
         // For now, return the same as MGA team - this can be expanded later
         return getUsersForScope(managerId, 'mga_team');
         
       case 'full_agency':
-        console.log(`[LEADERBOARD] Processing full agency scope`);
+
         // Get all active users in the agency
         const allUsersResult = await db.query(
-          'SELECT id FROM activeusers WHERE Active = "y"'
+          'SELECT id FROM activeusers WHERE Active = "y" AND managerActive = "y"'
         );
         
-        console.log(`[LEADERBOARD] Full agency query result:`, allUsersResult);
+
         
         const allUserIds = allUsersResult.map(user => user.id);
-        console.log(`[LEADERBOARD] Full agency user IDs array (count: ${allUserIds.length}):`, allUserIds);
+
         
         return allUserIds;
         
       default:
-        console.warn(`[LEADERBOARD] Unknown scope: ${scope}, defaulting to MGA team`);
+
         return getUsersForScope(managerId, 'mga_team');
     }
   } catch (error) {
-    console.error('[LEADERBOARD] Error getting users for scope:', error);
+
     return [];
   }
 }
 
 // Helper function to get date range for period
-function getDateRangeForPeriod(period) {
+function getDateRangeForPeriod(period, weekStartDay = 'monday') {
   const now = new Date();
   let startDate, endDate;
+  
+  console.log('📅 Current date:', now.toISOString());
+  console.log('📅 Current month (0-indexed):', now.getMonth());
+  console.log('📅 Period requested:', period);
+  console.log('📅 Week start day:', weekStartDay);
   
   switch (period) {
     case 'daily':
@@ -1978,17 +2059,39 @@ function getDateRangeForPeriod(period) {
       break;
       
     case 'weekly':
-      // Current week (Monday to Sunday)
-      const dayOfWeek = now.getDay();
-      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // If Sunday (0), go back 6 days to Monday
-      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + mondayOffset);
+      // Current week - different start days
+      const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+      let weekOffset;
+      
+      if (weekStartDay === 'wednesday') {
+        // Wednesday-Tuesday week
+        // Wednesday = 3, so if we're on Wed (3) or later, start this Wednesday
+        // If we're before Wed (Sun=0, Mon=1, Tue=2), go back to last Wednesday
+        if (dayOfWeek >= 3) {
+          // We're Wed or later, go back to this week's Wednesday
+          weekOffset = dayOfWeek - 3;
+        } else {
+          // We're Sun/Mon/Tue, go back to last Wednesday
+          weekOffset = dayOfWeek + 4; // Sun=4 days back, Mon=5, Tue=6
+        }
+      } else {
+        // Monday-Sunday week (default)
+        // Monday = 1, so adjust Sunday (0) to be -6
+        weekOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      }
+      
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - weekOffset);
       endDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + 7);
+      console.log('📅 Weekly startDate:', startDate.toISOString());
+      console.log('📅 Weekly endDate:', endDate.toISOString());
       break;
       
     case 'monthly':
       // Current month
       startDate = new Date(now.getFullYear(), now.getMonth(), 1);
       endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      console.log('📅 Monthly startDate:', startDate.toISOString());
+      console.log('📅 Monthly endDate:', endDate.toISOString());
       break;
       
     default:
@@ -2004,25 +2107,29 @@ function getDateRangeForPeriod(period) {
            String(date.getDate()).padStart(2, '0');
   };
   
-  return {
+  const dateRange = {
     start: formatDate(startDate),
     end: formatDate(endDate)
   };
+  
+  console.log('📅 Date range:', dateRange);
+  
+  return dateRange;
 }
 
 // Helper function to get leaderboard data for a specific metric
 async function getLeaderboardData(userIds, metric, dateRange, topCount, scope = null) {
   try {
-    console.log(`[LEADERBOARD] Getting leaderboard data for metric: ${metric}`);
-    console.log(`[LEADERBOARD] User IDs (${userIds.length}):`, userIds);
-    console.log(`[LEADERBOARD] Date range:`, dateRange);
-    console.log(`[LEADERBOARD] Top count:`, topCount);
-    console.log(`[LEADERBOARD] Scope:`, scope);
+
+
+
+
+
     
     // Validate metric column
     const validMetrics = ['calls', 'appts', 'sits', 'sales', 'alp', 'refs', 'refALP'];
     if (!validMetrics.includes(metric)) {
-      console.warn(`[LEADERBOARD] Invalid metric: ${metric}`);
+
       return [];
     }
     
@@ -2030,7 +2137,7 @@ async function getLeaderboardData(userIds, metric, dateRange, topCount, scope = 
     
     if (scope === 'full_agency') {
       // For full agency, get all data from Daily_Activity without filtering by specific userIds
-      console.log(`[LEADERBOARD] Using full agency query (no user filtering)`);
+
       
       // Include mga field and clname for full agency scope for consistent formatting
       const selectFields = 'u.lagnname, u.id as user_id, u.mga, u.clname, SUM(d.' + metric + ') as total';
@@ -2042,7 +2149,7 @@ async function getLeaderboardData(userIds, metric, dateRange, topCount, scope = 
         LEFT JOIN Daily_Activity d ON u.id = d.userId 
           AND d.reportDate >= ? 
           AND d.reportDate < ?
-        WHERE u.Active = 'y'
+        WHERE u.Active = 'y' AND u.managerActive = 'y'
         GROUP BY u.id, u.lagnname, u.mga, u.clname
         HAVING total > 0
         ORDER BY total DESC
@@ -2053,7 +2160,7 @@ async function getLeaderboardData(userIds, metric, dateRange, topCount, scope = 
     } else {
       // For other scopes, filter by specific user IDs
       if (userIds.length === 0) {
-        console.log(`[LEADERBOARD] No user IDs provided, returning empty array`);
+
         return [];
       }
       
@@ -2072,7 +2179,7 @@ async function getLeaderboardData(userIds, metric, dateRange, topCount, scope = 
         LEFT JOIN Daily_Activity d ON u.id = d.userId 
           AND d.reportDate >= ? 
           AND d.reportDate < ?
-        WHERE u.id IN (${placeholders})
+        WHERE u.id IN (${placeholders}) AND u.Active = 'y' AND u.managerActive = 'y'
         GROUP BY u.id, u.lagnname${(scope === 'rga_team' || scope === 'family_tree') ? ', u.mga, u.clname' : ''}
         HAVING total > 0
         ORDER BY total DESC
@@ -2082,17 +2189,17 @@ async function getLeaderboardData(userIds, metric, dateRange, topCount, scope = 
       params = [dateRange.start, dateRange.end, ...userIds, parseInt(topCount) || 10];
     }
     
-    console.log(`[LEADERBOARD] Executing query:`, query);
-    console.log(`[LEADERBOARD] Query params:`, params);
+
+
     
     const results = await db.query(query, params);
     
-    console.log(`[LEADERBOARD] Query returned ${results?.length || 0} results for ${metric}:`, results);
+
     
     return results || [];
     
   } catch (error) {
-    console.error(`[LEADERBOARD] Error getting leaderboard data for metric ${metric}:`, error);
+
     return [];
   }
 }
@@ -2113,9 +2220,20 @@ function getMetricDisplayName(metric) {
 }
 
 // Helper function to get display name for period with dates
-function getPeriodDisplayName(period, dateRange) {
-  const startDate = new Date(dateRange.start);
-  const endDate = new Date(dateRange.end);
+function getPeriodDisplayName(period, dateRange, weekStartDay = 'monday') {
+  // Parse dates carefully to avoid timezone issues
+  // dateRange.start is in format "YYYY-MM-DD"
+  const [startYear, startMonth, startDay] = dateRange.start.split('-').map(Number);
+  const [endYear, endMonth, endDay] = dateRange.end.split('-').map(Number);
+  
+  // Create dates in local timezone (month is 0-indexed in Date constructor)
+  const startDate = new Date(startYear, startMonth - 1, startDay);
+  const endDate = new Date(endYear, endMonth - 1, endDay);
+  
+  console.log('📅 getPeriodDisplayName - period:', period);
+  console.log('📅 getPeriodDisplayName - dateRange:', dateRange);
+  console.log('📅 getPeriodDisplayName - startDate:', startDate.toISOString());
+  console.log('📅 getPeriodDisplayName - displaying month:', startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
   
   switch (period) {
     case 'daily':
@@ -2127,7 +2245,7 @@ function getPeriodDisplayName(period, dateRange) {
       return `Daily ${dailyDate}`;
       
     case 'weekly':
-      // Format: "Weekly [M/D-M/D]"
+      // Format: "Weekly [M/D-M/D] (Mon-Sun)" or "Weekly [M/D-M/D] (Wed-Tue)"
       const weekStart = startDate.toLocaleDateString('en-US', {
         month: 'numeric',
         day: 'numeric'
@@ -2136,13 +2254,14 @@ function getPeriodDisplayName(period, dateRange) {
         month: 'numeric', 
         day: 'numeric'
       });
-      return `Weekly ${weekStart}-${weekEnd}`;
+      const weekType = weekStartDay === 'wednesday' ? ' (Wed-Tue)' : ' (Mon-Sun)';
+      return `Weekly ${weekStart}-${weekEnd}${weekType}`;
       
     case 'monthly':
-      // Format: "Monthly [MM/DD]" (using start of month)
+      // Format: "Monthly [Month Year]" (e.g., "Monthly October 2025")
       const monthlyDate = startDate.toLocaleDateString('en-US', {
-        month: '2-digit',
-        day: '2-digit'
+        month: 'long',
+        year: 'numeric'
       });
       return `Monthly ${monthlyDate}`;
       
@@ -2295,7 +2414,7 @@ router.get('/sales/stats', authMiddleware, async (req, res) => {
 
     res.json({ stats: stats[0] });
   } catch (error) {
-    console.error('Error fetching sales stats:', error);
+
     res.status(500).json({ error: 'Failed to fetch sales statistics' });
   }
 });
@@ -2306,14 +2425,14 @@ router.get('/guilds/:guildId', authMiddleware, async (req, res) => {
     const { guildId } = req.params;
     const userId = req.userId || req.user?.userId || req.user?.id;
     
-    // Check if the user has a Discord token
-    const userRows = await db.query('SELECT discord_token FROM activeusers WHERE id = ?', [userId]);
-    if (!userRows || userRows.length === 0 || !userRows[0].discord_token) {
-      return res.status(401).json({ error: 'Discord account not linked' });
+    // Get valid Discord token (auto-refreshes if needed)
+    let discordToken;
+    try {
+      discordToken = await getValidDiscordToken(userId);
+    } catch (tokenError) {
+      // Return 400 (not 401) to avoid triggering frontend auto-logout
+      return res.status(400).json({ error: tokenError.message, discordAuthError: true });
     }
-    
-    // Get user's Discord token
-    const discordToken = userRows[0].discord_token;
     
     // Fetch the guild from Discord API
     try {
@@ -2364,7 +2483,7 @@ router.get('/guilds/:guildId', authMiddleware, async (req, res) => {
       throw error;
     }
   } catch (error) {
-    console.error('Error fetching guild:', error);
+
     res.status(500).json({ error: 'Failed to fetch guild' });
   }
 });
@@ -2372,15 +2491,15 @@ router.get('/guilds/:guildId', authMiddleware, async (req, res) => {
 // Helper function to get production leaderboard data from Weekly_ALP table
 async function getProductionLeaderboardData(userIds, metric, period, topCount, scope = null) {
   try {
-    console.log(`[PRODUCTION] Getting production leaderboard data for metric: ${metric}, period: ${period}`);
-    console.log(`[PRODUCTION] User IDs (${userIds.length}):`, userIds);
-    console.log(`[PRODUCTION] Top count:`, topCount);
-    console.log(`[PRODUCTION] Scope:`, scope);
+
+
+
+
     
     // Validate metric
     const validMetrics = ['net', 'gross'];
     if (!validMetrics.includes(metric)) {
-      console.warn(`[PRODUCTION] Invalid metric: ${metric}`);
+
       return [];
     }
     
@@ -2397,7 +2516,7 @@ async function getProductionLeaderboardData(userIds, metric, period, topCount, s
         reportType = 'YTD Recap';
         break;
       default:
-        console.warn(`[PRODUCTION] Invalid period: ${period}`);
+
         return [];
     }
     
@@ -2408,7 +2527,7 @@ async function getProductionLeaderboardData(userIds, metric, period, topCount, s
     
     if (scope === 'full_agency') {
       // For full agency, get all data without filtering by specific userIds
-      console.log(`[PRODUCTION] Using full agency query (no user filtering)`);
+
       
       // First, get the most recent reportdates for this report type (top 2 to capture both branches)
       const maxDateQuery = `
@@ -2422,7 +2541,7 @@ async function getProductionLeaderboardData(userIds, metric, period, topCount, s
       const maxDateResult = await db.query(maxDateQuery, [reportType]);
       
       if (!maxDateResult || maxDateResult.length === 0) {
-        console.log(`[PRODUCTION] No data found for report type: ${reportType}`);
+
         return [];
       }
       
@@ -2431,7 +2550,7 @@ async function getProductionLeaderboardData(userIds, metric, period, topCount, s
       if (maxDateResult.length === 1) {
         // Only one date available, use it
         recentReportDates = [maxDateResult[0].reportdate];
-        console.log(`[PRODUCTION] Only one reportdate found for ${reportType}: ${recentReportDates[0]}`);
+
       } else {
         // Two dates available, check if they're within 3 days of each other
         const mostRecentDate = new Date(maxDateResult[0].reportdate);
@@ -2441,16 +2560,16 @@ async function getProductionLeaderboardData(userIds, metric, period, topCount, s
         const timeDiff = Math.abs(mostRecentDate.getTime() - secondMostRecentDate.getTime());
         const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
         
-        console.log(`[PRODUCTION] Date comparison for ${reportType}: ${maxDateResult[0].reportdate} vs ${maxDateResult[1].reportdate} (${daysDiff} days apart)`);
+
         
         if (daysDiff <= 3) {
           // Dates are within 3 days, use both
           recentReportDates = [maxDateResult[0].reportdate, maxDateResult[1].reportdate];
-          console.log(`[PRODUCTION] Using both dates (within 3 days): ${recentReportDates.join(', ')}`);
+
         } else {
           // Dates are more than 3 days apart, use only the most recent
           recentReportDates = [maxDateResult[0].reportdate];
-          console.log(`[PRODUCTION] Using only most recent date (more than 3 days apart): ${recentReportDates[0]}`);
+
         }
       }
       
@@ -2479,7 +2598,7 @@ async function getProductionLeaderboardData(userIds, metric, period, topCount, s
     } else {
       // For other scopes, filter by specific user IDs
       if (userIds.length === 0) {
-        console.log(`[PRODUCTION] No user IDs provided, returning empty array`);
+
         return [];
       }
       
@@ -2495,7 +2614,7 @@ async function getProductionLeaderboardData(userIds, metric, period, topCount, s
         const maxDateResult = await db.query(maxDateQuery, [reportType]);
         
         if (!maxDateResult || maxDateResult.length === 0) {
-          console.log(`[PRODUCTION] No data found for report type: ${reportType}`);
+  
           return [];
         }
         
@@ -2504,7 +2623,7 @@ async function getProductionLeaderboardData(userIds, metric, period, topCount, s
         if (maxDateResult.length === 1) {
           // Only one date available, use it
           recentReportDates = [maxDateResult[0].reportdate];
-          console.log(`[PRODUCTION] Only one reportdate found for ${reportType}: ${recentReportDates[0]}`);
+  
         } else {
           // Two dates available, check if they're within 3 days of each other
           const mostRecentDate = new Date(maxDateResult[0].reportdate);
@@ -2514,16 +2633,16 @@ async function getProductionLeaderboardData(userIds, metric, period, topCount, s
           const timeDiff = Math.abs(mostRecentDate.getTime() - secondMostRecentDate.getTime());
           const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
           
-          console.log(`[PRODUCTION] Date comparison for ${reportType}: ${maxDateResult[0].reportdate} vs ${maxDateResult[1].reportdate} (${daysDiff} days apart)`);
+  
           
           if (daysDiff <= 3) {
             // Dates are within 3 days, use both
             recentReportDates = [maxDateResult[0].reportdate, maxDateResult[1].reportdate];
-            console.log(`[PRODUCTION] Using both dates (within 3 days): ${recentReportDates.join(', ')}`);
+  
           } else {
             // Dates are more than 3 days apart, use only the most recent
             recentReportDates = [maxDateResult[0].reportdate];
-            console.log(`[PRODUCTION] Using only most recent date (more than 3 days apart): ${recentReportDates[0]}`);
+  
           }
         }
         
@@ -2540,7 +2659,7 @@ async function getProductionLeaderboardData(userIds, metric, period, topCount, s
       const lagnnames = lagnameResult.map(row => row.lagnname);
       
       if (lagnnames.length === 0) {
-        console.log(`[PRODUCTION] No lagnnames found for user IDs, returning empty array`);
+
         return [];
       }
       
@@ -2567,17 +2686,17 @@ async function getProductionLeaderboardData(userIds, metric, period, topCount, s
         params = [reportType, ...recentReportDates, ...lagnnames, parseInt(topCount) || 10];
     }
     
-    console.log(`[PRODUCTION] Executing query:`, query);
-    console.log(`[PRODUCTION] Query params:`, params);
+
+
     
     const results = await db.query(query, params);
     
-    console.log(`[PRODUCTION] Query returned ${results?.length || 0} results for ${metric} (${period}):`, results);
+
     
     return results || [];
     
   } catch (error) {
-    console.error(`[PRODUCTION] Error getting production leaderboard data for metric ${metric}:`, error);
+
     return [];
   }
 }
@@ -2603,6 +2722,86 @@ function getProductionPeriodDisplayName(period) {
   return periodNames[period] || period;
 }
 
+// ====================================
+// MOTIVATION CALLS ENDPOINTS
+// ====================================
+
+// Get all motivation calls for a manager
+router.get('/motivation-calls', authMiddleware, async (req, res) => {
+  return res.status(410).json({ error: 'Motivation feature has been removed' });
+});
+
+// Create a new motivation call
+router.post('/motivation-calls', authMiddleware, async (req, res) => {
+  return res.status(410).json({ error: 'Motivation feature has been removed' });
+});
+
+// Update a motivation call
+router.put('/motivation-calls/:id', authMiddleware, async (req, res) => {
+  return res.status(410).json({ error: 'Motivation feature has been removed' });
+});
+
+// Delete a motivation call
+router.delete('/motivation-calls/:id', authMiddleware, async (req, res) => {
+  return res.status(410).json({ error: 'Motivation feature has been removed' });
+});
+
+// Test a motivation call immediately
+router.post('/motivation-calls/:id/test', authMiddleware, async (req, res) => {
+  return res.status(410).json({ error: 'Motivation feature has been removed' });
+});
+
+// Get voice channels for a specific guild
+router.get('/guilds/:guildId/voice-channels', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.userId || req.user?.userId || req.user?.id;
+    const { guildId } = req.params;
+
+    // Get valid Discord token (with auto-refresh)
+    let discordToken;
+    try {
+      discordToken = await getValidDiscordToken(userId);
+    } catch (tokenError) {
+      // Return 400 (not 401) to avoid triggering frontend auto-logout
+      return res.status(400).json({ error: tokenError.message, discordAuthError: true });
+    }
+
+    // Get the guild from Discord API
+    const guildsRes = await discordApi.get('https://discord.com/api/users/@me/guilds', {
+      headers: {
+        'Authorization': `Bearer ${discordToken}`
+      }
+    });
+
+    const guild = guildsRes.data.find(g => g.id === guildId);
+    if (!guild) {
+      return res.status(404).json({ error: 'Guild not found or not accessible' });
+    }
+
+    // Get guild channels
+    const channelsRes = await discordApi.get(`https://discord.com/api/guilds/${guildId}/channels`, {
+      headers: {
+        'Authorization': `Bot ${process.env.DISCORD_TOKEN}`
+      }
+    });
+
+    // Filter voice channels only
+    const voiceChannels = channelsRes.data
+      .filter(channel => channel.type === 2) // Voice channel type
+      .map(channel => ({
+        id: channel.id,
+        name: channel.name,
+        position: channel.position
+      }))
+      .sort((a, b) => a.position - b.position);
+
+    res.json({ voiceChannels });
+  } catch (error) {
+
+    res.status(500).json({ error: 'Failed to fetch voice channels' });
+  }
+});
+
 module.exports = router;
 
 // Export helper functions for use by the bot scheduler
@@ -2611,7 +2810,7 @@ module.exports.generateLeaderboardMessage = generateLeaderboardMessage;
 // Helper function to generate production leaderboard message using Weekly_ALP table
 async function generateProductionLeaderboardMessage(leaderboard) {
   try {
-    console.log(`[PRODUCTION] Generating production leaderboard message for leaderboard ID: ${leaderboard.id}`);
+
     
     // Parse metrics if it's a JSON string
     let metrics = leaderboard.metrics;
@@ -2619,7 +2818,7 @@ async function generateProductionLeaderboardMessage(leaderboard) {
       try {
         metrics = JSON.parse(metrics);
       } catch (e) {
-        console.warn('[PRODUCTION] Error parsing metrics JSON:', e);
+
         metrics = ['net'];
       }
     }
@@ -2628,7 +2827,7 @@ async function generateProductionLeaderboardMessage(leaderboard) {
       metrics = ['net'];
     }
 
-    console.log(`[PRODUCTION] Parsed metrics:`, metrics);
+
 
     // Parse data_period if it's a JSON string
     let dataPeriods = leaderboard.data_period;
@@ -2636,7 +2835,7 @@ async function generateProductionLeaderboardMessage(leaderboard) {
       try {
         dataPeriods = JSON.parse(dataPeriods);
       } catch (e) {
-        console.warn('[PRODUCTION] Error parsing data_period JSON:', e);
+
         dataPeriods = ['weekly'];
       }
     }
@@ -2645,15 +2844,15 @@ async function generateProductionLeaderboardMessage(leaderboard) {
       dataPeriods = ['weekly'];
     }
 
-    console.log(`[PRODUCTION] Parsed data periods:`, dataPeriods);
+
 
     // Get users based on scope (reuse existing logic)
     const userIds = await getUsersForScope(leaderboard.manager_id, leaderboard.scope);
     
-    console.log(`[PRODUCTION] Retrieved ${userIds.length} user IDs for scope processing`);
+
     
     if (userIds.length === 0) {
-      console.log(`[PRODUCTION] No users found for scope, returning empty message`);
+
       return `Production Leaderboard Update\n\nNo users found for the selected scope.`;
     }
 
@@ -2661,10 +2860,10 @@ async function generateProductionLeaderboardMessage(leaderboard) {
     const leaderboardsByPeriodAndMetric = {};
     
     for (const metric of metrics) {
-      console.log(`[PRODUCTION] Processing metric: ${metric}`);
+
       
       for (const period of dataPeriods) {
-        console.log(`[PRODUCTION] Processing period: ${period}`);
+
         
         // Initialize period object if it doesn't exist
         if (!leaderboardsByPeriodAndMetric[period]) {
@@ -2672,7 +2871,7 @@ async function generateProductionLeaderboardMessage(leaderboard) {
         }
         
         const leaderboardData = await getProductionLeaderboardData(userIds, metric, period, leaderboard.top_count, leaderboard.scope);
-        console.log(`[PRODUCTION] Leaderboard data for ${metric} (${period}):`, leaderboardData);
+
         
         if (leaderboardData.length > 0) {
           const metricName = getProductionMetricDisplayName(metric);
@@ -2700,9 +2899,9 @@ async function generateProductionLeaderboardMessage(leaderboard) {
           });
           
           leaderboardsByPeriodAndMetric[period][metric] = section;
-          console.log(`[PRODUCTION] Added section for ${metric} (${period})`);
+
         } else {
-          console.log(`[PRODUCTION] No data found for metric: ${metric} (${period})`);
+
         }
       }
     }
@@ -2711,7 +2910,7 @@ async function generateProductionLeaderboardMessage(leaderboard) {
     const allSections = Object.values(leaderboardsByPeriodAndMetric)
       .map(periodData => Object.values(periodData)).flat();
     if (allSections.length === 0) {
-      console.log(`[PRODUCTION] No leaderboard sections generated, returning empty production message`);
+
       return `Production Leaderboard Update\n\nNo production data found for the selected period(s).`;
     }
 
@@ -2731,22 +2930,22 @@ async function generateProductionLeaderboardMessage(leaderboard) {
     }
     
     if (messages.length === 0) {
-      console.log(`[PRODUCTION] No messages generated, returning empty production message`);
+
       return `Production Leaderboard Update\n\nNo production data found for the selected period(s).`;
     }
     
     if (messages.length === 1) {
       // Single message, return as string for backwards compatibility
-      console.log(`[PRODUCTION] Single message generated:`, messages[0]);
+
       return messages[0];
     } else {
       // Multiple messages, return as array
-      console.log(`[PRODUCTION] Generated ${messages.length} separate messages`);
+
       return messages;
     }
     
   } catch (error) {
-    console.error('[PRODUCTION] Error generating production leaderboard message:', error);
+
     throw error;
   }
 }
@@ -2781,7 +2980,7 @@ router.get('/bot/status', async (req, res) => {
     
     res.json(status);
   } catch (error) {
-    console.error('Error getting bot status:', error);
+
     res.status(500).json({ 
       error: 'Failed to get bot status',
       details: error.message
@@ -2798,16 +2997,6 @@ router.get('/sales/user-sales', async (req, res) => {
   try {
     const { startDate, endDate, userId: queryUserId } = req.query;
     
-    console.log(`[DISCORD-SALES-API] 🔍 Auth debugging:`, {
-      hasReqUser: !!req.user,
-      hasReqUserId: !!req.userId,
-      queryUserId,
-      userObject: req.user,
-      userId: req.userId,
-      authHeader: req.headers.authorization,
-      cookies: req.headers.cookie
-    });
-    
     // For now, use a fallback to test user (21 - COLEMAN CHARLES) or query param
     // Ensure userId is a single value, not an array
     let userId = req.user?.userId || req.userId || queryUserId || 21;
@@ -2816,11 +3005,11 @@ router.get('/sales/user-sales', async (req, res) => {
     }
     userId = String(userId); // Ensure it's a string
 
-    console.log(`[DISCORD-SALES-API] Starting user-sales request for user ${userId} (fallback: 21)`);
-    console.log(`[DISCORD-SALES-API] Date range: ${startDate} to ${endDate}`);
+
+
 
     if (!startDate || !endDate) {
-      console.log(`[DISCORD-SALES-API] ❌ Missing required parameters - startDate: ${startDate}, endDate: ${endDate}`);
+
       return res.status(400).json({
         success: false,
         message: 'Start date and end date are required'
@@ -2848,35 +3037,23 @@ router.get('/sales/user-sales', async (req, res) => {
       ORDER BY ds.ts DESC
     `;
 
-    console.log(`[DISCORD-SALES-API] Executing query with parameters: [${userId}, ${startDate}, ${endDate}]`);
-    console.log(`[DISCORD-SALES-API] Query: ${query.replace(/\s+/g, ' ').trim()}`);
+
+
 
     // First, let's check if there's ANY discord_sales data for this user
-    console.log(`[DISCORD-SALES-API] 🐛 About to query with userId:`, { 
-      userId, 
-      userIdType: typeof userId, 
-      userIdArray: [userId],
-      userIdStringified: JSON.stringify([userId])
-    });
     
     const userSalesCount = await db.query(
       'SELECT COUNT(*) as total_sales, MIN(ts) as earliest_sale, MAX(ts) as latest_sale FROM discord_sales WHERE user_id = ?',
       [userId]
     );
     
-    console.log(`[DISCORD-SALES-API] User ${userId} total discord sales in database:`, userSalesCount[0]);
+
 
     // Also check if there are ANY discord_sales records in the database at all
     const totalSalesCount = await db.query(
       'SELECT COUNT(*) as total_count, COUNT(DISTINCT user_id) as unique_users, MIN(ts) as earliest, MAX(ts) as latest FROM discord_sales'
     );
     
-    console.log(`[DISCORD-SALES-API] Total discord sales in database:`, totalSalesCount[0]);
-
-    // Also check the date range we're looking for
-    console.log(`[DISCORD-SALES-API] Looking for sales between ${startDate} and ${endDate}`);
-    console.log(`[DISCORD-SALES-API] Date comparison: DATE(ts) >= '${startDate}' AND DATE(ts) <= '${endDate}'`);
-
     // Test the date formatting to see what DATE(ts) actually returns
     if (userSalesCount[0].total_sales > 0) {
       const dateFormatTest = await db.query(
@@ -2884,25 +3061,15 @@ router.get('/sales/user-sales', async (req, res) => {
         [userId]
       );
       
-      console.log(`[DISCORD-SALES-API] Date format samples for user ${userId}:`, dateFormatTest);
+
     }
 
     const salesData = await db.query(query, [userId, startDate, endDate]);
 
-    console.log(`[DISCORD-SALES-API] ✅ Query executed successfully`);
-    console.log(`[DISCORD-SALES-API] Raw query result count: ${salesData ? salesData.length : 'null'}`);
+
+
     
     if (salesData && salesData.length > 0) {
-      console.log(`[DISCORD-SALES-API] Sample record:`, {
-        id: salesData[0].id,
-        sale_date: salesData[0].sale_date,
-        alp: salesData[0].alp,
-        refs: salesData[0].refs,
-        lead_type: salesData[0].lead_type,
-        ts: salesData[0].ts,
-        lagnname: salesData[0].lagnname
-      });
-      
       // Group by date for logging
       const dateGroups = {};
       salesData.forEach(sale => {
@@ -2910,10 +3077,8 @@ router.get('/sales/user-sales', async (req, res) => {
         if (!dateGroups[date]) dateGroups[date] = 0;
         dateGroups[date]++;
       });
-      
-      console.log(`[DISCORD-SALES-API] Sales by date:`, dateGroups);
     } else {
-      console.log(`[DISCORD-SALES-API] ⚠️ No sales data found for user ${userId} between ${startDate} and ${endDate}`);
+      // No sales data found for the user
     }
 
     const response = {
@@ -2921,13 +3086,9 @@ router.get('/sales/user-sales', async (req, res) => {
       data: salesData || []
     };
 
-    console.log(`[DISCORD-SALES-API] Sending response with ${response.data.length} records`);
-
     res.json(response);
 
   } catch (error) {
-    console.error(`[DISCORD-SALES-API] ❌ Error fetching discord sales:`, error);
-    console.error(`[DISCORD-SALES-API] Error stack:`, error.stack);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch discord sales data'
@@ -2984,7 +3145,7 @@ router.put('/sales/:id', authMiddleware, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error updating discord sale:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to update discord sale'
@@ -3035,7 +3196,7 @@ router.delete('/sales/:id', authMiddleware, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error deleting discord sale:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to delete discord sale'
@@ -3050,7 +3211,7 @@ router.delete('/sales/:id', authMiddleware, async (req, res) => {
  */
 async function updateDailyActivityFromDiscordSales(userId, saleDate) {
   try {
-    console.log(`[DISCORD-API] 📊 Updating Daily_Activity for user ${userId} on ${saleDate}`);
+
 
     // Get user details from activeusers
     const userDetails = await db.query(
@@ -3059,7 +3220,7 @@ async function updateDailyActivityFromDiscordSales(userId, saleDate) {
     );
 
     if (!userDetails || userDetails.length === 0) {
-      console.error(`[DISCORD-API] ❌ User ${userId} not found in activeusers table`);
+
       return;
     }
 
@@ -3076,7 +3237,7 @@ async function updateDailyActivityFromDiscordSales(userId, saleDate) {
     `, [userId, saleDate]);
 
     const salesData = salesAggregation[0];
-    console.log(`[DISCORD-API] 📈 Discord sales aggregation for ${saleDate}:`, salesData);
+
 
     // Check if Daily_Activity record exists for this date and user
     const existingRecord = await db.query(
@@ -3085,19 +3246,14 @@ async function updateDailyActivityFromDiscordSales(userId, saleDate) {
     );
 
     if (existingRecord && existingRecord.length > 0) {
-      // Update existing record - preserve manual additions
+      // Update existing record - preserve manual additions without relying on deleted discord_* columns
       const existing = existingRecord[0];
       
-      // Calculate manual additions (what user entered beyond Discord sales)
-      const existingDiscordSales = existing.discord_sales || 0;
-      const existingDiscordAlp = existing.discord_alp || 0;
-      const existingDiscordRefs = existing.discord_refs || 0;
+      // Manual additions are whatever is above the current Discord aggregation
+      const manualSalesAddition = Math.max(0, (existing.sales || 0) - (salesData.total_sales || 0));
+      const manualAlpAddition = Math.max(0, (existing.alp || 0) - (salesData.total_alp || 0));
+      const manualRefsAddition = Math.max(0, (existing.refs || 0) - (salesData.total_refs || 0));
       
-      const manualSalesAddition = Math.max(0, (existing.sales || 0) - existingDiscordSales);
-      const manualAlpAddition = Math.max(0, (existing.alp || 0) - existingDiscordAlp);
-      const manualRefsAddition = Math.max(0, (existing.refs || 0) - existingDiscordRefs);
-      
-      // New totals = Discord totals + manual additions
       const newSales = (salesData.total_sales || 0) + manualSalesAddition;
       const newAlp = (salesData.total_alp || 0) + manualAlpAddition;
       const newRefs = (salesData.total_refs || 0) + manualRefsAddition;
@@ -3107,27 +3263,19 @@ async function updateDailyActivityFromDiscordSales(userId, saleDate) {
         SET 
           sales = ?,
           alp = ?,
-          refs = ?,
-          discord_sales = ?,
-          discord_alp = ?,
-          discord_refs = ?
+          refs = ?
         WHERE agent = ? AND reportDate = ?
       `, [
         newSales, 
         newAlp, 
         newRefs,
-        salesData.total_sales || 0,
-        salesData.total_alp || 0,
-        salesData.total_refs || 0,
         user.lagnname, 
         saleDate
       ]);
 
-      console.log(`[DISCORD-API] ✅ Updated Daily_Activity: total_sales=${newSales}, total_alp=${newAlp}, total_refs=${newRefs}`);
-      console.log(`[DISCORD-API] 📊 Discord portion: sales=${salesData.total_sales}, alp=${salesData.total_alp}, refs=${salesData.total_refs}`);
-      console.log(`[DISCORD-API] 📝 Manual addition: sales=${manualSalesAddition}, alp=${manualAlpAddition}, refs=${manualRefsAddition}`);
+
     } else {
-      // Create new record
+      // Create new record with only the aggregated Discord totals
       await db.query(`
         INSERT INTO Daily_Activity (
           reportDate,
@@ -3140,11 +3288,8 @@ async function updateDailyActivityFromDiscordSales(userId, saleDate) {
           agent,
           SA,
           GA,
-          userId,
-          discord_sales,
-          discord_alp,
-          discord_refs
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          userId
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         saleDate,           // reportDate
         user.esid,          // esid
@@ -3156,17 +3301,14 @@ async function updateDailyActivityFromDiscordSales(userId, saleDate) {
         user.lagnname,      // agent
         user.SA,            // SA
         user.GA,            // GA
-        userId,             // userId
-        salesData.total_sales || 0,  // discord_sales
-        salesData.total_alp || 0,    // discord_alp
-        salesData.total_refs || 0    // discord_refs
+        userId              // userId
       ]);
 
-      console.log(`[DISCORD-API] ✅ Created new Daily_Activity record: sales=${salesData.total_sales}, alp=${salesData.total_alp}, refs=${salesData.total_refs}`);
+
     }
 
   } catch (error) {
-    console.error(`[DISCORD-API] ❌ Error updating Daily_Activity:`, error);
+
   }
 }
 
@@ -3186,7 +3328,7 @@ router.get('/sales/breakdown', async (req, res) => {
     }
     userId = String(userId);
 
-    console.log(`[DISCORD-BREAKDOWN-API] 📊 Getting breakdown for user ${userId} from ${startDate} to ${endDate}`);
+
 
     if (!startDate || !endDate) {
       return res.status(400).json({
@@ -3231,10 +3373,7 @@ router.get('/sales/breakdown', async (req, res) => {
         reportDate as report_date,
         sales as total_sales,
         alp as total_alp,
-        refs as total_refs,
-        discord_sales,
-        discord_alp,
-        discord_refs
+        refs as total_refs
       FROM Daily_Activity 
       WHERE agent = ? 
         AND reportDate >= ? 
@@ -3285,12 +3424,8 @@ router.get('/sales/breakdown', async (req, res) => {
       breakdown[date].total_alp = parseFloat(activity.total_alp) || 0;
       breakdown[date].total_refs = activity.total_refs || 0;
       
-      // Use the Discord tracking columns from Daily_Activity (more reliable than aggregating)
-      breakdown[date].discord_sales = activity.discord_sales || 0;
-      breakdown[date].discord_alp = parseFloat(activity.discord_alp) || 0;
-      breakdown[date].discord_refs = activity.discord_refs || 0;
-      
       // Calculate manual additions (total - discord)
+      // Discord values are already set from the discord_sales table aggregation above
       breakdown[date].manual_sales = Math.max(0, breakdown[date].total_sales - breakdown[date].discord_sales);
       breakdown[date].manual_alp = Math.max(0, breakdown[date].total_alp - breakdown[date].discord_alp);
       breakdown[date].manual_refs = Math.max(0, breakdown[date].total_refs - breakdown[date].discord_refs);
@@ -3298,7 +3433,7 @@ router.get('/sales/breakdown', async (req, res) => {
 
     const result = Object.values(breakdown).sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    console.log(`[DISCORD-BREAKDOWN-API] ✅ Breakdown calculated for ${result.length} dates`);
+
 
     res.json({
       success: true,
@@ -3306,7 +3441,7 @@ router.get('/sales/breakdown', async (req, res) => {
     });
 
   } catch (error) {
-    console.error(`[DISCORD-BREAKDOWN-API] ❌ Error getting breakdown:`, error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to get sales breakdown'

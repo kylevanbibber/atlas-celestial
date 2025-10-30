@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FiChevronRight, FiLoader, FiUser, FiSearch, FiFilter, FiX, FiCheck, FiDownload, FiChevronDown, FiChevronUp, FiUsers, FiList, FiGrid } from 'react-icons/fi';
+import { FiChevronRight, FiLoader, FiUser, FiSearch, FiFilter, FiX, FiCheck, FiDownload, FiChevronDown, FiChevronUp, FiUsers, FiGrid } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api';
-import '../../pages/settings/Settings.css';
+import '../../pages/utilities/Utilities.css';
 import './AdminHierarchySettings.css';
 import FilterMenu from '../common/FilterMenu';
 import ScrollToTop from '../utils/ScrollToTop';
-import AdminHierarchyTableView from './AdminHierarchyTableView';
+import HierarchyMGAUtilitiesTable from '../utilities/HierarchyMGAUtilitiesTable';
 
 // Don't import from constants directly, define states here to avoid circular dependencies
 const US_STATES_LIST = [
@@ -21,7 +21,8 @@ const US_STATES_LIST = [
 // Admin Hierarchy settings component
 const AdminHierarchySettings = () => {
   const { hasPermission, user } = useAuth();
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true); // Show UI skeleton immediately
+  const [dataLoading, setDataLoading] = useState(false); // Track data loading separately
   const [rgaHierarchies, setRgaHierarchies] = useState([]);
   const [expandedRGAs, setExpandedRGAs] = useState({});
   const [expandedNodes, setExpandedNodes] = useState({});
@@ -57,26 +58,47 @@ const AdminHierarchySettings = () => {
   const [searchTimer, setSearchTimer] = useState(null);
   // Add view toggle state - 'tree' or 'table'
   const [viewMode, setViewMode] = useState('tree');
+  // Add search mode state - 'full' or 'isolated'
+  const [searchMode, setSearchMode] = useState('full');
 
-  // Check permissions and load data on mount
+  // Show UI immediately, then load data
   useEffect(() => {
-    if (!hasPermission('admin')) {
-      // Use searchByUserId instead of displaying error
-      fetchUserHierarchyData();
-    } else {
-      fetchAllRGAsHierarchy();
-    }
-  }, [hasPermission, user?.userId]);
+    // Show UI skeleton immediately
+    setInitialLoading(false);
+    
+    // Start data loading after a brief delay to allow UI to render
+    const loadData = async () => {
+      setDataLoading(true);
+      try {
+        // Determine if the current user should see org-wide data
+        // Strict org-wide viewer check: Admin role, app teamRole, or SGA clname only
+        const isOrgWideViewer = (
+          String(user?.Role || '').toUpperCase() === 'ADMIN' ||
+          String(user?.teamRole || '').toLowerCase() === 'app' ||
+          String(user?.clname || '').toUpperCase() === 'SGA'
+        );
+
+        if (!isOrgWideViewer) {
+          await fetchUserHierarchyData();
+        } else {
+          await fetchAllRGAsHierarchy();
+        }
+      } finally {
+        setDataLoading(false);
+      }
+    };
+    
+    // Small delay to let the UI render first
+    setTimeout(loadData, 100);
+  }, [hasPermission, user?.userId, user?.teamRole, user?.clname]);
 
   // New function to fetch data using searchByUserId for non-admin users
   const fetchUserHierarchyData = async () => {
     try {
-      setLoading(true);
       setError('');
       
       if (!user || !user.userId) {
         setError('User information is not available. Please try logging in again.');
-        setLoading(false);
         return;
       }
 
@@ -122,15 +144,12 @@ const AdminHierarchySettings = () => {
       }
     } catch (err) {
       setError('Error loading hierarchy data: ' + (err.response?.data?.message || err.message));
-    } finally {
-      setLoading(false);
     }
   };
 
   // Fetch hierarchy data for all RGAs
   const fetchAllRGAsHierarchy = async () => {
     try {
-      setLoading(true);
       setError('');
       setProcessingStats({
         total: 0,
@@ -189,8 +208,6 @@ const AdminHierarchySettings = () => {
         loaded: 0,
         inProgress: false
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -377,12 +394,110 @@ const AdminHierarchySettings = () => {
     };
   }, [searchTimer]);
 
+  // Build isolated hierarchy for a specific user
+  const buildIsolatedHierarchy = (targetUser, rgaHierarchy) => {
+    const allUsers = rgaHierarchy.hierarchyData;
+    const isolatedUsers = new Set();
+    const userMap = {};
+    
+    // Create a map for quick user lookup
+    allUsers.forEach(user => {
+      userMap[user.lagnname] = user;
+    });
+    
+    // Add the target user
+    isolatedUsers.add(targetUser.lagnname);
+    
+    // Find and add all uplines
+    const addUplines = (user) => {
+      if (user.sa && userMap[user.sa]) {
+        isolatedUsers.add(user.sa);
+        addUplines(userMap[user.sa]);
+      }
+      if (user.ga && userMap[user.ga]) {
+        isolatedUsers.add(user.ga);
+        addUplines(userMap[user.ga]);
+      }
+      if (user.mga && userMap[user.mga]) {
+        isolatedUsers.add(user.mga);
+        addUplines(userMap[user.mga]);
+      }
+      if (user.rga && userMap[user.rga]) {
+        isolatedUsers.add(user.rga);
+        addUplines(userMap[user.rga]);
+      }
+    };
+    
+    // Find and add all downlines
+    const addDownlines = (userName) => {
+      allUsers.forEach(user => {
+        if (!isolatedUsers.has(user.lagnname)) {
+          // Check if this user has the target user as an upline
+          if (user.sa === userName || user.ga === userName || 
+              user.mga === userName || user.rga === userName) {
+            isolatedUsers.add(user.lagnname);
+            addDownlines(user.lagnname); // Recursively add their downlines
+          }
+        }
+      });
+    };
+    
+    addUplines(targetUser);
+    addDownlines(targetUser.lagnname);
+    
+    // Filter users to only include isolated ones
+    const isolatedUserList = allUsers.filter(user => isolatedUsers.has(user.lagnname));
+    
+    // Build hierarchy with isolated users
+    return buildRgaHierarchy(isolatedUserList);
+  };
+
+  // Helper function to determine the primary RGA for a user based on their direct reporting chain
+  const findPrimaryRGA = (user, allHierarchies) => {
+    // Strategy 1: Find the RGA where this user's MGA has the most direct relationship
+    const userMGA = user.mga;
+    if (userMGA) {
+      // Find which RGA hierarchy contains this user's MGA as a direct MGA
+      for (const hierarchy of allHierarchies) {
+        const mgaInHierarchy = hierarchy.hierarchyData.find(person => 
+          person.lagnname === userMGA && person.clname === 'MGA'
+        );
+        
+        // Check if this MGA directly reports to this RGA (not through other relationships)
+        if (mgaInHierarchy && mgaInHierarchy.rga === hierarchy.rgaName) {
+          return hierarchy.rgaId;
+        }
+      }
+    }
+    
+    // Strategy 2: If no direct MGA relationship found, use user's direct RGA field
+    if (user.rga) {
+      const directRgaHierarchy = allHierarchies.find(h => h.rgaName === user.rga);
+      if (directRgaHierarchy) {
+        return directRgaHierarchy.rgaId;
+      }
+    }
+    
+    // Fallback: Find the RGA hierarchy where this user appears first
+    for (const hierarchy of allHierarchies) {
+      const userInHierarchy = hierarchy.hierarchyData.find(person => person.lagnname === user.lagnname);
+      if (userInHierarchy) {
+        return hierarchy.rgaId;
+      }
+    }
+    
+    return null;
+  };
+
   // Update performSearch to use the search index for faster lookups
-  const performSearch = (query) => {
+  const performSearch = (query, mode = null) => {
     if (!query.trim() || rgaHierarchies.length === 0) {
       setSearchResults(null);
       return;
     }
+    
+    // Use the provided mode or fall back to current searchMode
+    const currentSearchMode = mode !== null ? mode : searchMode;
     
     console.time('search');
     
@@ -405,60 +520,168 @@ const AdminHierarchySettings = () => {
       });
     });
     
-    // Fast prefix matching using the index
+    // Fast prefix matching using the index with deduplication
     const matchedNodeIds = new Set();
     
+    // Step 1: Collect all potential matches across all hierarchies
+    const potentialMatches = new Map(); // Map of lagnname -> [{node, rgaId}, ...]
+
     // Check each key in the index for matches
     Object.keys(searchIndex).forEach(key => {
       if (key.includes(searchLower)) {
         searchIndex[key].forEach(({ node, rgaId }) => {
-          // Avoid duplicates
-          const nodeId = `${rgaId}-${node.lagnname}`;
-          if (!matchedNodeIds.has(nodeId)) {
-            matchedNodeIds.add(nodeId);
-            
-            // Find the RGA this node belongs to
-            const rgaHierarchy = rgaHierarchies.find(h => h.rgaId === rgaId);
-            if (rgaHierarchy) {
-              // Add to matching RGAs
-              matchingRgas.add(rgaId);
-              
-              // Get existing group or create new one
-              let matchingGroup = matchingNodes.find(g => g.rgaId === rgaId);
-              if (!matchingGroup) {
-                matchingGroup = {
-                  rgaId: rgaId,
-                  rgaName: rgaHierarchy.rgaName,
-                  matches: [],
-                  directUplines: new Map()
-                };
-                matchingNodes.push(matchingGroup);
-              }
-              
-              // Add node to matches
-              matchingGroup.matches.push(node);
-              
-              // For each matching node, create a record of its direct uplines
-              const uplines = {
-                sa: node.sa ? rgaHierarchy.hierarchyData.find(u => u.lagnname === node.sa) : null,
-                ga: node.ga ? rgaHierarchy.hierarchyData.find(u => u.lagnname === node.ga) : null,
-                mga: node.mga ? rgaHierarchy.hierarchyData.find(u => u.lagnname === node.mga) : null,
-                rga: node.rga ? rgaHierarchy.hierarchyData.find(u => u.lagnname === node.rga) : null,
-              };
-              
-              matchingGroup.directUplines.set(node.lagnname, uplines);
-              
-              // Track uplines for expansion
-              if (uplines.sa) nodesToExpand.add(uplines.sa.lagnname);
-              if (uplines.ga) nodesToExpand.add(uplines.ga.lagnname);
-              if (uplines.mga) nodesToExpand.add(uplines.mga.lagnname);
-              if (uplines.rga) nodesToExpand.add(uplines.rga.lagnname);
-              
-              // Store upline map for this RGA
-              directUplineMap.set(rgaId, matchingGroup.directUplines);
-            }
+          if (!potentialMatches.has(node.lagnname)) {
+            potentialMatches.set(node.lagnname, []);
           }
+          potentialMatches.get(node.lagnname).push({ node, rgaId });
         });
+      }
+    });
+
+    // Step 2: Deduplicate users by determining their primary RGA
+    potentialMatches.forEach((matches, lagnname) => {
+      if (matches.length === 0) return;
+      
+      // If user appears in multiple RGAs, determine their primary RGA
+      let primaryMatch;
+      
+      if (matches.length === 1) {
+        // User only appears in one RGA, use it
+        primaryMatch = matches[0];
+      } else {
+        // User appears in multiple RGAs, find their primary one
+        const firstNode = matches[0].node;
+        const primaryRgaId = findPrimaryRGA(firstNode, rgaHierarchies);
+        
+        // Find the match that corresponds to the primary RGA
+        primaryMatch = matches.find(m => m.rgaId === primaryRgaId);
+        
+        // If primary RGA not found in matches, use the first match as fallback
+        if (!primaryMatch) {
+          primaryMatch = matches[0];
+        }
+        
+        console.log(`Deduplicated user ${lagnname}: found in ${matches.length} RGAs, showing in primary RGA:`, primaryMatch.rgaId);
+      }
+      
+      const { node, rgaId } = primaryMatch;
+      const nodeId = `${rgaId}-${node.lagnname}`;
+      
+      if (!matchedNodeIds.has(nodeId)) {
+        matchedNodeIds.add(nodeId);
+        
+        // Find the RGA this node belongs to
+        const rgaHierarchy = rgaHierarchies.find(h => h.rgaId === rgaId);
+        if (rgaHierarchy) {
+          // Add to matching RGAs
+          matchingRgas.add(rgaId);
+          
+          // Get existing group or create new one
+          let matchingGroup = matchingNodes.find(g => g.rgaId === rgaId);
+          if (!matchingGroup) {
+            matchingGroup = {
+              rgaId: rgaId,
+              rgaName: rgaHierarchy.rgaName,
+              matches: [],
+              directUplines: new Map()
+            };
+            matchingNodes.push(matchingGroup);
+          }
+          
+          // For each matching node, create a record of its direct uplines
+          // Search across ALL hierarchies to find uplines (they might be in different RGA data)
+          const findUplineAcrossHierarchies = (uplineName) => {
+            if (!uplineName) return null;
+            const uplineNameLower = uplineName.toLowerCase();
+            
+            // First try current RGA (case-insensitive)
+            let upline = rgaHierarchy.hierarchyData.find(u => 
+              u.lagnname && u.lagnname.toLowerCase() === uplineNameLower
+            );
+            if (upline) return upline;
+            
+            // If not found, search all other RGA hierarchies (case-insensitive)
+            for (const otherRga of rgaHierarchies) {
+              if (otherRga.rgaId !== rgaId) {
+                upline = otherRga.hierarchyData.find(u => 
+                  u.lagnname && u.lagnname.toLowerCase() === uplineNameLower
+                );
+                if (upline) return upline;
+              }
+            }
+            return null;
+          };
+          
+          const uplines = {
+            sa: findUplineAcrossHierarchies(node.sa),
+            ga: findUplineAcrossHierarchies(node.ga),
+            mga: findUplineAcrossHierarchies(node.mga),
+            rga: findUplineAcrossHierarchies(node.rga),
+          };
+          
+          // Debug logging
+          if (node.lagnname === 'VALENT MICHAEL B') {
+            console.log('[Search Debug] VALENT MICHAEL B uplines object:', uplines);
+            console.log('[Search Debug] MGA details:', {
+              mga_exists: !!uplines.mga,
+              mga_lagnname: uplines.mga?.lagnname,
+              mga_clname: uplines.mga?.clname,
+              mga_full_object: uplines.mga
+            });
+          }
+          
+          // Build uplineIds array in order: SA, GA, MGA, RGA
+          const uplineIds = [];
+          if (uplines.sa) {
+            uplineIds.push(uplines.sa.lagnname);
+            if (node.lagnname === 'VALENT MICHAEL B') console.log('Added SA:', uplines.sa.lagnname);
+          }
+          if (uplines.ga) {
+            uplineIds.push(uplines.ga.lagnname);
+            if (node.lagnname === 'VALENT MICHAEL B') console.log('Added GA:', uplines.ga.lagnname);
+          }
+          if (uplines.mga) {
+            uplineIds.push(uplines.mga.lagnname);
+            if (node.lagnname === 'VALENT MICHAEL B') console.log('Added MGA:', uplines.mga.lagnname);
+          } else {
+            if (node.lagnname === 'VALENT MICHAEL B') console.log('MGA is null/undefined, node.mga was:', node.mga);
+          }
+          if (uplines.rga) {
+            uplineIds.push(uplines.rga.lagnname);
+            if (node.lagnname === 'VALENT MICHAEL B') console.log('Added RGA:', uplines.rga.lagnname);
+          }
+          
+          if (node.lagnname === 'VALENT MICHAEL B') {
+            console.log('[Search Debug] Built uplineIds:', uplineIds);
+          }
+          
+          // Add node to matches with uplineIds attached
+          matchingGroup.matches.push({
+            ...node,
+            uplineIds: uplineIds
+          });
+          
+          // Debug logging for VALENT
+          if (node.lagnname === 'VALENT MICHAEL B') {
+            console.log('[Match Add Debug] Added VALENT MICHAEL B to matchingGroup for RGA:', rgaId, rgaHierarchy.rgaName);
+            console.log('[Match Add Debug] Current matches in this group:', matchingGroup.matches.map(m => m.lagnname));
+          }
+          if (node.lagnname === 'KOZEJ SPENCER G') {
+            console.log('[Match Add Debug] Added KOZEJ SPENCER G to matchingGroup for RGA:', rgaId, rgaHierarchy.rgaName);
+            console.log('[Match Add Debug] Current matches in this group:', matchingGroup.matches.map(m => m.lagnname));
+          }
+          
+          matchingGroup.directUplines.set(node.lagnname, uplines);
+          
+          // Track uplines for expansion
+          if (uplines.sa) nodesToExpand.add(uplines.sa.lagnname);
+          if (uplines.ga) nodesToExpand.add(uplines.ga.lagnname);
+          if (uplines.mga) nodesToExpand.add(uplines.mga.lagnname);
+          if (uplines.rga) nodesToExpand.add(uplines.rga.lagnname);
+          
+          // Store upline map for this RGA
+          directUplineMap.set(rgaId, matchingGroup.directUplines);
+        }
       }
     });
     
@@ -484,13 +707,48 @@ const AdminHierarchySettings = () => {
         });
       }
       
+      // Build isolated hierarchies if in isolated mode
+      const processedMatchingNodes = matchingNodes.map(matchingGroup => {
+        if (currentSearchMode === 'isolated') {
+          // Find the RGA hierarchy for this group
+          const rgaHierarchy = rgaHierarchies.find(h => h.rgaId === matchingGroup.rgaId);
+          if (rgaHierarchy && matchingGroup.matches.length > 0) {
+            // For isolated mode, build isolated hierarchy for each match
+            const isolatedHierarchies = matchingGroup.matches.map(match => {
+              const isolatedHierarchy = buildIsolatedHierarchy(match, rgaHierarchy);
+              return {
+                targetUser: match,
+                isolatedHierarchy: isolatedHierarchy
+              };
+            });
+            
+            return {
+              ...matchingGroup,
+              isolatedHierarchies: isolatedHierarchies,
+              searchMode: 'isolated'
+            };
+          }
+        }
+        
+        return {
+          ...matchingGroup,
+          searchMode: 'full'
+        };
+      });
+      
       setSearchResults({
-        matchingRgaGroups: matchingNodes,
+        matchingRgaGroups: processedMatchingNodes,
         totalMatches: matchingNodes.reduce((sum, group) => sum + group.matches.length, 0),
-        directUplineMap
+        directUplineMap,
+        searchMode: currentSearchMode
       });
     } else {
-      setSearchResults({ matchingRgaGroups: [], totalMatches: 0, directUplineMap: new Map() });
+      setSearchResults({ 
+        matchingRgaGroups: [], 
+        totalMatches: 0, 
+        directUplineMap: new Map(),
+        searchMode: currentSearchMode
+      });
     }
     
     console.timeEnd('search');
@@ -670,9 +928,10 @@ const AdminHierarchySettings = () => {
       });
 
       if (response.data.success) {
-        // Update local state
+        // Update local state - need to update both hierarchyData and hierarchicalData
         setRgaHierarchies(prev => {
           return prev.map(rgaHierarchy => {
+            // Update flat hierarchyData
             const updatedHierarchyData = rgaHierarchy.hierarchyData.map(user => {
               if (user.lagnname === node.lagnname) {
                 return { ...user, managerActive: newStatus };
@@ -680,9 +939,29 @@ const AdminHierarchySettings = () => {
               return user;
             });
             
+            // Also update hierarchicalData (tree structure) recursively
+            const updateHierarchicalNodes = (nodes) => {
+              if (!nodes) return nodes;
+              return nodes.map(hierarchyNode => {
+                const updatedNode = { ...hierarchyNode };
+                if (hierarchyNode.lagnname === node.lagnname) {
+                  updatedNode.managerActive = newStatus;
+                }
+                if (hierarchyNode.children && hierarchyNode.children.length > 0) {
+                  updatedNode.children = updateHierarchicalNodes(hierarchyNode.children);
+                }
+                return updatedNode;
+              });
+            };
+            
+            const updatedHierarchicalData = rgaHierarchy.hierarchicalData 
+              ? updateHierarchicalNodes(rgaHierarchy.hierarchicalData)
+              : rgaHierarchy.hierarchicalData;
+            
             return {
               ...rgaHierarchy,
-              hierarchyData: updatedHierarchyData
+              hierarchyData: updatedHierarchyData,
+              hierarchicalData: updatedHierarchicalData
             };
           });
         });
@@ -1308,6 +1587,12 @@ const AdminHierarchySettings = () => {
 
   // Function to check if a node passes all filters
   const passesAllFilters = (node) => {
+    // First check: Never show users with Active = 'n' regardless of managerActive status
+    if (node.Active !== undefined && node.Active !== null && 
+        node.Active.toLowerCase() === 'n') {
+      return false;
+    }
+    
     // Check role filters
     if (!activeFilters[node.clname]) {
       return false;
@@ -1384,10 +1669,27 @@ const AdminHierarchySettings = () => {
     // If no search results or no matching group for this RGA, return null
     const matchingGroup = searchResults?.matchingRgaGroups?.find(group => group.rgaId === rgaHierarchy.rgaId);
     
+    console.log('[renderSearchResults] Looking for matches for RGA ID:', rgaHierarchy.rgaId, 'Name:', rgaHierarchy.rgaName);
+    console.log('[renderSearchResults] All matchingRgaGroups:', searchResults?.matchingRgaGroups?.map(g => ({
+      rgaId: g.rgaId,
+      rgaName: g.rgaName,
+      matches: g.matches.map(m => m.lagnname)
+    })));
+    console.log('[renderSearchResults] Found matchingGroup?', !!matchingGroup);
+    
     // If no matches for this RGA, return null
     if (!matchingGroup || !matchingGroup.matches || matchingGroup.matches.length === 0) {
       return null;
     }
+    
+    // If in isolated mode and we have isolated hierarchies, render them instead
+    if (matchingGroup.searchMode === 'isolated' && matchingGroup.isolatedHierarchies) {
+      return renderIsolatedSearchResults(matchingGroup);
+    }
+    
+    console.log('[Full Team View] Rendering search results for RGA:', rgaHierarchy.rgaName);
+    console.log('[Full Team View] Number of matches:', matchingGroup.matches.length);
+    console.log('[Full Team View] Matches:', matchingGroup.matches.map(m => m.lagnname));
     
     // Helper function to determine if a node is the current user
     const isCurrentUser = (node) => {
@@ -1395,19 +1697,25 @@ const AdminHierarchySettings = () => {
     };
     
     // First create a flat map of all nodes for quick lookup
+    // Build from flat hierarchyData (not hierarchicalData) to ensure we get everyone
     const nodeMap = {};
-    const collectNodes = (nodes) => {
-      nodes.forEach(node => {
+    if (rgaHierarchy.hierarchyData) {
+      rgaHierarchy.hierarchyData.forEach(node => {
         nodeMap[node.lagnname] = node;
-        if (node.children && node.children.length > 0) {
-          collectNodes(node.children);
-        }
       });
-    };
-    
-    if (rgaHierarchy.hierarchicalData) {
-      collectNodes(rgaHierarchy.hierarchicalData);
     }
+    
+    // Also add nodes from ALL other RGA hierarchies to find cross-RGA uplines
+    rgaHierarchies.forEach(otherRga => {
+      if (otherRga.rgaId !== rgaHierarchy.rgaId && otherRga.hierarchyData) {
+        otherRga.hierarchyData.forEach(node => {
+          // Only add if not already in map (current RGA takes precedence)
+          if (!nodeMap[node.lagnname]) {
+            nodeMap[node.lagnname] = node;
+          }
+        });
+      }
+    });
     
     // Then create a map of match nodes with their uplines
     const matchNodesWithUplines = matchingGroup.matches.map(match => {
@@ -1419,9 +1727,23 @@ const AdminHierarchySettings = () => {
       
       // Add all available uplines
       if (match.uplineIds && match.uplineIds.length > 0) {
+        // Map uplines and preserve their order from uplineIds (SA, GA, MGA, RGA)
+        // Then reverse to show RGA first, then MGA, then GA, then SA
         result.uplines = match.uplineIds
-          .map(uplineId => nodeMap[uplineId])
-          .filter(Boolean); // Filter out any missing nodes
+          .map(uplineId => {
+            const uplineNode = nodeMap[uplineId];
+            if (match.lagnname === 'VALENT MICHAEL B') {
+              console.log('[Render Debug] Looking up upline:', uplineId, 'Found:', !!uplineNode, uplineNode?.clname);
+            }
+            return uplineNode;
+          })
+          .filter(Boolean) // Filter out any missing nodes
+          .reverse(); // Reverse to show RGA, MGA, GA, SA order (most senior first)
+        
+        if (match.lagnname === 'VALENT MICHAEL B') {
+          console.log('[Render Debug] Final uplines array (after reverse):', result.uplines.map(u => u.lagnname));
+          console.log('[Render Debug] Full upline details:', result.uplines);
+        }
       }
       
       return result;
@@ -1467,52 +1789,101 @@ const AdminHierarchySettings = () => {
           // Mark this node as rendered
           renderedNodeIds.add(node.lagnname);
           
-          // Sort uplines by role importance
-          const sortedUplines = [...uplines].sort((a, b) => {
-            const roleOrder = { 'RGA': 1, 'MGA': 2, 'GA': 3, 'SA': 4, 'AGT': 5 };
-            return (roleOrder[a.clname] || 99) - (roleOrder[b.clname] || 99);
-          });
+          // Uplines are already in the correct order (RGA, MGA, GA, SA) from the reverse() above
+          // Don't re-sort by clname since both might be 'RGA' but have different relationships
+          const sortedUplines = uplines;
           
-          // Mark all uplines as rendered
-          sortedUplines.forEach(upline => {
-            renderedNodeIds.add(upline.lagnname);
-          });
+          if (node.lagnname === 'VALENT MICHAEL B') {
+            console.log('[Display Debug] About to render VALENT MICHAEL B');
+            console.log('[Display Debug] sortedUplines:', sortedUplines.map(u => u.lagnname));
+            console.log('[Display Debug] sortedUplines.length:', sortedUplines.length);
+          }
+          
+          // Don't mark uplines as rendered - they can appear multiple times as uplines for different matches
+          
+          if (node.lagnname === 'VALENT MICHAEL B') {
+            console.log('[JSX Debug] About to render JSX for VALENT MICHAEL B');
+            console.log('[JSX Debug] sortedUplines.length > 0?', sortedUplines.length > 0);
+            console.log('[JSX Debug] Will render uplines section?', sortedUplines.length > 0);
+          }
           
           return (
             <div key={`match-${node.lagnname}-${index}`} className="admin-search-result-item">
+              {/* Show uplines first (top-down hierarchy) as standalone cards to avoid nesting/layout issues */}
+              {sortedUplines.length > 0 && (
+                sortedUplines.map((upline, uplineIndex) => {
+                  if (node.lagnname === 'VALENT MICHAEL B') {
+                    console.log(`[Map Debug] Rendering upline ${uplineIndex}:`, upline.lagnname, 'Calling renderUserCard with isUpline=true');
+                  }
+                  const cardResult = renderUserCard(
+                    upline,
+                    0,
+                    currentUserMap[upline.lagnname],
+                    false,
+                    true
+                  );
+                  if (node.lagnname === 'VALENT MICHAEL B') {
+                    console.log(`[Map Debug] renderUserCard returned for ${upline.lagnname}:`, cardResult ? 'JSX element' : 'null');
+                  }
+                  return (
+                    <div key={`upline-${upline.lagnname}-${uplineIndex}`} className="admin-search-match">
+                      {cardResult}
+                    </div>
+                  );
+                })
+              )}
+
+              {/* Then show the matched user below their uplines */}
               <div className="admin-search-match">
                 {renderUserCard(
-                  node, 
-                  0, 
-                  currentUserMap[node.lagnname], // Use pre-computed value
-                  true, // This is a search match
-                  false // Not an upline
+                  node,
+                  0,
+                  currentUserMap[node.lagnname],
+                  true,
+                  false
                 )}
               </div>
-              
-              {sortedUplines.length > 0 && (
-                <div className="admin-search-uplines">
-                  <div className="admin-uplines-header">
-                    <FiUsers size={14} />
-                    <span>Uplines</span>
-                  </div>
-                  {sortedUplines.map((upline, uplineIndex) => (
-                    <div 
-                      key={`upline-${upline.lagnname}-${uplineIndex}`} 
-                      className="admin-upline-item"
-                      style={{ marginLeft: `${uplineIndex * 15}px` }}
-                    >
-                      {renderUserCard(
-                        upline, 
-                        0, 
-                        currentUserMap[upline.lagnname], // Use pre-computed value
-                        false, // Not a search match
-                        true // Is an upline
-                      )}
-                    </div>
-                  ))}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // Render isolated search results showing isolated hierarchies
+  const renderIsolatedSearchResults = (matchingGroup) => {
+    if (!matchingGroup.isolatedHierarchies || matchingGroup.isolatedHierarchies.length === 0) {
+      return null;
+    }
+
+    // Helper function to determine if a node is the current user
+    const isCurrentUser = (node) => {
+      return node.lagnname === user?.userId;
+    };
+
+    return (
+      <div className="admin-search-results">
+        {matchingGroup.isolatedHierarchies.map((isolatedItem, index) => {
+          const { targetUser, isolatedHierarchy } = isolatedItem;
+
+          return (
+            <div key={`isolated-${targetUser.lagnname}-${index}`} className="admin-isolated-result">
+              <div className="admin-isolated-header">
+                <div className="isolated-target-info">
+                  <FiUsers size={16} />
+                  <span>Isolated hierarchy for: <strong>{targetUser.lagnname}</strong> ({targetUser.clname})</span>
                 </div>
-              )}
+              </div>
+              
+              <div className="admin-isolated-hierarchy">
+                {isolatedHierarchy && isolatedHierarchy.length > 0 ? (
+                  renderHierarchyTree(isolatedHierarchy, 0, new Set([targetUser.lagnname]))
+                ) : (
+                  <div className="isolated-empty">
+                    <span>No hierarchy data available for {targetUser.lagnname}</span>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}
@@ -1695,7 +2066,12 @@ const AdminHierarchySettings = () => {
   // Update the renderUserCard function to use formatDateForDisplay for PNP date
   const renderUserCard = (node, level = 0, isCurrentUser = false, isSearchMatch = false, isUpline = false) => {
     if (!node) {
+      console.log('[RenderCard Debug] Node is null/undefined, returning null');
       return null;
+    }
+    
+    if (node.lagnname === 'BRATIN JASON' || node.lagnname === 'KOZEJ SPENCER G') {
+      console.log(`[RenderCard Debug] Rendering card for ${node.lagnname}, isUpline: ${isUpline}, isSearchMatch: ${isSearchMatch}`);
     }
     
     // Calculate indentation based on level
@@ -1761,6 +2137,9 @@ const AdminHierarchySettings = () => {
           </div>
           <div className="hierarchy-contact">
             <strong>Phone:</strong> <a href={`tel:${node.phone}`} className="hierarchy-phone">{formatPhoneNumber(node.phone)}</a>
+          </div>
+          <div className="hierarchy-contact">
+            <strong>Agent #:</strong> <span className="hierarchy-agtnum">{node.agtnum || '—'}</span>
           </div>
           
           {/* PNP data section */}
@@ -1856,8 +2235,160 @@ const AdminHierarchySettings = () => {
     setExpandedRGAs(newState);
   };
 
+  // Scroll to next manager (MGA/GA/SA) card in view
+  const scrollToNextManager = useCallback(() => {
+    try {
+      // Detect scrollable container (match ScrollToTop behavior)
+      const detectScrollable = () => {
+        const selectors = [
+          '.settings-content',
+          '.settings-section-large',
+          '.settings-section',
+          'main',
+          'body'
+        ];
+        for (const sel of selectors) {
+          const el = document.querySelector(sel);
+          if (el && el.scrollHeight > el.clientHeight) return el;
+        }
+        return window;
+      };
+
+      const container = detectScrollable();
+      const header = document.querySelector('.admin-hierarchy-controls-container') || document.querySelector('.admin-hierarchy-controls');
+      const headerHeight = header ? header.offsetHeight : 0;
+
+      // Collect manager elements (tree cards and table rows)
+      let managerCards = Array.from(document.querySelectorAll(
+        '.admin-hierarchy-card[data-role="RGA"], .admin-hierarchy-card[data-role="MGA"], .admin-hierarchy-card[data-role="GA"], .admin-hierarchy-card[data-role="SA"], .hierarchy-table tbody tr[data-role="RGA"], .hierarchy-table tbody tr[data-role="MGA"], .hierarchy-table tbody tr[data-role="GA"], .hierarchy-table tbody tr[data-role="SA"]'
+      ));
+      if (!managerCards.length) {
+        // Fallback: infer role from Role column text in table (4th column)
+        const rows = Array.from(document.querySelectorAll('.hierarchy-table tbody tr'));
+        const roleSet = new Set(['RGA','MGA','GA','SA']);
+        managerCards = rows.filter(row => {
+          const cell = row.querySelector('td:nth-child(4)');
+          if (!cell) return false;
+          const text = (cell.textContent || '').trim().toUpperCase();
+          return roleSet.has(text);
+        });
+        if (!managerCards.length) return;
+      }
+
+      // Helper to compute element top relative to container scroll
+      const getElementTop = (el) => {
+        const rect = el.getBoundingClientRect();
+        if (container === window) {
+          return rect.top + (window.pageYOffset || document.documentElement.scrollTop);
+        }
+        const cRect = container.getBoundingClientRect();
+        return rect.top - cRect.top + container.scrollTop;
+      };
+
+      const getScrollTop = () => (
+        container === window
+          ? (window.pageYOffset || document.documentElement.scrollTop)
+          : container.scrollTop
+      );
+
+      const currentTop = getScrollTop();
+      // Use header bottom as the threshold so we always pick a manager below the sticky header
+      const threshold = currentTop + headerHeight + 1;
+
+      // Build sorted list of tops
+      const tops = managerCards.map(getElementTop);
+      // Find the index of the first manager whose top is at/after the header bottom
+      const firstIdx = tops.findIndex(top => top >= threshold);
+      // Choose the NEXT manager after the first visible one, wrapping to start
+      const targetIdx = firstIdx === -1 ? 0 : (firstIdx + 1) % managerCards.length;
+      let target = managerCards[targetIdx];
+
+      // Smooth scroll to target
+      const targetTop = getElementTop(target) - headerHeight - 8; // account for sticky header + small padding
+      if (container === window) {
+        window.scrollTo({ top: targetTop, behavior: 'smooth' });
+      } else {
+        container.scrollTo({ top: targetTop, behavior: 'smooth' });
+      }
+    } catch (e) {
+      // noop on failure
+    }
+  }, []);
+
+  // Scroll to previous manager (MGA/GA/SA) above the header
+  const scrollToPrevManager = useCallback(() => {
+    try {
+      const detectScrollable = () => {
+        const selectors = [
+          '.settings-content',
+          '.settings-section-large',
+          '.settings-section',
+          'main',
+          'body'
+        ];
+        for (const sel of selectors) {
+          const el = document.querySelector(sel);
+          if (el && el.scrollHeight > el.clientHeight) return el;
+        }
+        return window;
+      };
+
+      const container = detectScrollable();
+      const header = document.querySelector('.admin-hierarchy-controls-container') || document.querySelector('.admin-hierarchy-controls');
+      const headerHeight = header ? header.offsetHeight : 0;
+
+      let managerCards = Array.from(document.querySelectorAll(
+        '.admin-hierarchy-card[data-role="RGA"], .admin-hierarchy-card[data-role="MGA"], .admin-hierarchy-card[data-role="GA"], .admin-hierarchy-card[data-role="SA"], .hierarchy-table tbody tr[data-role="RGA"], .hierarchy-table tbody tr[data-role="MGA"], .hierarchy-table tbody tr[data-role="GA"], .hierarchy-table tbody tr[data-role="SA"]'
+      ));
+      if (!managerCards.length) {
+        const rows = Array.from(document.querySelectorAll('.hierarchy-table tbody tr'));
+        const roleSet = new Set(['RGA','MGA','GA','SA']);
+        managerCards = rows.filter(row => {
+          const cell = row.querySelector('td:nth-child(4)');
+          if (!cell) return false;
+          const text = (cell.textContent || '').trim().toUpperCase();
+          return roleSet.has(text);
+        });
+        if (!managerCards.length) return;
+      }
+
+      const getElementTop = (el) => {
+        const rect = el.getBoundingClientRect();
+        if (container === window) {
+          return rect.top + (window.pageYOffset || document.documentElement.scrollTop);
+        }
+        const cRect = container.getBoundingClientRect();
+        return rect.top - cRect.top + container.scrollTop;
+      };
+
+      const getScrollTop = () => (
+        container === window
+          ? (window.pageYOffset || document.documentElement.scrollTop)
+          : container.scrollTop
+      );
+
+      const currentTop = getScrollTop();
+      const threshold = currentTop + headerHeight + 1; // header bottom
+
+      const tops = managerCards.map(getElementTop);
+      const firstIdx = tops.findIndex(top => top >= threshold);
+      const prevIdx = firstIdx === -1 ? (managerCards.length - 1) : ((firstIdx - 1 + managerCards.length) % managerCards.length);
+      const target = managerCards[prevIdx];
+
+      const targetTop = getElementTop(target) - headerHeight - 8;
+      if (container === window) {
+        window.scrollTo({ top: targetTop, behavior: 'smooth' });
+      } else {
+        container.scrollTo({ top: targetTop, behavior: 'smooth' });
+      }
+    } catch (e) {
+      // noop
+    }
+  }, []);
+
   // Main render function
-  if (loading) {
+  // Show initial loading only for the first render
+  if (initialLoading) {
     return (
       <div className="route-loading" role="alert" aria-busy="true">
         <div className="spinner"></div>
@@ -1866,21 +2397,8 @@ const AdminHierarchySettings = () => {
     );
   }
 
-  if (!hasPermission('admin') && !loading && !rgaHierarchies.length) {
-    return (
-      <div className="settings-section">
-        <h1 className="settings-section-title">Hierarchy</h1>
-        <div className="settings-card">
-          <div className="settings-alert settings-alert-error">
-            {error || 'No hierarchy data available for your account.'}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="settings-section">
+    <div className="settings-section-large">
       
       {error && <div className="settings-alert settings-alert-error">{error}</div>}
       
@@ -1977,8 +2495,9 @@ const AdminHierarchySettings = () => {
       )}
       
       <div className="settings-card">
-        {/* Controls panel */}
-        <div className="admin-hierarchy-controls">
+        {/* Controls panel - now centered */}
+        <div className="admin-hierarchy-controls-container">
+          <div className="admin-hierarchy-controls">
           <div className="controls-left-section">
             <div className="hierarchy-search">
               <div className="search-input-wrapper">
@@ -2062,11 +2581,11 @@ const AdminHierarchySettings = () => {
                 </svg>
               </button>
               <button 
-                className={`view-toggle-button ${viewMode === 'table' ? 'active' : ''}`}
-                onClick={() => setViewMode('table')}
-                title="Table View"
+                className={`view-toggle-button ${viewMode === 'mga' ? 'active' : ''}`}
+                onClick={() => setViewMode('mga')}
+                title="MGA Teams View"
               >
-                <FiList />
+                <FiUsers />
               </button>
               
               <button className="admin-toggle-button" onClick={toggleAllRGAs} title={Object.values(expandedRGAs).some(isExpanded => isExpanded) ? "Collapse All" : "Expand All"}>
@@ -2075,12 +2594,18 @@ const AdminHierarchySettings = () => {
                   : <FiChevronDown />
                 }
               </button>
-              
+              <button className="admin-scroll-prev-button" onClick={scrollToPrevManager} title="Scroll to previous manager (MGA/GA/SA)">
+                Prev Manager
+              </button>
+              <button className="admin-scroll-next-button" onClick={scrollToNextManager} title="Scroll to next manager (MGA/GA/SA)">
+                Next Manager
+              </button>
               <button className="admin-export-button" onClick={exportToCSV} title="Export to CSV">
                 <FiDownload />
               </button>
             </div>
           </div>
+        </div>
         </div>
         
         {/* State filters visibility indicator */}
@@ -2116,16 +2641,45 @@ const AdminHierarchySettings = () => {
             {searchResults.totalMatches === 0 ? (
               <p>No results found for "{searchQuery}"</p>
             ) : (
-              <p>Found {searchResults.totalMatches} result(s) for "{searchQuery}" across {searchResults.matchingRgaGroups.length} RGA(s). <span className="search-tip">(Search works with first name, last name, or full name formats)</span></p>
+              <div>
+                <p>Found {searchResults.totalMatches} result(s) for "{searchQuery}" across {searchResults.matchingRgaGroups.length} RGA(s). <span className="search-tip">(Search works with first name, last name, or full name formats)</span></p>
+                
+                {/* Search Mode Toggle */}
+                <div className="search-mode-toggle">
+                  <span className="search-mode-label">View:</span>
+                  <button 
+                    className={`search-mode-button ${searchMode === 'full' ? 'active' : ''}`}
+                    onClick={() => {
+                      setSearchMode('full');
+                      // Re-trigger search with new mode immediately
+                      performSearch(searchQuery, 'full');
+                    }}
+                    title="Show only uplines and downlines"
+                  >
+                    Isolated
+                  </button>
+                  <button 
+                    className={`search-mode-button ${searchMode === 'isolated' ? 'active' : ''}`}
+                    onClick={() => {
+                      setSearchMode('isolated');
+                      // Re-trigger search with new mode immediately
+                      performSearch(searchQuery, 'isolated');
+                    }}
+                    title="Show full team hierarchy"
+                  >
+                    Full Team
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         )}
         
         {/* Processing stats if still loading data */}
-        {processingStats.inProgress && (
+        {(dataLoading || processingStats.inProgress) && (
           <div className="processing-stats">
-            <FiLoader className="spinner" />
-            <span>Loading hierarchies: {processingStats.loaded}/{processingStats.total} RGAs processed</span>
+            <div className="spinner"></div>
+            <span>Loading hierarchy data...</span>
           </div>
         )}
         
@@ -2133,6 +2687,29 @@ const AdminHierarchySettings = () => {
         {viewMode === 'tree' ? (
           /* Existing tree view content */
           <div className="admin-hierarchy-container">
+            {/* Show skeleton loading when no data yet */}
+            {rgaHierarchies.length === 0 && dataLoading && (
+              <div className="hierarchy-skeleton">
+                <div className="skeleton-rga-section">
+                  <div className="skeleton-rga-header">
+                    <div className="skeleton-text skeleton-rga-name"></div>
+                    <div className="skeleton-badge"></div>
+                  </div>
+                </div>
+                <div className="skeleton-rga-section">
+                  <div className="skeleton-rga-header">
+                    <div className="skeleton-text skeleton-rga-name"></div>
+                    <div className="skeleton-badge"></div>
+                  </div>
+                </div>
+                <div className="skeleton-rga-section">
+                  <div className="skeleton-rga-header">
+                    <div className="skeleton-text skeleton-rga-name"></div>
+                    <div className="skeleton-badge"></div>
+                  </div>
+                </div>
+              </div>
+            )}
             {rgaHierarchies.length > 0 ? (
               rgaHierarchies.map((rgaHierarchy, rgaIndex) => {
                 // Skip if this hierarchy doesn't have any matching users in search results
@@ -2206,17 +2783,32 @@ const AdminHierarchySettings = () => {
             )}
           </div>
         ) : (
-          /* Table view */
-          <AdminHierarchyTableView 
-            rgaHierarchies={rgaHierarchies} 
-            expandedRGAs={expandedRGAs}
-            setExpandedRGAs={setExpandedRGAs}
-            activeFilters={activeFilters}
-            searchQuery={searchQuery}
-            searchResults={searchResults}
-            error={error}
-            showControls={false} /* Hide the controls that are already shown above */
-          />
+          /* MGA Teams view */
+          <div>
+            {dataLoading ? (
+              <div className="mga-skeleton">
+                <div className="skeleton-text" style={{width: '200px', height: '18px', marginBottom: '15px'}}></div>
+                {[1,2,3].map(i => (
+                  <div key={i} className="skeleton-mga-row">
+                    <div className="skeleton-badge" style={{width: '40px', height: '20px'}}></div>
+                    <div className="skeleton-text" style={{width: '150px', height: '16px'}}></div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <HierarchyMGAUtilitiesTable 
+                searchQuery={searchQuery}
+                rgaHierarchies={rgaHierarchies}
+                dataLoading={dataLoading}
+                error={error}
+                activeFilters={activeFilters}
+                allAvailableStates={allAvailableStates}
+                passesAllFilters={passesAllFilters}
+                searchMode={searchMode}
+                searchResults={searchResults}
+              />
+            )}
+          </div>
         )}
       </div>
       

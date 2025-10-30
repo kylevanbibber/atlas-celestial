@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FiActivity, FiCheckCircle, FiAward, FiList, FiPercent, FiStar } from 'react-icons/fi';
+import { FiActivity, FiCheckCircle, FiAward, FiList, FiPercent, FiStar, FiTarget, FiTrendingUp } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import './Production.css';
 
 // Import component files
-import ProductionSidebar from '../components/production/ProductionSidebar';
+import SecondarySidebar from '../components/utils/SecondarySidebar';
 import DailyActivityForm from '../components/production/activity/DailyActivityForm';
-
+import ProductionTracker from '../components/production/activity/ProductionTracker';
+import ProductionGoals from '../components/production/ProductionGoals';
 import Verify from '../components/production/verification/Verify';
 import Release from '../components/production/release/Release';
 import Scorecard from '../components/production/Scorecard/Scorecard';
@@ -22,7 +23,8 @@ const Production = () => {
   // Check if user is admin with teamRole="app" to hide daily activity and set default section
   const hideDailyActivity = user?.Role === 'Admin' && user?.teamRole === 'app';
   const isAppTeam = user?.teamRole === 'app';
-  const defaultSection = hideDailyActivity ? 'verification' : 'daily-activity';
+  const hasProductionTrackerAccess = user?.Role === 'Admin' || user?.teamRole === 'app';
+  const defaultSection = hideDailyActivity ? 'production-tracker' : 'daily-activity';
   
   const [activeSection, setActiveSection] = useState(defaultSection);
   const navigate = useNavigate();
@@ -35,13 +37,10 @@ const Production = () => {
     
     // Define available sections based on user permissions
     let availableSections = hideDailyActivity 
-      ? ['scorecard', 'leaderboard', 'verification', 'release']
-      : ['daily-activity', 'scorecard', 'leaderboard', 'verification'];
-    
-    // Add VIPs section for app team users
-    if (isAppTeam) {
-      availableSections.push('vips');
-    }
+      ? ['production-tracker', 'scorecard', 'leaderboard', 'verification', 'release', 'vips', 'goals']
+      : hasProductionTrackerAccess
+      ? ['daily-activity', 'production-tracker', 'scorecard', 'leaderboard', 'verification', 'vips', 'goals']
+      : ['daily-activity', 'scorecard', 'leaderboard', 'verification', 'vips', 'goals'];
     
     if (section && availableSections.includes(section)) {
       setActiveSection(section);
@@ -50,7 +49,7 @@ const Production = () => {
       setActiveSection('verification');
       navigate('/production?section=verification', { replace: true });
     }
-  }, [location, hideDailyActivity, activeSection, navigate, isAppTeam]);
+  }, [location, hideDailyActivity, activeSection, navigate, isAppTeam, hasProductionTrackerAccess]);
   
   // Update URL when section changes
   const handleSectionChange = (section) => {
@@ -61,16 +60,16 @@ const Production = () => {
   // Production navigation items (alphabetical order)
   let productionItems = [
     ...(hideDailyActivity ? [] : [{ id: 'daily-activity', label: 'Daily Activity', icon: <FiActivity /> }]),
+    { id: 'goals', label: 'Goals', icon: <FiTarget /> },
     { id: 'leaderboard', label: 'Leaderboard', icon: <FiAward /> },
+    ...(hasProductionTrackerAccess ? [{ id: 'production-tracker', label: 'Production Tracker', icon: <FiTrendingUp /> }] : []),
     ...(hideDailyActivity ? [{ id: 'release', label: 'Release', icon: <FiList /> }] : []),
     { id: 'scorecard', label: 'Scorecard', icon: <FiPercent /> },
     { id: 'verification', label: 'Verification', icon: <FiCheckCircle /> },
   ];
   
-  // Add VIPs section for app team users
-  if (isAppTeam) {
-    productionItems.push({ id: 'vips', label: 'VIPs', icon: <FiStar /> });
-  }
+  // Add Codes & VIPs section for everyone
+  productionItems.push({ id: 'vips', label: 'Codes & VIPs', icon: <FiStar /> });
   
   // Items that need warning indicators (none for now)
   const warningItems = [];
@@ -83,6 +82,12 @@ const Production = () => {
           return <Scorecard />;
         }
         return <DailyActivityForm />;
+      
+      case 'production-tracker':
+        return <ProductionTracker />;
+
+      case 'goals':
+        return <ProductionGoals />;
 
       case 'scorecard':
         return <Scorecard />;
@@ -101,7 +106,7 @@ const Production = () => {
         
       default:
         if (hideDailyActivity) {
-          return <Verify />;
+          return <ProductionTracker />;
         }
         return <DailyActivityForm />;
     }
@@ -109,7 +114,7 @@ const Production = () => {
   
   return (
     <div className="settings-container">
-      <ProductionSidebar 
+      <SecondarySidebar 
         items={productionItems} 
         activeItem={activeSection} 
         onItemClick={handleSectionChange} 
@@ -131,14 +136,5 @@ const ProductionReportsPlaceholder = () => (
     <p>This section will contain production reports and analytics.</p>
   </div>
 );
-
-const ProductionGoalsPlaceholder = () => (
-  <div>
-    <h2>Production Goals</h2>
-    <p>This section will contain goal setting and tracking features.</p>
-  </div>
-);
-
-
 
 export default Production; 

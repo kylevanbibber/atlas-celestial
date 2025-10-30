@@ -31,20 +31,12 @@ router.use(cors(corsOptions));
 
 // Handle signed document submission
 router.post('/sign', upload.single('file'), async (req, res) => {
-  console.log('Received signing request:', {
-    body: req.body,
-    file: req.file ? {
-      originalname: req.file.originalname,
-      mimetype: req.file.mimetype,
-      size: req.file.size
-    } : null
-  });
 
-  const { token, clientEmail } = req.body;
+
+  const { token, clientEmail, agentEmail, documentType } = req.body;
   const file = req.file;
   
   if (!file || !token) {
-    console.log('Missing file or token:', { file: !!file, token: !!token });
     return res.status(400).json({ 
       success: false, 
       message: 'Missing signed file or token' 
@@ -64,9 +56,16 @@ router.post('/sign', upload.single('file'), async (req, res) => {
       const json = Buffer.from(decodedToken, 'base64').toString();
       tokenData = JSON.parse(json);
       
-      // Validate required fields
-      if (!tokenData.clientName || !tokenData.agentName || !tokenData.agentEmail) {
-        throw new Error('Invalid token data - missing required fields');
+      // Validate required fields based on document type
+      if (documentType === 'agent') {
+        if (!tokenData.agentName || !tokenData.agentID) {
+          throw new Error('Invalid token data - missing required agent fields');
+        }
+      } else {
+        // Default to client document validation
+        if (!tokenData.clientName || !tokenData.agentName) {
+          throw new Error('Invalid token data - missing required client fields');
+        }
       }
     } catch (error) {
       console.error('Token validation error:', error);
@@ -82,14 +81,20 @@ router.post('/sign', upload.single('file'), async (req, res) => {
       fs.mkdirSync(documentsDir, { recursive: true });
     }
 
-    // Generate unique filename
+    // Generate unique filename based on document type
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `signed-document-${tokenData.clientName.replace(/[^a-zA-Z0-9]/g, '_')}-${timestamp}.pdf`;
+    let filename;
+    if (documentType === 'agent') {
+      const agentIdentifier = `${tokenData.agentName || 'Agent'}_${tokenData.agentID || 'NoID'}`.replace(/[^a-zA-Z0-9]/g, '_');
+      filename = `signed-agent-document-${agentIdentifier}-${timestamp}.pdf`;
+    } else {
+      const clientIdentifier = tokenData.clientName ? tokenData.clientName.replace(/[^a-zA-Z0-9]/g, '_') : 'Client';
+      filename = `signed-document-${clientIdentifier}-${timestamp}.pdf`;
+    }
     const filepath = path.join(documentsDir, filename);
 
     // Save the signed document
     fs.writeFileSync(filepath, file.buffer);
-    console.log('Document saved to:', filepath);
 
     // Configure email transporter (fixed method name)
     const transporter = nodemailer.createTransport({
@@ -103,27 +108,54 @@ router.post('/sign', upload.single('file'), async (req, res) => {
       tls: { rejectUnauthorized: false }
     });
 
-    // Prepare email content
-    const emailSubject = `Signed AD&D Gift Certificate - ${tokenData.clientName}`;
-    const emailBody = `
-      <h3>New Signed AD&D Gift Certificate</h3>
-      <p><strong>Client:</strong> ${tokenData.clientName}</p>
-      <p><strong>Agent:</strong> ${tokenData.agentName}</p>
-      <p><strong>Date of Birth:</strong> ${tokenData.dateOfBirth}</p>
-      <p><strong>Address:</strong> ${tokenData.address}, ${tokenData.city}, ${tokenData.state} ${tokenData.zip}</p>
-      <p><strong>Phone:</strong> ${tokenData.phoneNumber}</p>
-      <p><strong>Beneficiary:</strong> ${tokenData.beneficiary}</p>
-      <p><strong>Relationship:</strong> ${tokenData.relationshipToInsured}</p>
-      <p><strong>Signed:</strong> ${new Date().toLocaleString()}</p>
-      <p>Please find the signed document attached.</p>
-    `;
+    // Prepare email content based on document type
+    let emailSubject, emailBody;
+    if (documentType === 'agent') {
+      emailSubject = `Signed Agent Documentation - ${tokenData.agentName}`;
+      emailBody = `
+        <h3>New Signed Agent Documentation</h3>
+        <p><strong>Agent Name:</strong> ${tokenData.agentName}</p>
+        <p><strong>Phone:</strong> ${tokenData.phoneNumber || 'N/A'}</p>
+        <p><strong>Email:</strong> ${tokenData.email || 'N/A'}</p>
+        <p><strong>Signed:</strong> ${new Date().toLocaleString()}</p>
+        <p>Please find the signed agent documentation attached.</p>
+      `;
+    } else {
+      emailSubject = `Signed AD&D Gift Certificate - ${tokenData.clientName}`;
+      emailBody = `
+        <h3>New Signed AD&D Gift Certificate</h3>
+        <p><strong>Client:</strong> ${tokenData.clientName}</p>
+        <p><strong>Agent:</strong> ${tokenData.agentName}</p>
+        <p><strong>Date of Birth:</strong> ${tokenData.dateOfBirth}</p>
+        <p><strong>Address:</strong> ${tokenData.address}, ${tokenData.city}, ${tokenData.state} ${tokenData.zip}</p>
+        <p><strong>Phone:</strong> ${tokenData.phoneNumber}</p>
+        <p><strong>Beneficiary:</strong> ${tokenData.beneficiary}</p>
+        <p><strong>Relationship:</strong> ${tokenData.relationshipToInsured}</p>
+        <p><strong>Signed:</strong> ${new Date().toLocaleString()}</p>
+        <p>Please find the signed document attached.</p>
+      `;
+    }
 
-    // Prepare recipients
-    const recipients = [process.env.SIGNING_RECEIVER || 'IGCERTS@Globe.Life'];
-    if (tokenData.agentEmail) recipients.push(tokenData.agentEmail);
-    if (clientEmail && clientEmail.trim()) recipients.push(clientEmail.trim());
+    // Prepare recipients based on document type
+    let recipients = [];
+    
+    if (documentType === 'agent') {
+      // For agent documents, send to specific email
+      recipients.push('esign@ariasagencies.com');
+      
+      // Also add supervisor email and agent email
+      if (tokenData.supervisorEmail) recipients.push(tokenData.supervisorEmail);
+      if (tokenData.email) recipients.push(tokenData.email);
+      if (agentEmail && agentEmail.trim()) recipients.push(agentEmail.trim());
+    } else {
+      // For client documents, use default recipient
+      recipients.push(process.env.SIGNING_RECEIVER || 'IGCERTS@Globe.Life');
+      
+      // Add agent email and client email
+      if (tokenData.agentEmail) recipients.push(tokenData.agentEmail);
+      if (clientEmail && clientEmail.trim()) recipients.push(clientEmail.trim());
+    }
 
-    console.log('Sending email to recipients:', recipients);
 
     // Send email with attachment
     await transporter.sendMail({
@@ -138,7 +170,6 @@ router.post('/sign', upload.single('file'), async (req, res) => {
       }]
     });
 
-    console.log('Email sent successfully');
     
     res.json({
       success: true,

@@ -1,0 +1,1818 @@
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { FiChevronLeft, FiChevronRight, FiCalendar, FiDownload, FiSearch, FiList, FiGrid, FiFilter, FiUpload } from 'react-icons/fi';
+import DataTable from './DataTable';
+import ActionBar from './ActionBar';
+import { useAuth } from '../../context/AuthContext';
+import { useUserHierarchy } from '../../hooks/useUserHierarchy';
+
+import api from '../../api';
+import * as XLSX from 'xlsx';
+import './Pnp.css';
+
+// Define field types for formatting
+const CURRENCY_FIELDS = [
+  'curr_mo_grs_submit', 'curr_mo_net_submit',
+  'past_12_mo_life_grs_submit', 'past_12_mo_life_net_submit',
+  'cur_ytd_life_grs_submit', 'cur_ytd_life_net_submit',
+  'curr_mo_submit', 'curr_mo_net_iss', 'curr_mo_net_sub',
+  'proj_plus_1_submit', 'proj_plus_1_net_iss', 'proj_plus_1_net_sub',
+  'proj_plus_2_submit', 'proj_plus_2_net_iss', 'proj_plus_2_net_sub'
+];
+
+const PERCENTAGE_FIELDS = [
+  'curr_mo_pct', 'past_12_mo_life_pct', 'cur_ytd_pct',
+  'curr_mo_4mo_rate', 'proj_plus_1_4mo_rate', 'proj_plus_2_4mo_rate'
+];
+
+const NUMERIC_FIELDS = [
+  'curr_mo_paid4mo', 'proj_plus_1_paid4mo', 'proj_plus_2_paid4mo'
+];
+
+const DATE_RANGE_FIELDS = [
+  'proj_plus_1_months', 'proj_plus_2_months'
+];
+
+// Helper functions to parse values to numbers (for sorting)
+const parseToNumber = (value) => {
+  if (!value || value === '' || value === null || value === undefined || value === 'N/A') return 0;
+  
+  // Remove commas and other formatting before parsing
+  const cleanValue = String(value).replace(/[,$%]/g, '');
+  const num = parseFloat(cleanValue);
+  return isNaN(num) ? 0 : num;
+};
+
+// Helper function to format currency values (for display only)
+const formatCurrency = (value) => {
+  const num = typeof value === 'number' ? value : parseToNumber(value);
+  if (num === 0) return '$0';
+  
+  return '$' + num.toLocaleString('en-US', { 
+    minimumFractionDigits: 0, 
+    maximumFractionDigits: 0 
+  });
+};
+
+// Helper function to format percentage values (for display only)
+const formatPercentage = (value) => {
+  const num = typeof value === 'number' ? value : parseToNumber(value);
+  if (num === 0) return '0%';
+  
+  // If the value is already a percentage (like 25.5), just add %
+  // If it's a decimal (like 0.255), multiply by 100
+  const displayValue = num > 1 ? num : num * 100;
+  return displayValue.toFixed(1) + '%';
+};
+
+// Helper function to format numeric values (for display only)
+const formatNumber = (value) => {
+  const num = typeof value === 'number' ? value : parseToNumber(value);
+  if (num === 0) return '0';
+  
+  return num.toLocaleString('en-US');
+};
+
+// Helper function for date range fields (don't parse as numbers)
+const formatDateRange = (value) => {
+  if (!value || value === '' || value === null || value === undefined || value === 'N/A') return '';
+  return String(value); // Keep as-is for date ranges like "10/24-03/25"
+};
+
+// Function to convert string values to numbers for proper sorting
+const convertPnpRowData = (row) => {
+  const convertedRow = {};
+  
+
+  
+  Object.keys(row).forEach(key => {
+    if (CURRENCY_FIELDS.includes(key) || PERCENTAGE_FIELDS.includes(key) || NUMERIC_FIELDS.includes(key)) {
+      const original = row[key];
+      const numericValue = parseToNumber(row[key]);
+      convertedRow[key] = numericValue;
+      
+    
+    } else if (DATE_RANGE_FIELDS.includes(key)) {
+      // Keep date ranges as strings
+      convertedRow[key] = formatDateRange(row[key]);
+    } else {
+      // Keep original value for text fields like name_line, esid, agent_num
+      convertedRow[key] = row[key];
+    }
+  });
+  
+
+  
+  return convertedRow;
+};
+
+// Helper functions for hierarchy view (mirroring HierarchyMGAUtilitiesTable)
+const groupAgentsByMGA = (users) => {
+  const groups = new Map();
+  users.forEach(u => {
+    const mgaName = u.mga || u.lagnname;
+    if (!groups.has(mgaName)) groups.set(mgaName, new Set());
+    groups.get(mgaName).add(u.lagnname);
+    if (u.clname === 'MGA' || u.lagnname === mgaName) {
+      groups.get(mgaName).add(mgaName);
+    }
+  });
+  return new Map([...groups.entries()].map(([k, v]) => [k, Array.from(v)]));
+};
+
+const buildHierarchy = (agents) => {
+  const order = ['RGA','MGA','GA','SA','AGT'];
+  const nodesByName = new Map();
+  agents.forEach(a => { nodesByName.set(a.lagnname, { ...a, children: [] }); });
+  const roots = [];
+  agents.forEach(a => {
+    const node = nodesByName.get(a.lagnname);
+    let parentName = null;
+    if (a.sa && nodesByName.has(a.sa)) parentName = a.sa; else
+    if (a.ga && nodesByName.has(a.ga)) parentName = a.ga; else
+    if (a.mga && nodesByName.has(a.mga)) parentName = a.mga; else
+    if (a.rga && nodesByName.has(a.rga)) parentName = a.rga;
+    if (parentName && nodesByName.has(parentName)) nodesByName.get(parentName).children.push(node);
+    else roots.push(node);
+  });
+  const sortRec = (arr, parent = null) => arr
+    .sort((a,b)=> {
+      const aRole = String(a.clname || '').toUpperCase();
+      const bRole = String(b.clname || '').toUpperCase();
+      const orphanA = (aRole === 'AGT' && !a.sa && !a.ga);
+      const orphanB = (bRole === 'AGT' && !b.sa && !b.ga);
+      if (parent && String(parent.clname || '').toUpperCase() === 'GA') {
+        const agtNoSaA = (aRole === 'AGT' && !a.sa);
+        const agtNoSaB = (bRole === 'AGT' && !b.sa);
+        if (agtNoSaA !== agtNoSaB) return agtNoSaA ? -1 : 1;
+        const isSaA = (aRole === 'SA');
+        const isSaB = (bRole === 'SA');
+        if (isSaA !== isSaB) return isSaA ? 1 : -1;
+      }
+      if (orphanA !== orphanB) return orphanA ? -1 : 1;
+      const oa = order.indexOf(aRole);
+      const ob = order.indexOf(bRole);
+      if (oa === ob) return a.lagnname.localeCompare(b.lagnname);
+      return oa - ob;
+    })
+    .map(n => ({ ...n, children: sortRec(n.children, n) }));
+  return sortRec(roots);
+};
+
+
+const PNP_UPLOAD_URL = 'https://peaceful-badlands-42414-7b2e5f9acb76.herokuapp.com/upload/pnp';
+
+const Pnp = () => {
+  const { user } = useAuth();
+  const { hierarchyData, hierarchyLoading, getHierarchyForComponent } = useUserHierarchy();
+  const isAdmin = user?.Role === 'Admin'; // Any admin can see all PnP data
+  
+  // Get allowed names from cached hierarchy data, excluding managerActive = 'n' users
+  const allowedNames = useMemo(() => {
+    if (isAdmin) return []; // Admins see all data
+    
+    // Get full hierarchy data to check managerActive status
+    const fullHierarchyData = getHierarchyForComponent('full') || [];
+    
+    // Create a map of name to managerActive status
+    const managerActiveMap = new Map();
+    fullHierarchyData.forEach(user => {
+      if (user.lagnname && user.managerActive !== undefined) {
+        managerActiveMap.set(String(user.lagnname).toLowerCase(), String(user.managerActive).toLowerCase() === 'y');
+      }
+    });
+    
+    // Get base allowed names and filter out managerActive = 'n' users
+    const baseAllowedNames = getHierarchyForComponent('names') || [];
+    return baseAllowedNames.filter(name => {
+      const isManagerActive = managerActiveMap.get(String(name).toLowerCase());
+      return isManagerActive !== false; // Include if not found (undefined) or if true
+    });
+  }, [isAdmin, getHierarchyForComponent]);
+  
+  const allowedNamesSet = useMemo(() => new Set(allowedNames.map(name => String(name).toLowerCase())), [allowedNames]);
+  const [availableDates, setAvailableDates] = useState([]);
+  const [currentDateIndex, setCurrentDateIndex] = useState(0);
+  const [pnpData, setPnpData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('all');
+  const [isPreparedForExport, setIsPreparedForExport] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState('flat'); // 'flat' or 'hierarchy'
+  const [expandedMga, setExpandedMga] = useState({});
+  const [hierarchyUsers, setHierarchyUsers] = useState([]);
+  const [pnpHierarchyLoading, setPnpHierarchyLoading] = useState(false);
+  // Upload state
+  const [uploading, setUploading] = useState(false);
+  const [processingUpload, setProcessingUpload] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState(null);
+  // No options: always process all pages and all levels
+  const [selectedFileName, setSelectedFileName] = useState('');
+  const fileInputRef = useRef(null);
+  
+  // Filter state
+  const [activeFilters, setActiveFilters] = useState({
+    esidRange: { min: '', max: '' },
+    grossSubmitRange: { min: '', max: '' },
+    netSubmitRange: { min: '', max: '' },
+    fourMoRateRange: { min: '', max: '' },
+    proj1Range: { min: '', max: '' },
+    proj2Range: { min: '', max: '' },
+    showZeroValues: true // Whether to show rows with zero/null values
+  });
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+
+  // Determine if user should see tabs (Admin or teamRole = 'app')
+  const shouldShowTabs = isAdmin || user?.teamRole === 'app';
+
+  // Tab definitions with filtering logic (only used if shouldShowTabs is true)
+  const tabs = [
+    { id: 'all', label: 'All', description: 'All records' },
+    { id: 'over', label: 'Over', description: 'All 4mo rates ≥ 85%' },
+    { id: 'under', label: 'Under', description: 'Any 4mo rate < 85%' }
+  ];
+
+  // Filter functions
+  const updateRangeFilter = (filterName, field, value) => {
+    setActiveFilters(prev => ({
+      ...prev,
+      [filterName]: {
+        ...prev[filterName],
+        [field]: value
+      }
+    }));
+  };
+
+  const clearAllFilters = () => {
+    setActiveFilters({
+      esidRange: { min: '', max: '' },
+      grossSubmitRange: { min: '', max: '' },
+      netSubmitRange: { min: '', max: '' },
+      fourMoRateRange: { min: '', max: '' },
+      proj1Range: { min: '', max: '' },
+      proj2Range: { min: '', max: '' },
+      showZeroValues: true
+    });
+  };
+
+  const toggleZeroValuesFilter = () => {
+    setActiveFilters(prev => ({
+      ...prev,
+      showZeroValues: !prev.showZeroValues
+    }));
+  };
+
+  const hasActiveFilters = () => {
+    return activeFilters.esidRange.min || activeFilters.esidRange.max ||
+           activeFilters.grossSubmitRange.min || activeFilters.grossSubmitRange.max ||
+           activeFilters.netSubmitRange.min || activeFilters.netSubmitRange.max ||
+           activeFilters.fourMoRateRange.min || activeFilters.fourMoRateRange.max ||
+           activeFilters.proj1Range.min || activeFilters.proj1Range.max ||
+           activeFilters.proj2Range.min || activeFilters.proj2Range.max ||
+           !activeFilters.showZeroValues;
+  };
+
+  // Check if a row passes all active filters
+  const passesAllFilters = (row) => {
+    // ESID filter (date range)
+    if (activeFilters.esidRange.min || activeFilters.esidRange.max) {
+      const esidDate = row.esid ? new Date(row.esid) : null;
+      if (!esidDate) return false;
+      
+      if (activeFilters.esidRange.min) {
+        const minDate = new Date(activeFilters.esidRange.min);
+        if (esidDate < minDate) return false;
+      }
+      
+      if (activeFilters.esidRange.max) {
+        const maxDate = new Date(activeFilters.esidRange.max);
+        if (esidDate > maxDate) return false;
+      }
+    }
+
+    // Numeric range filters
+    const numericFilters = [
+      { filter: 'grossSubmitRange', field: 'curr_mo_grs_submit' },
+      { filter: 'netSubmitRange', field: 'curr_mo_net_submit' },
+      { filter: 'fourMoRateRange', field: 'curr_mo_4mo_rate' },
+      { filter: 'proj1Range', field: 'curr_mo_proj_1' },
+      { filter: 'proj2Range', field: 'curr_mo_proj_2' }
+    ];
+
+    for (const { filter, field } of numericFilters) {
+      const filterRange = activeFilters[filter];
+      if (filterRange.min !== '' || filterRange.max !== '') {
+        const value = parseFloat(row[field]) || 0;
+        
+        // If showZeroValues is false and value is 0, exclude this row
+        if (!activeFilters.showZeroValues && value === 0) {
+          return false;
+        }
+        
+        if (filterRange.min !== '' && value < parseFloat(filterRange.min)) {
+          return false;
+        }
+        
+        if (filterRange.max !== '' && value > parseFloat(filterRange.max)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  };
+
+  // Filter data based on active tab and search term
+  const getFilteredData = (data) => {
+    let filtered = [...data];
+    
+    // Apply custom filters first
+    filtered = filtered.filter(passesAllFilters);
+    
+    // Apply tab filter only if user should see tabs
+    if (shouldShowTabs && activeTab !== 'all') {
+      filtered = filtered.filter(row => {
+        const currMo4MoRate = row.curr_mo_4mo_rate || 0;
+        const proj1Rate = row.proj_plus_1_4mo_rate || 0;
+        const proj2Rate = row.proj_plus_2_4mo_rate || 0;
+        
+        switch (activeTab) {
+          case 'over':
+            // All rates >= 85
+            return currMo4MoRate >= 85 && proj1Rate >= 85 && proj2Rate >= 85;
+          case 'under':
+            // Any rate < 85
+            return currMo4MoRate < 85 || proj1Rate < 85 || proj2Rate < 85;
+          default:
+            return true;
+        }
+      });
+    }
+    
+    // Apply search filter
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter(row => {
+        const nameLineMatch = row.name_line?.toLowerCase().includes(searchLower);
+        const esidMatch = row.esid?.toLowerCase().includes(searchLower);
+        const agentNumMatch = row.agent_num?.toLowerCase().includes(searchLower);
+        
+        return nameLineMatch || esidMatch || agentNumMatch;
+      });
+    }
+    
+    return filtered;
+  };
+
+  const filteredData = getFilteredData(pnpData);
+
+  // Create hierarchical display data (mirroring HierarchyMGAUtilitiesTable logic)
+  const getHierarchicalDisplayData = () => {
+    if (viewMode !== 'hierarchy') {
+      return filteredData;
+    }
+
+    // If hierarchy data is still loading, return filtered data
+    if (pnpHierarchyLoading || hierarchyUsers.length === 0) {
+      return filteredData;
+    }
+
+    // Create a P&P data lookup by name
+    const pnpLookup = new Map();
+    filteredData.forEach(record => {
+      if (record.name_line) {
+        pnpLookup.set(record.name_line.toLowerCase(), record);
+      }
+    });
+
+    // Group hierarchy users by MGA (same as HierarchyMGAUtilitiesTable)
+    const mgaToAgents = groupAgentsByMGA(hierarchyUsers);
+    
+    // Create base MGA rows
+    const baseRows = [];
+    mgaToAgents.forEach((agents, mgaName) => {
+      // Find the MGA user data
+      const mgaUser = hierarchyUsers.find(u => u.lagnname === mgaName && u.clname === 'MGA') || 
+                      hierarchyUsers.find(u => u.lagnname === mgaName);
+      
+      // Get P&P data for this MGA if available
+      const mgaPnpData = pnpLookup.get(mgaName.toLowerCase());
+      
+      baseRows.push({ 
+        id: mgaName, 
+        role: 'MGA', 
+        name: mgaName, 
+        depth: 0,
+        email: mgaUser?.email || '',
+        phone: mgaUser?.phone || '',
+        esid: mgaUser?.esid || '',
+        userData: mgaUser || {},
+        pnpData: mgaPnpData,
+        // Use P&P data if available, otherwise use empty values
+        name_line: mgaName,
+        agent_num: mgaPnpData?.agent_num || '',
+        curr_mo_grs_submit: mgaPnpData?.curr_mo_grs_submit || 0,
+        curr_mo_net_submit: mgaPnpData?.curr_mo_net_submit || 0,
+        curr_mo_pct: mgaPnpData?.curr_mo_pct || 0,
+        curr_mo_4mo_rate: mgaPnpData?.curr_mo_4mo_rate || 0,
+        past_12_mo_life_grs_submit: mgaPnpData?.past_12_mo_life_grs_submit || 0,
+        past_12_mo_life_net_submit: mgaPnpData?.past_12_mo_life_net_submit || 0,
+        past_12_mo_life_pct: mgaPnpData?.past_12_mo_life_pct || 0,
+        cur_ytd_life_grs_submit: mgaPnpData?.cur_ytd_life_grs_submit || 0,
+        cur_ytd_life_net_submit: mgaPnpData?.cur_ytd_life_net_submit || 0,
+        cur_ytd_pct: mgaPnpData?.cur_ytd_pct || 0,
+        proj_plus_1_months: mgaPnpData?.proj_plus_1_months || '',
+        proj_plus_1_submit: mgaPnpData?.proj_plus_1_submit || 0,
+        proj_plus_1_net_iss: mgaPnpData?.proj_plus_1_net_iss || 0,
+        proj_plus_1_net_sub: mgaPnpData?.proj_plus_1_net_sub || 0,
+        proj_plus_1_paid4mo: mgaPnpData?.proj_plus_1_paid4mo || 0,
+        proj_plus_1_4mo_rate: mgaPnpData?.proj_plus_1_4mo_rate || 0,
+        proj_plus_2_months: mgaPnpData?.proj_plus_2_months || '',
+        proj_plus_2_submit: mgaPnpData?.proj_plus_2_submit || 0,
+        proj_plus_2_net_iss: mgaPnpData?.proj_plus_2_net_iss || 0,
+        proj_plus_2_net_sub: mgaPnpData?.proj_plus_2_net_sub || 0,
+        proj_plus_2_paid4mo: mgaPnpData?.proj_plus_2_paid4mo || 0,
+        proj_plus_2_4mo_rate: mgaPnpData?.proj_plus_2_4mo_rate || 0,
+        isMgaHeader: true
+      });
+    });
+
+    // Sort base rows
+    const sortedBaseRows = baseRows.sort((a, b) => a.name.localeCompare(b.name));
+
+    // Build display rows
+    const displayRows = [];
+    sortedBaseRows.forEach(mgaRow => {
+      displayRows.push(mgaRow);
+      
+      // Add agent hierarchy if MGA is expanded
+      if (expandedMga[mgaRow.id]) {
+        const agents = hierarchyUsers.filter(u => u.mga === mgaRow.name || u.lagnname === mgaRow.name);
+        const tree = buildHierarchy(agents);
+        
+        // Flatten the tree and add P&P data
+        const flattenTree = (nodes, depth) => {
+          nodes.forEach(node => {
+            const nodePnpData = pnpLookup.get(node.lagnname.toLowerCase());
+            
+            displayRows.push({
+              id: `${mgaRow.id}::${node.lagnname}`,
+              role: node.clname || '',
+              name: node.lagnname,
+              depth,
+              email: node.email || '',
+              phone: node.phone || '',
+              esid: node.esid || '',
+              userData: node,
+              pnpData: nodePnpData,
+              // Merge hierarchy user data with P&P data
+              name_line: node.lagnname,
+              agent_num: nodePnpData?.agent_num || '',
+              curr_mo_grs_submit: nodePnpData?.curr_mo_grs_submit || 0,
+              curr_mo_net_submit: nodePnpData?.curr_mo_net_submit || 0,
+              curr_mo_pct: nodePnpData?.curr_mo_pct || 0,
+              curr_mo_4mo_rate: nodePnpData?.curr_mo_4mo_rate || 0,
+              past_12_mo_life_grs_submit: nodePnpData?.past_12_mo_life_grs_submit || 0,
+              past_12_mo_life_net_submit: nodePnpData?.past_12_mo_life_net_submit || 0,
+              past_12_mo_life_pct: nodePnpData?.past_12_mo_life_pct || 0,
+              cur_ytd_life_grs_submit: nodePnpData?.cur_ytd_life_grs_submit || 0,
+              cur_ytd_life_net_submit: nodePnpData?.cur_ytd_life_net_submit || 0,
+              cur_ytd_pct: nodePnpData?.cur_ytd_pct || 0,
+              proj_plus_1_months: nodePnpData?.proj_plus_1_months || '',
+              proj_plus_1_submit: nodePnpData?.proj_plus_1_submit || 0,
+              proj_plus_1_net_iss: nodePnpData?.proj_plus_1_net_iss || 0,
+              proj_plus_1_net_sub: nodePnpData?.proj_plus_1_net_sub || 0,
+              proj_plus_1_paid4mo: nodePnpData?.proj_plus_1_paid4mo || 0,
+              proj_plus_1_4mo_rate: nodePnpData?.proj_plus_1_4mo_rate || 0,
+              proj_plus_2_months: nodePnpData?.proj_plus_2_months || '',
+              proj_plus_2_submit: nodePnpData?.proj_plus_2_submit || 0,
+              proj_plus_2_net_iss: nodePnpData?.proj_plus_2_net_iss || 0,
+              proj_plus_2_net_sub: nodePnpData?.proj_plus_2_net_sub || 0,
+              proj_plus_2_paid4mo: nodePnpData?.proj_plus_2_paid4mo || 0,
+              proj_plus_2_4mo_rate: nodePnpData?.proj_plus_2_4mo_rate || 0,
+              isMgaHeader: false
+            });
+            
+            if (node.children && node.children.length) {
+              flattenTree(node.children, depth + 1);
+            }
+          });
+        };
+        
+        flattenTree(tree, 1);
+      }
+    });
+    
+    return displayRows;
+  };
+
+  const displayData = getHierarchicalDisplayData();
+
+  // Handle MGA row expansion
+  const handleMgaExpansion = (mgaName) => {
+    setExpandedMga(prev => ({
+      ...prev,
+      [mgaName]: !prev[mgaName]
+    }));
+  };
+
+  // Fetch hierarchy data (similar to HierarchyMGAUtilitiesTable)
+  const fetchHierarchyData = async () => {
+    if (viewMode !== 'hierarchy') return; // Only fetch when needed
+    
+    setPnpHierarchyLoading(true);
+    try {
+      if (!user?.userId) throw new Error('No user');
+      
+      const isOrgAdmin = isAdmin || user?.teamRole === 'app';
+      let hierarchyResponse;
+      
+      if (isOrgAdmin) {
+        // Load all hierarchies across the organization (same as HierarchyMGAUtilitiesTable)
+        hierarchyResponse = await api.get('/admin/getAllRGAsHierarchy');
+      } else {
+        // Load only current user's hierarchy (lite version)
+        hierarchyResponse = await api.post('/auth/searchByUserIdLite', { userId: user.userId });
+      }
+      
+      if (!hierarchyResponse.data?.success) {
+        throw new Error('Hierarchy load failed');
+      }
+      
+      let users = [];
+      if (isOrgAdmin) {
+        // Flatten all RGA hierarchies
+        (hierarchyResponse.data.data || []).forEach(h => {
+          (h.hierarchyData || []).forEach(u => users.push(u));
+        });
+      } else {
+        users = hierarchyResponse.data.data || [];
+      }
+      
+      // Filter active users (similar to HierarchyMGAUtilitiesTable)
+      const activeUsers = users.filter(u => {
+        const active = String(u.Active || '').toLowerCase() === 'y';
+        const mgrActive = String(u.managerActive || '').toLowerCase() === 'y';
+        return active && mgrActive && u.lagnname;
+      });
+      
+      setHierarchyUsers(activeUsers);
+    } catch (err) {
+      console.error('Error fetching hierarchy data:', err);
+      setError('Failed to fetch hierarchy data');
+    } finally {
+      setPnpHierarchyLoading(false);
+    }
+  };
+
+  // Fetch available dates on component mount
+  useEffect(() => {
+    fetchAvailableDates();
+  }, []);
+
+  // Fetch hierarchy data when switching to hierarchy view
+  useEffect(() => {
+    if (viewMode === 'hierarchy' && hierarchyUsers.length === 0) {
+      fetchHierarchyData();
+    }
+  }, [viewMode, user?.userId]);
+
+  // Fetch data when date changes or hierarchy data is ready
+  useEffect(() => {
+    if (availableDates.length > 0 && (isAdmin || (hierarchyData && allowedNames.length > 0))) {
+      fetchPnpData(availableDates[currentDateIndex]);
+    }
+  }, [currentDateIndex, availableDates, isAdmin, hierarchyData, allowedNames]);
+
+  const fetchAvailableDates = async () => {
+    try {
+      const response = await api.get('/pnp/dates');
+      const result = response.data;
+      
+      if (result.success && result.dates.length > 0) {
+        setAvailableDates(result.dates);
+        setCurrentDateIndex(0);
+      } else {
+        setError('No P&P data available');
+      }
+    } catch (err) {
+      console.error('Error fetching PnP dates:', err);
+      setError('Failed to fetch P&P dates');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Upload handlers (Admin or teamRole = 'app' only)
+  const handleChooseFile = () => {
+    setUploadError(null);
+    if (fileInputRef.current) fileInputRef.current.click();
+  };
+
+  const handleFileChange = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (!/\.pdf$/i.test(f.name)) {
+      setUploadError('Please select a PDF file');
+      return;
+    }
+    setSelectedFileName(f.name);
+  };
+
+  const handleProcess = async () => {
+    try {
+      setUploadError(null);
+      const file = fileInputRef.current?.files?.[0];
+      if (!file) {
+        setUploadError('Please choose a PDF file first');
+        return;
+      }
+      setUploading(true);
+      setProcessingUpload(false);
+      setUploadProgress(0);
+
+      const form = new FormData();
+      form.append('file', file);
+
+      // Submit to backend (returns immediately with job_id)
+      const uploadResp = await api.post(PNP_UPLOAD_URL, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        params: {
+          // Process all pages; large upper bound
+          page_limit: 10000
+        },
+        withCredentials: false,
+        onUploadProgress: (evt) => {
+          if (evt.total) {
+            const pct = Math.round((evt.loaded * 100) / evt.total);
+            setUploadProgress(pct);
+          }
+        }
+      });
+
+      // Upload finished, now processing in background
+      setUploading(false);
+      setProcessingUpload(true);
+
+      if (uploadResp.status === 202 && uploadResp.data.job_id) {
+        const jobId = uploadResp.data.job_id;
+        console.log(`[PnP Upload] Job started: ${jobId}`);
+
+        // Poll status endpoint until complete
+        const pollInterval = 3000; // 3 seconds
+        const maxPollTime = 20 * 60 * 1000; // 20 minutes max
+        const startTime = Date.now();
+
+        const pollStatus = async () => {
+          try {
+            const statusResp = await api.get(`${PNP_UPLOAD_URL}/status/${jobId}`, {
+              withCredentials: false
+            });
+            const { status, result, error } = statusResp.data;
+
+            if (status === 'success') {
+              console.log('[PnP Upload] Processing complete:', result);
+              setProcessingUpload(false);
+              
+              // Refresh available dates (new data added)
+              await fetchAvailableDates();
+              const date = availableDates[currentDateIndex];
+              if (date) await fetchPnpData(date);
+              
+              // Clear form
+              setSelectedFileName('');
+              if (fileInputRef.current) fileInputRef.current.value = '';
+              return true; // Done
+            } else if (status === 'error') {
+              throw new Error(error || 'Processing failed');
+            } else if (status === 'processing') {
+              // Still processing, continue polling
+              if (Date.now() - startTime > maxPollTime) {
+                throw new Error('Processing timeout (20 min)');
+              }
+              setTimeout(pollStatus, pollInterval);
+              return false; // Continue
+            } else {
+              throw new Error(`Unknown status: ${status}`);
+            }
+          } catch (err) {
+            setProcessingUpload(false);
+            setUploadError(err?.response?.data?.error || err.message || 'Processing failed');
+            return true; // Stop polling on error
+          }
+        };
+
+        // Start polling
+        await pollStatus();
+      } else {
+        // Unexpected response
+        throw new Error('Unexpected upload response');
+      }
+    } catch (err) {
+      setUploading(false);
+      setProcessingUpload(false);
+      setUploadError(err?.response?.data?.error || err.message || 'Upload failed');
+    }
+  };
+
+  const fetchPnpData = async (date) => {
+    if (!date) return;
+    
+    setLoading(true);
+    try {
+      // Fetch PnP data
+      const dataResponse = await api.get(`/pnp/data?date=${encodeURIComponent(date)}`);
+      const dataResult = dataResponse.data;
+
+  
+
+      if (dataResult.success) {
+        // Add sequential IDs and convert string values to numbers for proper sorting
+        let dataWithIds = dataResult.data.map((row, index) => ({
+          ...row,
+          id: row.id || index + 1,
+          ...convertPnpRowData(row)
+        }));
+
+        // Apply hierarchy filtering for non-admin users (includes managerActive filtering)
+        if (!isAdmin && allowedNamesSet.size > 0) {
+          dataWithIds = dataWithIds.filter(row => {
+            const nameLineMatch = row.name_line && allowedNamesSet.has(String(row.name_line).toLowerCase());
+            return nameLineMatch;
+          });
+        } else if (isAdmin) {
+          // For admin users, still filter out managerActive = 'n' users
+          // Get full hierarchy data to check managerActive status
+          const fullHierarchyData = hierarchyData ? getHierarchyForComponent('full') || [] : [];
+          const managerActiveMap = new Map();
+          fullHierarchyData.forEach(user => {
+            if (user.lagnname && user.managerActive !== undefined) {
+              managerActiveMap.set(String(user.lagnname).toLowerCase(), String(user.managerActive).toLowerCase() === 'y');
+            }
+          });
+          
+          // Filter out managerActive = 'n' users for admins too
+          dataWithIds = dataWithIds.filter(row => {
+            if (!row.name_line) return false;
+            const isManagerActive = managerActiveMap.get(String(row.name_line).toLowerCase());
+            return isManagerActive !== false; // Include if not found (undefined) or if true
+          });
+        }
+
+        setPnpData(dataWithIds);
+      } else {
+        setError(dataResult.message || 'Failed to fetch P&P data');
+      }
+    } catch (err) {
+      console.error('Error fetching PnP data:', err);
+      setError('Failed to fetch P&P data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const goToPreviousDate = () => {
+    if (currentDateIndex < availableDates.length - 1) {
+      setCurrentDateIndex(currentDateIndex + 1);
+    }
+  };
+
+  const goToNextDate = () => {
+    if (currentDateIndex > 0) {
+      setCurrentDateIndex(currentDateIndex - 1);
+    }
+  };
+
+  // Base columns (always shown)
+  const baseColumns = [
+    {
+      Header: 'Name Line',
+      accessor: 'name_line',
+      autoWidth: true
+    },
+    {
+      Header: 'ESID',
+      accessor: 'esid',
+      width: 100
+    },
+    {
+      Header: 'Agent #',
+      accessor: 'agent_num',
+      width: 100
+    }
+  ];
+
+  // Rate-specific columns for Over/Under tabs
+  const rateColumns = [
+    ...baseColumns,
+    {
+      Header: 'Current Month 4Mo Rate',
+      accessor: 'curr_mo_4mo_rate',
+      width: 120,
+      className: 'text-right',
+      Cell: ({ value }) => formatPercentage(value)
+    },
+    {
+      Header: 'Proj+1 4Mo Rate',
+      accessor: 'proj_plus_1_4mo_rate',
+      width: 120,
+      className: 'text-right',
+      Cell: ({ value }) => formatPercentage(value)
+    },
+    {
+      Header: 'Proj+2 4Mo Rate',
+      accessor: 'proj_plus_2_4mo_rate',
+      width: 120,
+      className: 'text-right',
+      Cell: ({ value }) => formatPercentage(value)
+    }
+  ];
+
+
+
+  // Define all available columns for "All" tab
+  const allColumns = [
+    // Add role column for hierarchy view
+    ...(viewMode === 'hierarchy' ? [{
+      Header: 'Role',
+      accessor: 'role',
+      width: 12,
+      sticky: 'left',
+      Cell: ({ value, row }) => {
+        if (row.original.isMgaHeader) return null;
+        const getRoleBadgeStyle = (cl) => {
+          const clname = String(cl || '').toUpperCase();
+          const styles = { backgroundColor: 'lightgrey', border: '2px solid grey' };
+          switch (clname) {
+            case 'SA': styles.backgroundColor = 'rgb(178, 82, 113)'; styles.border = '2px solid rgb(138, 62, 93)'; break;
+            case 'GA': styles.backgroundColor = 'rgb(237, 114, 47)'; styles.border = '2px solid rgb(197, 94, 37)'; break;
+            case 'MGA': styles.backgroundColor = 'rgb(104, 182, 117)'; styles.border = '2px solid rgb(84, 152, 97)'; break;
+            case 'RGA': styles.backgroundColor = '#00558c'; styles.border = '2px solid #004372'; break;
+            case 'AGT': default: styles.backgroundColor = 'lightgrey'; styles.border = '2px solid grey'; break;
+          }
+          return {
+            ...styles,
+            padding: '2px 4px',
+            borderRadius: '4px',
+            fontSize: '10px',
+            color: 'white',
+            fontWeight: 600,
+            letterSpacing: '0.5px',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+            display: 'inline-block'
+            // Note: marginLeft will be overridden in the component return
+          };
+        };
+        return (
+          <div className="sticky-role-cell">
+            <span 
+              className="user-role-badge"
+              style={{
+                ...getRoleBadgeStyle(value),
+                marginLeft: `${(row.original.depth || 0) * 16}px` // Add hierarchy indentation to role badge
+              }}
+            >
+              {value}
+            </span>
+          </div>
+        );
+      }
+    }] : []),
+    {
+      Header: 'Name Line',
+      accessor: 'name_line',
+      autoWidth: true,
+      sticky: 'left',
+      Cell: ({ value, row }) => {
+        const depth = row.original.depth || 0;
+        const isMgaHeader = row.original.isMgaHeader;
+        const isExpanded = expandedMga[row.original.id];
+        
+        if (viewMode === 'hierarchy') {
+          return (
+            <div 
+              className="sticky-name-cell"
+              style={{ 
+                cursor: isMgaHeader ? 'pointer' : 'default'
+              }}
+              onClick={isMgaHeader ? () => handleMgaExpansion(row.original.id) : undefined}
+            >
+              <div 
+                style={{ 
+                  display: 'flex',
+                  alignItems: 'center',
+                  width: '100%'
+                }}
+              >
+                {isMgaHeader && (
+                  <span 
+                    style={{ 
+                      marginRight: '8px',
+                      fontSize: '12px',
+                      transition: 'transform 0.2s'
+                    }}
+                  >
+                    {isExpanded ? '▼' : '▶'}
+                  </span>
+                )}
+                <span style={{ fontWeight: isMgaHeader ? 'bold' : 'normal' }}>
+                  {value}
+                </span>
+              </div>
+            </div>
+          );
+        } else {
+          return (
+            <div className="sticky-name-cell">
+              {value}
+            </div>
+          );
+        }
+      }
+    },
+    {
+      Header: 'ESID',
+      accessor: 'esid',
+      width: 100
+    },
+    {
+      Header: 'Agent #',
+      accessor: 'agent_num',
+      width: 100
+    },
+    {
+      Header: 'Current Month',
+      columns: [
+        {
+          Header: 'Gross Submit',
+          accessor: 'curr_mo_grs_submit',
+          width: 120,
+          className: 'text-right',
+          Cell: ({ value }) => formatCurrency(value)
+        },
+        {
+          Header: 'Net Submit',
+          accessor: 'curr_mo_net_submit',
+          width: 120,
+          className: 'text-right',
+          Cell: ({ value }) => formatCurrency(value)
+        },
+        {
+          Header: 'Percentage',
+          accessor: 'curr_mo_pct',
+          width: 100,
+          className: 'text-right',
+          Cell: ({ value }) => formatPercentage(value)
+        }
+      ]
+    },
+    {
+      Header: 'Past 12 Months',
+      columns: [
+        {
+          Header: 'Gross Submit',
+          accessor: 'past_12_mo_life_grs_submit',
+          width: 120,
+          className: 'text-right',
+          Cell: ({ value }) => formatCurrency(value)
+        },
+        {
+          Header: 'Net Submit',
+          accessor: 'past_12_mo_life_net_submit',
+          width: 120,
+          className: 'text-right',
+          Cell: ({ value }) => formatCurrency(value)
+        },
+        {
+          Header: 'Percentage',
+          accessor: 'past_12_mo_life_pct',
+          width: 100,
+          className: 'text-right',
+          Cell: ({ value }) => formatPercentage(value)
+        }
+      ]
+    },
+    {
+      Header: 'Current YTD',
+      columns: [
+        {
+          Header: 'Gross Submit',
+          accessor: 'cur_ytd_life_grs_submit',
+          width: 120,
+          className: 'text-right',
+          Cell: ({ value }) => formatCurrency(value)
+        },
+        {
+          Header: 'Net Submit',
+          accessor: 'cur_ytd_life_net_submit',
+          width: 120,
+          className: 'text-right',
+          Cell: ({ value }) => formatCurrency(value)
+        },
+        {
+          Header: 'Percentage',
+          accessor: 'cur_ytd_pct',
+          width: 100,
+          className: 'text-right',
+          Cell: ({ value }) => formatPercentage(value)
+        }
+      ]
+    },
+    {
+      Header: 'Projection +1',
+      columns: [
+        {
+          Header: 'Months',
+          accessor: 'proj_plus_1_months',
+          width: 120,
+          className: 'text-center'
+        },
+        {
+          Header: 'Submit',
+          accessor: 'proj_plus_1_submit',
+          width: 120,
+          className: 'text-right',
+          Cell: ({ value }) => formatCurrency(value)
+        },
+        {
+          Header: 'Net Issue',
+          accessor: 'proj_plus_1_net_iss',
+          width: 120,
+          className: 'text-right',
+          Cell: ({ value }) => formatCurrency(value)
+        },
+        {
+          Header: 'Net Sub',
+          accessor: 'proj_plus_1_net_sub',
+          width: 120,
+          className: 'text-right',
+          Cell: ({ value }) => formatCurrency(value)
+        },
+        {
+          Header: 'Paid 4 Mo',
+          accessor: 'proj_plus_1_paid4mo',
+          width: 100,
+          className: 'text-right',
+          Cell: ({ value }) => formatNumber(value)
+        },
+        {
+          Header: '4 Mo Rate',
+          accessor: 'proj_plus_1_4mo_rate',
+          width: 100,
+          className: 'text-right',
+          Cell: ({ value }) => formatPercentage(value)
+        }
+      ]
+    },
+    {
+      Header: 'Projection +2',
+      columns: [
+        {
+          Header: 'Months',
+          accessor: 'proj_plus_2_months',
+          width: 120,
+          className: 'text-center'
+        },
+        {
+          Header: 'Submit',
+          accessor: 'proj_plus_2_submit',
+          width: 120,
+          className: 'text-right',
+          Cell: ({ value }) => formatCurrency(value)
+        },
+        {
+          Header: 'Net Issue',
+          accessor: 'proj_plus_2_net_iss',
+          width: 120,
+          className: 'text-right',
+          Cell: ({ value }) => formatCurrency(value)
+        },
+        {
+          Header: 'Net Sub',
+          accessor: 'proj_plus_2_net_sub',
+          width: 120,
+          className: 'text-right',
+          Cell: ({ value }) => formatCurrency(value)
+        },
+        {
+          Header: 'Paid 4 Mo',
+          accessor: 'proj_plus_2_paid4mo',
+          width: 100,
+          className: 'text-right',
+          Cell: ({ value }) => formatNumber(value)
+        },
+        {
+          Header: '4 Mo Rate',
+          accessor: 'proj_plus_2_4mo_rate',
+          width: 100,
+          className: 'text-right',
+          Cell: ({ value }) => formatPercentage(value)
+        }
+      ]
+    }
+  ];
+
+  // Function to get columns based on active tab
+  const getColumnsForTab = () => {
+    // If user shouldn't see tabs, always use all columns
+    if (!shouldShowTabs) {
+      return allColumns;
+    }
+    
+    switch (activeTab) {
+      case 'over':
+      case 'under':
+        return rateColumns;
+      case 'all':
+      default:
+        return allColumns;
+    }
+  };
+
+  const columns = getColumnsForTab();
+  const currentDate = availableDates[currentDateIndex];
+
+  // Helper function to get data for a specific tab
+  const getDataForTab = (tabId) => {
+    let tabData = [...pnpData];
+    
+    // Apply tab-specific filtering only if user should see tabs
+    if (shouldShowTabs && tabId !== 'all') {
+      tabData = tabData.filter(row => {
+        const currMo4MoRate = row.curr_mo_4mo_rate || 0;
+        const proj1Rate = row.proj_plus_1_4mo_rate || 0;
+        const proj2Rate = row.proj_plus_2_4mo_rate || 0;
+        
+        switch (tabId) {
+          case 'over':
+            return currMo4MoRate >= 85 && proj1Rate >= 85 && proj2Rate >= 85;
+          case 'under':
+            return currMo4MoRate < 85 || proj1Rate < 85 || proj2Rate < 85;
+          default:
+            return true;
+        }
+      });
+    }
+    
+    // Apply search filter if active
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase().trim();
+      tabData = tabData.filter(row => {
+        const nameLineMatch = row.name_line?.toLowerCase().includes(searchLower);
+        const esidMatch = row.esid?.toLowerCase().includes(searchLower);
+        const agentNumMatch = row.agent_num?.toLowerCase().includes(searchLower);
+        
+        return nameLineMatch || esidMatch || agentNumMatch;
+      });
+    }
+    
+    return tabData;
+  };
+
+  // Helper function to transform data for export
+  const transformDataForExport = (data) => {
+    return data.map(item => ({
+      // Basic info
+      name_line: item.name_line,
+      esid: item.esid,
+      agent_num: item.agent_num,
+      date: currentDate,
+      
+      // Current Month
+      curr_mo_grs_submit: item.curr_mo_grs_submit,
+      curr_mo_net_submit: item.curr_mo_net_submit,
+      curr_mo_pct: item.curr_mo_pct,
+      curr_mo_4mo_rate: item.curr_mo_4mo_rate,
+      
+      // Past 12 Months
+      past_12_mo_life_grs_submit: item.past_12_mo_life_grs_submit,
+      past_12_mo_life_net_submit: item.past_12_mo_life_net_submit,
+      past_12_mo_life_pct: item.past_12_mo_life_pct,
+      
+      // Current YTD
+      cur_ytd_life_grs_submit: item.cur_ytd_life_grs_submit,
+      cur_ytd_life_net_submit: item.cur_ytd_life_net_submit,
+      cur_ytd_pct: item.cur_ytd_pct,
+      
+      // Projection +1
+      proj_plus_1_months: item.proj_plus_1_months,
+      proj_plus_1_submit: item.proj_plus_1_submit,
+      proj_plus_1_net_iss: item.proj_plus_1_net_iss,
+      proj_plus_1_net_sub: item.proj_plus_1_net_sub,
+      proj_plus_1_paid4mo: item.proj_plus_1_paid4mo,
+      proj_plus_1_4mo_rate: item.proj_plus_1_4mo_rate,
+      
+      // Projection +2
+      proj_plus_2_months: item.proj_plus_2_months,
+      proj_plus_2_submit: item.proj_plus_2_submit,
+      proj_plus_2_net_iss: item.proj_plus_2_net_iss,
+      proj_plus_2_net_sub: item.proj_plus_2_net_sub,
+      proj_plus_2_paid4mo: item.proj_plus_2_paid4mo,
+      proj_plus_2_4mo_rate: item.proj_plus_2_4mo_rate
+    }));
+  };
+
+  // Create export data structure with multiple worksheets
+  const exportData = {
+    summary: {
+      currentDate: currentDate,
+      searchTerm: searchTerm,
+      totalAllRecords: pnpData.length,
+      isFiltered: searchTerm.trim() !== '',
+      generatedTabs: shouldShowTabs ? tabs.length : 1
+    },
+    // Multiple worksheets - one for each tab (or single sheet if no tabs)
+    worksheets: shouldShowTabs ? tabs.map(tab => {
+      const tabData = getDataForTab(tab.id);
+      const worksheet = {
+        name: tab.label,
+        description: tab.description,
+        data: transformDataForExport(tabData),
+        recordCount: tabData.length,
+        columns: tab.id === 'all' ? 'all' : 'rates' // Column set identifier
+      };
+      
+      // Debug logging in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`📊 PnP Export - Tab "${tab.label}": ${tabData.length} records`);
+      }
+      
+      return worksheet;
+    }) : [{
+      name: 'PnP Data',
+      description: 'All P&P records',
+      data: transformDataForExport(filteredData),
+      recordCount: filteredData.length,
+      columns: 'all'
+    }],
+    // Maintain backward compatibility
+    chartData: transformDataForExport(filteredData)
+  };
+
+  // Create multi-sheet XLSX export function
+  const handleXLSXExport = async () => {
+    setIsPreparedForExport(true);
+    
+    try {
+      console.log('📊 Starting PnP multi-sheet XLSX export...');
+      
+      // Create a new workbook
+      const workbook = XLSX.utils.book_new();
+      
+      // Process each worksheet from exportData
+      exportData.worksheets.forEach(worksheet => {
+        console.log(`📊 Creating sheet "${worksheet.name}" with ${worksheet.data.length} records`);
+        
+        // Prepare headers based on column set
+        let headers = [];
+        let dataRows = [];
+        
+        if (worksheet.columns === 'all') {
+          // All columns (removed Level)
+          headers = [
+            'Name Line', 'ESID', 'Agent #',
+            'Current Month Gross Submit', 'Current Month Net Submit', 'Current Month %', 'Current Month 4Mo Rate',
+            'Past 12 Mo Life Gross Submit', 'Past 12 Mo Life Net Submit', 'Past 12 Mo Life %',
+            'Current YTD Life Gross Submit', 'Current YTD Life Net Submit', 'Current YTD %',
+            'Current Month Submit', 'Current Month Net Issue', 'Current Month Net Submit',
+            'Current Month Paid 4Mo', 'Proj+1 Months', 'Proj+1 Submit', 'Proj+1 Net Issue',
+            'Proj+1 Net Submit', 'Proj+1 Paid 4Mo', 'Proj+1 4Mo Rate',
+            'Proj+2 Months', 'Proj+2 Submit', 'Proj+2 Net Issue', 'Proj+2 Net Submit',
+            'Proj+2 Paid 4Mo', 'Proj+2 4Mo Rate'
+          ];
+          
+          dataRows = worksheet.data.map(item => [
+            item.name_line, item.esid, item.agent_num,
+            item.curr_mo_grs_submit, item.curr_mo_net_submit, item.curr_mo_pct, item.curr_mo_4mo_rate,
+            item.past_12_mo_life_grs_submit, item.past_12_mo_life_net_submit, item.past_12_mo_life_pct,
+            item.cur_ytd_life_grs_submit, item.cur_ytd_life_net_submit, item.cur_ytd_pct,
+            item.curr_mo_submit, item.curr_mo_net_iss, item.curr_mo_net_sub, item.curr_mo_paid4mo,
+            item.proj_plus_1_months, item.proj_plus_1_submit, item.proj_plus_1_net_iss,
+            item.proj_plus_1_net_sub, item.proj_plus_1_paid4mo, item.proj_plus_1_4mo_rate,
+            item.proj_plus_2_months, item.proj_plus_2_submit, item.proj_plus_2_net_iss,
+            item.proj_plus_2_net_sub, item.proj_plus_2_paid4mo, item.proj_plus_2_4mo_rate
+          ]);
+        } else {
+          // Rate columns (over/under) (removed Level)
+          headers = [
+            'Name Line', 'ESID', 'Agent #',
+            'Current Month 4Mo Rate', 'Proj+1 4Mo Rate', 'Proj+2 4Mo Rate'
+          ];
+          dataRows = worksheet.data.map(item => [
+            item.name_line, item.esid, item.agent_num,
+            item.curr_mo_4mo_rate, item.proj_plus_1_4mo_rate, item.proj_plus_2_4mo_rate
+          ]);
+        }
+        
+        // Create sheet data
+        const sheetData = [headers, ...dataRows];
+        const sheet = XLSX.utils.aoa_to_sheet(sheetData);
+        
+        // Apply formatting
+        const range = XLSX.utils.decode_range(sheet['!ref']);
+        
+        // Format header row
+        for (let col = range.s.c; col <= range.e.c; col++) {
+          const cellRef = XLSX.utils.encode_cell({ r: 0, c: col });
+          if (sheet[cellRef]) {
+            sheet[cellRef].s = {
+              font: { bold: true, color: { rgb: "FFFFFF" } },
+              fill: { bgColor: { indexed: 64 }, fgColor: { rgb: "366092" } },
+              alignment: { horizontal: "center", vertical: "center" },
+              border: {
+                top: { style: "thin" },
+                bottom: { style: "thin" },
+                left: { style: "thin" },
+                right: { style: "thin" }
+              }
+            };
+          }
+        }
+        
+        // Set column widths
+        const colWidths = headers.map(header => {
+          if (header.includes('Name')) return { wch: 25 };
+          if (header.includes('ESID')) return { wch: 15 };
+          if (header.includes('Agent')) return { wch: 12 };
+          if (header.includes('Rate')) return { wch: 18 };
+          if (header.includes('Submit') || header.includes('Gross') || header.includes('Net')) return { wch: 16 };
+          return { wch: 12 };
+        });
+        sheet['!cols'] = colWidths;
+        
+        // Create Excel Table with filters and formatting
+        const tableRange = XLSX.utils.encode_range({
+          s: { c: 0, r: 0 }, // Start at A1
+          e: { c: headers.length - 1, r: dataRows.length } // End at last column, last row
+        });
+        
+        // Add autofilter (enables filtering dropdowns)
+        sheet['!autofilter'] = { ref: tableRange };
+        
+        // Create Excel table formatting (if supported by XLSX version)
+        try {
+          if (!sheet['!tables']) sheet['!tables'] = [];
+          sheet['!tables'].push({
+            ref: tableRange,
+            name: `Table_${worksheet.name.replace(/[^A-Za-z0-9]/g, '_')}`,
+            headerRowCount: 1,
+            totalsRowCount: 0,
+            style: {
+              theme: 'TableStyleMedium2', // Professional blue theme
+              showFirstColumn: false,
+              showLastColumn: false,
+              showRowStripes: true,
+              showColumnStripes: false
+            }
+          });
+          console.log(`📊 Added table formatting to "${worksheet.name}" sheet`);
+        } catch (error) {
+          console.log(`⚠️ Table formatting not fully supported, using autofilter only for "${worksheet.name}"`);
+        }
+        
+        // Freeze header row
+        sheet['!freeze'] = { xSplit: 0, ySplit: 1 };
+        
+        // Add worksheet to workbook
+        XLSX.utils.book_append_sheet(workbook, sheet, worksheet.name);
+      });
+      
+      // Generate filename and save
+      const tabsSuffix = shouldShowTabs ? '_All_Tabs' : '';
+      const filename = `PnP_Report${tabsSuffix}${searchTerm ? '_filtered' : ''}_${currentDate?.replace(/\//g, '-') || 'current'}.xlsx`;
+      
+      // Write and download the file
+      XLSX.writeFile(workbook, filename);
+      
+      console.log(`✅ PnP XLSX export completed: ${filename}`);
+      
+    } catch (error) {
+      console.error('❌ PnP XLSX export failed:', error);
+      window.alert('Failed to export XLSX file. Please try again.');
+    } finally {
+      setIsPreparedForExport(false);
+    }
+  };
+
+  if ((loading && availableDates.length === 0) || (pnpHierarchyLoading && viewMode === 'hierarchy')) {
+    return (
+      <div className="pnp-container">
+        <div className="route-loading" role="alert" aria-busy="true">
+          <div className="spinner"></div>
+          <p>Loading P&P data{pnpHierarchyLoading ? ' and hierarchy structure' : ''}...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="pnp-container">
+        <div className="error-message">
+          <h3>Error Loading P&P Data</h3>
+          <p>{error}</p>
+          <button onClick={fetchAvailableDates} className="retry-button">
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`pnp-container ${viewMode === 'hierarchy' ? 'hierarchy-mode' : ''}`}>
+      {/* Header with search and controls */}
+      <div className="pnp-header" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        {/* Date Navigation */}
+        <div className="date-navigation" style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '0 0 auto' }}>
+          <button 
+            onClick={goToPreviousDate}
+            disabled={currentDateIndex >= availableDates.length - 1}
+            className="date-nav-btn"
+            style={{ padding: 4, width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <FiChevronLeft />
+          </button>
+          
+          <div className="current-date" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#333', maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <FiCalendar />
+            <span>{currentDate || 'No date selected'}</span>
+          </div>
+          
+          <button 
+            onClick={goToNextDate}
+            disabled={currentDateIndex <= 0}
+            className="date-nav-btn"
+            style={{ padding: 4, width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <FiChevronRight />
+          </button>
+        </div>
+        
+        {/* Search Bar */}
+        <div className="pnp-search-section" style={{ flex: '1 1 520px', minWidth: 260 }}>
+          <div className="search-input-wrapper" style={{ width: '100%' }}>
+            <FiSearch className="search-icon" />
+            <input
+              type="text"
+              placeholder="Search by name, ESID, or agent number..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="search-input"
+              style={{ width: '100%' }}
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="clear-search-btn"
+                title="Clear search"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
+        
+        <div className="pnp-header-controls" style={{ display: 'flex', alignItems: 'center', gap: 12, flex: '0 0 auto', marginLeft: 'auto' }}>
+          {/* Admin/app upload UI - upload icon, then separate Process button */}
+          {(isAdmin || user?.teamRole === 'app') && (
+            <div className="pnp-upload">
+              <input
+                type="file"
+                accept="application/pdf"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                style={{ display: 'none' }}
+              />
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <button
+                  className="upload-btn"
+                  onClick={handleChooseFile}
+                  style={{
+                    padding: '8px',
+                    backgroundColor: '#00558c',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                  title="Upload PnP PDF"
+                  aria-label="Upload PnP PDF"
+                  disabled={uploading}
+                >
+                  <FiUpload />
+                </button>
+                {selectedFileName && (
+                  <span style={{ fontSize: 12, color: '#333' }}>{selectedFileName}</span>
+                )}
+                <button
+                  onClick={handleProcess}
+                  disabled={uploading || !selectedFileName}
+                  style={{
+                    padding: '8px',
+                    backgroundColor: uploading ? '#999' : '#4CAF50',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: uploading ? 'not-allowed' : 'pointer'
+                  }}
+                  title="Process PDF"
+                >
+                  {uploading ? 'Uploading...' : 'Process PDF'}
+                </button>
+              </div>
+              {(uploading || processingUpload) && (
+                <div style={{ marginTop: 6 }}>
+                  {/* Simple progress bar */}
+                  <div style={{ height: 8, background: '#eee', borderRadius: 4, overflow: 'hidden', width: 240 }}>
+                    <div style={{ width: `${uploadProgress}%`, height: '100%', background: '#4CAF50', transition: 'width 0.2s ease' }} />
+                  </div>
+                  <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                    {uploading ? `Uploading: ${uploadProgress}%` : 'Processing...'}
+                  </div>
+                </div>
+              )}
+              {uploadError && (
+                <div style={{ color: '#b00020', fontSize: 12, marginTop: 6 }}>{uploadError}</div>
+              )}
+            </div>
+          )}
+          {/* Filter Menu */}
+          <div className="pnp-filter-menu">
+            <button
+              className="filter-toggle-btn"
+              style={{
+                padding: '8px',
+                backgroundColor: hasActiveFilters() ? '#00558c' : 'transparent',
+                color: hasActiveFilters() ? 'white' : '#666',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '16px'
+              }}
+              title="Filter P&P Data"
+              onClick={() => setShowFilterMenu(!showFilterMenu)}
+            >
+              <FiFilter />
+            </button>
+            
+            {showFilterMenu && (
+              <div className="filter-dropdown">
+                <div className="filter-section">
+                  <h4>ESID Date Range</h4>
+                  <div className="filter-row">
+                    <input
+                      type="date"
+                      placeholder="From"
+                      value={activeFilters.esidRange.min}
+                      onChange={(e) => updateRangeFilter('esidRange', 'min', e.target.value)}
+                    />
+                    <span>to</span>
+                    <input
+                      type="date"
+                      placeholder="To"
+                      value={activeFilters.esidRange.max}
+                      onChange={(e) => updateRangeFilter('esidRange', 'max', e.target.value)}
+                    />
+                  </div>
+                </div>
+                
+                <div className="filter-section">
+                  <h4>Gross Submit Range</h4>
+                  <div className="filter-row">
+                    <input
+                      type="number"
+                      placeholder="Min"
+                      value={activeFilters.grossSubmitRange.min}
+                      onChange={(e) => updateRangeFilter('grossSubmitRange', 'min', e.target.value)}
+                    />
+                    <span>to</span>
+                    <input
+                      type="number"
+                      placeholder="Max"
+                      value={activeFilters.grossSubmitRange.max}
+                      onChange={(e) => updateRangeFilter('grossSubmitRange', 'max', e.target.value)}
+                    />
+                  </div>
+                </div>
+                
+                <div className="filter-section">
+                  <h4>Net Submit Range</h4>
+                  <div className="filter-row">
+                    <input
+                      type="number"
+                      placeholder="Min"
+                      value={activeFilters.netSubmitRange.min}
+                      onChange={(e) => updateRangeFilter('netSubmitRange', 'min', e.target.value)}
+                    />
+                    <span>to</span>
+                    <input
+                      type="number"
+                      placeholder="Max"
+                      value={activeFilters.netSubmitRange.max}
+                      onChange={(e) => updateRangeFilter('netSubmitRange', 'max', e.target.value)}
+                    />
+                  </div>
+                </div>
+                
+                <div className="filter-section">
+                  <h4>4-Mo Rate % Range</h4>
+                  <div className="filter-row">
+                    <input
+                      type="number"
+                      placeholder="Min %"
+                      value={activeFilters.fourMoRateRange.min}
+                      onChange={(e) => updateRangeFilter('fourMoRateRange', 'min', e.target.value)}
+                    />
+                    <span>to</span>
+                    <input
+                      type="number"
+                      placeholder="Max %"
+                      value={activeFilters.fourMoRateRange.max}
+                      onChange={(e) => updateRangeFilter('fourMoRateRange', 'max', e.target.value)}
+                    />
+                  </div>
+                </div>
+                
+                <div className="filter-section">
+                  <h4>Proj +1 Range</h4>
+                  <div className="filter-row">
+                    <input
+                      type="number"
+                      placeholder="Min %"
+                      value={activeFilters.proj1Range.min}
+                      onChange={(e) => updateRangeFilter('proj1Range', 'min', e.target.value)}
+                    />
+                    <span>to</span>
+                    <input
+                      type="number"
+                      placeholder="Max %"
+                      value={activeFilters.proj1Range.max}
+                      onChange={(e) => updateRangeFilter('proj1Range', 'max', e.target.value)}
+                    />
+                  </div>
+                </div>
+                
+                <div className="filter-section">
+                  <h4>Proj +2 Range</h4>
+                  <div className="filter-row">
+                    <input
+                      type="number"
+                      placeholder="Min %"
+                      value={activeFilters.proj2Range.min}
+                      onChange={(e) => updateRangeFilter('proj2Range', 'min', e.target.value)}
+                    />
+                    <span>to</span>
+                    <input
+                      type="number"
+                      placeholder="Max %"
+                      value={activeFilters.proj2Range.max}
+                      onChange={(e) => updateRangeFilter('proj2Range', 'max', e.target.value)}
+                    />
+                  </div>
+                </div>
+                
+                <div className="filter-section">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={activeFilters.showZeroValues}
+                      onChange={toggleZeroValuesFilter}
+                    />
+                    Show zero values
+                  </label>
+                </div>
+                
+                <div className="filter-actions">
+                  <button onClick={clearAllFilters}>Clear All</button>
+                  <button onClick={() => setShowFilterMenu(false)}>Done</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* View Mode Toggle */}
+          <div className="view-mode-toggle">
+            <button
+              onClick={() => setViewMode('flat')}
+              className={`view-mode-btn ${viewMode === 'flat' ? 'active' : ''}`}
+              title="Flat view"
+            >
+              <FiList />
+            </button>
+            <button
+              onClick={() => setViewMode('hierarchy')}
+              className={`view-mode-btn ${viewMode === 'hierarchy' ? 'active' : ''}`}
+              title="Hierarchy view"
+            >
+              <FiGrid />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ActionBar with performance tabs and export button */}
+      <ActionBar
+        selectedCount={0}
+        totalCount={displayData.filter(row => !row.isMgaHeader).length}
+        entityName="agents"
+        archivedView={false}
+      >
+        {/* Performance Tabs - only show for Admin or teamRole = 'app' */}
+        {shouldShowTabs && (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: activeTab === tab.id ? '#00558c' : 'transparent',
+                  color: activeTab === tab.id ? 'white' : '#666',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                title={tab.description}
+              >
+                {tab.label}
+                <span style={{ fontSize: '11px', opacity: 0.9 }}>
+                  ({activeTab === tab.id ? displayData.filter(row => !row.isMgaHeader).length : tab.count})
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Export Button - always visible */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button 
+            onClick={handleXLSXExport}
+            disabled={isPreparedForExport}
+            style={{
+              padding: '8px',
+              backgroundColor: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: isPreparedForExport ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: isPreparedForExport ? 0.6 : 1,
+              fontSize: '16px'
+            }}
+            title={`Export ${shouldShowTabs ? 'all tabs' : 'data'} to Excel${searchTerm ? ' (filtered)' : ''}`}
+          >
+            <FiDownload className={isPreparedForExport ? 'spinning' : ''} />
+          </button>
+        </div>
+      </ActionBar>
+
+      {/* Data table */}
+      {loading ? (
+        <div className="route-loading" role="alert" aria-busy="true">
+          <div className="spinner"></div>
+          <p>Loading table data...</p>
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={displayData}
+          disableCellEditing={true}
+          showActionBar={false}
+          disablePagination={displayData.length <= 100}
+          allowTableOverflow={true}
+          stickyHeader={true}
+          entityName="PnP record"
+        />
+      )}
+
+      {!loading && displayData.length === 0 && pnpData.length > 0 && (
+        <div className="no-data-message">
+          <p>
+            {shouldShowTabs 
+              ? `No records match the "${tabs.find(t => t.id === activeTab)?.label}" filter criteria`
+              : 'No records match your search criteria'
+            }
+          </p>
+        </div>
+      )}
+
+      {!loading && pnpData.length === 0 && (
+        <div className="no-data-message">
+          <p>No P&P data available for {currentDate}</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Pnp;

@@ -12,7 +12,7 @@ import NotificationCenter from "../common/NotificationCenter";
 import api from "../../api";
 import "./Header.css";
 
-const Header = ({ pageTitle, isExpanded }) => {
+const Header = ({ pageTitle, isExpanded, onboardingMode = false }) => {
   const { 
     user, 
     isImpersonating, 
@@ -45,6 +45,32 @@ const Header = ({ pageTitle, isExpanded }) => {
 
   // Use custom team name or fall back to the page title
   const displayTitle = pageTitle || teamName || "Atlas";
+  const [hasRecentUpdate, setHasRecentUpdate] = useState(false);
+
+  // Detect recent page-specific updates (last 7 days) by matching current path
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const res = await api.get('/training/updates');
+        if (res.data?.success) {
+          const updates = res.data.data || [];
+          const now = new Date();
+          const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+          const path = window.location.pathname;
+          const recent = updates.some(u => {
+            const created = new Date(u.createdAt);
+            const within7 = now - created <= sevenDaysMs;
+            const matches = (u.pageUrl && path.startsWith(u.pageUrl)) || (u.tutorialUrl && path.startsWith(u.tutorialUrl));
+            return within7 && matches;
+          });
+          setHasRecentUpdate(recent);
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    run();
+  }, [displayTitle]);
 
   // Check window status periodically
   useEffect(() => {
@@ -84,7 +110,14 @@ const Header = ({ pageTitle, isExpanded }) => {
 
   // Phone Scripts window function
   const openPhone = (phoneFile) => {
-    // Check if a phone window is already open and not closed
+    // For mobile devices, open directly in new tab
+    if (isMobile) {
+      const phoneUrl = 'https://ariaslife.com/temp/agent_tools/phone_scripts/phone_scripts.html';
+      window.open(phoneUrl, '_blank');
+      return;
+    }
+
+    // Desktop behavior - check if a phone window is already open and not closed
     if (phoneWindowRef.current && !phoneWindowRef.current.closed) {
       phoneWindowRef.current.focus();
       return;
@@ -103,8 +136,9 @@ const Header = ({ pageTitle, isExpanded }) => {
     const left = screenWidth - width; // Start from the middle of the screen
     const top = 0; // Align to the top of the screen
 
+    const phoneUrl = 'https://ariaslife.com/temp/agent_tools/phone_scripts/phone_scripts.html';
     phoneWindowRef.current = window.open(
-      phoneFile,
+      phoneUrl,
       '_blank',
       `toolbar=no,scrollbars=no,resizable=yes,top=${top},left=${left},width=${width},height=${height},alwaysRaised=true`
     );
@@ -125,7 +159,16 @@ const Header = ({ pageTitle, isExpanded }) => {
 
   // Presentation window function
   const openPres = async (presFile) => {
-    // Check if a presentation window is already open and not closed
+    // For mobile devices, open directly in new tab
+    if (isMobile) {
+      const userId = user?.userId;
+      const userToken = localStorage.getItem('auth_token');
+      const presUrl = `https://ariaslife.com/temp/agent_tools/presentation/pres_setup.html?a=${userToken}&b=${userId}`;
+      window.open(presUrl, '_blank');
+      return;
+    }
+
+    // Desktop behavior - check if a presentation window is already open and not closed
     if (presWindowRef.current && !presWindowRef.current.closed) {
       presWindowRef.current.focus();
       return;
@@ -165,9 +208,14 @@ const Header = ({ pageTitle, isExpanded }) => {
 
     top = screenHeight - height; // Align to bottom
 
+    // Use the same URL as handleLaunchPresentation for consistency
+    const userId = user?.userId;
+    const userToken = localStorage.getItem('auth_token');
+    const presUrl = `https://ariaslife.com/temp/agent_tools/presentation/pres_setup.html?a=${userToken}&b=${userId}`;
+
     // Open the presentation window
     presWindowRef.current = window.open(
-      presFile,
+      presUrl,
       '_blank',
       `toolbar=no,scrollbars=no,resizable=yes,top=${top},left=${left},width=${width},height=${height},alwaysRaised=true`
     );
@@ -270,10 +318,10 @@ const Header = ({ pageTitle, isExpanded }) => {
   };
 
   // Profile menu options
-  const profileOptions = [
+  const baseProfileOptions = [
     {
       label: "Account",
-      onClick: () => navigate("/settings?section=account"),
+      onClick: () => navigate("/utilities?section=account"),
       icon: <FiUser />
     },
     // Admin user switching option
@@ -295,6 +343,19 @@ const Header = ({ pageTitle, isExpanded }) => {
       onClick: toggleTheme,
       icon: theme === 'light' ? <FiMoon /> : <FiSun />
     },
+    // Mobile-only options
+    ...(isMobile ? [
+      {
+        label: "Phone Scripts",
+        onClick: () => openPhone('scripts'),
+        icon: <FiPhone />
+      },
+      {
+        label: "Presentation",
+        onClick: () => openPres(),
+        icon: <FiMonitor />
+      }
+    ] : []),
     // Agent Sites with submenu
     {
       label: "Agent Sites",
@@ -319,6 +380,11 @@ const Header = ({ pageTitle, isExpanded }) => {
         {
           label: "Option Builder",
           onClick: () => window.open("https://thekeefersuccess.com/WinnersCircle/agent_tools/presentation/option_builder_solo.html", "_blank"),
+          icon: <FiExternalLink />
+        },
+        {
+          label: "Career Track",
+          onClick: () => window.open("https://ariaslife.com/uploads/defaultFolder/CareerTrackwAgent.pdf", "_blank"),
           icon: <FiExternalLink />
         },
         {
@@ -357,6 +423,10 @@ const Header = ({ pageTitle, isExpanded }) => {
       className: "menu-item-logout"
     }
   ];
+
+  const profileOptions = onboardingMode
+    ? baseProfileOptions.filter(opt => ["Account", "Dark Mode", "Light Mode", "Logout"].includes(opt.label))
+    : baseProfileOptions;
 
   // Filter users based on search query and role filter
   const filteredUsers = users.filter(user => {
@@ -419,11 +489,13 @@ const Header = ({ pageTitle, isExpanded }) => {
 
 
   // Hamburger menu options based on sidebar nav items
-  const hamburgerOptions = sidebarNavItems.map((item) => ({
-    label: item.name,
-    onClick: () => navigate(item.submenu ? item.submenu[0].path : item.path),
-    icon: item.icon
-  }));
+  const hamburgerOptions = onboardingMode
+    ? [{ label: 'Onboarding Home', onClick: () => navigate('/onboarding/home'), icon: sidebarNavItems[0]?.icon }]
+    : sidebarNavItems.map((item) => ({
+        label: item.name,
+        onClick: () => navigate(item.submenu ? item.submenu[0].path : item.path),
+        icon: item.icon
+      }));
 
   return (
     <div className={`header ${isExpanded ? "expanded" : ""}`}>
@@ -456,12 +528,28 @@ const Header = ({ pageTitle, isExpanded }) => {
       </div>
       
       {/* Header Title */}
-      {displayTitle && <h4 className={`header-title ${isExpanded ? "expanded" : ""}`}>{displayTitle}</h4>}
+      {displayTitle && (
+        <h4 className={`header-title ${isExpanded ? "expanded" : ""}`}>
+          {displayTitle}
+          {hasRecentUpdate && (
+            <span style={{
+              display: 'inline-block',
+              fontSize: '10px',
+              lineHeight: 1,
+              padding: '3px 6px',
+              background: '#ff9800',
+              color: '#fff',
+              borderRadius: '8px',
+              marginLeft: 8
+            }}>New</span>
+          )}
+        </h4>
+      )}
       
       {/* Right section - Header actions container */}
       <div className="header-actions">
         {/* Agent Tools - Only show on desktop */}
-        {!isMobile && (
+        {!isMobile && !onboardingMode && (
           <div className="agent-tools">
             <button
               className={`tool-button phone-button ${isPhoneOpen ? 'active' : ''}`}
@@ -482,7 +570,7 @@ const Header = ({ pageTitle, isExpanded }) => {
         )}
         
         {/* Notification Center */}
-        <NotificationCenter />
+        {!onboardingMode && <NotificationCenter />}
         
         {/* Profile Picture with Dropdown */}
         <div className="profile">

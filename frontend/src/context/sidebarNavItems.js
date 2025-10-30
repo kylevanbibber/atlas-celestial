@@ -1,6 +1,6 @@
 // src/config/sidebarNavItems.js
 import React from "react";
-import { FiHome, FiClipboard, FiSettings, FiBell, FiShield, FiUsers, FiList, FiTrendingUp, FiUserPlus, FiBookOpen, FiEdit3, FiBarChart2, FiUser } from "react-icons/fi";
+import { FiHome, FiClipboard, FiSettings, FiBell, FiShield, FiUsers, FiList, FiTrendingUp, FiUserPlus, FiBookOpen, FiEdit3, FiBarChart2, FiUser, FiMessageSquare } from "react-icons/fi";
 
 /**
  * Get sidebar navigation items with status indicators
@@ -25,9 +25,16 @@ const getSidebarNavItems = (hasLicenseWarning = false, isAdmin = false, unreadNo
     // }
     
     {
-      name: "Reports",
-      path: "/reports",
+      name: "Resources",
+      path: "/resources",
       icon: <FiClipboard />,
+      submenu: [
+        {
+          name: "Release",
+          path: "/resources?active=release",
+          icon: <FiList />,
+        }
+      ]
     },
   ];
 
@@ -39,6 +46,8 @@ const getSidebarNavItems = (hasLicenseWarning = false, isAdmin = false, unreadNo
       icon: <FiTrendingUp />,
     });
   }
+
+  // Removed 1-on-1 tab for now
 
   // Add Promotion Tracking for app users
   if (isAdmin && teamRole === 'app') {
@@ -60,10 +69,10 @@ const getSidebarNavItems = (hasLicenseWarning = false, isAdmin = false, unreadNo
 
  
 
-  // Add Settings/Utilities with conditional Login Logs submenu
+  // Add Utilities with conditional Login Logs submenu
   const settingsItem = {
-    name: teamRole === 'app' ? "Utilities" : "Settings",
-    path: "/settings",
+    name: "Utilities",
+    path: "/utilities",
     icon: <FiSettings />,
     hasWarning: hasLicenseWarning, // Add warning indicator flag
   };
@@ -81,56 +90,21 @@ const getSidebarNavItems = (hasLicenseWarning = false, isAdmin = false, unreadNo
 
   navItems.push(settingsItem);
 
-  // Add Training and Recruiting only if user is not an admin with teamRole="app"
+  // Add Recruiting only if user is not an admin with teamRole="app"
   const hideForAppRole = isAdmin && teamRole === 'app';
   
   if (!hideForAppRole) {
-    // Insert Training after Reports (index 2)
+    // Insert Recruiting after Resources (index 3)
     navItems.splice(3, 0, {
-      name: "Training",
-      path: "/training",
-      icon: <FiBookOpen />,
-      submenu: [
-        {
-          name: "Release",
-          path: "/training?section=release",
-          icon: <FiList />,
-        }
-      ]
-    });
-    
-    // Insert Recruiting after Training (index 4)
-    navItems.splice(4, 0, {
       name: "Recruiting",
       path: "/recruiting",
       icon: <FiUserPlus />,
     });
   }
   
-  // Add admin section if user is admin
-  if (isAdmin) {
-    navItems.push({
-      name: "Admin",
-      icon: <FiShield />,
-      submenu: [
-        {
-          name: "Notifications",
-          path: "/admin/notifications",
-          icon: <FiBell />,
-        },
-        {
-          name: "Hierarchy",
-          path: "/admin/hierarchy",
-          icon: <FiUsers />,
-        },
-        {
-          name: "Hierarchy Table",
-          path: "/admin/hierarchy-table",
-          icon: <FiList />,
-        }
-      ]
-    });
-  }
+  // Admin section removed - admin users don't need the admin badge in sidebar
+  // Admin functionality is still accessible via direct URLs:
+  // /admin/notifications, /admin/hierarchy, /admin/hierarchy-table
   
   return navItems;
 };

@@ -1,9 +1,10 @@
 /* Login Form General Styles */
 .login-container {
     display: flex;
-    height: 100vh;
+    min-height: 100vh; /* allow content taller than viewport */
     align-items: center;
     justify-content: center;
+    overflow-y: auto; /* enable scrolling on small screens */
   }
   
   .login-card {
@@ -16,6 +17,38 @@
     transition: box-shadow 0.3s ease;
     border: 1px solid var(--border-color);
   }
+
+  /* Register card - based on login-card */
+  .register-card {
+    display: flex;
+    flex-direction: row;
+    width: 94%;
+    max-width: 1100px;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px var(--shadow-color);
+    transition: box-shadow 0.3s ease;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+  }
+  .register-card:hover { box-shadow: 0 8px 24px var(--shadow-color); }
+  .register-card .left-side {
+    flex: 1;
+    background: linear-gradient(135deg, #d7d7d7cc, #00548ca9);
+    padding: 32px;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .register-card .right-side {
+    flex: 1.1;
+    padding: 32px;
+    background: var(--bg-primary);
+  }
+  .register-card .left-side h2 { font-size: 1.8rem; margin-bottom: 8px; color: #fff; }
+  .register-card .left-side p { color: #fff; }
+  .register-card .account-setup-register-form { max-width: 640px; padding: 20px; }
+  .register-card .image-container { margin-bottom: 8px; }
   
   .login-card:hover {
     box-shadow: 0 8px 24px var(--shadow-color);
@@ -99,6 +132,11 @@
   }
   
   @media (max-width: 600px) {
+    .login-container {
+      align-items: flex-start; /* start from top to avoid cutoffs */
+      padding-top: 12px;
+      padding-bottom: 12px;
+    }
     .login-card {
       flex-direction: column;
     }
@@ -109,4 +147,216 @@
       border-radius: 0 0 16px 16px; /* Rounded bottom corners */
     }
   }
+
+  /* Responsive adjustments for register card */
+  @media (max-width: 900px) {
+    .register-card { max-width: 96%; }
+  }
+  @media (max-width: 720px) {
+    .register-card { flex-direction: column; }
+    .register-card .left-side { border-radius: 16px 16px 0 0; }
+    .register-card .right-side { border-radius: 0 0 16px 16px; }
+    .register-card { width: 100%; margin: 8px 0; }
+  }
+  @media (max-width: 480px) {
+    .register-card .left-side, .register-card .right-side { padding: 20px; }
+    .register-card .account-setup-register-form { padding: 16px; }
+  }
+  
+/* ======================================
+   Auth: Account Setup & Forgot Password
+   Reuse login card look-and-feel
+   ====================================== */
+
+.account-setup-register-container,
+.change-password-container {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Center the profile picture block on the setup page */
+.account-setup-register-container .image-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.account-setup-register-container .user-profile-picture-container {
+  margin: 0 auto;
+}
+
+.account-setup-back-link {
+  display: inline-block;
+  margin-bottom: 10px;
+  color: var(--hover-color);
+  font-size: 0.9rem;
+}
+.account-setup-back-link:hover { text-decoration: underline; }
+
+/* Card wrapper for forms */
+.account-setup-register-form {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  box-shadow: 0 4px 12px var(--shadow-color);
+  padding: 20px;
+  max-width: 600px;
+}
+
+/* Utility: hide on mobile */
+@media (max-width: 600px) {
+  .desktop-only { display: none; }
+}
+
+.change-password-container h3,
+.account-setup-register-header {
+  color: var(--text-primary);
+  margin: 10px 0 16px;
+}
+
+.account-setup-description,
+.account-setup-description-small {
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.account-setup-form-field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 14px;
+}
+
+.account-setup-form-label,
+.account-setup-register-form label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+}
+
+.account-setup-form-input {
+  width: 100%;
+  padding: 12px 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  font-size: 16px; /* prevent mobile zoom */
+}
+
+.account-setup-error-message {
+  color: #d9534f;
+  font-size: 0.9rem;
+  margin-top: 6px;
+}
+
+.success-message {
+  color: #22c55e;
+  font-size: 0.9rem;
+  margin-top: 6px;
+}
+
+.phone-number-container {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+.phone-number-container input { flex: 1; }
+
+.account-setup-submit-button,
+.account-setup-register-form .insured-button {
+  display: inline-block;
+  background-color: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  border: 2px solid var(--button-primary-bg);
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.account-setup-submit-button:hover,
+.account-setup-register-form .insured-button:hover { opacity: 0.9; }
+
+@media (max-width: 600px) {
+  .account-setup-register-container,
+  .change-password-container { padding: 12px; }
+
+  .account-setup-register-form {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  /* Keep labels visible on mobile */
+  .account-setup-form-field label,
+  .account-setup-form-label { display: block; }
+
+  /* Force phone inputs into a single row on small screens */
+  .phone-number-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.5fr;
+    gap: 8px;
+  }
+  .phone-number-container input {
+    min-width: 0;
+    text-align: center;
+  }
+}
+  
+/* Info overlay for account setup help image */
+.info-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 16px;
+}
+
+.info-overlay-content {
+  position: relative;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  max-width: 90vw;
+  max-height: 85vh;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Ensure the info image fits within the modal without overflowing */
+.info-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: 78vh;
+  object-fit: contain; /* Keep aspect ratio */
+  border-radius: 8px;
+}
+
+/* Close button top-right */
+.close-overlay {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 24px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .info-overlay { padding: 8px; }
+  .info-overlay-content { padding: 8px; }
+}
   

@@ -55,7 +55,6 @@ router.get('/allvip-alp', async (req, res) => {
     }
 
     try {
-        console.log(`Fetching all VIPs for ${column}=${value}`);
 
         // Fetch all VIPs from activeusers (without date filter)
         const vipQuery = `
@@ -64,12 +63,10 @@ router.get('/allvip-alp', async (req, res) => {
             WHERE ?? = ?
         `;
 
-        console.log("Executing VIP query:", vipQuery, [column, value]);
 
         const vipResults = await query(vipQuery, [column, value]);
 
         if (!vipResults.length) {
-            console.log('No VIPs found.');
             return res.status(200).json({ success: true, data: [] });
         }
 
@@ -77,7 +74,6 @@ router.get('/allvip-alp', async (req, res) => {
         const vipNames = vipResults.map(row => row.lagnname);
         vipNames.push(value); // Include the agnName itself
 
-        console.log('All VIPs including agnName:', vipNames);
 
         // Query Weekly_ALP for the latest MTD Report data for these names
         const alpQuery = `
@@ -94,11 +90,9 @@ router.get('/allvip-alp', async (req, res) => {
             AND DATE(w1.reportdate) = DATE(w2.latest_date)
         `;
 
-        console.log("Executing ALP query:", alpQuery, [vipNames]);
 
         const alpResults = await query(alpQuery, [vipNames]);
 
-        console.log('Raw ALP Results:', JSON.stringify(alpResults, null, 2));
 
         res.status(200).json({
             success: true,
@@ -136,7 +130,6 @@ router.get('/potentialvip-alp', async (req, res) => {
         endDate.setDate(0);  // Setting the date to 0 gets the last day of the previous month
         const formattedEndDate = endDate.toISOString().split("T")[0];
 
-        console.log(`Fetching potential VIPs for ${column}=${value} from ${formattedStartDate} to ${formattedEndDate}`);
 
         // Fetch potential VIPs from activeusers within the computed date range
         const vipQuery = `
@@ -144,17 +137,14 @@ router.get('/potentialvip-alp', async (req, res) => {
             WHERE ?? = ? 
             AND esid BETWEEN ? AND ?
         `;
-        console.log("Executing VIP query:", vipQuery, [column, value, formattedStartDate, formattedEndDate]);
 
         const vipResults = await query(vipQuery, [column, value, formattedStartDate, formattedEndDate]);
 
         if (!vipResults.length) {
-            console.log('No potential VIPs found.');
             return res.status(200).json({ success: true, data: [] });
         }
 
         const vipNames = vipResults.map(row => row.lagnname); // Ensure column case matches DB
-        console.log('Potential VIPs found:', vipNames);
 
         // Now create a date range for the selected month.
         // Month start: first day of selected month
@@ -166,7 +156,6 @@ router.get('/potentialvip-alp', async (req, res) => {
         const formattedMonthStart = monthStart.toISOString().split("T")[0];
         const formattedMonthEnd = monthEnd.toISOString().split("T")[0];
 
-        console.log(`Fetching Weekly_ALP rows where REPORT = "MTD Recap" and reportdate between ${formattedMonthStart} and ${formattedMonthEnd}`);
 
         // Query Weekly_ALP to get only rows where:
         // - REPORT = "MTD Recap"
@@ -179,11 +168,9 @@ router.get('/potentialvip-alp', async (req, res) => {
               AND DATE(reportdate) BETWEEN ? AND ?
               AND LagnName IN (?)
         `;
-        console.log("Executing ALP query:", alpQuery, [formattedMonthStart, formattedMonthEnd, vipNames]);
 
         const alpResults = await query(alpQuery, [formattedMonthStart, formattedMonthEnd, vipNames]);
 
-        console.log('Raw ALP Results:', JSON.stringify(alpResults, null, 2));
 
         res.status(200).json({
             success: true,
@@ -279,20 +266,31 @@ router.get('/pending', async (req, res) => {
 });
 
 router.get('/monthly-alp-by-mga', async (req, res) => {
-    const { value } = req.query;
+    const { value, clNameFilter } = req.query;
 
     if (!value) {
         return res.status(400).json({ success: false, message: 'Value is required' });
     }
 
     try {
-        // Query to get rows where LagnName matches the value
-        const queryStr = `
+        // Build query with optional CL_Name filtering
+        let queryStr = `
             SELECT * FROM Monthly_ALP 
             WHERE LagnName = ?
         `;
+        const params = [value];
+        
+        // Add CL_Name filter if specified
+        if (clNameFilter === 'blank') {
+            // For RGA mode: get rows where CL_Name is blank or NULL
+            queryStr += ` AND (CL_Name = '' OR CL_Name IS NULL)`;
+        } else if (clNameFilter === 'MGA') {
+            // For MGA mode: get rows where CL_Name = 'MGA'
+            queryStr += ` AND CL_Name = 'MGA'`;
+        }
+        // If clNameFilter is not specified, return all rows (original behavior)
 
-        const results = await query(queryStr, [value]);
+        const results = await query(queryStr, params);
 
         // Directly return the filtered results
         return res.status(200).json({
@@ -687,6 +685,34 @@ router.get('/subagent-alp-mga', async (req, res) => {
     }
 });
 
+// Get latest Weekly Recap row per LagnName from Weekly_ALP
+router.post('/weekly-alp/latest-weekly-recap', async (req, res) => {
+    try {
+        const { names } = req.body; // array of lagnname strings
+        if (!Array.isArray(names) || names.length === 0) {
+            return res.status(400).json({ success: false, message: 'names array required' });
+        }
+
+        // Find the latest reportdate for REPORT = 'YTD Recap' for each name, then join back
+        const sql = `
+            SELECT w1.LagnName, w1.reportdate, w1.LVL_1_NET
+            FROM Weekly_ALP w1
+            INNER JOIN (
+                SELECT LagnName, MAX(reportdate) AS latest_date
+                FROM Weekly_ALP
+                WHERE REPORT = 'YTD Recap' AND LagnName IN (?)
+                GROUP BY LagnName
+            ) w2 ON w1.LagnName = w2.LagnName AND DATE(w1.reportdate) = DATE(w2.latest_date)
+            WHERE w1.REPORT = 'YTD Recap'
+        `;
+        const rows = await query(sql, [names]);
+        res.status(200).json({ success: true, data: rows });
+    } catch (error) {
+        console.error('Error fetching YTD Recap ALP:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+});
+
 router.get('/sga-alp', async (req, res) => {
     const { value } = req.query;
 
@@ -733,7 +759,6 @@ const convertDateToShortYear = (dateStr) => {
   router.get('/pnp', async (req, res) => {
     const { name_line, esid, startDate, endDate } = req.query;
   
-    console.log('Received query parameters:', { name_line, esid, startDate, endDate });
   
     if (!name_line || !esid || !startDate || !endDate) {
       console.error('Missing required parameters.');
@@ -747,7 +772,6 @@ const convertDateToShortYear = (dateStr) => {
       // Convert startDate and endDate from mm/dd/yyyy to mm/dd/yy
       const formattedStartDate = convertDateToShortYear(startDate);
       const formattedEndDate = convertDateToShortYear(endDate);
-      console.log('Converted dates:', { formattedStartDate, formattedEndDate });
   
       // Build the query:
       // - Use an exact match for name_line.
@@ -760,10 +784,8 @@ const convertDateToShortYear = (dateStr) => {
           AND date BETWEEN ? AND ?
       `;
       const params = [name_line, esid, formattedStartDate, formattedEndDate];
-      console.log('Executing query with parameters:', params);
   
       const results = await query(queryStr, params);
-      console.log('Query results:', results);
   
       return res.status(200).json({
         success: true,
@@ -928,7 +950,8 @@ router.get('/get-all-mgas', async (req, res) => {
                 tree,
                 'MGA' as clname,
                 Active,
-                hide
+                hide,
+                start
             FROM MGAs
             ORDER BY lagnname
         `;

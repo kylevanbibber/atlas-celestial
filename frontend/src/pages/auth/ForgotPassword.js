@@ -13,6 +13,9 @@ const ForgotPassword = ({ onBackToLogin }) => {
   const [isCodeVerified, setIsCodeVerified] = useState(false);
 
   const handleSendResetCode = async () => {
+    setErrorMessage("");
+    setSuccessMessage("");
+    setIsLoading(true);
     try {
       const response = await fetch(
         "https://ariaslogin-4a95935f6093.herokuapp.com/api/send-reset-code-by-email",
@@ -26,6 +29,7 @@ const ForgotPassword = ({ onBackToLogin }) => {
       );
 
       const result = await response.json();
+      setIsLoading(false);
 
       if (result.success) {
         setSuccessMessage("Reset code sent to your email.");
@@ -35,6 +39,7 @@ const ForgotPassword = ({ onBackToLogin }) => {
         setErrorMessage(result.message || "Failed to send reset code.");
       }
     } catch (error) {
+      setIsLoading(false);
       setErrorMessage("An error occurred while sending the reset code.");
     }
   };
@@ -54,7 +59,7 @@ const ForgotPassword = ({ onBackToLogin }) => {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ userId, code: emailCode }), // Use userId and emailCode
+          body: JSON.stringify({ userId, code: emailCode.trim().toUpperCase() }), // Normalize code to uppercase
         }
       );
 
@@ -93,7 +98,7 @@ const ForgotPassword = ({ onBackToLogin }) => {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ userId, emailCode, newPassword }), // Use userId, emailCode, and newPassword
+          body: JSON.stringify({ userId, emailCode: emailCode.trim().toUpperCase(), newPassword }), // Normalize code to uppercase
         }
       );
 
@@ -102,6 +107,7 @@ const ForgotPassword = ({ onBackToLogin }) => {
 
       if (result.success) {
         setSuccessMessage("Password reset successfully. You can now log in.");
+        try { localStorage.removeItem("userId"); } catch (_) {}
       } else {
         setErrorMessage(result.message || "Failed to reset password.");
       }
@@ -145,8 +151,9 @@ const ForgotPassword = ({ onBackToLogin }) => {
               <button
                 onClick={handleSendResetCode}
                 className="insured-button"
+                disabled={isLoading || !email}
               >
-                Send Reset Code
+                {isLoading ? "Sending..." : "Send Reset Code"}
               </button>
             </>
           ) : !isCodeVerified ? (
@@ -169,8 +176,9 @@ const ForgotPassword = ({ onBackToLogin }) => {
               <button
                 onClick={handleVerifyCode}
                 className="insured-button"
+                disabled={isLoading || !emailCode}
               >
-                Verify Code
+                {isLoading ? "Verifying..." : "Verify Code"}
               </button>
             </>
           ) : (
@@ -202,8 +210,14 @@ const ForgotPassword = ({ onBackToLogin }) => {
               <button
                 onClick={handleResetPassword}
                 className="insured-button"
+                disabled={
+                  isLoading ||
+                  !newPassword ||
+                  !confirmPassword ||
+                  newPassword !== confirmPassword
+                }
               >
-                Reset Password
+                {isLoading ? "Resetting..." : "Reset Password"}
               </button>
             </>
           )}

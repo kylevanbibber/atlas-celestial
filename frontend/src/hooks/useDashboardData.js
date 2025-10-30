@@ -1,3 +1,4 @@
+
 /**
  * Unified Dashboard Data Hook
  * 
@@ -15,32 +16,25 @@ import { getApiEndpoints } from '../config/dashboardConfig';
 const getCurrentWeekRange = () => {
   // Use UTC to avoid timezone issues
   const today = new Date();
-  console.log(`🔍 [getCurrentWeekRange] Today (local): ${today.toDateString()}`);
-  console.log(`🔍 [getCurrentWeekRange] Today (UTC): ${today.toUTCString()}`);
   
   const dayOfWeek = today.getUTCDay(); // 0 = Sunday, 1 = Monday, etc.
-  console.log(`🔍 [getCurrentWeekRange] Day of week (UTC): ${dayOfWeek} (0=Sunday, 1=Monday, etc.)`);
   
   const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Days to go back to Monday
-  console.log(`🔍 [getCurrentWeekRange] Days to go back to Monday: ${daysToMonday}`);
   
   // Calculate Monday of current week (UTC)
   const monday = new Date(today);
   monday.setUTCDate(today.getUTCDate() - daysToMonday);
   monday.setUTCHours(0, 0, 0, 0);
-  console.log(`🔍 [getCurrentWeekRange] Monday (UTC): ${monday.toUTCString()}`);
   
   // Calculate Sunday of current week (UTC)
   const sunday = new Date(monday);
   sunday.setUTCDate(monday.getUTCDate() + 6);
   sunday.setUTCHours(23, 59, 59, 999);
-  console.log(`🔍 [getCurrentWeekRange] Sunday (UTC): ${sunday.toUTCString()}`);
   
   // Format as YYYY-MM-DD to match Daily_Activity.reportDate format
   const startDate = monday.toISOString().split('T')[0];
   const endDate = sunday.toISOString().split('T')[0];
   
-  console.log(`🔍 [getCurrentWeekRange] Final range: ${startDate} to ${endDate}`);
   
   return { startDate, endDate };
 };
@@ -64,7 +58,48 @@ const getCurrentMonthRange = () => {
   const startDate = firstDay.toISOString().split('T')[0];
   const endDate = lastDay.toISOString().split('T')[0];
   
-  console.log(`🔍 [getCurrentMonthRange] Current month range: ${startDate} to ${endDate}`);
+  
+  return { startDate, endDate };
+};
+
+const getPreviousMonthRange = () => {
+  // Use UTC to avoid timezone issues
+  const today = new Date();
+  const year = today.getUTCFullYear();
+  const month = today.getUTCMonth();
+  
+  // Calculate previous month
+  const prevMonth = month === 0 ? 11 : month - 1;
+  const prevYear = month === 0 ? year - 1 : year;
+  
+  // First day of previous month (UTC)
+  const firstDay = new Date(Date.UTC(prevYear, prevMonth, 1));
+  
+  // Last day of previous month (UTC)
+  const lastDay = new Date(Date.UTC(prevYear, prevMonth + 1, 0));
+  
+  // Format as YYYY-MM-DD to match Daily_Activity.reportDate format
+  const startDate = firstDay.toISOString().split('T')[0];
+  const endDate = lastDay.toISOString().split('T')[0];
+  
+  return { startDate, endDate };
+};
+
+const getYearToDateRange = () => {
+  // Use UTC to avoid timezone issues
+  const today = new Date();
+  const year = today.getUTCFullYear();
+  
+  // January 1st of current year (UTC)
+  const firstDay = new Date(Date.UTC(year, 0, 1));
+  
+  // Today (UTC)
+  const lastDay = new Date(today);
+  lastDay.setUTCHours(23, 59, 59, 999);
+  
+  // Format as YYYY-MM-DD to match Daily_Activity.reportDate format
+  const startDate = firstDay.toISOString().split('T')[0];
+  const endDate = lastDay.toISOString().split('T')[0];
   
   return { startDate, endDate };
 };
@@ -109,14 +144,9 @@ const findMostRecentMonthWithData = (monthlyData, maxIndex, dataType) => {
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
   ];
   
-  console.log(`🔍 [${dataType}] Searching for most recent month with data. Max index: ${maxIndex}`);
-  console.log(`🔍 [${dataType}] Monthly data:`, monthlyData);
-  
   // Start from maxIndex - 1 to exclude the current month
   for (let i = maxIndex - 1; i >= 0; i--) {
-    console.log(`🔍 [${dataType}] Checking month ${i} (${monthNames[i]}): ${monthlyData[i]}`);
     if (monthlyData[i] > 0) {
-      console.log(`🔍 [${dataType}] Found data at month ${i} (${monthNames[i]}): ${monthlyData[i]}`);
       return {
         value: monthlyData[i],
         month: monthNames[i]
@@ -124,7 +154,6 @@ const findMostRecentMonthWithData = (monthlyData, maxIndex, dataType) => {
     }
   }
   
-  console.log(`🔍 [${dataType}] No data found, returning 0`);
   return {
     value: 0,
     month: monthNames[0]
@@ -370,55 +399,42 @@ const calculateCodesAndHiresMetrics = (vipsData, associatesData, hiresData, repo
    * Calculate ALP metrics from monthly data for MGA/RGA (uses LVL_3_NET)
    */
   const calculateMgaAlpMetrics = (monthlyData, reportingMonthIndex) => {
-    console.log(`🔍 [MGA ALP Processing] Raw monthly data:`, monthlyData);
     const currentYear = new Date().getFullYear();
     const previousYear = currentYear - 1;
     
     // Group data by year and month using LVL_3_NET
     const grouped = {};
     monthlyData.forEach((item, index) => {
-      console.log(`🔍 [MGA ALP Processing] Item ${index}:`, item);
       if (!item.month) {
-        console.log(`⚠️ [MGA ALP Processing] No month field for item ${index}`);
         return;
       }
       if (!item.LVL_3_NET) {
-        console.log(`⚠️ [MGA ALP Processing] No LVL_3_NET field for item ${index}, LVL_3_NET: ${item.LVL_3_NET}`);
         return;
       }
       
       const parts = item.month.split("/");
       if (parts.length !== 2) {
-        console.log(`⚠️ [MGA ALP Processing] Invalid month format for item ${index}: ${item.month}`);
         return;
       }
       
       const monthIndex = parseInt(parts[0], 10) - 1; // Convert to 0-indexed
       const year = parseInt(parts[1], 10);
       
-      console.log(`🔍 [MGA ALP Processing] Parsed - Month: ${monthIndex + 1}, Year: ${year}, LVL_3_NET: ${item.LVL_3_NET}`);
       
       if (!grouped[year]) {
         grouped[year] = Array(12).fill(0);
       }
       const alpValue = parseFloat(item.LVL_3_NET) || 0;
       grouped[year][monthIndex] = alpValue;
-      console.log(`🔍 [MGA ALP Processing] Set month ${monthIndex + 1} to: ${alpValue}`);
     });
 
-    console.log(`🔍 [MGA ALP Processing] Final grouped data:`, grouped);
     const currentYearData = grouped[currentYear] || Array(12).fill(0);
     const previousYearData = grouped[previousYear] || Array(12).fill(0);
 
-    console.log(`🔍 [MGA ALP Processing] Current year data:`, currentYearData);
-    console.log(`🔍 [MGA ALP Processing] Previous year data:`, previousYearData);
-    console.log(`🔍 [MGA ALP Processing] Reporting month index: ${reportingMonthIndex}`);
-    console.log(`🔍 [MGA ALP Processing] May 2025 data (index 4): ${currentYearData[4]}`);
 
     const ytdAlp = currentYearData.slice(0, reportingMonthIndex + 1).reduce((sum, val) => sum + val, 0);
     const currentMonthAlp = currentYearData[reportingMonthIndex] || 0;
     
-    console.log(`🔍 [MGA ALP Processing] YTD ALP: ${ytdAlp}, Current Month ALP: ${currentMonthAlp}`);
     
     // Find the most recent month with actual ALP data
     const alpComparison = findMostRecentMonthWithData(currentYearData, reportingMonthIndex, "MGA ALP");
@@ -613,7 +629,7 @@ const calculateCodesAndHiresMetrics = (vipsData, associatesData, hiresData, repo
 /**
  * Main hook for dashboard data
  */
-export const useDashboardData = (userRole, user) => {
+export const useDashboardData = (userRole, user, saViewMode = 'team', gaViewMode = 'team', mgaViewMode = 'team', rgaViewMode = 'team') => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedDateRange, setSelectedDateRange] = useState(getCurrentWeekRange());
@@ -626,9 +642,30 @@ export const useDashboardData = (userRole, user) => {
   const [hiresData, setHiresData] = useState([]);
   const [dailyActivityData, setDailyActivityData] = useState({ totalRefAlp: 0, totalAlp: 0, totalRefs: 0, agentCount: 0 });
   const [dailyActivityLoading, setDailyActivityLoading] = useState(false);
+  const [weeklyAlpData, setWeeklyAlpData] = useState({ weeklyAlp: 0, comparisonAlp: 0, weekStart: '', weekEnd: '' });
+  const [weeklyAlpLoading, setWeeklyAlpLoading] = useState(false);
+  const [weeklyHiresData, setWeeklyHiresData] = useState({ weeklyHires: 0 });
+  const [weeklyHiresLoading, setWeeklyHiresLoading] = useState(false);
+  const [weeklyCodesData, setWeeklyCodesData] = useState({ weeklyCodes: 0 });
+  const [weeklyCodesLoading, setWeeklyCodesLoading] = useState(false);
+  const [weeklyRefSalesData, setWeeklyRefSalesData] = useState({ weeklyRefSales: 0 });
+  const [weeklyRefSalesLoading, setWeeklyRefSalesLoading] = useState(false);
+  // Monthly data states (for "This Month" tab)
+  const [monthlyAlpSumData, setMonthlyAlpSumData] = useState({ monthlyAlp: 0, comparisonAlp: 0 });
+  const [monthlyAlpSumLoading, setMonthlyAlpSumLoading] = useState(false);
+  const [monthlyHiresSumData, setMonthlyHiresSumData] = useState({ monthlyHires: 0 });
+  const [monthlyHiresSumLoading, setMonthlyHiresSumLoading] = useState(false);
+  const [monthlyCodesSumData, setMonthlyCodesSumData] = useState({ monthlyCodes: 0 });
+  const [monthlyCodesSumLoading, setMonthlyCodesSumLoading] = useState(false);
+  const [monthlyRefSalesSumData, setMonthlyRefSalesSumData] = useState({ monthlyRefSales: 0 });
+  const [monthlyRefSalesSumLoading, setMonthlyRefSalesSumLoading] = useState(false);
   const [refSalesData, setRefSalesData] = useState({ totalRefSales: 0, previousMonthRefSales: 0 });
   const [currentMonthRefSalesData, setCurrentMonthRefSalesData] = useState({ totalRefSales: 0 });
   const [ytdRefSalesData, setYtdRefSalesData] = useState({ ytdRefSales: 0, previousYearYtdRefSales: 0 });
+  const [currentMonthHiresData, setCurrentMonthHiresData] = useState({ monthlyHires: 0 });
+  const [currentMonthHiresLoading, setCurrentMonthHiresLoading] = useState(false);
+  const [currentMonthVipsData, setCurrentMonthVipsData] = useState({ monthlyVips: 0 });
+  const [currentMonthVipsLoading, setCurrentMonthVipsLoading] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
 
@@ -652,7 +689,6 @@ export const useDashboardData = (userRole, user) => {
 
       const lagnName = user.lagnname;
       
-      console.log(`🔍 [Dashboard] Fetching main data for ${userRole} - ${lagnName}`);
       
       // Handle different parameter structures for different roles
       let weeklyYtdResponse, monthlyAlpResponse, associatesResponse, vipsResponse, hiresResponse;
@@ -671,12 +707,43 @@ export const useDashboardData = (userRole, user) => {
         ]);
       } else {
         // MGA, RGA, SA, GA, AGT all use MGA endpoints with lagnName parameter
+        // For SA and GA users, also pass userRole for proper filtering on associates and VIPs only
+        
+        // Build monthlyAlp and weeklyYtd URLs with viewMode for GA/MGA/RGA users
+        let monthlyAlpUrl = `${endpoints.monthlyAlp}?lagnName=${lagnName}`;
+        let weeklyYtdUrl = `${endpoints.weeklyYtd}?lagnName=${lagnName}`;
+        
+        if (userRole === 'GA') {
+          monthlyAlpUrl += `&viewMode=${gaViewMode}`;
+          weeklyYtdUrl += `&viewMode=${gaViewMode}`;
+          console.log('📞 [Main Fetch] GA user with viewMode:', { userRole, gaViewMode, monthlyAlpUrl, weeklyYtdUrl });
+        } else if (userRole === 'MGA') {
+          monthlyAlpUrl += `&viewMode=${mgaViewMode}`;
+          weeklyYtdUrl += `&viewMode=${mgaViewMode}`;
+          console.log('📞 [Main Fetch] MGA user with viewMode:', { userRole, mgaViewMode, monthlyAlpUrl, weeklyYtdUrl });
+        } else if (userRole === 'RGA') {
+          monthlyAlpUrl += `&viewMode=${rgaViewMode}`;
+          weeklyYtdUrl += `&viewMode=${rgaViewMode}`;
+          console.log('📞 [Main Fetch] RGA user with viewMode:', { userRole, rgaViewMode, monthlyAlpUrl, weeklyYtdUrl });
+        }
+        
+        // Build URLs for associates, vips, hires with viewMode for RGA users
+        let associatesUrl = `${endpoints.associates}?lagnName=${lagnName}&userRole=${userRole}`;
+        let vipsUrl = `${endpoints.vips}?lagnName=${lagnName}&userRole=${userRole}`;
+        let hiresUrl = `${endpoints.hires}?lagnName=${lagnName}&userRole=${userRole}`;
+        
+        if (userRole === 'RGA') {
+          associatesUrl += `&viewMode=${rgaViewMode}`;
+          vipsUrl += `&viewMode=${rgaViewMode}`;
+          hiresUrl += `&viewMode=${rgaViewMode}`;
+        }
+        
         [weeklyYtdResponse, monthlyAlpResponse, associatesResponse, vipsResponse, hiresResponse] = await Promise.all([
-          api.get(`${endpoints.weeklyYtd}?lagnName=${lagnName}`),
-          api.get(`${endpoints.monthlyAlp}?lagnName=${lagnName}`),
-          api.get(`${endpoints.associates}?lagnName=${lagnName}`),
-          api.get(`${endpoints.vips}?lagnName=${lagnName}`),
-          api.get(`${endpoints.hires}?lagnName=${lagnName}`)
+          api.get(weeklyYtdUrl, { headers: { 'user-role': userRole } }),
+          api.get(monthlyAlpUrl, { headers: { 'user-role': userRole } }),
+          api.get(associatesUrl),
+          api.get(vipsUrl),
+          api.get(hiresUrl)
         ]);
       }
 
@@ -775,7 +842,6 @@ export const useDashboardData = (userRole, user) => {
       
       setYtdRefSalesData({ ytdRefSales, previousYearYtdRefSales });
 
-      console.log(`🔍 [Dashboard] Main data fetched successfully for ${userRole}`);
 
     } catch (err) {
       console.error(`Error fetching dashboard data for ${userRole}:`, err);
@@ -783,7 +849,7 @@ export const useDashboardData = (userRole, user) => {
     } finally {
       setLoading(false);
     }
-  }, [userRole, user?.lagnname]); // Removed selectedDateRange dependency
+  }, [userRole, user?.lagnname, gaViewMode, mgaViewMode, rgaViewMode]); // Re-fetch when users switch view modes
 
   /**
    * Fetch daily activity data separately (dependent on date range)
@@ -799,42 +865,671 @@ export const useDashboardData = (userRole, user) => {
 
       const lagnName = user.lagnname;
       
-      console.log(`🔍 [Dashboard] Fetching daily activity data for ${userRole} - ${selectedDateRange.startDate} to ${selectedDateRange.endDate}`);
       
       let dailyActivityResponse;
+      let url;
       
       if (userRole === 'SGA') {
-        dailyActivityResponse = await api.get(`${endpoints.dailyActivity}?startDate=${selectedDateRange.startDate}&endDate=${selectedDateRange.endDate}`);
+        url = `${endpoints.dailyActivity}?startDate=${selectedDateRange.startDate}&endDate=${selectedDateRange.endDate}`;
+        dailyActivityResponse = await api.get(url);
+      } else if ((userRole === 'SA' && saViewMode === 'team' && endpoints.saTeamDailyActivity) || 
+                 (userRole === 'GA' && gaViewMode === 'team' && endpoints.gaTeamDailyActivity) ||
+                 (userRole === 'MGA' && mgaViewMode === 'team' && endpoints.mgaTeamDailyActivity) ||
+                 (userRole === 'RGA' && (rgaViewMode === 'mga' || rgaViewMode === 'rga') && endpoints.rgaTeamDailyActivity)) {
+        // For SA/GA/MGA/RGA users in team mode, use special endpoint that combines hierarchical data
+        if (userRole === 'SA') {
+          url = `${endpoints.saTeamDailyActivity}?lagnName=${lagnName}&startDate=${selectedDateRange.startDate}&endDate=${selectedDateRange.endDate}`;
+          console.log('📞 [fetchDailyActivityData] Using SA team endpoint for', userRole, 'in', saViewMode, 'mode:', lagnName);
+        } else if (userRole === 'GA') {
+          url = `${endpoints.gaTeamDailyActivity}?lagnName=${lagnName}&startDate=${selectedDateRange.startDate}&endDate=${selectedDateRange.endDate}`;
+          console.log('📞 [fetchDailyActivityData] Using GA team endpoint for', userRole, 'in', gaViewMode, 'mode:', lagnName);
+        } else if (userRole === 'MGA') {
+          url = `${endpoints.mgaTeamDailyActivity}?lagnName=${lagnName}&startDate=${selectedDateRange.startDate}&endDate=${selectedDateRange.endDate}`;
+          console.log('📞 [fetchDailyActivityData] Using MGA team endpoint for', userRole, 'in', mgaViewMode, 'mode:', lagnName);
+        } else if (userRole === 'RGA') {
+          url = `${endpoints.rgaTeamDailyActivity}?lagnName=${lagnName}&startDate=${selectedDateRange.startDate}&endDate=${selectedDateRange.endDate}&viewMode=${rgaViewMode}`;
+          console.log('📞 [fetchDailyActivityData] Using RGA team endpoint for', userRole, 'in', rgaViewMode, 'mode:', lagnName);
+        }
+        dailyActivityResponse = await api.get(url);
       } else {
-        dailyActivityResponse = await api.get(`${endpoints.dailyActivity}?lagnName=${lagnName}&startDate=${selectedDateRange.startDate}&endDate=${selectedDateRange.endDate}`);
+        url = `${endpoints.dailyActivity}?lagnName=${lagnName}&startDate=${selectedDateRange.startDate}&endDate=${selectedDateRange.endDate}`;
+        console.log('📞 [fetchDailyActivityData] Adding lagnName parameter for', userRole, ':', lagnName);
+        dailyActivityResponse = await api.get(url);
       }
+      
+      console.log('📊 [fetchDailyActivityData] Daily activity data received for', userRole, ':', {
+        userRole: userRole,
+        userLagnName: user?.lagnname,
+        endpoint: url,
+        dateRange: `${selectedDateRange.startDate} to ${selectedDateRange.endDate}`,
+        receivedData: dailyActivityResponse?.data,
+        hasLagnNameFilter: userRole !== 'SGA',
+        timestamp: new Date().toISOString()
+      });
       
       setDailyActivityData(dailyActivityResponse?.data || { totalRefAlp: 0, totalAlp: 0, totalRefs: 0, agentCount: 0 });
 
-      console.log(`🔍 [Dashboard] Daily activity data fetched successfully`);
 
     } catch (err) {
       console.error(`Error fetching daily activity data:`, err);
     } finally {
       setDailyActivityLoading(false);
     }
-  }, [userRole, user?.lagnname, selectedDateRange]);
+  }, [userRole, user?.lagnname, selectedDateRange, saViewMode, gaViewMode, mgaViewMode, rgaViewMode]);
+
+  /**
+   * Fetch weekly ALP data separately
+   */
+  const fetchWeeklyAlpData = useCallback(async () => {
+    console.log('🚀 [fetchWeeklyAlpData] Starting fetch with:', { user: !!user, userRole, lagnname: user?.lagnname });
+    
+    if (!userRole || !user?.lagnname) {
+      console.log('❌ [fetchWeeklyAlpData] Missing userRole or user.lagnname:', { userRole, lagnname: user?.lagnname });
+      return;
+    }
+
+    try {
+      setWeeklyAlpLoading(true);
+      const endpoints = getApiEndpoints(userRole);
+      
+      console.log('📡 [fetchWeeklyAlpData] Endpoints for role:', { userRole, endpoints });
+      
+      if (!endpoints) {
+        console.log('❌ [fetchWeeklyAlpData] No endpoints found for role:', userRole);
+        return;
+      }
+
+      if (!endpoints.weeklyAlp) {
+        console.log('❌ [fetchWeeklyAlpData] No weeklyAlp endpoint found:', { endpoints });
+        setWeeklyAlpData({ weeklyAlp: 0, comparisonAlp: 0, weekStart: '', weekEnd: '' });
+        return;
+      }
+
+      const lagnName = user.lagnname;
+      
+      let weeklyAlpResponse;
+      let endpoint;
+      
+      if (userRole === 'SGA') {
+        endpoint = endpoints.weeklyAlp;
+        console.log('📞 [fetchWeeklyAlpData] Calling SGA endpoint:', endpoint);
+        weeklyAlpResponse = await api.get(endpoint);
+      } else {
+        endpoint = `${endpoints.weeklyAlp}?lagnName=${lagnName}`;
+        
+        // For SA/GA/MGA/RGA users, add viewMode parameter to determine LVL_1_NET vs LVL_2_NET vs LVL_3_NET
+        if (userRole === 'SA') {
+          endpoint += `&viewMode=${saViewMode}`;
+          console.log('📞 [fetchWeeklyAlpData] SA user with viewMode:', { userRole, saViewMode, endpoint });
+        } else if (userRole === 'GA') {
+          endpoint += `&viewMode=${gaViewMode}`;
+          console.log('📞 [fetchWeeklyAlpData] GA user with viewMode:', { userRole, gaViewMode, endpoint });
+        } else if (userRole === 'MGA') {
+          endpoint += `&viewMode=${mgaViewMode}`;
+          console.log('📞 [fetchWeeklyAlpData] MGA user with viewMode:', { userRole, mgaViewMode, endpoint });
+        } else if (userRole === 'RGA') {
+          endpoint += `&viewMode=${rgaViewMode}`;
+          console.log('📞 [fetchWeeklyAlpData] RGA user with viewMode:', { userRole, rgaViewMode, endpoint });
+        }
+        
+        console.log('📞 [fetchWeeklyAlpData] Calling user endpoint:', { endpoint, lagnName });
+        weeklyAlpResponse = await api.get(endpoint, {
+          headers: {
+            'user-role': userRole
+          }
+        });
+      }
+      
+      console.log('📥 [fetchWeeklyAlpData] Raw API response:', weeklyAlpResponse);
+      
+      const receivedData = weeklyAlpResponse?.data || { weeklyAlp: 0, comparisonAlp: 0, weekStart: '', weekEnd: '' };
+      
+      console.log(`📊 [Frontend] Weekly ALP data received for ${userRole}:`, {
+        userRole,
+        lagnName: user.lagnname,
+        receivedData,
+        endpoint
+      });
+      
+      setWeeklyAlpData(receivedData);
+
+    } catch (err) {
+      console.error(`❌ [fetchWeeklyAlpData] Error fetching weekly ALP data:`, {
+        error: err,
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        userRole,
+        user: user?.lagnname
+      });
+      setWeeklyAlpData({ weeklyAlp: 0, comparisonAlp: 0, weekStart: '', weekEnd: '' });
+    } finally {
+      setWeeklyAlpLoading(false);
+    }
+  }, [userRole, user?.lagnname, saViewMode, gaViewMode, mgaViewMode, rgaViewMode]);
+
+  /**
+   * Fetch weekly hires data for SGA dashboard
+   */
+  const fetchWeeklyHiresData = useCallback(async () => {
+    console.log('🚀 [fetchWeeklyHiresData] Starting fetch for SGA');
+    
+    if (userRole !== 'SGA') {
+      console.log('❌ [fetchWeeklyHiresData] Not SGA role:', userRole);
+      return;
+    }
+
+    try {
+      setWeeklyHiresLoading(true);
+      const endpoints = getApiEndpoints(userRole);
+      
+      if (!endpoints?.weeklyHires) {
+        console.log('❌ [fetchWeeklyHiresData] No weeklyHires endpoint found');
+        setWeeklyHiresData({ weeklyHires: 0 });
+        return;
+      }
+
+      console.log('📞 [fetchWeeklyHiresData] Calling endpoint:', endpoints.weeklyHires);
+      const weeklyHiresResponse = await api.get(endpoints.weeklyHires);
+      
+      console.log('📥 [fetchWeeklyHiresData] Raw API response:', weeklyHiresResponse);
+      
+      const receivedData = weeklyHiresResponse?.data || { weeklyHires: 0 };
+      
+      console.log('📊 [Frontend] Weekly hires data received:', receivedData);
+      
+      setWeeklyHiresData(receivedData);
+
+    } catch (err) {
+      console.error('❌ [fetchWeeklyHiresData] Error:', {
+        error: err,
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      setWeeklyHiresData({ weeklyHires: 0 });
+    } finally {
+      setWeeklyHiresLoading(false);
+    }
+  }, [userRole]);
+
+  /**
+   * Fetch weekly codes data for SGA dashboard
+   */
+  const fetchWeeklyCodesData = useCallback(async () => {
+    console.log('🚀 [fetchWeeklyCodesData] Starting fetch for SGA');
+    
+    if (userRole !== 'SGA') {
+      console.log('❌ [fetchWeeklyCodesData] Not SGA role:', userRole);
+      return;
+    }
+
+    try {
+      setWeeklyCodesLoading(true);
+      const endpoints = getApiEndpoints(userRole);
+      
+      if (!endpoints?.weeklyCode) {
+        console.log('❌ [fetchWeeklyCodesData] No weeklyCode endpoint found');
+        setWeeklyCodesData({ weeklyCodes: 0 });
+        return;
+      }
+
+      console.log('📞 [fetchWeeklyCodesData] Calling endpoint:', endpoints.weeklyCode);
+      const weeklyCodesResponse = await api.get(endpoints.weeklyCode);
+      
+      console.log('📥 [fetchWeeklyCodesData] Raw API response:', weeklyCodesResponse);
+      
+      const receivedData = weeklyCodesResponse?.data || { weeklyCodes: 0 };
+      
+      console.log('📊 [Frontend] Weekly codes data received:', receivedData);
+      
+      setWeeklyCodesData(receivedData);
+
+    } catch (err) {
+      console.error('❌ [fetchWeeklyCodesData] Error:', {
+        error: err,
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      setWeeklyCodesData({ weeklyCodes: 0 });
+    } finally {
+      setWeeklyCodesLoading(false);
+    }
+  }, [userRole]);
+
+  /**
+   * Fetch weekly ref sales data for SGA dashboard
+   */
+  const fetchWeeklyRefSalesData = useCallback(async () => {
+    console.log('🚀 [fetchWeeklyRefSalesData] Starting fetch for role:', userRole);
+    
+    if (!['SGA', 'AGT', 'MGA', 'RGA', 'SA', 'GA'].includes(userRole)) {
+      console.log('❌ [fetchWeeklyRefSalesData] Invalid role:', userRole);
+      return;
+    }
+
+    try {
+      setWeeklyRefSalesLoading(true);
+      const endpoints = getApiEndpoints(userRole);
+      
+      if (!endpoints?.weeklyRefSales) {
+        console.log('❌ [fetchWeeklyRefSalesData] No weeklyRefSales endpoint found');
+        setWeeklyRefSalesData({ weeklyRefSales: 0 });
+        return;
+      }
+
+      // Build URL with lagnName parameter for non-SGA users (same as monthly ref sales)
+      let url = endpoints.weeklyRefSales;
+      if (userRole !== 'SGA' && user?.lagnname) {
+        url += `?lagnName=${encodeURIComponent(user.lagnname)}`;
+        console.log('📞 [fetchWeeklyRefSalesData] Adding lagnName parameter for', userRole, ':', user.lagnname);
+      }
+
+      console.log('📞 [fetchWeeklyRefSalesData] Calling endpoint:', url);
+      const weeklyRefSalesResponse = await api.get(url);
+      
+      console.log('📥 [fetchWeeklyRefSalesData] Raw API response:', weeklyRefSalesResponse);
+      
+      const receivedData = weeklyRefSalesResponse?.data || { weeklyRefSales: 0 };
+      
+      console.log('📊 [Frontend] Weekly ref sales data received:', receivedData);
+      
+      setWeeklyRefSalesData(receivedData);
+
+    } catch (err) {
+      console.error('❌ [fetchWeeklyRefSalesData] Error:', {
+        error: err,
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      setWeeklyRefSalesData({ weeklyRefSales: 0 });
+    } finally {
+      setWeeklyRefSalesLoading(false);
+    }
+  }, [userRole, user?.lagnname]);
+
+  /**
+   * Fetch monthly ALP data for SGA dashboard
+   */
+  const fetchMonthlyAlpData = useCallback(async () => {
+    console.log('🚀 [fetchMonthlyAlpData] Starting fetch for role:', userRole);
+    
+    if (!['SGA', 'AGT', 'MGA', 'RGA', 'SA', 'GA'].includes(userRole)) {
+      console.log('❌ [fetchMonthlyAlpData] Invalid role:', userRole);
+      return;
+    }
+
+    try {
+      setMonthlyAlpSumLoading(true);
+      const endpoints = getApiEndpoints(userRole);
+      
+      if (!endpoints?.monthlyAlpSum) {
+        console.log('❌ [fetchMonthlyAlpData] No monthlyAlpSum endpoint found');
+        setMonthlyAlpSumData({ monthlyAlp: 0, comparisonAlp: 0 });
+        return;
+      }
+
+      // Build URL with lagnName parameter for non-SGA users (same as ref sales)
+      let url = endpoints.monthlyAlpSum;
+      if (userRole !== 'SGA' && user?.lagnname) {
+        url += `?lagnName=${encodeURIComponent(user.lagnname)}`;
+        
+        // For SA/GA/MGA/RGA users, add viewMode parameter to determine LVL_1_NET vs LVL_2_NET vs LVL_3_NET
+        if (userRole === 'SA') {
+          url += `&viewMode=${saViewMode}`;
+          console.log('📞 [fetchMonthlyAlpData] SA user with viewMode:', { userRole, saViewMode, url });
+        } else if (userRole === 'GA') {
+          url += `&viewMode=${gaViewMode}`;
+          console.log('📞 [fetchMonthlyAlpData] GA user with viewMode:', { userRole, gaViewMode, url });
+        } else if (userRole === 'MGA') {
+          url += `&viewMode=${mgaViewMode}`;
+          console.log('📞 [fetchMonthlyAlpData] MGA user with viewMode:', { userRole, mgaViewMode, url });
+        } else if (userRole === 'RGA') {
+          url += `&viewMode=${rgaViewMode}`;
+          console.log('📞 [fetchMonthlyAlpData] RGA user with viewMode:', { userRole, rgaViewMode, url });
+        }
+        
+        console.log('📞 [fetchMonthlyAlpData] Adding lagnName parameter for', userRole, ':', user.lagnname);
+      }
+
+      console.log('📞 [fetchMonthlyAlpData] Calling endpoint:', url);
+      const monthlyAlpResponse = await api.get(url, {
+        headers: {
+          'user-role': userRole
+        }
+      });
+      
+      console.log('🔍 [fetchMonthlyAlpData] Full API Response:', {
+        status: monthlyAlpResponse.status,
+        statusText: monthlyAlpResponse.statusText,
+        headers: monthlyAlpResponse.headers,
+        data: monthlyAlpResponse.data
+      });
+      
+      const receivedData = monthlyAlpResponse?.data || { monthlyAlp: 0, comparisonAlp: 0 };
+      
+      console.log('📊 [fetchMonthlyAlpData] Parsed data for', userRole, 'user:', {
+        userRole: userRole,
+        userLagnName: user?.lagnname,
+        endpoint: url,
+        rawResponse: monthlyAlpResponse.data,
+        parsedData: receivedData,
+        monthlyAlp: receivedData.monthlyAlp,
+        comparisonAlp: receivedData.comparisonAlp,
+        maxReportDate: receivedData.maxReportDate,
+        monthStart: receivedData.monthStart,
+        monthEnd: receivedData.monthEnd,
+        hasLagnNameFilter: userRole !== 'SGA',
+        timestamp: new Date().toISOString()
+      });
+      
+      if (receivedData.monthlyAlp === 0) {
+        console.warn('⚠️ [fetchMonthlyAlpData] Monthly ALP is 0 - check if data exists for:', {
+          userRole,
+          lagnName: user?.lagnname,
+          endpoint: url,
+          possibleIssues: [
+            'No Weekly_ALP records with REPORT=MTD Recap for this LagnName',
+            'No records for current month',
+            'LagnName mismatch between user.lagnname and Weekly_ALP.LagnName'
+          ]
+        });
+      }
+      
+      setMonthlyAlpSumData(receivedData);
+
+    } catch (err) {
+      console.error('❌ [fetchMonthlyAlpData] Error:', {
+        error: err,
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      setMonthlyAlpSumData({ monthlyAlp: 0, comparisonAlp: 0 });
+    } finally {
+      setMonthlyAlpSumLoading(false);
+    }
+  }, [userRole, user?.lagnname, saViewMode, gaViewMode, mgaViewMode, rgaViewMode]);
+
+  /**
+   * Fetch monthly hires data for SGA dashboard
+   */
+  const fetchMonthlyHiresData = useCallback(async () => {
+    console.log('🚀 [fetchMonthlyHiresData] Starting fetch for SGA');
+    
+    if (userRole !== 'SGA') {
+      console.log('❌ [fetchMonthlyHiresData] Not SGA role:', userRole);
+      return;
+    }
+
+    try {
+      setMonthlyHiresSumLoading(true);
+      const endpoints = getApiEndpoints(userRole);
+      
+      if (!endpoints?.monthlyHiresSum) {
+        console.log('❌ [fetchMonthlyHiresData] No monthlyHiresSum endpoint found');
+        setMonthlyHiresSumData({ monthlyHires: 0 });
+        return;
+      }
+
+      console.log('📞 [fetchMonthlyHiresData] Calling endpoint:', endpoints.monthlyHiresSum);
+      const monthlyHiresResponse = await api.get(endpoints.monthlyHiresSum);
+      
+      const receivedData = monthlyHiresResponse?.data || { monthlyHires: 0 };
+      
+      console.log('📊 [Frontend] Monthly hires data received:', receivedData);
+      
+      setMonthlyHiresSumData(receivedData);
+
+    } catch (err) {
+      console.error('❌ [fetchMonthlyHiresData] Error:', {
+        error: err,
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      setMonthlyHiresSumData({ monthlyHires: 0 });
+    } finally {
+      setMonthlyHiresSumLoading(false);
+    }
+  }, [userRole]);
+
+  /**
+   * Fetch monthly codes data for SGA dashboard
+   */
+  const fetchMonthlyCodesData = useCallback(async () => {
+    console.log('🚀 [fetchMonthlyCodesData] Starting fetch for SGA');
+    
+    if (userRole !== 'SGA') {
+      console.log('❌ [fetchMonthlyCodesData] Not SGA role:', userRole);
+      return;
+    }
+
+    try {
+      setMonthlyCodesSumLoading(true);
+      const endpoints = getApiEndpoints(userRole);
+      
+      if (!endpoints?.monthlyCodesSum) {
+        console.log('❌ [fetchMonthlyCodesData] No monthlyCodesSum endpoint found');
+        setMonthlyCodesSumData({ monthlyCodes: 0 });
+        return;
+      }
+
+      console.log('📞 [fetchMonthlyCodesData] Calling endpoint:', endpoints.monthlyCodesSum);
+      const monthlyCodesResponse = await api.get(endpoints.monthlyCodesSum);
+      
+      const receivedData = monthlyCodesResponse?.data || { monthlyCodes: 0 };
+      
+      console.log('📊 [Frontend] Monthly codes data received:', receivedData);
+      
+      setMonthlyCodesSumData(receivedData);
+
+    } catch (err) {
+      console.error('❌ [fetchMonthlyCodesData] Error:', {
+        error: err,
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      setMonthlyCodesSumData({ monthlyCodes: 0 });
+    } finally {
+      setMonthlyCodesSumLoading(false);
+    }
+  }, [userRole]);
+
+  /**
+   * Fetch monthly ref sales data for SGA dashboard
+   */
+  const fetchMonthlyRefSalesData = useCallback(async () => {
+    console.log('🚀 [fetchMonthlyRefSalesData] Starting fetch for role:', userRole);
+    
+    if (!['SGA', 'AGT', 'MGA', 'RGA', 'SA', 'GA'].includes(userRole)) {
+      console.log('❌ [fetchMonthlyRefSalesData] Invalid role:', userRole);
+      return;
+    }
+
+    try {
+      setMonthlyRefSalesSumLoading(true);
+      const endpoints = getApiEndpoints(userRole);
+      
+      if (!endpoints?.monthlyRefSalesSum) {
+        console.log('❌ [fetchMonthlyRefSalesData] No monthlyRefSalesSum endpoint found');
+        setMonthlyRefSalesSumData({ monthlyRefSales: 0 });
+        return;
+      }
+
+      // Build URL with lagnName parameter for non-SGA users (same as monthly ref sales)
+      let url = endpoints.monthlyRefSalesSum;
+      if (userRole !== 'SGA' && user?.lagnname) {
+        url += `?lagnName=${encodeURIComponent(user.lagnname)}`;
+        console.log('📞 [fetchMonthlyRefSalesData] Adding lagnName parameter for', userRole, ':', user.lagnname);
+      }
+
+      console.log('📞 [fetchMonthlyRefSalesData] Calling endpoint:', url);
+      const monthlyRefSalesResponse = await api.get(url);
+      
+      const receivedData = monthlyRefSalesResponse?.data || { monthlyRefSales: 0 };
+      
+      console.log('📊 [Frontend] Monthly ref sales data received:', receivedData);
+      
+      setMonthlyRefSalesSumData(receivedData);
+
+    } catch (err) {
+      console.error('❌ [fetchMonthlyRefSalesData] Error:', {
+        error: err,
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      setMonthlyRefSalesSumData({ monthlyRefSales: 0 });
+    } finally {
+      setMonthlyRefSalesSumLoading(false);
+    }
+  }, [userRole, user?.lagnname]);
+
+  /**
+   * Fetch current month hires data for MGA/RGA dashboard (similar to OneOnOne.js logic)
+   */
+  const fetchCurrentMonthHiresData = useCallback(async () => {
+    console.log('🚀 [fetchCurrentMonthHiresData] Starting fetch for role:', userRole);
+    
+    if (!['MGA', 'RGA'].includes(userRole)) {
+      console.log('❌ [fetchCurrentMonthHiresData] Not MGA/RGA role:', userRole);
+      return;
+    }
+
+    try {
+      setCurrentMonthHiresLoading(true);
+      
+      if (!user?.lagnname) {
+        console.log('❌ [fetchCurrentMonthHiresData] No lagnname available');
+        setCurrentMonthHiresData({ monthlyHires: 0 });
+        return;
+      }
+
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      
+      // Fetch hires data using the same endpoint as OneOnOne
+      const enc = encodeURIComponent(user.lagnname);
+      const hiresRes = await api.get(`/dataroutes/total-hires?value=${enc}`);
+      const hiresArr = hiresRes?.data?.data || [];
+      
+      // Calculate current month hires (similar to OneOnOne.js logic)
+      const monthlyHires = hiresArr.reduce((sum, row) => {
+        const d = row?.MORE_Date ? new Date(row.MORE_Date) : null;
+        if (d && d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
+          const n = parseFloat(row?.Total_Hires) || 0;
+          return sum + n;
+        }
+        return sum;
+      }, 0);
+      
+      console.log('📊 [fetchCurrentMonthHiresData] Monthly hires:', monthlyHires);
+      
+      setCurrentMonthHiresData({ monthlyHires });
+
+    } catch (err) {
+      console.error('❌ [fetchCurrentMonthHiresData] Error:', {
+        error: err,
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      setCurrentMonthHiresData({ monthlyHires: 0 });
+    } finally {
+      setCurrentMonthHiresLoading(false);
+    }
+  }, [userRole, user?.lagnname]);
+
+  /**
+   * Fetch current month VIPs data for MGA/RGA dashboard (similar to OneOnOne.js logic)
+   */
+  const fetchCurrentMonthVipsData = useCallback(async () => {
+    console.log('🚀 [fetchCurrentMonthVipsData] Starting fetch for role:', userRole);
+    
+    if (!['MGA', 'RGA'].includes(userRole)) {
+      console.log('❌ [fetchCurrentMonthVipsData] Not MGA/RGA role:', userRole);
+      return;
+    }
+
+    try {
+      setCurrentMonthVipsLoading(true);
+      
+      if (!user?.lagnname) {
+        console.log('❌ [fetchCurrentMonthVipsData] No lagnname available');
+        setCurrentMonthVipsData({ monthlyVips: 0 });
+        return;
+      }
+
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      const ym = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`; // YYYY-MM
+      
+      // Try to get Potential VIPs data first (preferred method from OneOnOne.js)
+      try {
+        const potRes = await api.get('/admin/potential-vips', { params: { month: ym } });
+        const potRows = potRes?.data?.data || [];
+        
+        const mgaNameLower = String(user.lagnname || '').toLowerCase();
+        
+        // Count VIPs where LVL_1_GROSS >= 5000 for this MGA
+        let monthlyVips = 0;
+        potRows.forEach(r => {
+          const rowMgaName = String(r?.mga || '').toLowerCase();
+          if (rowMgaName === mgaNameLower) {
+            const gross = typeof r?.totalLvl1Gross === 'number' ? r.totalLvl1Gross : parseFloat(r?.totalLvl1Gross || 0);
+            if (Number.isFinite(gross) && gross >= 5000) {
+              monthlyVips++;
+            }
+          }
+        });
+        
+        console.log('📊 [fetchCurrentMonthVipsData] Monthly VIPs (from potential-vips):', monthlyVips);
+        setCurrentMonthVipsData({ monthlyVips });
+        
+      } catch (potErr) {
+        // Fallback to regular VIPs table if potential-vips fails
+        console.warn('⚠️ [fetchCurrentMonthVipsData] Potential VIPs failed, falling back to VIPs table:', potErr.message);
+        
+        const enc = encodeURIComponent(user.lagnname);
+        const vipsRes = await api.get(`/dataroutes/vips/multiple?value=${enc}`);
+        const vipsArr = vipsRes?.data?.data || [];
+        
+        // Calculate current month VIPs
+        const monthlyVips = vipsArr.filter((row) => {
+          const d = row?.vip_month ? new Date(row.vip_month) : null;
+          return d && d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+        }).length;
+        
+        console.log('📊 [fetchCurrentMonthVipsData] Monthly VIPs (from VIPs table):', monthlyVips);
+        setCurrentMonthVipsData({ monthlyVips });
+      }
+
+    } catch (err) {
+      console.error('❌ [fetchCurrentMonthVipsData] Error:', {
+        error: err,
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      setCurrentMonthVipsData({ monthlyVips: 0 });
+    } finally {
+      setCurrentMonthVipsLoading(false);
+    }
+  }, [userRole, user?.lagnname]);
 
   /**
    * Process leaderboard data to match the Leaderboard component format
    */
   const processLeaderboardData = (data) => {
-    console.log(`🔍 [Leaderboard] Processing ${data?.length || 0} raw records for role: ${userRole}`);
     
-    if (!data || data.length === 0) {
-      console.log(`🔍 [Leaderboard] No data to process`);
-      return [];
-    }
-    
-    // Log a sample record to understand the data structure
-    if (data.length > 0) {
-      console.log(`🔍 [Leaderboard] Sample record:`, data[0]);
-    }
+ 
+  
     
     const processed = data
       .map((row, index) => {
@@ -867,17 +1562,12 @@ export const useDashboardData = (userRole, user) => {
           reportdate: row.reportdate
         };
         
-        // Log first few processed items for debugging
-        if (index < 3) {
-          console.log(`🔍 [Leaderboard] Processed item ${index}:`, processedItem);
-        }
-        
+     
         return processedItem;
       })
       .sort((a, b) => (b.value || 0) - (a.value || 0))
       .map((item, index) => ({ ...item, rank: index + 1 }));
       
-    console.log(`🔍 [Leaderboard] Final processed data count: ${processed.length}`);
     return processed;
   };
 
@@ -947,7 +1637,6 @@ export const useDashboardData = (userRole, user) => {
       const startDateFormatted = formatToMMDDYYYY(new Date(startDate));
       const endDateFormatted = formatToMMDDYYYY(new Date(endDate));
 
-      console.log(`🔍 [Leaderboard] Fetching for ${userRole} from ${startDateFormatted} to ${endDateFormatted}`);
 
       const response = await api.get(`/alp/${endpoints.leaderboard}`, {
         params: { 
@@ -1051,6 +1740,46 @@ export const useDashboardData = (userRole, user) => {
   }, [fetchDailyActivityData]);
 
   useEffect(() => {
+    fetchWeeklyAlpData(); // Fetch weekly ALP data separately
+  }, [fetchWeeklyAlpData]);
+
+  useEffect(() => {
+    fetchWeeklyHiresData(); // Fetch weekly hires data for SGA
+  }, [fetchWeeklyHiresData]);
+
+  useEffect(() => {
+    fetchWeeklyCodesData(); // Fetch weekly codes data for SGA
+  }, [fetchWeeklyCodesData]);
+
+  useEffect(() => {
+    fetchWeeklyRefSalesData(); // Fetch weekly ref sales data for SGA
+  }, [fetchWeeklyRefSalesData]);
+
+  useEffect(() => {
+    fetchMonthlyAlpData(); // Fetch monthly ALP data for SGA
+  }, [fetchMonthlyAlpData]);
+
+  useEffect(() => {
+    fetchMonthlyHiresData(); // Fetch monthly hires data for SGA
+  }, [fetchMonthlyHiresData]);
+
+  useEffect(() => {
+    fetchMonthlyCodesData(); // Fetch monthly codes data for SGA
+  }, [fetchMonthlyCodesData]);
+
+  useEffect(() => {
+    fetchMonthlyRefSalesData(); // Fetch monthly ref sales data for SGA
+  }, [fetchMonthlyRefSalesData]);
+
+  useEffect(() => {
+    fetchCurrentMonthHiresData(); // Fetch current month hires data for MGA/RGA
+  }, [fetchCurrentMonthHiresData]);
+
+  useEffect(() => {
+    fetchCurrentMonthVipsData(); // Fetch current month VIPs data for MGA/RGA
+  }, [fetchCurrentMonthVipsData]);
+
+  useEffect(() => {
     fetchLeaderboardData();
   }, [fetchLeaderboardData]);
 
@@ -1062,13 +1791,11 @@ export const useDashboardData = (userRole, user) => {
 
   // Format date range helper
   const formatDateRange = (startDate, endDate) => {
-    console.log(`🔍 [formatDateRange] Input - Start: ${startDate}, End: ${endDate}`);
     
     // Parse dates as UTC to avoid timezone issues
     const start = new Date(startDate + 'T00:00:00.000Z');
     const end = new Date(endDate + 'T00:00:00.000Z');
     
-    console.log(`🔍 [formatDateRange] Parsed UTC - Start: ${start.toUTCString()}, End: ${end.toUTCString()}`);
     
     const formatDate = (date) => {
       // Use UTC methods to format to avoid timezone shifts
@@ -1083,7 +1810,6 @@ export const useDashboardData = (userRole, user) => {
     const formattedEnd = formatDate(end);
     const result = `${formattedStart} - ${formattedEnd}`;
     
-    console.log(`🔍 [formatDateRange] Final formatted result: ${result}`);
     
     return result;
   };
@@ -1093,6 +1819,16 @@ export const useDashboardData = (userRole, user) => {
     loading,
     error,
     dailyActivityLoading,
+    weeklyAlpLoading,
+    weeklyHiresLoading,
+    weeklyCodesLoading,
+    weeklyRefSalesLoading,
+    monthlyAlpSumLoading,
+    monthlyHiresSumLoading,
+    monthlyCodesSumLoading,
+    monthlyRefSalesSumLoading,
+    currentMonthHiresLoading,
+    currentMonthVipsLoading,
     leaderboardLoading,
     
     // Date range
@@ -1101,11 +1837,23 @@ export const useDashboardData = (userRole, user) => {
     
     // Raw data
     weeklyYtdData,
+    // Monthly data (old config, keep for compatibility)
     monthlyAlpData,
     vipsData,
     associatesData,
     hiresData,
     dailyActivityData,
+    weeklyAlpData,
+    weeklyHiresData,
+    weeklyCodesData,
+    weeklyRefSalesData,
+    // Monthly data - new endpoints for "This Month" tab
+    monthlyAlpSumData: monthlyAlpSumData,
+    monthlyHiresSumData: monthlyHiresSumData,
+    monthlyCodesSumData: monthlyCodesSumData,
+    monthlyRefSalesSumData: monthlyRefSalesSumData,
+    currentMonthHiresData,
+    currentMonthVipsData,
     refSalesData,
     currentMonthRefSalesData,
     ytdRefSalesData,
@@ -1122,9 +1870,17 @@ export const useDashboardData = (userRole, user) => {
     // Refetch functions
     refetchData: fetchDashboardData,
     refetchDailyActivity: fetchDailyActivityData,
+    refetchWeeklyAlp: fetchWeeklyAlpData,
+    refetchWeeklyHires: fetchWeeklyHiresData,
+    refetchWeeklyCodes: fetchWeeklyCodesData,
+    refetchWeeklyRefSales: fetchWeeklyRefSalesData,
+    refetchMonthlyAlp: fetchMonthlyAlpData,
+    refetchMonthlyHires: fetchMonthlyHiresData,
+    refetchMonthlyCodes: fetchMonthlyCodesData,
+    refetchMonthlyRefSales: fetchMonthlyRefSalesData,
     refetchLeaderboard: fetchLeaderboardData
   };
 };
 
 // Export helper functions for use in components
-export { getCurrentWeekRange, getCurrentMonthRange };
+export { getCurrentWeekRange, getCurrentMonthRange, getPreviousMonthRange, getYearToDateRange };

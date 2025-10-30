@@ -17,7 +17,7 @@ const FilterMenu = ({
   filterCategories = [],
   menuType = 'expandable', // 'expandable' or 'overlay'
   buttonLabel = 'Filters',
-  position = 'bottom', // 'bottom', 'right', 'left',
+  position = 'bottom', // 'bottom', 'bottom-right', 'right', 'left',
   showFilterState = false,
   getFilterLabel,
   includeDateRange = false,
@@ -274,6 +274,9 @@ const FilterMenu = ({
     // For non-mobile or non-expandable mode, use the position prop
     if (position === 'bottom') {
       return { top: '100%', left: '0', marginTop: '8px' };
+    } else if (position === 'bottom-right') {
+      // Open below the button, aligned to the right edge of the trigger
+      return { top: '100%', right: '0', marginTop: '8px' };
     } else if (position === 'right') {
       return { top: '0', left: '100%', marginLeft: '8px' };
     } else if (position === 'left') {

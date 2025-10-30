@@ -10,12 +10,15 @@ import "./DataTable.css";
 import { DateTime } from "luxon";
 import AddressContextMenu from "./AddressContextMenu";
 import { Cell } from "./Cell";
-import { FiX } from "react-icons/fi";
+import { FiX, FiPlus, FiUpload, FiDownload, FiTrash2, FiArchive, FiMail, FiRefreshCw, FiUsers, FiEye, FiEyeOff, FiFilter, FiSave, FiBookmark } from "react-icons/fi";
+import { BiSortAZ, BiSortZA } from "react-icons/bi";
+import { AiOutlineClose } from "react-icons/ai";
 
 const DataTable = ({
   columns,
   data,
   onCellUpdate,
+  onCellBlur,
   onMassStatusChange,
   onSelectionChange,
   enableRowContextMenu = false,
@@ -27,6 +30,7 @@ const DataTable = ({
   disableSorting = false,
   defaultSortBy = null,
   defaultSortOrder = "asc",
+  onSortChange,
   highlightRowOnEdit = true,
   entityName = "item",
   archivedView = false,
@@ -57,6 +61,8 @@ const DataTable = ({
     saveChanges: false,
     cancelChanges: false
   },
+  // Custom action bar content appended to default controls
+  actionBarExtras = null,
   filterOptions = {
     showFilterMenu: false,
     roleFilters: [],
@@ -72,6 +78,7 @@ const DataTable = ({
   totalsLabelColumn = null, // which column to show the label in (defaults to first column)
   // Row styling props
   rowClassNames = {}, // object mapping row IDs to CSS class names
+  bandedRows = false, // enable alternating row colors (zebra striping) for better readability
   // Sticky props
   stickyHeader = true, // make header sticky
   stickyRows = [], // array of row IDs that should be sticky
@@ -84,8 +91,49 @@ const DataTable = ({
   expandableRows = {}, // object mapping row IDs to boolean (which rows can be expanded)
   renderExpandedRow = null, // function to render expanded content: (row) => JSX
   onRowExpansionChange = null, // callback when row expansion state changes: (rowId, isExpanded) => void
-  expandedRowsInitial = {} // initial expanded state: {rowId: boolean}
+  expandedRowsInitial = {}, // initial expanded state: {rowId: boolean}
+  expandableDefault = true, // default expandability when row not specified in expandableRows
+  isRowExpandable = null, // optional predicate: (rowOriginal) => boolean; further restricts expandability
+  expandOnRowClick = false, // when true, clicking anywhere on an expandable row toggles expansion
+  showExpandButton = true, // when false, hides the expand arrow button in cells
+  // Table layout props
+  allowTableOverflow = false, // allow table to be wider than container for horizontal scrolling
+  // Row coloring props
+  enableRowColoring = false, // enable row coloring functionality
+  rowColorColumn = 'rowcolor', // column accessor that contains the color value
+  // Table/row customization
+  tableClassName = '', // additional class name(s) for the table element
+  getRowDataAttributes = null, // optional function: (rowOriginal) => { 'data-role': 'MGA', ... }
+  // Column filtering props
+  enableColumnFilters = false, // enable Excel-like column filtering
+  onColumnFilterChange = null, // callback when column filters change: (filters) => void
+  tableId = 'default-table' // unique identifier for the table to save/load filters
 }) => {
+  // Helper function for creating styled icon buttons
+  const createIconButton = (onClick, icon, title, disabled = false) => (
+    <button 
+      onClick={onClick} 
+      className="action-button icon-button"
+      title={title}
+      disabled={disabled}
+      style={{
+        color: disabled ? '#9ca3af' : '#6b7280',
+        backgroundColor: 'transparent',
+        border: 'none',
+        padding: '8px',
+        borderRadius: '4px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: disabled ? 'not-allowed' : 'pointer'
+      }}
+      onMouseEnter={(e) => !disabled && (e.target.style.color = '#374151')}
+      onMouseLeave={(e) => !disabled && (e.target.style.color = '#6b7280')}
+    >
+      {icon}
+    </button>
+  );
+
   const [editingCell, setEditingCell] = useState(null);
   const [editedData, setEditedData] = useState({});
   const [localData, setLocalData] = useState(data);
@@ -101,8 +149,19 @@ const DataTable = ({
     states: {}
   });
   const [allAvailableStates, setAllAvailableStates] = useState([]);
+  const [columnFilters, setColumnFilters] = useState({});  // {columnId: filterValue}
+  const [showColumnFilter, setShowColumnFilter] = useState(null); // which column's filter dropdown is open
+  const [filterDropdownPosition, setFilterDropdownPosition] = useState({ top: 0, left: 0 }); // position for filter dropdown
+  const [tempFilterSelections, setTempFilterSelections] = useState({}); // temporary selections before applying
+  const [filterSearchTerm, setFilterSearchTerm] = useState(''); // search term for filtering checkbox options
+  const [showSaveFilterDialog, setShowSaveFilterDialog] = useState(false); // show save filter dialog
+  const [saveFilterName, setSaveFilterName] = useState(''); // name for saving filter
+  const [savedFilters, setSavedFilters] = useState([]); // list of saved filters
+  const [showSavedFilters, setShowSavedFilters] = useState(false); // show saved filters list
+  const [filterToDelete, setFilterToDelete] = useState(null); // filter pending deletion confirmation
   const tableRef = useRef(null);
   const inputRef = useRef(null);
+  const filterButtonRefs = useRef({}); // refs for filter buttons to calculate position
 
   useEffect(() => {
     setLocalData(data);
@@ -125,12 +184,83 @@ const DataTable = ({
     const handleClickOutside = (event) => {
       if (tableRef.current && !tableRef.current.contains(event.target)) {
         setEditingCell(null);
+        setShowColumnFilter(null);
+        setFilterSearchTerm('');
+        setShowSavedFilters(false);
+        setShowSaveFilterDialog(false);
+        setFilterToDelete(null);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Load saved filters from localStorage on mount
+  useEffect(() => {
+    if (enableColumnFilters) {
+      const loadSavedFilters = () => {
+        try {
+          const saved = localStorage.getItem(`datatable_saved_filters_${tableId}`);
+          if (saved) {
+            setSavedFilters(JSON.parse(saved));
+          }
+        } catch (error) {
+          console.error('Error loading saved filters:', error);
+        }
+      };
+      loadSavedFilters();
+    }
+  }, [tableId, enableColumnFilters]);
+
+  // Save filters to localStorage
+  const saveFilter = (name, columnId, filterData) => {
+    try {
+      const newFilter = {
+        id: Date.now().toString(),
+        name,
+        tableId,
+        columnId,
+        filterData,
+        createdAt: new Date().toISOString()
+      };
+      
+      const updatedFilters = [...savedFilters, newFilter];
+      setSavedFilters(updatedFilters);
+      localStorage.setItem(`datatable_saved_filters_${tableId}`, JSON.stringify(updatedFilters));
+      return true;
+    } catch (error) {
+      console.error('Error saving filter:', error);
+      return false;
+    }
+  };
+
+  // Load and apply a saved filter
+  const loadSavedFilter = (filter) => {
+    try {
+      setColumnFilters(prev => ({
+        ...prev,
+        [filter.columnId]: filter.filterData
+      }));
+      setTempFilterSelections(prev => ({
+        ...prev,
+        [filter.columnId]: filter.filterData
+      }));
+      setShowSavedFilters(false);
+    } catch (error) {
+      console.error('Error loading filter:', error);
+    }
+  };
+
+  // Delete a saved filter
+  const deleteSavedFilter = (filterId) => {
+    try {
+      const updatedFilters = savedFilters.filter(f => f.id !== filterId);
+      setSavedFilters(updatedFilters);
+      localStorage.setItem(`datatable_saved_filters_${tableId}`, JSON.stringify(updatedFilters));
+    } catch (error) {
+      console.error('Error deleting filter:', error);
+    }
+  };
 
   
   const saveChangeDebounced = useRef(
@@ -196,32 +326,107 @@ const DataTable = ({
   
   const handleKeyDown = (e, rowIndex, columnIndex, totalRows, totalCols) => {
     const moveToCell = (newRow, newCol) => {
-      const columnId = columns[newCol]?.accessor;
-      if (columnId !== undefined) {
-        setEditingCell({ id: localData[newRow].id, field: columnId });
+      // Use the currently rendered page rows and their visible cells to determine targets
+      const safeRowIndex = Math.max(0, Math.min(newRow, (page?.length || 0) - 1));
+      const targetRow = page?.[safeRowIndex];
+      if (!targetRow) return;
+
+      const visibleColsCount = targetRow.cells?.length || 0;
+      if (visibleColsCount === 0) return;
+
+      const wrappedColIndex = ((newCol % visibleColsCount) + visibleColsCount) % visibleColsCount;
+      const targetColId = targetRow.cells?.[wrappedColIndex]?.column?.id;
+      const targetRowId = targetRow.original?.id ?? targetRow.id;
+
+      if (targetColId !== undefined && targetRowId !== undefined) {
+        console.log('[DataTable] moveToCell -> setEditingCell', {
+          from: { rowIndex, columnIndex },
+          to: { rowIndex: safeRowIndex, columnIndex: wrappedColIndex },
+          targetRowId,
+          targetColId
+        });
+        setEditingCell({ id: targetRowId, field: targetColId });
+
+        // Try to programmatically focus the inner control (input/select) for the target cell
+        // Selects are not tied to editing state, so they won't be focused by inputRef logic
+        setTimeout(() => {
+          console.log('[DataTable] focusing inner control for cell', {
+            rowIndex: safeRowIndex,
+            columnIndex: wrappedColIndex
+          });
+          const container = tableRef.current;
+          if (!container) return;
+
+          // Prefer selecting by indexed row/col added as data attributes
+          let td = container.querySelector(
+            `tbody tr[data-row-index=\"${safeRowIndex}\"] td[data-column-index=\"${wrappedColIndex}\"]`
+          );
+
+          // Fallback: any focusable within the row's nth cell
+          if (!td) {
+            const rows = Array.from(container.querySelectorAll('tbody tr'))
+              .filter(r => !r.classList.contains('totals-row'));
+            const rowEl = rows[safeRowIndex];
+            if (rowEl) {
+              td = rowEl.querySelectorAll('td')?.[wrappedColIndex];
+            }
+          }
+
+          const focusable = td?.querySelector('select, input, textarea, [tabindex]:not([tabindex=\"-1\"])');
+          if (focusable && typeof focusable.focus === 'function') {
+            focusable.focus();
+            if (focusable.tagName === 'INPUT' && focusable.type === 'text') {
+              try {
+                const len = focusable.value?.length ?? 0;
+                focusable.setSelectionRange(len, len);
+              } catch (_) {}
+            }
+          }
+        }, 0);
       }
     };
+
+    // If the active element is a dropdown/select, let it handle arrows/enter,
+    // and let Tab move focus naturally.
+    const target = e.target;
+    const tagName = target?.tagName?.toUpperCase?.();
+    const isSelect = tagName === 'SELECT';
+    const isComboRole = target?.getAttribute && (
+      target.getAttribute('role') === 'combobox' || target.getAttribute('role') === 'listbox'
+    );
+    const isDropdownLike = isSelect || isComboRole;
 
     switch (e.key) {
       case "Escape":
         setEditingCell(null);
         break;
       case "Enter":
+        if (isDropdownLike) return; // allow select to open/select
+        // fallthrough intended to Tab-like behavior
       case "Tab":
+        console.log('[DataTable] Tab keydown', { rowIndex, columnIndex, shiftKey: !!e.shiftKey });
         e.preventDefault();
-        moveToCell(rowIndex, (columnIndex + 1) % totalCols);
+        moveToCell(rowIndex, columnIndex + (e.shiftKey ? -1 : 1));
         break;
       case "ArrowRight":
-        moveToCell(rowIndex, columnIndex + 1 < totalCols ? columnIndex + 1 : 0);
+        if (isDropdownLike) return; // let dropdown handle
+        e.preventDefault();
+        moveToCell(rowIndex, columnIndex + 1);
         break;
       case "ArrowLeft":
-        moveToCell(rowIndex, columnIndex > 0 ? columnIndex - 1 : totalCols - 1);
+        if (isDropdownLike) return; // let dropdown handle
+        e.preventDefault();
+        moveToCell(rowIndex, columnIndex - 1);
         break;
       case "ArrowDown":
-        moveToCell(rowIndex + 1 < totalRows ? rowIndex + 1 : rowIndex, columnIndex);
+        if (isDropdownLike) return; // let dropdown handle
+        e.preventDefault();
+        moveToCell(rowIndex + 1, columnIndex);
         break;
       case "ArrowUp":
-        moveToCell(rowIndex > 0 ? rowIndex - 1 : rowIndex, columnIndex);
+        if (isDropdownLike) return; // let dropdown handle
+        e.preventDefault();
+        moveToCell(rowIndex - 1, columnIndex);
         break;
       default:
         break;
@@ -277,6 +482,48 @@ const DataTable = ({
 
   const initialPageSize = disablePagination ? data.length : 10;
 
+  // Apply archive filter
+  let filteredData = localData.filter(row => {
+    // Handle archive filtering based on archivedView setting
+    if (archivedView) {
+      // Show only archived rows (archive === 'y')
+      return row.archive === 'y' || row.archive === true || row.archive === 1;
+    } else {
+      // Show non-archived rows (archive !== 'y' or null/undefined)
+      return row.archive !== 'y' && row.archive !== true && row.archive !== 1;
+    }
+  });
+  
+  // Apply column filters if enabled
+  if (enableColumnFilters && Object.keys(columnFilters).length > 0) {
+    filteredData = filteredData.filter(row => {
+      return Object.entries(columnFilters).every(([columnId, filterValue]) => {
+        // Skip empty filters
+        if (!filterValue || filterValue === '' || filterValue === 'all') return true;
+        
+        const cellValue = row[columnId];
+        
+        // Handle null/undefined values
+        if (cellValue === null || cellValue === undefined) return false;
+        
+        // Check if filterValue is an array (checkbox filter)
+        if (Array.isArray(filterValue)) {
+          // For array filters, check if the cell value is in the selected values
+          return filterValue.some(val => {
+            const cellStr = String(cellValue).toLowerCase();
+            const filterStr = String(val).toLowerCase();
+            return cellStr === filterStr;
+          });
+        } else {
+          // For text filters, check if cell value includes the filter value
+          const cellStr = String(cellValue).toLowerCase();
+          const filterStr = String(filterValue).toLowerCase();
+          return cellStr.includes(filterStr);
+        }
+      });
+    });
+  }
+
   // Build table hooks array conditionally
   const tableHooks = [];
   if (!disableSorting) {
@@ -303,15 +550,15 @@ const DataTable = ({
     setPageSize,
     canNextPage,
     canPreviousPage,
-    state: { pageIndex, pageSize },
+    state: { pageIndex, pageSize, sortBy },
   } = useTable(
     { 
       columns, 
-      data: localData,
+      data: filteredData,
       getRowId: (row, index) => row.id || row.userId || index, // Ensure proper row identification
       initialState: { 
         pageIndex: 0, 
-        pageSize: disablePagination ? localData.length || 1000 : 25,
+        pageSize: disablePagination ? filteredData.length || 1000 : 25,
         sortBy: initialSort
       }, 
       autoResetPage: false, 
@@ -322,10 +569,22 @@ const DataTable = ({
   
   // Update page size when data changes and pagination is disabled
   useEffect(() => {
-    if (disablePagination && setPageSize && localData.length > 0) {
-      setPageSize(localData.length);
+    if (disablePagination && setPageSize && filteredData.length > 0) {
+      setPageSize(filteredData.length);
     }
-  }, [localData.length, disablePagination, setPageSize]);
+  }, [filteredData.length, disablePagination, setPageSize]);
+
+  // Notify parent component when sort changes
+  useEffect(() => {
+    if (onSortChange && sortBy && sortBy.length > 0) {
+      const currentSortBy = sortBy[0].id;
+      const currentSortOrder = sortBy[0].desc ? 'desc' : 'asc';
+      onSortChange({
+        sortBy: currentSortBy,
+        sortOrder: currentSortOrder
+      });
+    }
+  }, [sortBy, onSortChange]);
   
   const getContrastColor = (color) => {
     if (color[0] === "#") {
@@ -403,7 +662,7 @@ const DataTable = ({
     });
   };
   
-  const renderCell = (cell, row) => {
+  const renderCell = (cell, row, rowIndexProp, columnIndexProp) => {
     const isEditing =
       editingCell &&
       editingCell.id === row.id &&
@@ -419,8 +678,8 @@ const DataTable = ({
     const cellProps = {
       cell,
       row,
-      rowIndex: row.index,
-      columnIndex: cell.column.index,
+      rowIndex: rowIndexProp,
+      columnIndex: columnIndexProp,
       columns,
       localData,
       editedData,
@@ -433,6 +692,7 @@ const DataTable = ({
       handleEditStart,
       handleEditChange,
       onCellUpdate,
+      onCellBlur,
       handleKeyDown,
       inputRef,
       onOpenAddressMenu,
@@ -444,8 +704,8 @@ const DataTable = ({
           e,
           row.index,
           cell.column.index,
-          localData.length,
-          columns.length
+          page.length,
+          row.cells.length
         ),
       type: columnType,
     };
@@ -472,17 +732,31 @@ const DataTable = ({
     );
   };
 
-  const filteredData = localData.filter(row => archivedView ? row.archive : !row.archive);
+  // Helper function to flatten grouped columns
+  const flattenColumns = (cols) => {
+    const flattened = [];
+    cols.forEach(col => {
+      if (col.columns && col.columns.length > 0) {
+        // This is a group, add its children
+        flattened.push(...col.columns);
+      } else {
+        // This is a regular column
+        flattened.push(col);
+      }
+    });
+    return flattened;
+  };
 
   // Calculate totals for specified columns
   const calculateTotals = () => {
     if (!showTotals || totalsColumns.length === 0) return null;
 
     const totals = {};
-    const labelColumnAccessor = totalsLabelColumn || columns[0]?.accessor;
+    const flatColumns = flattenColumns(columns);
+    const labelColumnAccessor = totalsLabelColumn || flatColumns[0]?.accessor;
 
     // Initialize totals object
-    columns.forEach(col => {
+    flatColumns.forEach(col => {
       if (totalsColumns.includes(col.accessor)) {
         totals[col.accessor] = 0;
       } else if (col.accessor === labelColumnAccessor) {
@@ -492,21 +766,66 @@ const DataTable = ({
       }
     });
 
-    // Sum the specified columns (exclude weekly total rows to prevent double-counting)
+    // Define stats columns that should be calculated, not summed
+    const statsColumns = ['showRatio', 'closeRatio', 'alpPerSale', 'alpPerRefSale', 'alpPerRefCollected', 'daysRep'];
+    
+    // Sum the specified columns (exclude weekly total rows, excluded rows, and stats columns)
     filteredData.forEach(row => {
       // Skip weekly total rows when calculating overall totals
       if (row.isWeeklyTotal) return;
       
+      // Skip rows marked to exclude from totals (e.g., expanded MGA headers)
+      if (row._excludeFromTotals) return;
+      
       totalsColumns.forEach(colAccessor => {
+        // Skip stats columns - they will be calculated separately
+        if (statsColumns.includes(colAccessor)) return;
+        
         const value = parseFloat(row[colAccessor]) || 0;
         totals[colAccessor] += value;
       });
     });
 
-    // Format decimal columns to 2 places if they have decimals
+    // Calculate stats based on the summed totals
+    if (totalsColumns.some(col => statsColumns.includes(col))) {
+      const calls = totals.calls || 0;
+      const appts = totals.appts || 0;
+      const sits = totals.sits || 0;
+      const sales = totals.sales || 0;
+      const alp = totals.alp || 0;
+      const refs = totals.refs || 0;
+      const refAlp = totals.refAlp || 0;
+      const refSale = totals.refSale || 0;
+      
+      // Calculate each stat if it's included in totalsColumns
+      if (totalsColumns.includes('showRatio')) {
+        totals.showRatio = appts > 0 ? ((sits / appts) * 100).toFixed(1) + '%' : '0.0%';
+      }
+      if (totalsColumns.includes('closeRatio')) {
+        totals.closeRatio = sits > 0 ? ((sales / sits) * 100).toFixed(1) + '%' : '0.0%';
+      }
+      if (totalsColumns.includes('alpPerSale')) {
+        totals.alpPerSale = sales > 0 ? '$' + (alp / sales).toFixed(0) : '$0';
+      }
+      if (totalsColumns.includes('alpPerRefSale')) {
+        totals.alpPerRefSale = refSale > 0 ? '$' + (refAlp / refSale).toFixed(0) : '$0';
+      }
+      if (totalsColumns.includes('alpPerRefCollected')) {
+        totals.alpPerRefCollected = refs > 0 ? '$' + (refAlp / refs).toFixed(0) : '$0';
+      }
+      
+      // Days Rep doesn't make sense to calculate at organization level, leave blank
+      if (totalsColumns.includes('daysRep')) {
+        totals.daysRep = '';
+      }
+    }
+
+    // Format decimal columns to 2 places if they have decimals (skip stats columns)
     totalsColumns.forEach(colAccessor => {
+      if (statsColumns.includes(colAccessor)) return; // Skip stats columns
+      
       const total = totals[colAccessor];
-      if (total % 1 !== 0) {
+      if (typeof total === 'number' && total % 1 !== 0) {
         totals[colAccessor] = total.toFixed(2);
       }
     });
@@ -522,6 +841,7 @@ const DataTable = ({
 
     // Calculate sticky top position for totals row
     const totalsTop = stickyHeader ? (stickyTop + 40) : 0; // 40px for header height
+    const flatColumns = flattenColumns(columns);
 
     return (
       <tr 
@@ -533,7 +853,7 @@ const DataTable = ({
           backgroundColor: 'var(--bg-tertiary)'
         }}
       >
-        {columns.map((column) => {
+        {flatColumns.map((column) => {
           const value = totalsRow[column.accessor];
           return (
             <td key={`totals-${column.accessor}`} className="totals-cell">
@@ -671,6 +991,13 @@ const DataTable = ({
     }
   }, [activeFilters, onFilterChange]);
 
+  // Call onColumnFilterChange when column filters change
+  useEffect(() => {
+    if (onColumnFilterChange) {
+      onColumnFilterChange(columnFilters);
+    }
+  }, [columnFilters, onColumnFilterChange]);
+
   return (
     <div className="data-table-container" ref={tableRef}>
       {showActionBar && (
@@ -680,76 +1007,48 @@ const DataTable = ({
           entityName={entityName}
           archivedView={archivedView}
         >
-          {actionBarButtons.addNew && onAddNew && (
-            <button onClick={onAddNew} className="action-button">
-              Add New
-            </button>
+          {actionBarButtons.addNew && onAddNew && createIconButton(onAddNew, <FiPlus size={16} />, "Add New")}
+          {actionBarButtons.import && onImport && createIconButton(onImport, <FiUpload size={16} />, "Import")}
+          {actionBarButtons.export && onExport && createIconButton(onExport, <FiDownload size={16} />, "Export")}
+          {actionBarButtons.delete && onDelete && createIconButton(
+            () => {
+              const selectedIds = Object.keys(selectedRows);
+              if (selectedIds.length > 0) {
+                onDelete(selectedIds);
+              }
+            },
+            <FiTrash2 size={16} />,
+            "Delete",
+            Object.keys(selectedRows).length === 0
           )}
-          {actionBarButtons.import && onImport && (
-            <button onClick={onImport} className="action-button">
-              Import
-            </button>
+          {actionBarButtons.archive && onArchive && createIconButton(
+            () => {
+              const selectedIds = Object.keys(selectedRows);
+              if (selectedIds.length > 0) {
+                onArchive(selectedIds);
+              }
+            },
+            <FiArchive size={16} />,
+            "Archive",
+            Object.keys(selectedRows).length === 0
           )}
-          {actionBarButtons.export && onExport && (
-            <button onClick={onExport} className="action-button">
-              Export
-            </button>
+          {actionBarButtons.sendEmail && onSendEmail && createIconButton(
+            onSendEmail,
+            <FiMail size={16} />,
+            "Send Email",
+            Object.keys(selectedRows).length === 0
           )}
-          {actionBarButtons.delete && onDelete && (
-            <button 
-              onClick={() => {
-                const selectedIds = Object.keys(selectedRows);
-                if (selectedIds.length > 0) {
-                  onDelete(selectedIds);
-                }
-              }} 
-              className="action-button" 
-              disabled={Object.keys(selectedRows).length === 0}
-            >
-              Delete
-            </button>
+          {actionBarButtons.toggleArchived && onToggleArchivedView && createIconButton(
+            onToggleArchivedView,
+            archivedView ? <FiEye size={16} /> : <FiEyeOff size={16} />,
+            archivedView ? "Show Active" : "Show Archived"
           )}
-          {actionBarButtons.archive && onArchive && (
-            <button 
-              onClick={() => {
-                const selectedIds = Object.keys(selectedRows);
-                if (selectedIds.length > 0) {
-                  onArchive(selectedIds);
-                }
-              }} 
-              className="action-button" 
-              disabled={Object.keys(selectedRows).length === 0}
-            >
-              Archive
-            </button>
-          )}
-          {actionBarButtons.sendEmail && onSendEmail && (
-            <button 
-              onClick={onSendEmail} 
-              className="action-button" 
-              disabled={Object.keys(selectedRows).length === 0}
-            >
-              Send Email
-            </button>
-          )}
-          {actionBarButtons.toggleArchived && onToggleArchivedView && (
-            <button onClick={onToggleArchivedView} className="action-button">
-              {archivedView ? "Show Active" : "Show Archived"}
-            </button>
-          )}
-          {actionBarButtons.refresh && onRefresh && (
-            <button onClick={onRefresh} className="action-button">
-              Refresh
-            </button>
-          )}
-          {actionBarButtons.reassign && onMassReassign && (
-            <button 
-              onClick={onMassReassign} 
-              className="action-button" 
-              disabled={Object.keys(selectedRows).length === 0}
-            >
-              Reassign
-            </button>
+          {actionBarButtons.refresh && onRefresh && createIconButton(onRefresh, <FiRefreshCw size={16} />, "Refresh")}
+          {actionBarButtons.reassign && onMassReassign && createIconButton(
+            onMassReassign,
+            <FiUsers size={16} />,
+            "Reassign",
+            Object.keys(selectedRows).length === 0
           )}
           {actionBarButtons.saveChanges && onSaveChanges && (
             <button onClick={onSaveChanges} className="action-button save-changes-button" style={{
@@ -768,6 +1067,7 @@ const DataTable = ({
               Cancel Changes
             </button>
           )}
+          {actionBarExtras}
         </ActionBar>
       )}
 
@@ -823,7 +1123,7 @@ const DataTable = ({
         <div className="data-table-container">
           {/* main scrollable table */}
           <div className={`scroll-container ${pageScrollSticky ? 'page-scroll-mode' : 'table-scroll-mode'}`}>
-            <table {...getTableProps()} className="table">
+            <table {...getTableProps()} className={`table ${allowTableOverflow ? 'table-overflow' : ''} ${tableClassName}`.trim()}>
               {/* ---------- TABLE HEAD ---------- */}
               <thead>
                 {headerGroups.map((headerGroup) => (
@@ -839,8 +1139,14 @@ const DataTable = ({
                             ? {}
                             : !disableSorting && column.getSortByToggleProps ? column.getSortByToggleProps() : {}
                         )}
+                        {...column.getHeaderProps()}
+                        colSpan={column.columns ? column.columns.length : 1}
+                        className={`${column.className || ''} ${column.autoWidth ? 'auto-width-column' : ''}`.trim()}
                         style={{ 
-                          width: column.width ? `${column.width}px` : "auto"
+                          width: column.autoWidth ? (allowTableOverflow ? 'auto' : 'max-content') : (column.width ? `${column.width}px` : "auto"),
+                          minWidth: column.autoWidth ? '120px' : undefined,
+                          maxWidth: column.autoWidth ? '300px' : undefined,
+                          ...column.getHeaderProps().style
                         }}
                       >
                         {column.massSelection ? (
@@ -886,7 +1192,399 @@ const DataTable = ({
                             );
                           })()
                         ) : (
-                          column.render("Header")
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'space-between' }}>
+                            <span>{column.render("Header")}</span>
+                            {enableColumnFilters && column.filterable !== false && !column.massSelection && (
+                              <div style={{ position: 'relative', display: 'inline-block' }}>
+                                <button
+                                  ref={(el) => { filterButtonRefs.current[column.id] = el; }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (showColumnFilter === column.id) {
+                                      setShowColumnFilter(null);
+                                    } else {
+                                      // Calculate position based on button location
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      setFilterDropdownPosition({
+                                        top: rect.bottom + window.scrollY + 4,
+                                        left: rect.right + window.scrollX - 240 // 240px is the width of dropdown
+                                      });
+                                      setShowColumnFilter(column.id);
+                                    }
+                                  }}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: '2px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    color: columnFilters[column.id] ? '#3498db' : '#999'
+                                  }}
+                                  title="Filter column"
+                                >
+                                  <FiFilter size={14} />
+                                </button>
+                                {showColumnFilter === column.id && (
+                                  <div
+                                    style={{
+                                      position: 'fixed',
+                                      top: `${filterDropdownPosition.top}px`,
+                                      left: `${filterDropdownPosition.left}px`,
+                                      zIndex: 10000,
+                                      background: 'white',
+                                      border: '1px solid #ddd',
+                                      borderRadius: '4px',
+                                      padding: '0',
+                                      width: '240px',
+                                      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                      fontSize: '13px'
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {(() => {
+                                      // Get unique values from the column
+                                      const uniqueValues = [...new Set(
+                                        localData
+                                          .map(row => row[column.id])
+                                          .filter(val => val !== null && val !== undefined && val !== '')
+                                      )].sort();
+                                      
+                                      // Initialize temp selections if not already set
+                                      if (!tempFilterSelections[column.id]) {
+                                        const currentFilter = columnFilters[column.id];
+                                        const initialSelections = currentFilter && Array.isArray(currentFilter)
+                                          ? currentFilter
+                                          : uniqueValues;
+                                        setTempFilterSelections(prev => ({
+                                          ...prev,
+                                          [column.id]: initialSelections
+                                        }));
+                                      }
+                                      
+                                      const currentSelections = tempFilterSelections[column.id] || uniqueValues;
+                                      const filteredValues = uniqueValues.filter(val =>
+                                        val.toString().toLowerCase().includes(filterSearchTerm.toLowerCase())
+                                      );
+                                      const allSelected = filteredValues.every(val => currentSelections.includes(val));
+                                      
+                                      const menuItemStyle = {
+                                        padding: '8px 12px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        fontSize: '13px',
+                                        borderBottom: '1px solid #f0f0f0'
+                                      };
+                                      
+                                      const menuItemHoverStyle = {
+                                        background: '#f5f5f5'
+                                      };
+                                      
+                                      return (
+                                        <div>
+                                          {/* Sort A to Z */}
+                                          <div
+                                            style={menuItemStyle}
+                                            onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
+                                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                            onClick={() => {
+                                              if (!disableSorting && column.toggleSortBy) {
+                                                column.toggleSortBy(false); // false = ascending
+                                              }
+                                              setShowColumnFilter(null);
+                                              setFilterSearchTerm('');
+                                            }}
+                                          >
+                                            <BiSortAZ size={16} />
+                                            <span>Sort A to Z</span>
+                                          </div>
+                                          
+                                          {/* Sort Z to A */}
+                                          <div
+                                            style={menuItemStyle}
+                                            onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
+                                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                            onClick={() => {
+                                              if (!disableSorting && column.toggleSortBy) {
+                                                column.toggleSortBy(true); // true = descending
+                                              }
+                                              setShowColumnFilter(null);
+                                              setFilterSearchTerm('');
+                                            }}
+                                          >
+                                            <BiSortZA size={16} />
+                                            <span>Sort Z to A</span>
+                                          </div>
+                                          
+                                          {/* Clear Filter */}
+                                          {columnFilters[column.id] && (
+                                            <div
+                                              style={{...menuItemStyle, color: '#f44336'}}
+                                              onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
+                                              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                              onClick={() => {
+                                                setColumnFilters(prev => {
+                                                  const newFilters = { ...prev };
+                                                  delete newFilters[column.id];
+                                                  return newFilters;
+                                                });
+                                                setTempFilterSelections(prev => {
+                                                  const newSelections = { ...prev };
+                                                  delete newSelections[column.id];
+                                                  return newSelections;
+                                                });
+                                              }}
+                                            >
+                                              <AiOutlineClose size={14} />
+                                              <span>Clear Filter from "{column.Header}"</span>
+                                            </div>
+                                          )}
+                                          
+                                          {/* Divider before search */}
+                                          <div style={{ borderBottom: '1px solid #ddd', margin: '4px 0' }}></div>
+                                          
+                                          {/* Search box */}
+                                          <div style={{ padding: '8px' }}>
+                                            <input
+                                              type="text"
+                                              placeholder="Search..."
+                                              value={filterSearchTerm}
+                                              onChange={(e) => setFilterSearchTerm(e.target.value)}
+                                              style={{
+                                                width: '100%',
+                                                padding: '6px 8px',
+                                                border: '1px solid #ddd',
+                                                borderRadius: '4px',
+                                                fontSize: '13px',
+                                                boxSizing: 'border-box'
+                                              }}
+                                              autoFocus
+                                            />
+                                          </div>
+                                          
+                                          {/* Select All checkbox */}
+                                          <div style={{
+                                            padding: '6px 8px',
+                                            borderBottom: '1px solid #eee'
+                                          }}>
+                                            <label style={{
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              cursor: 'pointer',
+                                              fontSize: '13px',
+                                              fontWeight: 'bold',
+                                              gap: '8px',
+                                              margin: 0
+                                            }}>
+                                              <input
+                                                type="checkbox"
+                                                checked={allSelected}
+                                                onChange={(e) => {
+                                                  const newSelections = e.target.checked
+                                                    ? [...new Set([...currentSelections, ...filteredValues])]
+                                                    : currentSelections.filter(val => !filteredValues.includes(val));
+                                                  setTempFilterSelections(prev => ({
+                                                    ...prev,
+                                                    [column.id]: newSelections
+                                                  }));
+                                                }}
+                                                style={{ 
+                                                  margin: 0, 
+                                                  flexShrink: 0,
+                                                  width: '14px',
+                                                  height: '14px'
+                                                }}
+                                              />
+                                              <span>Select All</span>
+                                            </label>
+                                          </div>
+                                          
+                                          {/* Scrollable list of checkboxes */}
+                                          <div style={{
+                                            maxHeight: '200px',
+                                            overflowY: 'auto',
+                                            padding: '4px 0'
+                                          }}>
+                                            {filteredValues.map(val => (
+                                              <div key={val} style={{ 
+                                                padding: '4px 8px',
+                                                display: 'flex',
+                                                alignItems: 'center'
+                                              }}>
+                                                <label style={{
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  cursor: 'pointer',
+                                                  fontSize: '13px',
+                                                  gap: '8px',
+                                                  width: '100%',
+                                                  margin: 0
+                                                }}>
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={currentSelections.includes(val)}
+                                                    onChange={(e) => {
+                                                      const newSelections = e.target.checked
+                                                        ? [...currentSelections, val]
+                                                        : currentSelections.filter(v => v !== val);
+                                                      setTempFilterSelections(prev => ({
+                                                        ...prev,
+                                                        [column.id]: newSelections
+                                                      }));
+                                                    }}
+                                                    style={{ 
+                                                      margin: 0, 
+                                                      flexShrink: 0,
+                                                      width: '14px',
+                                                      height: '14px'
+                                                    }}
+                                                  />
+                                                  <span style={{
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap',
+                                                    flex: 1
+                                                  }}>{val}</span>
+                                                </label>
+                                              </div>
+                                            ))}
+                                          </div>
+                                          
+                                          {/* Action buttons */}
+                                          <div style={{ 
+                                            display: 'flex', 
+                                            gap: '4px', 
+                                            padding: '8px',
+                                            borderTop: '1px solid #eee',
+                                            flexDirection: 'column'
+                                          }}>
+                                            <div style={{ display: 'flex', gap: '4px' }}>
+                                              <button
+                                                onClick={() => {
+                                                  const selections = tempFilterSelections[column.id];
+                                                  if (selections && selections.length < uniqueValues.length) {
+                                                    setColumnFilters(prev => ({
+                                                      ...prev,
+                                                      [column.id]: selections
+                                                    }));
+                                                  } else {
+                                                    setColumnFilters(prev => {
+                                                      const newFilters = { ...prev };
+                                                      delete newFilters[column.id];
+                                                      return newFilters;
+                                                    });
+                                                  }
+                                                  setShowColumnFilter(null);
+                                                  setFilterSearchTerm('');
+                                                }}
+                                                style={{
+                                                  flex: 1,
+                                                  padding: '6px 12px',
+                                                  background: '#4CAF50',
+                                                  color: 'white',
+                                                  border: 'none',
+                                                  borderRadius: '4px',
+                                                  cursor: 'pointer',
+                                                  fontSize: '13px',
+                                                  fontWeight: 'bold'
+                                                }}
+                                              >
+                                                Apply
+                                              </button>
+                                              <button
+                                                onClick={() => {
+                                                  setColumnFilters(prev => {
+                                                    const newFilters = { ...prev };
+                                                    delete newFilters[column.id];
+                                                    return newFilters;
+                                                  });
+                                                  setTempFilterSelections(prev => {
+                                                    const newSelections = { ...prev };
+                                                    delete newSelections[column.id];
+                                                    return newSelections;
+                                                  });
+                                                  setShowColumnFilter(null);
+                                                  setFilterSearchTerm('');
+                                                }}
+                                                style={{
+                                                  flex: 1,
+                                                  padding: '6px 12px',
+                                                  background: '#f44336',
+                                                  color: 'white',
+                                                  border: 'none',
+                                                  borderRadius: '4px',
+                                                  cursor: 'pointer',
+                                                  fontSize: '13px'
+                                                }}
+                                              >
+                                                Clear
+                                              </button>
+                                            </div>
+                                            
+                                            {/* Save and Load Filter buttons */}
+                                            <div style={{ 
+                                              display: 'flex', 
+                                              gap: '4px',
+                                              borderTop: '1px solid #eee',
+                                              paddingTop: '8px',
+                                              marginTop: '4px'
+                                            }}>
+                                              <button
+                                                onClick={() => {
+                                                  setShowSaveFilterDialog(true);
+                                                }}
+                                                style={{
+                                                  flex: 1,
+                                                  padding: '6px 12px',
+                                                  background: '#2196F3',
+                                                  color: 'white',
+                                                  border: 'none',
+                                                  borderRadius: '4px',
+                                                  cursor: 'pointer',
+                                                  fontSize: '12px',
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  gap: '4px'
+                                                }}
+                                              >
+                                                <FiSave size={12} />
+                                                Save Filter
+                                              </button>
+                                              <button
+                                                onClick={() => {
+                                                  setShowSavedFilters(true);
+                                                }}
+                                                style={{
+                                                  flex: 1,
+                                                  padding: '6px 12px',
+                                                  background: '#9C27B0',
+                                                  color: 'white',
+                                                  border: 'none',
+                                                  borderRadius: '4px',
+                                                  cursor: 'pointer',
+                                                  fontSize: '12px',
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  gap: '4px'
+                                                }}
+                                              >
+                                                <FiBookmark size={12} />
+                                                Saved ({savedFilters.filter(f => f.columnId === column.id).length})
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })()}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </th>
                     ))}
@@ -902,7 +1600,7 @@ const DataTable = ({
                 {/* No data message */}
                 {(!page || page.length === 0) && (
                   <tr className="no-data-row">
-                    <td colSpan={columns.length} className="no-data-cell">
+                    <td colSpan={flattenColumns(columns).length} className="no-data-cell">
                       <div className="no-data-container">
                         <div className="no-data-icon">📋</div>
                         <div className="no-data-message">
@@ -919,18 +1617,47 @@ const DataTable = ({
                   const isEditingRow =
                     highlightRowOnEdit && editingCell?.id === row.original.id;
                   
-                  // Build className from editing state and custom row classes
+                  // Build className parts from editing state, banded rows, and custom row classes
                   const customClassName = rowClassNames[row.original.id] || "";
                   const isSticky = stickyRows.includes(row.original.id);
-                  const className = [
+                  const bandedClassName = bandedRows ? (rowIndex % 2 === 0 ? "banded-row-even" : "banded-row-odd") : "";
+                  const baseClassParts = [
                     isEditingRow ? "editing-row" : "",
+                    bandedClassName,
                     customClassName,
                     isSticky ? "sticky-row" : ""
-                  ].filter(Boolean).join(" ");
+                  ];
 
-                  // Check if this row can be expanded
-                  const canExpand = enableRowExpansion && expandableRows[row.original.id];
+                  // Build inline style for row coloring
+                  let rowStyle = {};
+                  if (enableRowColoring && row.original[rowColorColumn]) {
+                    const color = row.original[rowColorColumn];
+                    rowStyle.backgroundColor = color;
+                    // Automatically adjust text color for better readability
+                    const rgb = parseInt(color.replace('#', ''), 16);
+                    const r = (rgb >> 16) & 0xff;
+                    const g = (rgb >> 8) & 0xff;
+                    const b = (rgb >> 0) & 0xff;
+                    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+                    rowStyle.color = brightness > 186 ? '#000000' : '#ffffff';
+                  }
+
+                  // Check if this row can be expanded (default governed by expandableDefault) and optional predicate
+                  const allowedByPredicate = typeof isRowExpandable === 'function' ? !!isRowExpandable(row.original) : true;
+                  const allowedByMap = (expandableRows[row.original.id] === undefined ? !!expandableDefault : !!expandableRows[row.original.id]);
+                  const canExpand = enableRowExpansion && allowedByPredicate && allowedByMap;
+                  try {
+                    if (enableRowExpansion) {
+                   
+                    }
+                  } catch (_) {}
                   const isExpanded = expandedRows[row.original.id] || false;
+
+                  // Finalize className including expanded highlighting (after canExpand is known)
+                  const className = [
+                    ...baseClassParts,
+                    (canExpand && isExpanded) ? "expanded-parent-row" : ""
+                  ].filter(Boolean).join(" ");
 
                   const toggleRowExpansion = () => {
                     const newExpanded = !isExpanded;
@@ -949,19 +1676,29 @@ const DataTable = ({
                   rowElements.push(
                     <tr
                       {...row.getRowProps()}
-                      key={`main-${rowIndex}`}
                       className={className}
-                      style={{ cursor: onRowClick ? 'pointer' : 'default' }}
+                      data-row-index={rowIndex}
+                      data-rowid={row.original.id}
+                      {...(typeof getRowDataAttributes === 'function' ? getRowDataAttributes(row.original) : {})}
+                      style={{ 
+                        cursor: (expandOnRowClick && canExpand) || onRowClick ? 'pointer' : 'default',
+                        ...rowStyle
+                      }}
                       onClick={(e) => {
                         // Only trigger row click if not editing and onRowClick is provided
-                        if (onRowClick && !editingCell) {
+                        if (!editingCell) {
                           // Check if the click is on a cell that shouldn't trigger row click
                           const isSelectCell = e.target.closest('input[type="checkbox"]');
                           const isDropdownCell = e.target.closest('select');
                           const isExpandButton = e.target.closest('.expand-button');
                           
                           if (!isSelectCell && !isDropdownCell && !isExpandButton) {
-                            onRowClick(row.original);
+                            if (expandOnRowClick && canExpand) {
+                              try { console.log('[DataTable] row-click expand toggle', { id: row.original.id, canExpand }); } catch (_) {}
+                              toggleRowExpansion();
+                            } else if (onRowClick) {
+                              onRowClick(row.original);
+                            }
                           }
                         }
                       }}
@@ -989,22 +1726,40 @@ const DataTable = ({
                       }}
                     >
                       {row.cells.map((cell, columnIndex) => {
-                        const colDef = columns.find(
+                        // Find column definition in flattened columns (handles grouped columns)
+                        const flatColumns = flattenColumns(columns);
+                        const colDef = flatColumns.find(
                           (c) => c.accessor === cell.column.id
                         );
                         const isEditingCell = editingCell?.id === row.original.id && editingCell?.field === cell.column.id;
                         
+                        // Determine per-cell editability (default true)
+                        const cellEditable = (() => {
+                          if (disableCellEditing) return false;
+                          if (!colDef) return true;
+                          if (typeof colDef.isEditable === 'function') return !!colDef.isEditable(row.original, cell);
+                          if (typeof colDef.isEditable === 'boolean') return colDef.isEditable;
+                          return true;
+                        })();
+
                         return (
                           <td
                             {...cell.getCellProps()}
                             key={cell.column.id}
-                            className={isEditingCell ? "editing-cell" : ""}
-                            style={{ width: colDef?.width || "auto" }}
+                            data-column-index={columnIndex}
+                            className={`${isEditingCell ? "editing-cell" : ""} ${colDef?.className || ''} ${colDef?.autoWidth ? 'auto-width-column' : ''}`.trim()}
+                            style={{ 
+                              width: colDef?.autoWidth ? (allowTableOverflow ? 'auto' : 'max-content') : (colDef?.width ? `${colDef.width}px` : "auto"),
+                              minWidth: colDef?.autoWidth ? '120px' : undefined,
+                              maxWidth: colDef?.autoWidth ? '300px' : undefined
+                            }}
                             tabIndex={0}
                             onClick={
                               colDef?.massSelection
                                 ? undefined
                                 : row.original.id === 'totals-row'
+                                ? undefined
+                                : !cellEditable
                                 ? undefined
                                 : () =>
                                     handleCellClick(
@@ -1017,6 +1772,8 @@ const DataTable = ({
                               colDef?.massSelection
                                 ? undefined
                                 : row.original.id === 'totals-row'
+                                ? undefined
+                                : !cellEditable
                                 ? undefined
                                 : () =>
                                     handleEditStart(
@@ -1031,12 +1788,12 @@ const DataTable = ({
                                 rowIndex,
                                 columnIndex,
                                 page.length,
-                                columns.length
+                                row.cells.length
                               )
                             }
                           >
                             {/* Add expand button to first column if row is expandable */}
-                            {columnIndex === 0 && canExpand && (
+                            {columnIndex === 0 && canExpand && showExpandButton && (
                               <button
                                 className="expand-button"
                                 onClick={(e) => {
@@ -1055,7 +1812,7 @@ const DataTable = ({
                                 {isExpanded ? '▼' : '▶'}
                               </button>
                             )}
-                            {renderCell(cell, row)}
+                            {renderCell(cell, row, rowIndex, columnIndex)}
                           </td>
                         );
                       })}
@@ -1065,8 +1822,8 @@ const DataTable = ({
                   // Expanded row content
                   if (canExpand && isExpanded && renderExpandedRow) {
                     rowElements.push(
-                      <tr key={`expanded-${rowIndex}`} className="expanded-row">
-                        <td colSpan={columns.length} className="expanded-cell">
+                      <tr key={`${row.original.id}-expanded`} className="expanded-row">
+                        <td colSpan={flattenColumns(columns).length} className="expanded-cell">
                           {renderExpandedRow(row.original)}
                         </td>
                       </tr>
@@ -1125,6 +1882,327 @@ const DataTable = ({
                 })
               }
             />
+          )}
+          
+          {/* Save Filter Dialog */}
+          {showSaveFilterDialog && (
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0,0,0,0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10001
+              }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                  setShowSaveFilterDialog(false);
+                  setSaveFilterName('');
+                }
+              }}
+            >
+              <div
+                style={{
+                  background: 'white',
+                  padding: '20px',
+                  borderRadius: '8px',
+                  width: '400px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 'bold' }}>
+                  Save Filter
+                </h3>
+                <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#666' }}>
+                  Column: <strong>{showColumnFilter && flattenColumns(columns).find(c => c.id === showColumnFilter)?.Header}</strong>
+                </p>
+                <input
+                  type="text"
+                  placeholder="Enter filter name..."
+                  value={saveFilterName}
+                  onChange={(e) => setSaveFilterName(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    marginBottom: '16px',
+                    boxSizing: 'border-box'
+                  }}
+                  autoFocus
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && saveFilterName.trim()) {
+                      const columnId = showColumnFilter;
+                      const filterData = tempFilterSelections[columnId];
+                      if (saveFilter(saveFilterName.trim(), columnId, filterData)) {
+                        setSaveFilterName('');
+                        setShowSaveFilterDialog(false);
+                        alert('Filter saved successfully!');
+                      }
+                    }
+                  }}
+                />
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => {
+                      setShowSaveFilterDialog(false);
+                      setSaveFilterName('');
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      background: '#f5f5f5',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (saveFilterName.trim()) {
+                        const columnId = showColumnFilter;
+                        const filterData = tempFilterSelections[columnId];
+                        if (saveFilter(saveFilterName.trim(), columnId, filterData)) {
+                          setSaveFilterName('');
+                          setShowSaveFilterDialog(false);
+                          alert('Filter saved successfully!');
+                        }
+                      }
+                    }}
+                    disabled={!saveFilterName.trim()}
+                    style={{
+                      padding: '8px 16px',
+                      background: saveFilterName.trim() ? '#2196F3' : '#ccc',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: saveFilterName.trim() ? 'pointer' : 'not-allowed',
+                      fontSize: '14px',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Saved Filters Modal */}
+          {showSavedFilters && (
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0,0,0,0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10001
+              }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                  setShowSavedFilters(false);
+                }
+              }}
+            >
+              <div
+                style={{
+                  background: 'white',
+                  padding: '20px',
+                  borderRadius: '8px',
+                  width: '500px',
+                  maxHeight: '600px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 'bold' }}>
+                  Saved Filters
+                </h3>
+                <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#666' }}>
+                  Column: <strong>{showColumnFilter && flattenColumns(columns).find(c => c.id === showColumnFilter)?.Header}</strong>
+                </p>
+                <div style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  marginBottom: '16px',
+                  border: '1px solid #eee',
+                  borderRadius: '4px'
+                }}>
+                  {savedFilters
+                    .filter(f => f.columnId === showColumnFilter)
+                    .length === 0 ? (
+                    <div style={{
+                      padding: '40px 20px',
+                      textAlign: 'center',
+                      color: '#999'
+                    }}>
+                      No saved filters for this column
+                    </div>
+                  ) : (
+                    savedFilters
+                      .filter(f => f.columnId === showColumnFilter)
+                      .map(filter => (
+                        <div
+                          key={filter.id}
+                          style={{
+                            padding: '12px',
+                            borderBottom: '1px solid #eee',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            cursor: 'pointer',
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <div 
+                            style={{ flex: 1 }}
+                            onClick={() => {
+                              loadSavedFilter(filter);
+                              setShowColumnFilter(null);
+                            }}
+                          >
+                            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                              {filter.name}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#666' }}>
+                              {Array.isArray(filter.filterData) 
+                                ? `${filter.filterData.length} items selected`
+                                : filter.filterData}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>
+                              {new Date(filter.createdAt).toLocaleDateString()}
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFilterToDelete(filter);
+                            }}
+                            style={{
+                              padding: '4px 8px',
+                              background: '#f44336',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '12px'
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ))
+                  )}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => setShowSavedFilters(false)}
+                    style={{
+                      padding: '8px 16px',
+                      background: '#f5f5f5',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Delete Confirmation Dialog */}
+          {filterToDelete && (
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0,0,0,0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10002
+              }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                  setFilterToDelete(null);
+                }
+              }}
+            >
+              <div
+                style={{
+                  background: 'white',
+                  padding: '20px',
+                  borderRadius: '8px',
+                  width: '400px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 'bold' }}>
+                  Delete Filter
+                </h3>
+                <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: '#666' }}>
+                  Are you sure you want to delete the filter "<strong>{filterToDelete.name}</strong>"? This action cannot be undone.
+                </p>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => setFilterToDelete(null)}
+                    style={{
+                      padding: '8px 16px',
+                      background: '#f5f5f5',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      deleteSavedFilter(filterToDelete.id);
+                      setFilterToDelete(null);
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      background: '#f44336',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>

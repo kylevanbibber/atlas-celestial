@@ -12,19 +12,44 @@ const ScrollToTop = ({
   const scrollableContainerRef = useRef(null);
   
   useEffect(() => {
-    // Find the scrollable container
+    // Find the scrollable container (robust detection)
     const findScrollableContainer = () => {
-      const container = document.querySelector(scrollableContainerSelector);
-      if (container) {
-        console.log('ScrollToTop: Found scrollable container:', scrollableContainerSelector);
-        scrollableContainerRef.current = container;
-        return container;
-      } else {
-        console.log('ScrollToTop: Scrollable container not found, falling back to window');
-        return window;
+      // 1) Try provided selector, if any
+      if (scrollableContainerSelector) {
+        const el = document.querySelector(scrollableContainerSelector);
+        if (el) {
+          // Use it only if it can actually scroll
+          const canScroll = el.scrollHeight > el.clientHeight;
+          if (canScroll) {
+            console.log('ScrollToTop: Using provided container:', scrollableContainerSelector);
+            scrollableContainerRef.current = el;
+            return el;
+          }
+        }
       }
+
+      // 2) Auto-detect from common containers
+      const candidates = [
+        '.settings-content',
+        '.settings-section-large',
+        '.settings-section',
+        'main',
+        'body'
+      ];
+      for (const sel of candidates) {
+        const el = document.querySelector(sel);
+        if (el && el.scrollHeight > el.clientHeight) {
+          console.log('ScrollToTop: Auto-selected container:', sel);
+          scrollableContainerRef.current = el;
+          return el;
+        }
+      }
+
+      // 3) Fallback to window
+      console.log('ScrollToTop: Falling back to window');
+      return window;
     };
-    
+
     const scrollableElement = findScrollableContainer();
     
     // Function to handle scroll event

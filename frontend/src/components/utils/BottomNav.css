@@ -136,6 +136,206 @@
   }
 }
 
+/* Submenu popup styles - positioned above clicked button */
+.bottom-nav-submenu-popup {
+  position: fixed;
+  z-index: 1100;
+  background-color: var(--sidebar-bg, #ffffff);
+  border-radius: 12px;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.25);
+  min-width: 160px;
+  max-width: 200px;
+  animation: fadeInUp 0.2s ease-out;
+  border: 1px solid var(--border-color, #e0e0e0);
+  will-change: transform, left, bottom;
+}
+
+/* Arrow pointing down to the clicked button */
+.bottom-nav-submenu-popup::after {
+  content: '';
+  position: absolute;
+  bottom: -8px; /* positioned below popup since we translateY(-100%) */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid var(--sidebar-bg, #ffffff);
+}
+
+/* Arrow border */
+.bottom-nav-submenu-popup::before {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-top: 9px solid var(--border-color, #e0e0e0);
+}
+
+/* OLD Submenu styles - keeping for now */
+.bottom-nav-submenu-overlay {
+  position: fixed;
+  bottom: 60px;
+  left: 0;
+  width: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1100;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.bottom-nav-submenu {
+  background-color: var(--sidebar-bg, #ffffff);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.bottom-nav-submenu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+  background-color: var(--sidebar-bg, #ffffff);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.bottom-nav-submenu-header span {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--sidebar-text, #333333);
+}
+
+.bottom-nav-submenu-close {
+  background: none;
+  border: none;
+  color: var(--sidebar-text, #333333);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.bottom-nav-submenu-close:hover {
+  background-color: var(--sidebar-hover, #f0f0f0);
+}
+
+.bottom-nav-submenu-popup .bottom-nav-submenu-items {
+  padding: 8px 0;
+}
+
+/* OLD submenu items for overlay */
+.bottom-nav-submenu-overlay .bottom-nav-submenu-items {
+  padding: 8px 0 20px;
+}
+
+.bottom-nav-submenu-popup .bottom-nav-submenu-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  color: var(--sidebar-text, #333333);
+}
+
+.bottom-nav-submenu-popup .bottom-nav-submenu-item:first-child {
+  border-radius: 12px 12px 0 0;
+}
+
+.bottom-nav-submenu-popup .bottom-nav-submenu-item:last-child {
+  border-radius: 0 0 12px 12px;
+}
+
+/* OLD submenu item for overlay */
+.bottom-nav-submenu-overlay .bottom-nav-submenu-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  color: var(--sidebar-text, #333333);
+}
+
+.bottom-nav-submenu-item:hover {
+  background-color: var(--sidebar-hover, #f0f0f0);
+}
+
+.bottom-nav-submenu-item.active {
+  background-color: rgba(var(--primary-color-rgb, 0, 123, 255), 0.1);
+  color: var(--primary-color, #007BFF);
+  font-weight: 500;
+}
+
+.bottom-nav-submenu-icon {
+  margin-right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.bottom-nav-submenu-label {
+  font-size: 14px;
+  font-weight: 400;
+}
+
+/* Submenu indicator */
+.bottom-nav-submenu-indicator {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 8px;
+  color: var(--primary-color, #007BFF);
+  font-weight: bold;
+}
+
+.bottom-nav-item.has-submenu {
+  position: relative;
+}
+
+/* Animation for submenu popup */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* OLD Animation for submenu overlay */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Adjust safe area padding for submenu overlay */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .bottom-nav-submenu-overlay {
+    bottom: calc(60px + env(safe-area-inset-bottom));
+  }
+}
+
 /* Add CSS variable for RGB version of primary color */
 :root {
   --primary-color-rgb: 0, 123, 255;

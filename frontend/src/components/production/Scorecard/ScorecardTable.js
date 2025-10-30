@@ -15,6 +15,34 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 
+// Helper function to parse MGA start date from MM/DD/YYYY format
+const parseMgaStartDate = (startDateString) => {
+  if (!startDateString) return null;
+  
+  try {
+    // Handle MM/DD/YYYY format
+    const parts = startDateString.split('/');
+    if (parts.length === 3) {
+      const month = parseInt(parts[0], 10) - 1; // months are 0-indexed in JS
+      const day = parseInt(parts[1], 10);
+      const year = parseInt(parts[2], 10);
+      return new Date(year, month, day);
+    }
+  } catch (error) {
+    console.warn('Failed to parse MGA start date:', startDateString, error);
+  }
+  
+  return null;
+};
+
+// Helper function to check if a date is before the MGA's start date
+const isDataBeforeMgaStart = (dataDate, mgaStartDate) => {
+  if (!mgaStartDate || !dataDate) return false;
+  
+  const parsedDataDate = typeof dataDate === 'string' ? new Date(dataDate) : dataDate;
+  return parsedDataDate < mgaStartDate;
+};
+
 // Custom star point plugin
 const starPointPlugin = {
   id: 'starPoint',
@@ -59,7 +87,7 @@ ChartJS.register(
 // Register custom star point plugin
 ChartJS.register(starPointPlugin);
 
-const Scorecard = memo(() => {
+const Scorecard = memo(({ filterMode = 'mga' }) => {
   // Get user data from auth context
   const { user } = useAuth();
   const userId = user?.userId;
@@ -149,46 +177,87 @@ const getMonthYear = useCallback((dateStr) => {
   const allowedRoles = useMemo(() => ["MGA", "RGA", "SGA"], []);
   
   const defaultAlpTab = useMemo(() => 
-    (userRole === "MGA" || userRole === "RGA" || userRole === "SGA" || userRole === "Admin") ? "LVL_3" : "LVL_1"
-  , [userRole]);
+    (filterMode === 'rga' || userRole === "MGA" || userRole === "RGA" || userRole === "SGA" || userRole === "Admin") ? "LVL_3" : "LVL_1"
+  , [userRole, filterMode]);
   
   const [selectedAlpTab, setSelectedAlpTab] = useState(defaultAlpTab);
+  useEffect(() => {
+    if (filterMode === 'rga') {
+      setSelectedAlpTab('LVL_3');
+    }
+  }, [filterMode]);
   const [showFutureMonths, setShowFutureMonths] = useState(true);
   const [quartersMode, setQuartersMode] = useState('show'); // 'show', 'hide', 'only'
   const [viewMode, setViewMode] = useState('table'); // 'table', 'graph'
   const [rawAlpData, setRawAlpData] = useState([]);
+  const [hireToCodeView, setHireToCodeView] = useState('YTD'); // 'Rolling' or 'YTD'
   
   const showAriasOrganization = useMemo(() => 
     userRole === "SGA" || ["ADMIN", "PARTNER", "STAFF"].includes(userRole)
   , [userRole]);
     
-  const effectiveAgnName = useMemo(() =>
-    (userRole === "MGA" || userRole === "RGA") && selectedMga
-      ? selectedMga
-      : agnName
-  , [userRole, selectedMga, agnName]);
+  const effectiveAgnName = useMemo(() => {
+    // In RGA filter mode, always honor the selected RGA from the dropdown
+    if (filterMode === 'rga' && selectedMga) {
+      return selectedMga;
+    }
+    // For MGA/RGA users, use selected MGA if present; otherwise fall back to own name
+    if ((userRole === "MGA" || userRole === "RGA") && selectedMga) {
+      return selectedMga;
+    }
+    return agnName;
+  }, [userRole, selectedMga, agnName, filterMode]);
   
   const [selectedView, setSelectedView] = useState("a"); // Track the selected view
   const [uniqueMgas, setUniqueMgas] = useState([]); // State for MGA dropdown options
+  const [mgaStartDate, setMgaStartDate] = useState(null); // MGA start date for the current user
   
+  // Fetch MGA list for dropdown (without start date logic)
   useEffect(() => {
-    // Fetch unique MGA options from the API endpoint
-    api
-      .get("/dataroutes/get-unique-mgas")
-      .then((res) => {
-        if (res.data.success) {
-          const mgas = res.data.data; // Array of objects containing lagnname
-          setUniqueMgas(mgas);
-          // If agnName is not in the fetched list, default to empty string
-          if (!mgas.some((mga) => mga.lagnname === agnName)) {
+    const fetchMgaList = async () => {
+      try {
+        if (filterMode === 'rga') {
+          // For RGA mode dropdown, fetch all RGAs from MGAs table
+          const res = await api.get('/settings/hierarchy/by-clname/RGA');
+          const rgasData = res?.data?.data || [];
+          // Exclude if hide='y' OR active='n'
+          const rgas = rgasData.filter(item => {
+            const activeValue = String(item.active || '').trim().toLowerCase();
+            const hideValue = String(item.hide || '').trim().toLowerCase();
+            return activeValue !== 'n' && hideValue !== 'y';
+          });
+          setUniqueMgas(rgas);
+          
+          // Reset selection when switching to RGA mode
+          setSelectedMga("");
+        } else {
+          // For MGA mode, fetch all MGAs using the hierarchy endpoint
+          // Get all MGAs in the system (pass 'ARIAS ORGANIZATION' or any high-level identifier)
+          const res = await api.get("/dataroutes/get-all-mgas");
+          if (res.data.success) {
+            // Filter out MGAs where hide='y' OR Active='n' (note: backend returns 'Active' with capital A)
+            const mgas = res.data.data.filter(mga => {
+              const activeValue = String(mga.Active || mga.active || '').trim().toLowerCase();
+              const hideValue = String(mga.hide || '').trim().toLowerCase();
+              return activeValue !== 'n' && hideValue !== 'y';
+            });
+            setUniqueMgas(mgas);
+          
+            // Reset to ARIAS ORGANIZATION when switching to MGA mode
+            if (showAriasOrganization) {
+              setSelectedMga("");
+            } else if (!mgas.some((mga) => mga.lagnname === agnName)) {
             setSelectedMga("");
           }
         }
-      })
-      .catch((err) => {
-        console.error("Error fetching unique MGAs:", err);
-      });
-  }, []);
+        }
+      } catch (err) {
+        console.error("Error fetching MGA data:", err);
+      }
+    };
+    
+    fetchMgaList();
+  }, [agnName, filterMode, showAriasOrganization]);
   
   const toggleView = useCallback((view) => {
     setSelectedView(view);
@@ -271,12 +340,26 @@ const getMonthYear = useCallback((dateStr) => {
       const month = date.getUTCMonth();
       const year = date.getUTCFullYear();
       
+      // Check if this data should be excluded based on MGA start date
+      if (mgaStartDate) {
+        // Only exclude if the data is from a month that's entirely before the start date
+        const monthEndDate = new Date(year, month + 1, 0); // Last day of the month
+        if (monthEndDate < mgaStartDate) {
+          return acc; // Skip this data entirely
+        }
+        
+        // For partial months, only count data that's actually after the start date
+        if (date < mgaStartDate) {
+          return acc; // Skip this individual data point
+        }
+      }
+      
       if (!acc[year]) acc[year] = Array(12).fill(0);
       acc[year][month] += 1;
       
       return acc;
     }, {});
-  }, []);
+  }, [mgaStartDate]);
   
   const groupTotalHiresByMonthAndYear = useCallback((data, dateField) => {
     if (!Array.isArray(data) || data.length === 0) {
@@ -286,40 +369,81 @@ const getMonthYear = useCallback((dateStr) => {
       const date = new Date(row[dateField]);
       const month = date.getMonth();
       const year = date.getFullYear();
+      
+      // Check if this data should be excluded based on MGA start date
+      if (mgaStartDate) {
+        // Only exclude if the data is from a month that's entirely before the start date
+        const monthEndDate = new Date(year, month + 1, 0); // Last day of the month
+        if (monthEndDate < mgaStartDate) {
+          return acc; // Skip this data entirely
+        }
+        
+        // For partial months, only count data that's actually after the start date
+        if (date < mgaStartDate) {
+          return acc; // Skip this individual data point
+        }
+      }
+      
       if (!acc[year]) acc[year] = Array(12).fill(0);
       acc[year][month] += parseFloat(row.Total_Hires) || 0;
+      
       return acc;
     }, {});
-  }, []);
+  }, [mgaStartDate]);
   
-  const calculateQuarterSums = useCallback((monthlyData, previousYearData = null) => {
-    const q1 = monthlyData.slice(0, 3).reduce((sum, value) => sum + value, 0);
-    const q2 = monthlyData.slice(3, 6).reduce((sum, value) => sum + value, 0);
-    const q3 = monthlyData.slice(6, 9).reduce((sum, value) => sum + value, 0);
-    const q4 = monthlyData.slice(9, 12).reduce((sum, value) => sum + value, 0);
+  const calculateQuarterSums = useCallback((monthlyData, previousYearData = null, year = null) => {
+    // Helper function to check if a month should be excluded due to MGA start date
+    const isMonthExcluded = (monthIndex) => {
+      if (!mgaStartDate || !year) return false;
+      const monthEndDate = new Date(year, monthIndex + 1, 0); // Last day of the month
+      return monthEndDate < mgaStartDate;
+    };
+
+    // Calculate quarters, excluding pre-start months
+    const q1Months = monthlyData.slice(0, 3).filter((_, idx) => !isMonthExcluded(idx));
+    const q2Months = monthlyData.slice(3, 6).filter((_, idx) => !isMonthExcluded(idx + 3));
+    const q3Months = monthlyData.slice(6, 9).filter((_, idx) => !isMonthExcluded(idx + 6));
+    const q4Months = monthlyData.slice(9, 12).filter((_, idx) => !isMonthExcluded(idx + 9));
+
+    const q1 = q1Months.reduce((sum, value) => sum + value, 0);
+    const q2 = q2Months.reduce((sum, value) => sum + value, 0);
+    const q3 = q3Months.reduce((sum, value) => sum + value, 0);
+    const q4 = q4Months.reduce((sum, value) => sum + value, 0);
     const total = q1 + q2 + q3 + q4;
     
     // Calculate previous year sum if data is provided (this means we're calculating for the previous year row)
-    const prevYearSum = previousYearData ? previousYearData.reduce((sum, value) => sum + value, 0) : 0;
+    const prevYearSum = previousYearData ? previousYearData.filter((_, idx) => !isMonthExcluded(idx)).reduce((sum, value) => sum + value, 0) : 0;
 
     return [...monthlyData.slice(0, 3), q1, ...monthlyData.slice(3, 6), q2, ...monthlyData.slice(6, 9), q3, ...monthlyData.slice(9, 12), q4, total, prevYearSum];
-  }, []);
+  }, [mgaStartDate]);
 
-  const calculateQuarterAverages = useCallback((monthlyData, previousYearData = null) => {
-    // Use the last month of each quarter for quarter values
-    const q1 = monthlyData[2]; // March (index 2)
-    const q2 = monthlyData[5]; // June (index 5)
-    const q3 = monthlyData[8]; // September (index 8)
-    const q4 = monthlyData[11]; // December (index 11)
+  const calculateQuarterAverages = useCallback((monthlyData, previousYearData = null, year = null) => {
+    // Helper function to check if a month should be excluded due to MGA start date
+    const isMonthExcluded = (monthIndex) => {
+      if (!mgaStartDate || !year) return false;
+      const monthEndDate = new Date(year, monthIndex + 1, 0); // Last day of the month
+      return monthEndDate < mgaStartDate;
+    };
+
+    // Use the last valid month of each quarter for quarter values
+    const q1ValidMonths = [0, 1, 2].filter(idx => !isMonthExcluded(idx));
+    const q2ValidMonths = [3, 4, 5].filter(idx => !isMonthExcluded(idx));
+    const q3ValidMonths = [6, 7, 8].filter(idx => !isMonthExcluded(idx));
+    const q4ValidMonths = [9, 10, 11].filter(idx => !isMonthExcluded(idx));
+
+    const q1 = q1ValidMonths.length > 0 ? monthlyData[q1ValidMonths[q1ValidMonths.length - 1]] : 0;
+    const q2 = q2ValidMonths.length > 0 ? monthlyData[q2ValidMonths[q2ValidMonths.length - 1]] : 0;
+    const q3 = q3ValidMonths.length > 0 ? monthlyData[q3ValidMonths[q3ValidMonths.length - 1]] : 0;
+    const q4 = q4ValidMonths.length > 0 ? monthlyData[q4ValidMonths[q4ValidMonths.length - 1]] : 0;
     
-    // For YTD: use the current month from last year and this year
+    // For YTD: use the current month from last year and this year, but only if it's valid
     const today = new Date();
     const currentMonth = today.getMonth(); // 0-indexed (0 = January, 11 = December)
     const lastMonthIndex = currentMonth === 0 ? 0 : currentMonth - 1; // If January, use January (0), otherwise use previous month
-    const ytd = monthlyData[lastMonthIndex] || 0;
+    const ytd = !isMonthExcluded(lastMonthIndex) ? (monthlyData[lastMonthIndex] || 0) : 0;
     
     // Calculate previous year value: use the same month as current year YTD for proper comparison
-    const prevYearValue = previousYearData ? previousYearData[lastMonthIndex] || 0 : 0;
+    const prevYearValue = previousYearData && !isMonthExcluded(lastMonthIndex) ? (previousYearData[lastMonthIndex] || 0) : 0;
     
     return [
       ...monthlyData.slice(0, 3).map((v) => Math.round(v)),
@@ -333,22 +457,33 @@ const getMonthYear = useCallback((dateStr) => {
       ytd,
       prevYearValue,
     ];
-  }, []);
+  }, [mgaStartDate]);
 
   const calculateQuarterValuesForArray = useCallback((monthlyArray, currentYear) => {
+    // Helper function to check if a month should be excluded due to MGA start date
+    const isMonthExcluded = (monthIndex) => {
+      if (!mgaStartDate || !currentYear) return false;
+      const monthEndDate = new Date(currentYear, monthIndex + 1, 0); // Last day of the month
+      return monthEndDate < mgaStartDate;
+    };
+
     // monthlyArray: array of length 12 with a value for each month.
-    // For quarterly columns, pick the value from March (index 2), June (index 5),
-    // September (index 8), and December (index 11).
-    const q1 = monthlyArray[2];
-    const q2 = monthlyArray[5];
-    const q3 = monthlyArray[8];
-    const q4 = monthlyArray[11];
+    // For quarterly columns, pick the value from the last valid month of each quarter
+    const q1ValidMonths = [0, 1, 2].filter(idx => !isMonthExcluded(idx));
+    const q2ValidMonths = [3, 4, 5].filter(idx => !isMonthExcluded(idx));
+    const q3ValidMonths = [6, 7, 8].filter(idx => !isMonthExcluded(idx));
+    const q4ValidMonths = [9, 10, 11].filter(idx => !isMonthExcluded(idx));
+
+    const q1 = q1ValidMonths.length > 0 ? monthlyArray[q1ValidMonths[q1ValidMonths.length - 1]] : 0;
+    const q2 = q2ValidMonths.length > 0 ? monthlyArray[q2ValidMonths[q2ValidMonths.length - 1]] : 0;
+    const q3 = q3ValidMonths.length > 0 ? monthlyArray[q3ValidMonths[q3ValidMonths.length - 1]] : 0;
+    const q4 = q4ValidMonths.length > 0 ? monthlyArray[q4ValidMonths[q4ValidMonths.length - 1]] : 0;
   
     // For YTD: if currentYear is the current calendar year, use the value up to the previous month;
     // otherwise, assume full-year data is available (use December).
     const today = new Date();
     const lastMonthIndex = (currentYear === today.getFullYear()) ? Math.max(0, today.getMonth() - 1) : 11;
-    const ytd = monthlyArray[lastMonthIndex];
+    const ytd = !isMonthExcluded(lastMonthIndex) ? monthlyArray[lastMonthIndex] : 0;
   
     return [
       monthlyArray[0],
@@ -369,7 +504,7 @@ const getMonthYear = useCallback((dateStr) => {
       q4,         // Q4 column
       ytd         // YTD column
     ];
-  }, []);
+  }, [mgaStartDate]);
   
   
     const processManagementHistoryDataByRole = useCallback((data) => {
@@ -433,6 +568,7 @@ const getMonthYear = useCallback((dateStr) => {
           uniqueIndividuals.add(row.lagnname);
         }
       });
+      // Count unique individuals (they should already be in the data)
       const totalCount = uniqueIndividuals.size;
       if (!result.total[year]) result.total[year] = Array(12).fill(0);
       result.total[year][month] = totalCount;
@@ -442,29 +578,55 @@ const getMonthYear = useCallback((dateStr) => {
   }, []);
   
   
-    const processAlpData = useCallback((data, userRole, selectedAlpTab) => {
+  const processAlpData = useCallback((data, userRole, selectedAlpTab, preferNonMga = false) => {
     // For SA, if user clicks on LVL_3 tab, use LVL_2_NET (as SA is level 2)
-    const column =
-      selectedAlpTab === "LVL_1"
+    // In RGA filter mode we always use team production (LVL_3_NET)
+    const column = (filterMode === 'rga')
+      ? "LVL_3_NET"
+      : selectedAlpTab === "LVL_1"
         ? "LVL_1_NET"
         : userRole === "SA"
-        ? "LVL_2_NET"
-        : "LVL_3_NET";
+          ? "LVL_2_NET"
+          : "LVL_3_NET";
 
     const groupedData = data.reduce((acc, row) => {
       const [month, year] = row.month.split("/").map(Number);
       const adjustedMonth = month - 1;
+      
+      // Check if this data should be excluded based on MGA start date
+      if (mgaStartDate) {
+        // For ALP data, we assume it represents the entire month
+        // Only exclude if the entire month is before the start date
+        const monthEndDate = new Date(year, adjustedMonth + 1, 0); // Last day of the month
+        if (monthEndDate < mgaStartDate) {
+          return acc; // Skip this data entirely
+        }
+      }
+      
       if (!acc[year]) acc[year] = Array(12).fill(0);
       const value = parseFloat(row[column]?.replace(/[^\d.-]/g, "")) || 0;
-      // If the cell is 0 or the row comes from MGA, update with the value
-      if (acc[year][adjustedMonth] === 0 || row.CL_Name === "MGA") {
-        acc[year][adjustedMonth] = value;
+
+      // Prefer non-MGA row when requested (RGA tab requirement). If both exist for the same month,
+      // keep the non-MGA value. Otherwise, fallback to whatever is available.
+      const isMga = (row.CL_Name || "").toUpperCase() === "MGA";
+
+      if (preferNonMga) {
+        // In RGA mode, ignore MGA rows entirely. Only accept non-MGA values.
+        if (!isMga) {
+          acc[year][adjustedMonth] = value;
+        }
+      } else {
+        // Original behavior: set if zero or if coming from MGA row to override personal
+        if (acc[year][adjustedMonth] === 0 || isMga) {
+          acc[year][adjustedMonth] = value;
+        }
       }
+      
       return acc;
     }, {});
 
     return groupedData;
-  }, []);
+  }, [mgaStartDate]);
   
     const processSubmittingAgentCount = useCallback((data) => {
     const groupedData = {};
@@ -481,6 +643,24 @@ const getMonthYear = useCallback((dateStr) => {
       const endDate = new Date(endYear, endMonth - 1, endDay);
       const startDate = new Date(endDate);
       startDate.setDate(startDate.getDate() - 6);
+      
+      // Check if this data should be excluded based on MGA start date
+      if (mgaStartDate) {
+        const month = startDate.getMonth();
+        const year = startDate.getFullYear();
+        
+        // Only exclude if the data is from a month that's entirely before the start date
+        const monthEndDate = new Date(year, month + 1, 0); // Last day of the month
+        if (monthEndDate < mgaStartDate) {
+          return; // Skip this data entirely
+        }
+        
+        // For partial months, only count data that's actually after the start date
+        if (startDate < mgaStartDate) {
+          return; // Skip this individual data point
+        }
+      }
+      
       const year = startDate.getFullYear();
       const month = startDate.getMonth(); // 0-indexed
       const day = startDate.getDate();
@@ -526,7 +706,7 @@ const getMonthYear = useCallback((dateStr) => {
       }
     });
     return { monthlyAveragesByYear, weeklyDetails };
-  }, []);
+  }, [mgaStartDate]);
 
   const processSubAgentDataFromDatabase = useCallback((data) => {
     const monthlyAveragesByYear = {};
@@ -542,6 +722,23 @@ const getMonthYear = useCallback((dateStr) => {
       const [yearStr, monthStr, dayStr] = row.date.split('-');
       const year = parseInt(yearStr, 10);
       const month = parseInt(monthStr, 10) - 1; // Convert to 0-indexed
+      
+      // Create date object for this data
+      const dataDate = new Date(year, month, parseInt(dayStr, 10));
+      
+      // Check if this data should be excluded based on MGA start date
+      if (mgaStartDate) {
+        // Only exclude if the data is from a month that's entirely before the start date
+        const monthEndDate = new Date(year, month + 1, 0); // Last day of the month
+        if (monthEndDate < mgaStartDate) {
+          return; // Skip this data entirely
+        }
+        
+        // For partial months, only count data that's actually after the start date
+        if (dataDate < mgaStartDate) {
+          return; // Skip this individual data point
+        }
+      }
       
       if (!groupedByYearMonth[year]) {
         groupedByYearMonth[year] = {};
@@ -590,7 +787,7 @@ const getMonthYear = useCallback((dateStr) => {
     });
     
     return { monthlyAveragesByYear, weeklyDetails };
-  }, []);
+  }, [mgaStartDate]);
   
   
   const processSgaAlpData = (data) => {
@@ -638,6 +835,18 @@ const getMonthYear = useCallback((dateStr) => {
   
       const adjustedMonth = month - 1; // Convert to 0-index
       if (adjustedMonth < 0 || adjustedMonth > 11) return;
+      
+      // Check if this data should be excluded based on MGA start date
+      if (mgaStartDate) {
+        // Only exclude if the data is from a month that's entirely before the start date
+        const monthEndDate = new Date(year, adjustedMonth + 1, 0); // Last day of the month
+        if (monthEndDate < mgaStartDate) {
+          return; // Skip this data entirely
+        }
+        
+        // For subagent data, we assume it represents the entire month
+        // so if any part of the month is valid, we include the whole month
+      }
   
       // Initialize the year if it doesn't exist.
       if (!groupedData[year]) {
@@ -699,6 +908,13 @@ const getMonthYear = useCallback((dateStr) => {
       // For RGA or SGA, use "MGA" as the query role; otherwise use userRole
       const queryRole = (userRole === "RGA" || userRole === "SGA") ? "MGA" : userRole;
 
+      console.log('🔍 ScorecardTable fetchData called:', {
+        userRole,
+        filterMode,
+        selectedMga,
+        agnName
+      });
+
       if (!agnName || !userRole) {
         console.warn("Waiting for user data to load...");
         return; // Don't throw error, just return early until user data is loaded
@@ -709,14 +925,234 @@ const getMonthYear = useCallback((dateStr) => {
         (userRole === "MGA" || userRole === "RGA" || (userRole === "SGA" && selectedMga))
           ? selectedMga || agnName
           : agnName;
+
+      console.log('📊 Effective agent name:', effectiveAgnName);
+
+      // Get the current MGA start date for the effective MGA
+      try {
+        const mgaResponse = await api.get("/dataroutes/get-all-mgas");
+        if (mgaResponse.data.success) {
+          const mgas = mgaResponse.data.data;
+          const targetMga = mgas.find((mga) => mga.lagnname === effectiveAgnName);
+          
+          if (targetMga && targetMga.start) {
+            const currentMgaStartDate = parseMgaStartDate(targetMga.start);
+            setMgaStartDate(currentMgaStartDate);
+            console.log(`Updated MGA start date for ${effectiveAgnName}: ${targetMga.start}`, currentMgaStartDate);
+          } else {
+            setMgaStartDate(null);
+            console.log(`No start date found for ${effectiveAgnName}`);
+          }
+        }
+      } catch (mgaError) {
+        console.warn("Failed to fetch MGA start date:", mgaError);
+        // Continue with data fetch even if MGA start date fails
+      }
   
-      // Use SGA endpoints when userRole is in the list and no specific MGA is selected.
-      const useSgaEndpoints = ["SGA", "MGA", "RGA"].includes(userRole) && !selectedMga;
+      // Use SGA endpoints when userRole is in the list and no specific MGA is selected, UNLESS we're in RGA filterMode
+      const useSgaEndpoints = (["SGA", "MGA", "RGA"].includes(userRole) && !selectedMga) || filterMode === 'rga';
+      
+      console.log('🎯 Using SGA endpoints:', useSgaEndpoints, '| Filter mode:', filterMode);
   
       const requests = [];
   
-      if (useSgaEndpoints) {
-        // SGA endpoints branch
+      // For RGA mode, fetch hierarchy first to get list of agents
+      let agentNamesToFetch = [effectiveAgnName];
+      let alpMgaNamesToFetch = [effectiveAgnName];
+      if (filterMode === 'rga') {
+        console.log('🏢 RGA MODE: Fetching RGA rollup hierarchy for', effectiveAgnName);
+        try {
+          // Use the same RGA rollup endpoint as OneOnOne.js
+          // This gets all MGAs that count for this RGA (including first-year rollups)
+          const rollupRes = await api.get(`/mga-hierarchy/rga-rollup/${encodeURIComponent(effectiveAgnName)}`);
+          
+          if (rollupRes?.data?.success) {
+            const mgas = rollupRes.data.data.mgas || [];
+            const mgaNames = mgas.map(m => m.lagnname).filter(Boolean);
+            
+            // For ALP: Use MGAs only (with blank CL_Name in backend)
+            alpMgaNamesToFetch = mgaNames;
+            
+            // For Hires/Codes/VIPs: Include the RGA themselves PLUS all their MGAs
+            agentNamesToFetch = [effectiveAgnName, ...mgaNames];
+            
+            console.log(`✅ RGA rollup for ${effectiveAgnName}:`, {
+              total: rollupRes.data.data.totalMGAs,
+              direct: rollupRes.data.data.directMGAs,
+              firstYear: rollupRes.data.data.firstYearMGAs,
+              includingSelf: true,
+              mgaNames: mgaNames.length,
+              agentNames: agentNamesToFetch.length
+            });
+            console.log(`✅ RGA mode: fetching ALP data for ${alpMgaNamesToFetch.length} MGAs:`, alpMgaNamesToFetch);
+            console.log(`✅ RGA mode: fetching hires/codes/VIPs data for ${agentNamesToFetch.length} agents (RGA + MGAs):`, agentNamesToFetch);
+          } else {
+            console.warn('⚠️ RGA rollup returned no data, falling back to user only');
+          }
+        } catch (hierError) {
+          console.error('❌ Error fetching RGA rollup hierarchy:', hierError);
+          console.warn('Falling back to single user');
+        }
+      }
+
+      let responses;
+
+      if (filterMode === 'rga') {
+        console.log('🚀 Using RGA-specific data fetching logic');
+        // For RGA mode, fetch ALP from MGAs (with blank CL_Name) and hires/codes/VIPs from all agents
+        
+        console.log('=== RGA DATA FETCHING SUMMARY ===');
+        console.log('RGA Name:', effectiveAgnName);
+        console.log('MGAs for ALP (blank CL_Name):', alpMgaNamesToFetch);
+        console.log('All agents for hires/codes/VIPs:', agentNamesToFetch);
+        
+        // Fetch ALP data for the selected RGA only; use CL_Name blank (non-MGA) row client-side
+        const alpRequests = [
+          api.get(`/dataroutes/monthly-alp-by-mga?value=${effectiveAgnName}`)
+        ];
+        const alpResults = await Promise.all(alpRequests);
+        const alpData = alpResults.flatMap(r => r?.data?.data || []);
+        
+        console.log('ALP Data Results:', {
+          totalRecords: alpData.length,
+          sampleRecord: alpData[0],
+          uniqueMonths: [...new Set(alpData.map(d => d.month))],
+          clNames: [...new Set(alpData.map(d => d.CL_Name || 'blank'))]
+        });
+        
+        // Fetch hires, codes, VIPs from ALL agents in the hierarchy
+        const hiresRequests = agentNamesToFetch.map(agentName =>
+          api.get(`/dataroutes/total-hires?value=${agentName}`)
+        );
+        const vipsRequests = agentNamesToFetch.map(agentName =>
+          api.get(`/dataroutes/vips/multiple?value=${agentName}`)
+        );
+        const codesRequests = agentNamesToFetch.map(agentName =>
+          api.get(`/dataroutes/associates/multiple?value=${agentName}`)
+        );
+        
+        const [hiresResults, vipsResults, codesResults] = await Promise.all([
+          Promise.all(hiresRequests),
+          Promise.all(vipsRequests),
+          Promise.all(codesRequests)
+        ]);
+        
+        // Flatten and DEDUPLICATE to prevent double counting
+        const hiresDataRaw = hiresResults.flatMap(r => r?.data?.data || []);
+        const vipsDataRaw = vipsResults.flatMap(r => r?.data?.data || []);
+        const codesDataRaw = codesResults.flatMap(r => r?.data?.data || []);
+        
+        // Deduplicate hires by a unique key (e.g., MORE_Date + lagnname + policy info)
+        const hiresMap = new Map();
+        hiresDataRaw.forEach(hire => {
+          // Create a unique key from available fields
+          const key = `${hire.MORE_Date}_${hire.lagnname}_${hire.PolicyNumber || ''}_${hire.Total_Hires}`;
+          if (!hiresMap.has(key)) {
+            hiresMap.set(key, hire);
+          }
+        });
+        const hiresData = Array.from(hiresMap.values());
+        
+        // Deduplicate VIPs by vipdate + lagnname + unique identifiers
+        const vipsMap = new Map();
+        vipsDataRaw.forEach(vip => {
+          const key = `${vip.vipdate || vip.vip_month}_${vip.lagnname}_${vip.softcode_date || ''}_${vip.gs || ''}`;
+          if (!vipsMap.has(key)) {
+            vipsMap.set(key, vip);
+          }
+        });
+        const vipsData = Array.from(vipsMap.values());
+        
+        // Deduplicate codes by PRODDATE + LagnName + unique identifiers
+        const codesMap = new Map();
+        codesDataRaw.forEach(code => {
+          const key = `${code.PRODDATE}_${code.LagnName}_${code.finaldate || ''}_${code.PolicyNumber || ''}`;
+          if (!codesMap.has(key)) {
+            codesMap.set(key, code);
+          }
+        });
+        const codesData = Array.from(codesMap.values());
+        
+        console.log('Hires Data Results (after deduplication):', {
+          rawRecords: hiresDataRaw.length,
+          uniqueRecords: hiresData.length,
+          duplicatesRemoved: hiresDataRaw.length - hiresData.length,
+          uniqueAgents: [...new Set(hiresData.map(d => d.lagnname))].length,
+          sampleRecord: hiresData[0],
+          totalHires2024: hiresData.filter(d => new Date(d.MORE_Date).getFullYear() === 2024).length,
+          totalHires2025: hiresData.filter(d => new Date(d.MORE_Date).getFullYear() === 2025).length
+        });
+        
+        console.log('VIPs Data Results (after deduplication):', {
+          rawRecords: vipsDataRaw.length,
+          uniqueRecords: vipsData.length,
+          duplicatesRemoved: vipsDataRaw.length - vipsData.length,
+          uniqueAgents: [...new Set(vipsData.map(d => d.lagnname))].length,
+          sampleRecord: vipsData[0],
+          vips2024: vipsData.filter(d => new Date(d.vipdate).getFullYear() === 2024).length,
+          vips2025: vipsData.filter(d => new Date(d.vipdate).getFullYear() === 2025).length
+        });
+        
+        console.log('Codes/Associates Data Results (after deduplication):', {
+          rawRecords: codesDataRaw.length,
+          uniqueRecords: codesData.length,
+          duplicatesRemoved: codesDataRaw.length - codesData.length,
+          uniqueAgents: [...new Set(codesData.map(d => d.LagnName))].length,
+          sampleRecord: codesData[0],
+          codes2024: codesData.filter(d => new Date(d.PRODDATE).getFullYear() === 2024).length,
+          codes2025: codesData.filter(d => new Date(d.PRODDATE).getFullYear() === 2025).length
+        });
+        
+        // Fetch agent history for the RGA only (includes full hierarchy)
+        // Don't fetch for each MGA separately to avoid over-counting
+        console.log('🏢 Fetching management history for RGA (includes full hierarchy)...');
+        const agentHistoryRequests = [
+          api.get(`/dataroutes/agent-history?value=${encodeURIComponent(effectiveAgnName)}`)
+        ];
+        const agentHistoryResults = await Promise.all(agentHistoryRequests);
+        
+        // Flatten and deduplicate management history data
+        const agentHistoryDataRaw = agentHistoryResults.flatMap(r => r?.data?.data || []);
+        
+        // Deduplicate by reportdate + lagnname + clname to avoid counting same person twice
+        const agentHistoryMap = new Map();
+        agentHistoryDataRaw.forEach(entry => {
+          const key = `${entry.reportdate}_${entry.lagnname}_${entry.clname}`;
+          if (!agentHistoryMap.has(key)) {
+            agentHistoryMap.set(key, entry);
+          }
+        });
+        const agentHistoryData = Array.from(agentHistoryMap.values());
+        // Ensure we only keep rows that belong to the selected RGA hierarchy
+        const agentHistoryDataFiltered = filterAgentHistoryData(
+          agentHistoryData,
+          effectiveAgnName,
+          'RGA'
+        );
+        
+        console.log('Management History Results (after deduplication):', {
+          rawRecords: agentHistoryDataRaw.length,
+          uniqueRecords: agentHistoryData.length,
+          duplicatesRemoved: agentHistoryDataRaw.length - agentHistoryData.length,
+          uniquePeople: [...new Set(agentHistoryData.map(d => d.lagnname))].length,
+          rgaQueried: effectiveAgnName
+        });
+        
+        const subagentRes = await api.get(`/production-reports/submitting-agent-count?year=${currentYear}`);
+        
+        console.log('=== END RGA DATA SUMMARY ===');
+        
+        // Aggregate results
+        responses = [
+          { data: { data: alpData } }, // ALP data
+          { data: { data: vipsData } }, // VIPs from all agents
+          { data: { data: codesData } }, // Associates/Codes from all agents
+          { data: { data: hiresData } }, // Hires from all agents
+          { data: { data: subagentRes?.data?.data || [] } }, // Subagent
+          { data: { data: agentHistoryDataFiltered } }  // Agent history filtered to selected RGA hierarchy
+        ];
+      } else if (useSgaEndpoints) {
+        // SGA/MGA endpoints branch
         requests.push(
           api.get(
             `/dataroutes/sga-alp?value=${effectiveAgnName}`
@@ -747,6 +1183,7 @@ const getMonthYear = useCallback((dateStr) => {
             `/dataroutes/agent-history?value=${effectiveAgnName}`
           )
         );
+        responses = await Promise.all(requests);
       } else {
         // Non-SGA endpoints branch
         requests.push(
@@ -781,12 +1218,40 @@ const getMonthYear = useCallback((dateStr) => {
             )
           );
         }
+        responses = await Promise.all(requests);
       }
   
-      const responses = await Promise.all(requests);
-  
       if (useSgaEndpoints) {
-        // Process SGA responses
+        // Process SGA responses (or RGA aggregated responses)
+        if (filterMode === 'rga') {
+          // For RGA mode, process aggregated data from multiple MGAs
+          const alpResponse = responses[0];
+          const rawData = alpResponse?.data?.data || [];
+          setRawAlpData(rawData);
+          setAlpData(processAlpData(rawData, queryRole, selectedAlpTab, /* preferNonMga */ true));
+          
+          setVipsData(responses[1]?.data?.data || []);
+          setAssociatesData(responses[2]?.data?.data || []);
+          const rawHires = responses[3]?.data?.data || [];
+          setRawHiresData(rawHires);
+          const hiresGrouped = groupTotalHiresByMonthAndYear(
+            rawHires,
+            "MORE_Date"
+          );
+          setHiresData(hiresGrouped);
+          
+          const { monthlyAveragesByYear, weeklyDetails } = processSubAgentDataFromDatabase(
+            responses[4]?.data?.data || []
+          );
+          setSubAgentData(monthlyAveragesByYear);
+          setSubAgentWeeks(weeklyDetails);
+          
+          const mgmtHistoryData = responses[5]?.data?.data || [];
+          setRawMgmtHistoryData(mgmtHistoryData);
+          const processedMgmtDataByRole = processManagementHistoryDataByRole(mgmtHistoryData);
+          setMgmtCountData(processedMgmtDataByRole);
+        } else {
+          // Regular SGA/MGA processing
         const alpResponse = responses[0];
         const sgaAlpData = alpResponse?.data?.data || [];
         const groupedSgaAlpData = processSgaAlpData(sgaAlpData);
@@ -812,7 +1277,7 @@ const getMonthYear = useCallback((dateStr) => {
 
         const processedMgmtDataByRole = processManagementHistoryDataByRole(mgmtHistoryData);
         setMgmtCountData(processedMgmtDataByRole);
-
+        }
       } else {
 // Process non-SGA responses
 if (queryRole !== "AGT") {
@@ -842,7 +1307,9 @@ if (queryRole !== "AGT") {
 if (!useSgaEndpoints && queryRole !== "AGT") {
   // Assuming the agent-history data is the last response in this branch:
   const rawAgentHistoryData = responses[responses.length - 1]?.data?.data || [];
-  const filteredAgentHistoryData = filterAgentHistoryData(rawAgentHistoryData, effectiveAgnName, userRole);
+  // When an MGA is selected, use "MGA" as the filter role to properly filter SA/GA under that MGA
+  const filterRole = selectedMga ? "MGA" : userRole;
+  const filteredAgentHistoryData = filterAgentHistoryData(rawAgentHistoryData, effectiveAgnName, filterRole);
   // Now you can use filteredAgentHistoryData in your further processing,
   // e.g., to compute management counts or to store in state.
   // For example, if you need to pass it to processManagementHistoryDataByRole:
@@ -859,7 +1326,7 @@ if (!useSgaEndpoints && queryRole !== "AGT") {
     } finally {
       setLoading(false);
     }
-  }, [agnName, userRole, selectedMga, effectiveAgnName, queryRole, rawAlpData, selectedAlpTab, rawMgmtHistoryData, processAlpData, groupTotalHiresByMonthAndYear, processSubAgentDataFromDatabase, processManagementHistoryDataByRole, currentYear]);
+  }, [agnName, userRole, selectedMga, effectiveAgnName, queryRole, rawAlpData, selectedAlpTab, rawMgmtHistoryData, processAlpData, groupTotalHiresByMonthAndYear, processSubAgentDataFromDatabase, processManagementHistoryDataByRole, currentYear, filterMode]);
   const filterAgentHistoryData = useCallback((data, effectiveName, userRole) => {
     const lowerEffectiveName = effectiveName.toLowerCase();
     if (userRole === "MGA") {
@@ -978,7 +1445,8 @@ if (!useSgaEndpoints && queryRole !== "AGT") {
     }
     
     // Determine if we're using SGA endpoints.
-    const isSgaEndpoints = ["SGA", "MGA", "RGA"].includes(userRole) && !selectedMga;
+    // Treat RGA filter mode as SGA endpoints to avoid double-filtering later
+    const isSgaEndpoints = ([("SGA"), ("MGA"), ("RGA")].includes(userRole) && !selectedMga) || filterMode === 'rga';
     
     // For non-SGA endpoints, filter the raw management data by effective name.
     let managementData = rawMgmtHistoryData;
@@ -1020,20 +1488,28 @@ if (!useSgaEndpoints && queryRole !== "AGT") {
   
   useEffect(() => {
     if (rawAlpData.length > 0) {
-      setAlpData(processAlpData(rawAlpData, queryRole, selectedAlpTab));
+      setAlpData(processAlpData(rawAlpData, queryRole, selectedAlpTab, /* preferNonMga */ (filterMode === 'rga')));
     }
   }, [rawAlpData, selectedAlpTab, queryRole]);
   
-  useEffect(() => {
-    fetchData();
-  }, [selectedMga]);
-
-  // Fetch data when user data becomes available
+  // Fetch data when user data becomes available or selectedMga changes
   useEffect(() => {
     if (agnName && userRole) {
+      console.log('🔄 Triggering fetchData due to dependency change:', {
+        agnName,
+        userRole,
+        selectedMga,
+        filterMode
+      });
       fetchData();
     }
-  }, [agnName, userRole]); 
+  }, [agnName, userRole, selectedMga, filterMode]); 
+  
+  // Close detail views when MGA selection changes
+  useEffect(() => {
+    setSelectedTableDetails({});
+    setSelectedManagementDetails(null);
+  }, [selectedMga]);
   
   // Helper function to check if a month is in the future
   const isMonthInFuture = useCallback((year, monthIndex) => {
@@ -1129,6 +1605,16 @@ if (!useSgaEndpoints && queryRole !== "AGT") {
     
     return true;
   }, [quartersMode, showFutureMonths]);
+
+  // Helper function to determine if a cell should be greyed out due to pre-start data
+  const shouldGreyOutCell = useCallback((monthIndex, year) => {
+    if (!mgaStartDate || monthIndex === undefined) return false;
+    
+    // Check if this entire month is before the MGA start date
+    // Only grey out if the entire month is before the start date
+    const monthEndDate = new Date(year, monthIndex + 1, 0); // Last day of the month
+    return monthEndDate < mgaStartDate;
+  }, [mgaStartDate]);
 
   // Animated Line Graph Component using Chart.js
   const LineGraph = ({ title, currentYearData, previousYearData, isCurrency = false }) => {
@@ -1440,19 +1926,20 @@ if (!useSgaEndpoints && queryRole !== "AGT") {
                     
                     // Only month cells (not quarter or YTD) should be clickable.
                     const actualMonth = convertTableIndexToActualMonth(idx);
+                    const isPreStart = actualMonth !== null && shouldGreyOutCell(actualMonth, previousYear);
                     return (
                       <td
                         key={idx}
-                        className={idx === prevValues.length - 1 ? "atlas-scorecard-prev-year-cell" : idx === prevValues.length - 2 ? "atlas-scorecard-ytd-cell" : idx % 4 === 3 ? "atlas-scorecard-quarter-cell" : ""}
+                        className={`${idx === prevValues.length - 1 ? "atlas-scorecard-prev-year-cell" : idx === prevValues.length - 2 ? "atlas-scorecard-ytd-cell" : idx % 4 === 3 ? "atlas-scorecard-quarter-cell" : ""} ${isPreStart ? "atlas-scorecard-pre-start-cell" : ""}`}
                         onClick={() => {
-                          if (actualMonth !== null) {
+                          if (actualMonth !== null && !isPreStart) {
                             handleMgmtCellClick(roleKey, previousYear, idx);
                           }
                         }}
-                        title={actualMonth !== null ? "Click to view breakdown" : ""}
-                        style={{ cursor: actualMonth !== null ? "pointer" : "default" }}
+                        title={actualMonth !== null && !isPreStart ? "Click to view breakdown" : isPreStart ? "Pre-start data" : ""}
+                        style={{ cursor: actualMonth !== null && !isPreStart ? "pointer" : "default" }}
                       >
-                        {numberFormatter(val)}
+                        {isPreStart ? "—" : numberFormatter(val)}
                       </td>
                     );
                   })}
@@ -1471,20 +1958,21 @@ if (!useSgaEndpoints && queryRole !== "AGT") {
                     
                     const actualMonth = convertTableIndexToActualMonth(idx);
                     const isFutureMonth = actualMonth !== null && isMonthInFuture(currentYear, actualMonth);
+                    const isPreStart = actualMonth !== null && shouldGreyOutCell(actualMonth, currentYear);
                     
                     return (
                       <td
                         key={idx}
-                        className={idx === currValues.length - 1 ? "atlas-scorecard-prev-year-cell" : idx === currValues.length - 2 ? "atlas-scorecard-ytd-cell" : idx % 4 === 3 ? "atlas-scorecard-quarter-cell" : ""}
+                        className={`${idx === currValues.length - 1 ? "atlas-scorecard-prev-year-cell" : idx === currValues.length - 2 ? "atlas-scorecard-ytd-cell" : idx % 4 === 3 ? "atlas-scorecard-quarter-cell" : ""} ${isPreStart ? "atlas-scorecard-pre-start-cell" : ""}`}
                         onClick={() => {
-                          if (actualMonth !== null && !isFutureMonth) {
+                          if (actualMonth !== null && !isFutureMonth && !isPreStart) {
                             handleMgmtCellClick(roleKey, currentYear, idx);
                           }
                         }}
-                        title={actualMonth !== null && !isFutureMonth ? "Click to view breakdown" : ""}
-                        style={{ cursor: actualMonth !== null && !isFutureMonth ? "pointer" : "default" }}
+                        title={actualMonth !== null && !isFutureMonth && !isPreStart ? "Click to view breakdown" : isPreStart ? "Pre-start data" : ""}
+                        style={{ cursor: actualMonth !== null && !isFutureMonth && !isPreStart ? "pointer" : "default" }}
                       >
-                        {isFutureMonth ? "—" : numberFormatter(val)}
+                        {isFutureMonth || isPreStart ? "—" : numberFormatter(val)}
                       </td>
                     );
                   })}
@@ -1502,9 +1990,10 @@ if (!useSgaEndpoints && queryRole !== "AGT") {
                     
                     const actualMonth = convertTableIndexToActualMonth(idx);
                     const isFutureMonth = actualMonth !== null && isMonthInFuture(currentYear, actualMonth);
+                    const isPreStart = actualMonth !== null && shouldGreyOutCell(actualMonth, currentYear);
                     return (
-                      <td key={idx} className={className}>
-                        {isFutureMonth ? "—" : numberFormatter(value)}
+                      <td key={idx} className={`${className} ${isPreStart ? "atlas-scorecard-pre-start-cell" : ""}`}>
+                        {isFutureMonth || isPreStart ? "—" : numberFormatter(value)}
                       </td>
                     );
                   })}
@@ -1522,9 +2011,10 @@ if (!useSgaEndpoints && queryRole !== "AGT") {
                     
                     const actualMonth = convertTableIndexToActualMonth(idx);
                     const isFutureMonth = actualMonth !== null && isMonthInFuture(currentYear, actualMonth);
+                    const isPreStart = actualMonth !== null && shouldGreyOutCell(actualMonth, currentYear);
                     return (
-                      <td key={idx} className={data.className}>
-                        {isFutureMonth ? "—" : (data.value === "N/A" ? "N/A" : `${data.value.toFixed(1)}%`)}
+                      <td key={idx} className={`${data.className} ${isPreStart ? "atlas-scorecard-pre-start-cell" : ""}`}>
+                        {isFutureMonth || isPreStart ? "—" : (data.value === "N/A" ? "N/A" : `${data.value.toFixed(1)}%`)}
                       </td>
                     );
                   })}
@@ -1609,6 +2099,81 @@ const renderHireToCodeTable = () => {
   // Get monthly data for hires (already in year/month format)
   const prevHireMonthly = hiresData[lastYear] || Array(12).fill(0);
   const currHireMonthly = hiresData[currentYear] || Array(12).fill(0);
+
+  // Helper to check if month is excluded due to MGA start date
+  const isMonthExcluded = (year, monthIndex) => {
+    if (!mgaStartDate || !year) return false;
+    const monthEndDate = new Date(year, monthIndex + 1, 0);
+    return monthEndDate < mgaStartDate;
+  };
+
+  // Simple YTD calculation: sum of hires / sum of codes for each period
+  const calculateSimpleRatios = (codeMonthly, hireMonthly, year) => {
+    // Q1: sum of hires (Jan-Mar) / sum of codes (Jan-Mar)
+    let q1Hires = 0, q1Codes = 0;
+    for (let i = 0; i < 3; i++) {
+      if (!isMonthExcluded(year, i)) {
+        q1Hires += hireMonthly[i] || 0;
+        q1Codes += codeMonthly[i] || 0;
+      }
+    }
+    const q1 = q1Codes > 0 ? q1Hires / q1Codes : 0;
+
+    // Q2: sum of hires (Apr-Jun) / sum of codes (Apr-Jun)
+    let q2Hires = 0, q2Codes = 0;
+    for (let i = 3; i < 6; i++) {
+      if (!isMonthExcluded(year, i)) {
+        q2Hires += hireMonthly[i] || 0;
+        q2Codes += codeMonthly[i] || 0;
+      }
+    }
+    const q2 = q2Codes > 0 ? q2Hires / q2Codes : 0;
+
+    // Q3: sum of hires (Jul-Sep) / sum of codes (Jul-Sep)
+    let q3Hires = 0, q3Codes = 0;
+    for (let i = 6; i < 9; i++) {
+      if (!isMonthExcluded(year, i)) {
+        q3Hires += hireMonthly[i] || 0;
+        q3Codes += codeMonthly[i] || 0;
+      }
+    }
+    const q3 = q3Codes > 0 ? q3Hires / q3Codes : 0;
+
+    // Q4: sum of hires (Oct-Dec) / sum of codes (Oct-Dec)
+    let q4Hires = 0, q4Codes = 0;
+    for (let i = 9; i < 12; i++) {
+      if (!isMonthExcluded(year, i)) {
+        q4Hires += hireMonthly[i] || 0;
+        q4Codes += codeMonthly[i] || 0;
+      }
+    }
+    const q4 = q4Codes > 0 ? q4Hires / q4Codes : 0;
+
+    // YTD: sum of hires (up to and including current month) / sum of codes (up to and including current month)
+    const today = new Date();
+    const monthsToConsider = Math.max(1, today.getMonth() + 1); // Include current month
+    let ytdHires = 0, ytdCodes = 0;
+    for (let i = 0; i < monthsToConsider; i++) {
+      if (!isMonthExcluded(year, i)) {
+        ytdHires += hireMonthly[i] || 0;
+        ytdCodes += codeMonthly[i] || 0;
+      }
+    }
+    const ytd = ytdCodes > 0 ? ytdHires / ytdCodes : 0;
+
+    // Full year: sum of all hires / sum of all codes
+    let fullYearHires = 0, fullYearCodes = 0;
+    for (let i = 0; i < 12; i++) {
+      if (!isMonthExcluded(year, i)) {
+        fullYearHires += hireMonthly[i] || 0;
+        fullYearCodes += codeMonthly[i] || 0;
+      }
+    }
+    const fullYear = fullYearCodes > 0 ? fullYearHires / fullYearCodes : 0;
+
+    // Return array: [Q1, Q2, Q3, Q4, YTD, Full Year]
+    return [q1, q2, q3, q4, ytd, fullYear];
+  };
 
   // Calculate ratios with rolling windows using raw weekly data
   const calculateRollingRatio = (codeMonthly, hireMonthly, year) => {
@@ -1882,78 +2447,51 @@ const renderHireToCodeTable = () => {
     return monthlyRatios;
   };
 
-  // Calculate rolling ratios for current and previous years
+  // Calculate ratios based on selected view mode
+  let prevRatios, currRatios;
+  
+  if (hireToCodeView === 'YTD') {
+    // Simple sum-based calculation
+    prevRatios = calculateSimpleRatios(prevCodeMonthly, prevHireMonthly, lastYear);
+    currRatios = calculateSimpleRatios(currCodeMonthly, currHireMonthly, currentYear);
+  } else {
+    // Rolling calculation (original logic) - but format as quarters only for display
   const prevMonthlyRatios = calculateRollingRatio(prevCodeMonthly, prevHireMonthly, lastYear);
   const currMonthlyRatios = calculateRollingRatio(currCodeMonthly, currHireMonthly, currentYear);
 
-  // Format ratios into display format with quarters and YTD
-  const formatRatiosWithQuarters = (monthlyRatios, year, previousYearRatios = null) => {
-    const q1 = monthlyRatios.slice(0, 3).filter(v => v > 0).length > 0
-      ? monthlyRatios.slice(0, 3).reduce((a, b) => a + b, 0) / monthlyRatios.slice(0, 3).filter(v => v > 0).length
-      : 0;
+    // Convert monthly ratios to quarterly format for display
+    const convertToQuarterlyFormat = (monthlyRatios, year) => {
+      const q1ValidData = monthlyRatios.slice(0, 3).filter((v, idx) => v > 0 && !isMonthExcluded(year, idx));
+      const q2ValidData = monthlyRatios.slice(3, 6).filter((v, idx) => v > 0 && !isMonthExcluded(year, idx + 3));
+      const q3ValidData = monthlyRatios.slice(6, 9).filter((v, idx) => v > 0 && !isMonthExcluded(year, idx + 6));
+      const q4ValidData = monthlyRatios.slice(9, 12).filter((v, idx) => v > 0 && !isMonthExcluded(year, idx + 9));
+
+    const q1 = q1ValidData.length > 0 ? q1ValidData.reduce((a, b) => a + b, 0) / q1ValidData.length : 0;
+    const q2 = q2ValidData.length > 0 ? q2ValidData.reduce((a, b) => a + b, 0) / q2ValidData.length : 0;
+    const q3 = q3ValidData.length > 0 ? q3ValidData.reduce((a, b) => a + b, 0) / q3ValidData.length : 0;
+    const q4 = q4ValidData.length > 0 ? q4ValidData.reduce((a, b) => a + b, 0) / q4ValidData.length : 0;
     
-    const q2 = monthlyRatios.slice(3, 6).filter(v => v > 0).length > 0
-      ? monthlyRatios.slice(3, 6).reduce((a, b) => a + b, 0) / monthlyRatios.slice(3, 6).filter(v => v > 0).length
-      : 0;
-    
-    const q3 = monthlyRatios.slice(6, 9).filter(v => v > 0).length > 0
-      ? monthlyRatios.slice(6, 9).reduce((a, b) => a + b, 0) / monthlyRatios.slice(6, 9).filter(v => v > 0).length
-      : 0;
-    
-    const q4 = monthlyRatios.slice(9, 12).filter(v => v > 0).length > 0
-      ? monthlyRatios.slice(9, 12).reduce((a, b) => a + b, 0) / monthlyRatios.slice(9, 12).filter(v => v > 0).length
-      : 0;
-    
-    // For YTD, consider only months that have data (non-zero) up to previous month for current year
     const today = new Date();
-    const isCurrentYear = year === today.getFullYear();
-    const monthsToConsider = isCurrentYear ? Math.max(0, today.getMonth()) : 12;
-    const validMonths = monthlyRatios.slice(0, monthsToConsider).filter(v => v > 0);
-    const ytd = validMonths.length > 0
-      ? validMonths.reduce((a, b) => a + b, 0) / validMonths.length
-      : 0;
+      const monthsToConsider = Math.max(0, today.getMonth());
+      const validMonths = monthlyRatios.slice(0, monthsToConsider).filter((v, idx) => v > 0 && !isMonthExcluded(year, idx));
+      const ytd = validMonths.length > 0 ? validMonths.reduce((a, b) => a + b, 0) / validMonths.length : 0;
+      
+      const fullYearValid = monthlyRatios.filter((v, idx) => v > 0 && !isMonthExcluded(year, idx));
+      const fullYear = fullYearValid.length > 0 ? fullYearValid.reduce((a, b) => a + b, 0) / fullYearValid.length : 0;
+      
+      return [q1, q2, q3, q4, ytd, fullYear];
+    };
     
-    // Calculate previous year average if data is provided
-    const prevYearAvg = previousYearRatios ? 
-      (previousYearRatios.filter(v => v > 0).length > 0 
-        ? previousYearRatios.reduce((a, b) => a + b, 0) / previousYearRatios.filter(v => v > 0).length 
-        : 0) 
-      : 0;
-    
-    return [
-      monthlyRatios[0],
-      monthlyRatios[1],
-      monthlyRatios[2],
-      q1,
-      monthlyRatios[3],
-      monthlyRatios[4],
-      monthlyRatios[5],
-      q2,
-      monthlyRatios[6],
-      monthlyRatios[7],
-      monthlyRatios[8],
-      q3,
-      monthlyRatios[9],
-      monthlyRatios[10],
-      monthlyRatios[11],
-      q4,
-      ytd,
-      prevYearAvg,
-    ];
-  };
+    prevRatios = convertToQuarterlyFormat(prevMonthlyRatios, lastYear);
+    currRatios = convertToQuarterlyFormat(currMonthlyRatios, currentYear);
+  }
 
-  const prevRatios = formatRatiosWithQuarters(prevMonthlyRatios, lastYear, prevMonthlyRatios);
-  const currRatios = formatRatiosWithQuarters(currMonthlyRatios, currentYear);
-
+  // Growth and % growth (lower Hire/Code is better: a decrease is positive growth)
   const growthData = currRatios.map((curr, i) => {
     const prev = prevRatios[i];
-    // For the previous year column (index 17), set growth to 0
-    if (i === 17) {
-      return { value: 0, className: "" };
-    }
     const diff = curr - prev;
     return {
-      value: diff,
+      value: Math.abs(diff),
       // For hire to code, an increase is bad (negative growth), a decrease is good (positive growth)
       className: diff < 0 ? "growth-positive" : diff > 0 ? "growth-negative" : "",
     };
@@ -1961,175 +2499,670 @@ const renderHireToCodeTable = () => {
 
   const percentGrowthData = currRatios.map((curr, i) => {
     const prev = prevRatios[i];
-    // For the previous year column (index 17), set percentage to "N/A"
-    if (i === 17) {
-      return { value: "N/A", className: "" };
-    }
     if (prev === 0) {
       return { value: "N/A", className: "" };
-    } else {
+    }
       const pct = ((curr - prev) / prev) * 100;
       return {
-        value: pct,
+      value: Math.abs(pct),
         // For hire to code, an increase is bad (negative growth), a decrease is good (positive growth)
         className: pct < 0 ? "growth-positive" : pct > 0 ? "growth-negative" : "",
       };
-    }
   });
+
+  // Define headers to show: Q1, Q2, Q3, Q4, YTD, Previous Year
+  const displayHeaders = ["Q1 ", "Q2 ", "Q3 ", "Q4 ", "YTD ", `${currentYear - 1}`];
 
   return (
     <div className="atlas-scorecard-section">
-      <h5>Hire to Code Ratios</h5>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+        <h5 style={{ margin: 0 }}>Hire to Code Ratios</h5>
+        <button 
+          className={`hire-to-code-view-toggle-btn ${hireToCodeView === 'YTD' ? 'active' : ''}`}
+          onClick={() => setHireToCodeView(hireToCodeView === 'Rolling' ? 'YTD' : 'Rolling')}
+          style={{
+            padding: '6px 12px',
+            fontSize: '13px',
+            fontWeight: '500',
+            border: '1px solid #d1d5db',
+            borderRadius: '6px',
+            backgroundColor: hireToCodeView === 'YTD' ? '#3b82f6' : '#ffffff',
+            color: hireToCodeView === 'YTD' ? '#ffffff' : '#374151',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+          title={hireToCodeView === 'Rolling' ? 'Switch to YTD View' : 'Switch to Rolling View'}
+        >
+          {hireToCodeView === 'Rolling' ? 'Switch to YTD' : 'Switch to Rolling'}
+        </button>
+      </div>
       <div style={{ overflowX: "auto" }}>
       <div className="atlas-scorecard-custom-table-container">
         <table className="atlas-scorecard-custom-table">
           <thead>
             <tr>
               <th>Year</th>
-              {months.map((month, index) => {
-                const isQuarter = isQuarterColumn(index);
-                const isFuture = isMonthIndexFuture(index);
-                
-                // Check if column should be shown based on quarters mode and future months toggle
-                if (!shouldShowColumn(index, isQuarter, isFuture)) {
-                  return null;
-                }
-                
-                return (
+                {displayHeaders.map((header, index) => (
                   <th
                     key={index}
                     className={
-                      index === 3 ||
-                      index === 7 ||
-                      index === 11 ||
-                      index === 15
+                      index < 4
                         ? "atlas-scorecard-quarter-header"
-                        : index === 16
+                        : index === 4
                         ? "atlas-scorecard-ytd-header"
-                        : index === 17
-                        ? "atlas-scorecard-prev-year-header"
-                        : ""
+                          : "atlas-scorecard-prev-year-header"
                     }
                   >
-                    {month}
+                    {header}
                   </th>
-                );
-              })}
+                ))}
             </tr>
           </thead>
           <tbody>
             <tr>
               <td>{lastYear}</td>
-              {prevRatios.map((val, index) => {
-                const isQuarter = isQuarterColumn(index);
-                const isFuture = isMonthIndexFuture(index);
-                
-                // Check if column should be shown based on quarters mode and future months toggle
-                if (!shouldShowColumn(index, isQuarter, isFuture)) {
-                  return null;
-                }
-                
-                const monthIndex = convertTableIndexToActualMonth(index);
-                return (
+                {prevRatios.map((val, index) => (
                 <td
                   key={index}
-                  className={
-                    index === 3 ||
-                    index === 7 ||
-                    index === 11 ||
-                    index === 15
+                    className={
+                      index < 4
                       ? "atlas-scorecard-quarter-cell"
-                      : index === 16
+                        : index === 4
                       ? "atlas-scorecard-ytd-cell"
-                      : index === 17
-                      ? "atlas-scorecard-prev-year-cell"
-                      : ""
-                  }
-                >
-                  {ratioFormatter(val)}
+                          : "atlas-scorecard-prev-year-cell"
+                    }
+                  >
+                    {ratioFormatter(val)}
                 </td>
-                );
-              })}
+                ))}
             </tr>
             <tr>
               <td>{currentYear}</td>
-              {currRatios.map((val, index) => {
-                const isQuarter = isQuarterColumn(index);
-                const isFuture = isMonthIndexFuture(index);
-                
-                // Check if column should be shown based on quarters mode and future months toggle
-                if (!shouldShowColumn(index, isQuarter, isFuture)) {
-                  return null;
-                }
-                
-                const monthIndex = convertTableIndexToActualMonth(index);
-                const isFutureMonth = monthIndex !== null && isMonthInFuture(currentYear, monthIndex);
-                
-                return (
+                {currRatios.map((val, index) => (
                 <td
                   key={index}
-                  className={
-                    index === 3 ||
-                    index === 7 ||
-                    index === 11 ||
-                    index === 15
+                    className={
+                      index < 4
                       ? "atlas-scorecard-quarter-cell"
-                      : index === 16
+                        : index === 4
                       ? "atlas-scorecard-ytd-cell"
-                      : index === 17
-                      ? "atlas-scorecard-prev-year-cell"
-                      : ""
-                  }
-                >
-                  {isFutureMonth ? "—" : ratioFormatter(val)}
+                          : "atlas-scorecard-prev-year-cell"
+                    }
+                  >
+                    {index === 5 ? "—" : ratioFormatter(val)}
                 </td>
-                );
-              })}
+                ))}
             </tr>
             <tr className="atlas-scorecard-growth-row">
               <td>Growth</td>
-              {growthData.map(({ value, className }, index) => {
-                const isQuarter = isQuarterColumn(index);
-                const isFuture = isMonthIndexFuture(index);
-                
-                // Check if column should be shown based on quarters mode and future months toggle
-                if (!shouldShowColumn(index, isQuarter, isFuture)) {
-                  return null;
-                }
-                
-                const monthIndex = convertTableIndexToActualMonth(index);
-                const isFutureMonth = monthIndex !== null && isMonthInFuture(currentYear, monthIndex);
-                
-                return (
-                <td key={index} className={className}>
-                  {isFutureMonth ? "—" : ratioFormatter(value)}
+                {growthData.map(({ value, className }, index) => (
+                  <td key={index} className={className}>
+                    {index === 5 ? "—" : ratioFormatter(value)}
                 </td>
-                );
-              })}
+                ))}
             </tr>
             <tr className="atlas-scorecard-percentage-row">
               <td>%</td>
-              {percentGrowthData.map((data, index) => {
-                const isQuarter = isQuarterColumn(index);
-                const isFuture = isMonthIndexFuture(index);
-                
-                // Check if column should be shown based on quarters mode and future months toggle
-                if (!shouldShowColumn(index, isQuarter, isFuture)) {
-                  return null;
-                }
-                
-                const monthIndex = convertTableIndexToActualMonth(index);
-                const isFutureMonth = monthIndex !== null && isMonthInFuture(currentYear, monthIndex);
-                
-                return (
-                <td key={index} className={data.className}>
-                  {isFutureMonth ? "—" : data.value === "N/A" ? "N/A" : `${data.value.toFixed(1)}%`}
+                {percentGrowthData.map((data, index) => (
+                  <td key={index} className={data.className}>
+                    {index === 5 ? "—" : (data.value === "N/A" ? "N/A" : `${data.value.toFixed(1)}%`)}
                 </td>
-                );
-              })}
+                ))}
             </tr>
           </tbody>
         </table>
+        </div>
+      </div>
+      <hr />
+    </div>
+  );
+};
+
+
+// New helper: render the Code/VIP ratio table (Codes divided by VIPs)
+const renderCodeVipRatioTable = () => {
+  const ratioFormatter = (num) => Number(num).toFixed(2);
+
+  // Build monthly counts for Codes and VIPs
+  const codesGrouped = groupByMonthAndYear(associatesData, "PRODDATE");
+  const vipsGrouped = groupByMonthAndYear(vipsData, "vip_month");
+
+  const prevCodeMonthly = codesGrouped[lastYear] || Array(12).fill(0);
+  const currCodeMonthly = codesGrouped[currentYear] || Array(12).fill(0);
+  const prevVipMonthly = vipsGrouped[lastYear] || Array(12).fill(0);
+  const currVipMonthly = vipsGrouped[currentYear] || Array(12).fill(0);
+
+  // Helper to check if month is excluded due to MGA start date
+  const isMonthExcluded = (year, monthIndex) => {
+      if (!mgaStartDate || !year) return false;
+      const monthEndDate = new Date(year, monthIndex + 1, 0);
+      return monthEndDate < mgaStartDate;
+    };
+
+  // Calculate ratios using sum of codes / sum of vips for each period
+  const calculatePeriodRatios = (codeMonthly, vipMonthly, year) => {
+    // Q1: sum of codes (Jan-Mar) / sum of vips (Jan-Mar)
+    let q1Codes = 0, q1Vips = 0;
+    for (let i = 0; i < 3; i++) {
+      if (!isMonthExcluded(year, i)) {
+        q1Codes += codeMonthly[i] || 0;
+        q1Vips += vipMonthly[i] || 0;
+      }
+    }
+    const q1 = q1Vips > 0 ? q1Codes / q1Vips : 0;
+
+    // Q2: sum of codes (Apr-Jun) / sum of vips (Apr-Jun)
+    let q2Codes = 0, q2Vips = 0;
+    for (let i = 3; i < 6; i++) {
+      if (!isMonthExcluded(year, i)) {
+        q2Codes += codeMonthly[i] || 0;
+        q2Vips += vipMonthly[i] || 0;
+      }
+    }
+    const q2 = q2Vips > 0 ? q2Codes / q2Vips : 0;
+
+    // Q3: sum of codes (Jul-Sep) / sum of vips (Jul-Sep)
+    let q3Codes = 0, q3Vips = 0;
+    for (let i = 6; i < 9; i++) {
+      if (!isMonthExcluded(year, i)) {
+        q3Codes += codeMonthly[i] || 0;
+        q3Vips += vipMonthly[i] || 0;
+      }
+    }
+    const q3 = q3Vips > 0 ? q3Codes / q3Vips : 0;
+
+    // Q4: sum of codes (Oct-Dec) / sum of vips (Oct-Dec)
+    let q4Codes = 0, q4Vips = 0;
+    for (let i = 9; i < 12; i++) {
+      if (!isMonthExcluded(year, i)) {
+        q4Codes += codeMonthly[i] || 0;
+        q4Vips += vipMonthly[i] || 0;
+      }
+    }
+    const q4 = q4Vips > 0 ? q4Codes / q4Vips : 0;
+
+    // YTD: sum of codes (up to last completed month) / sum of vips (up to last completed month)
+    const today = new Date();
+    const monthsToConsider = Math.max(0, today.getMonth()); // Exclude current month
+    let ytdCodes = 0, ytdVips = 0;
+    for (let i = 0; i < monthsToConsider; i++) {
+      if (!isMonthExcluded(year, i)) {
+        ytdCodes += codeMonthly[i] || 0;
+        ytdVips += vipMonthly[i] || 0;
+      }
+    }
+    const ytd = ytdVips > 0 ? ytdCodes / ytdVips : 0;
+
+    // Full year: sum of all codes / sum of all vips
+    let fullYearCodes = 0, fullYearVips = 0;
+    for (let i = 0; i < 12; i++) {
+      if (!isMonthExcluded(year, i)) {
+        fullYearCodes += codeMonthly[i] || 0;
+        fullYearVips += vipMonthly[i] || 0;
+      }
+    }
+    const fullYear = fullYearVips > 0 ? fullYearCodes / fullYearVips : 0;
+
+    // Return array: [Q1, Q2, Q3, Q4, YTD, Full Year]
+    return [q1, q2, q3, q4, ytd, fullYear];
+  };
+
+  const prevRatios = calculatePeriodRatios(prevCodeMonthly, prevVipMonthly, lastYear);
+  const currRatios = calculatePeriodRatios(currCodeMonthly, currVipMonthly, currentYear);
+
+  // Growth and % growth (lower Code/VIP is better: a decrease is positive growth)
+  const growthData = currRatios.map((curr, i) => {
+    const prev = prevRatios[i];
+    const diff = curr - prev;
+    return {
+      value: Math.abs(diff),
+      className: diff < 0 ? "growth-positive" : diff > 0 ? "growth-negative" : "",
+    };
+  });
+
+  const percentGrowthData = currRatios.map((curr, i) => {
+    const prev = prevRatios[i];
+    if (prev === 0) return { value: "N/A", className: "" };
+    const pct = ((curr - prev) / prev) * 100;
+    return { value: Math.abs(pct), className: pct < 0 ? "growth-positive" : pct > 0 ? "growth-negative" : "" };
+  });
+
+  // Define headers to show: Q1, Q2, Q3, Q4, YTD, Previous Year
+  const displayHeaders = ["Q1 ", "Q2 ", "Q3 ", "Q4 ", "YTD ", `${currentYear - 1}`];
+
+  return (
+    <div className="atlas-scorecard-section">
+      <h5>Code / VIP Ratios</h5>
+      <div style={{ overflowX: "auto" }}>
+        <div className="atlas-scorecard-custom-table-container">
+          <table className="atlas-scorecard-custom-table">
+            <thead>
+              <tr>
+                <th>Year</th>
+                {displayHeaders.map((header, index) => (
+                    <th
+                      key={index}
+                      className={
+                      index < 4
+                          ? "atlas-scorecard-quarter-header"
+                        : index === 4
+                            ? "atlas-scorecard-ytd-header"
+                          : "atlas-scorecard-prev-year-header"
+                      }
+                    >
+                    {header}
+                    </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{lastYear}</td>
+                {prevRatios.map((val, index) => (
+                    <td
+                      key={index}
+                    className={
+                      index < 4
+                        ? "atlas-scorecard-quarter-cell"
+                        : index === 4
+                          ? "atlas-scorecard-ytd-cell"
+                          : "atlas-scorecard-prev-year-cell"
+                    }
+                  >
+                    {ratioFormatter(val)}
+                    </td>
+                ))}
+              </tr>
+              <tr>
+                <td>{currentYear}</td>
+                {currRatios.map((val, index) => (
+                    <td
+                      key={index}
+                    className={
+                      index < 4
+                        ? "atlas-scorecard-quarter-cell"
+                        : index === 4
+                          ? "atlas-scorecard-ytd-cell"
+                          : "atlas-scorecard-prev-year-cell"
+                    }
+                  >
+                    {index === 5 ? "—" : ratioFormatter(val)}
+                    </td>
+                ))}
+              </tr>
+              <tr className="atlas-scorecard-growth-row">
+                <td>Growth</td>
+                {growthData.map(({ value, className }, index) => (
+                  <td key={index} className={className}>
+                    {index === 5 ? "—" : ratioFormatter(value)}
+                    </td>
+                ))}
+              </tr>
+              <tr className="atlas-scorecard-percentage-row">
+                <td>%</td>
+                {percentGrowthData.map((data, index) => (
+                  <td key={index} className={data.className}>
+                    {index === 5 ? "—" : (data.value === "N/A" ? "N/A" : `${data.value.toFixed(1)}%`)}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <hr />
+    </div>
+  );
+};
+
+// New helper: render the ALP/Code ratio table (ALP divided by Codes)
+const renderAlpCodeRatioTable = () => {
+  const ratioFormatter = (num) => Number(num).toFixed(2);
+
+  // Build monthly counts for Codes
+  const codesGrouped = groupByMonthAndYear(associatesData, "PRODDATE");
+
+  const prevCodeMonthly = codesGrouped[lastYear] || Array(12).fill(0);
+  const currCodeMonthly = codesGrouped[currentYear] || Array(12).fill(0);
+
+  // ALP data is already grouped by year
+  const prevAlpMonthly = alpData[lastYear] || Array(12).fill(0);
+  const currAlpMonthly = alpData[currentYear] || Array(12).fill(0);
+
+  // Helper to check if month is excluded due to MGA start date
+  const isMonthExcluded = (year, monthIndex) => {
+    if (!mgaStartDate || !year) return false;
+    const monthEndDate = new Date(year, monthIndex + 1, 0);
+    return monthEndDate < mgaStartDate;
+  };
+
+  // Calculate ratios using sum of ALP / sum of codes for each period
+  const calculatePeriodRatios = (alpMonthly, codeMonthly, year) => {
+    // Q1: sum of ALP (Jan-Mar) / sum of codes (Jan-Mar)
+    let q1Alp = 0, q1Codes = 0;
+    for (let i = 0; i < 3; i++) {
+      if (!isMonthExcluded(year, i)) {
+        q1Alp += alpMonthly[i] || 0;
+        q1Codes += codeMonthly[i] || 0;
+      }
+    }
+    const q1 = q1Codes > 0 ? q1Alp / q1Codes : 0;
+
+    // Q2: sum of ALP (Apr-Jun) / sum of codes (Apr-Jun)
+    let q2Alp = 0, q2Codes = 0;
+    for (let i = 3; i < 6; i++) {
+      if (!isMonthExcluded(year, i)) {
+        q2Alp += alpMonthly[i] || 0;
+        q2Codes += codeMonthly[i] || 0;
+      }
+    }
+    const q2 = q2Codes > 0 ? q2Alp / q2Codes : 0;
+
+    // Q3: sum of ALP (Jul-Sep) / sum of codes (Jul-Sep)
+    let q3Alp = 0, q3Codes = 0;
+    for (let i = 6; i < 9; i++) {
+      if (!isMonthExcluded(year, i)) {
+        q3Alp += alpMonthly[i] || 0;
+        q3Codes += codeMonthly[i] || 0;
+      }
+    }
+    const q3 = q3Codes > 0 ? q3Alp / q3Codes : 0;
+
+    // Q4: sum of ALP (Oct-Dec) / sum of codes (Oct-Dec)
+    let q4Alp = 0, q4Codes = 0;
+    for (let i = 9; i < 12; i++) {
+      if (!isMonthExcluded(year, i)) {
+        q4Alp += alpMonthly[i] || 0;
+        q4Codes += codeMonthly[i] || 0;
+      }
+    }
+    const q4 = q4Codes > 0 ? q4Alp / q4Codes : 0;
+
+    // YTD: sum of ALP (up to last completed month) / sum of codes (up to last completed month)
+    const today = new Date();
+    const monthsToConsider = Math.max(0, today.getMonth()); // Exclude current month
+    let ytdAlp = 0, ytdCodes = 0;
+    for (let i = 0; i < monthsToConsider; i++) {
+      if (!isMonthExcluded(year, i)) {
+        ytdAlp += alpMonthly[i] || 0;
+        ytdCodes += codeMonthly[i] || 0;
+      }
+    }
+    const ytd = ytdCodes > 0 ? ytdAlp / ytdCodes : 0;
+
+    // Full year: sum of all ALP / sum of all codes
+    let fullYearAlp = 0, fullYearCodes = 0;
+    for (let i = 0; i < 12; i++) {
+      if (!isMonthExcluded(year, i)) {
+        fullYearAlp += alpMonthly[i] || 0;
+        fullYearCodes += codeMonthly[i] || 0;
+      }
+    }
+    const fullYear = fullYearCodes > 0 ? fullYearAlp / fullYearCodes : 0;
+
+    // Return array: [Q1, Q2, Q3, Q4, YTD, Full Year]
+    return [q1, q2, q3, q4, ytd, fullYear];
+  };
+
+  const prevRatios = calculatePeriodRatios(prevAlpMonthly, prevCodeMonthly, lastYear);
+  const currRatios = calculatePeriodRatios(currAlpMonthly, currCodeMonthly, currentYear);
+
+  // Growth and % growth (higher ALP/Code is better: an increase is positive growth)
+  const growthData = currRatios.map((curr, i) => {
+    const prev = prevRatios[i];
+    const diff = curr - prev;
+    return {
+      value: Math.abs(diff),
+      className: diff > 0 ? "growth-positive" : diff < 0 ? "growth-negative" : "",
+    };
+  });
+
+  const percentGrowthData = currRatios.map((curr, i) => {
+    const prev = prevRatios[i];
+    if (prev === 0) return { value: "N/A", className: "" };
+    const pct = ((curr - prev) / prev) * 100;
+    return { value: Math.abs(pct), className: pct > 0 ? "growth-positive" : pct < 0 ? "growth-negative" : "" };
+  });
+
+  // Define headers to show: Q1, Q2, Q3, Q4, YTD, Previous Year
+  const displayHeaders = ["Q1 ", "Q2 ", "Q3 ", "Q4 ", "YTD ", `${currentYear - 1}`];
+
+                  return (
+    <div className="atlas-scorecard-section">
+      <h5>ALP / Code Ratios</h5>
+      <div style={{ overflowX: "auto" }}>
+        <div className="atlas-scorecard-custom-table-container">
+          <table className="atlas-scorecard-custom-table">
+            <thead>
+              <tr>
+                <th>Year</th>
+                {displayHeaders.map((header, index) => (
+                  <th
+                    key={index}
+                    className={
+                      index < 4
+                        ? "atlas-scorecard-quarter-header"
+                        : index === 4
+                          ? "atlas-scorecard-ytd-header"
+                          : "atlas-scorecard-prev-year-header"
+                    }
+                  >
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{lastYear}</td>
+                {prevRatios.map((val, index) => (
+                  <td
+                    key={index}
+                    className={
+                      index < 4
+                        ? "atlas-scorecard-quarter-cell"
+                        : index === 4
+                          ? "atlas-scorecard-ytd-cell"
+                          : "atlas-scorecard-prev-year-cell"
+                    }
+                  >
+                    {ratioFormatter(val)}
+                    </td>
+                ))}
+              </tr>
+              <tr>
+                <td>{currentYear}</td>
+                {currRatios.map((val, index) => (
+                  <td
+                    key={index}
+                    className={
+                      index < 4
+                        ? "atlas-scorecard-quarter-cell"
+                        : index === 4
+                          ? "atlas-scorecard-ytd-cell"
+                          : "atlas-scorecard-prev-year-cell"
+                    }
+                  >
+                    {index === 5 ? "—" : ratioFormatter(val)}
+                  </td>
+                ))}
+              </tr>
+              <tr className="atlas-scorecard-growth-row">
+                <td>Growth</td>
+                {growthData.map(({ value, className }, index) => (
+                  <td key={index} className={className}>
+                    {index === 5 ? "—" : ratioFormatter(value)}
+                  </td>
+                ))}
+              </tr>
+              <tr className="atlas-scorecard-percentage-row">
+                <td>%</td>
+                {percentGrowthData.map((data, index) => (
+                  <td key={index} className={data.className}>
+                    {index === 5 ? "—" : (data.value === "N/A" ? "N/A" : `${data.value.toFixed(1)}%`)}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <hr />
+    </div>
+  );
+};
+
+// Render YTD Summary Table
+const renderYTDSummaryTable = () => {
+  const currencyFormatter = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+
+  const today = new Date();
+  const isCurrentYear = currentYear === today.getFullYear();
+  const monthsToConsiderForHires = Math.max(1, today.getMonth() + 1); // Include current month for hires
+  const monthsToConsiderForOthers = Math.max(0, today.getMonth()); // Exclude current month for others
+
+  // Helper to check if month is excluded due to MGA start date
+  const isMonthExcluded = (year, monthIndex) => {
+    if (!mgaStartDate || !year) return false;
+    const monthEndDate = new Date(year, monthIndex + 1, 0);
+    return monthEndDate < mgaStartDate;
+  };
+
+  // Calculate YTD values for ALP
+  const prevAlpMonthly = alpData[lastYear] || Array(12).fill(0);
+  const currAlpMonthly = alpData[currentYear] || Array(12).fill(0);
+  
+  let prevAlpYTD = 0, currAlpYTD = 0;
+  for (let i = 0; i < (isCurrentYear ? monthsToConsiderForOthers : 12); i++) {
+    if (!isMonthExcluded(lastYear, i)) prevAlpYTD += prevAlpMonthly[i] || 0;
+    if (!isMonthExcluded(currentYear, i)) currAlpYTD += currAlpMonthly[i] || 0;
+  }
+
+  // Calculate YTD values for Hires (includes current month)
+  const prevHireMonthly = hiresData[lastYear] || Array(12).fill(0);
+  const currHireMonthly = hiresData[currentYear] || Array(12).fill(0);
+  
+  let prevHiresYTD = 0, currHiresYTD = 0;
+  for (let i = 0; i < 12; i++) {
+    if (!isMonthExcluded(lastYear, i)) prevHiresYTD += prevHireMonthly[i] || 0;
+  }
+  for (let i = 0; i < (isCurrentYear ? monthsToConsiderForHires : 12); i++) {
+    if (!isMonthExcluded(currentYear, i)) currHiresYTD += currHireMonthly[i] || 0;
+  }
+
+  // Calculate YTD values for Codes
+  const codesGrouped = groupByMonthAndYear(associatesData, "PRODDATE");
+  const prevCodeMonthly = codesGrouped[lastYear] || Array(12).fill(0);
+  const currCodeMonthly = codesGrouped[currentYear] || Array(12).fill(0);
+  
+  let prevCodesYTD = 0, currCodesYTD = 0;
+  for (let i = 0; i < (isCurrentYear ? monthsToConsiderForOthers : 12); i++) {
+    if (!isMonthExcluded(lastYear, i)) prevCodesYTD += prevCodeMonthly[i] || 0;
+    if (!isMonthExcluded(currentYear, i)) currCodesYTD += currCodeMonthly[i] || 0;
+  }
+
+  // Calculate YTD values for VIPs
+  const vipsGrouped = groupByMonthAndYear(vipsData, "vip_month");
+  const prevVipMonthly = vipsGrouped[lastYear] || Array(12).fill(0);
+  const currVipMonthly = vipsGrouped[currentYear] || Array(12).fill(0);
+  
+  let prevVipsYTD = 0, currVipsYTD = 0;
+  for (let i = 0; i < (isCurrentYear ? monthsToConsiderForOthers : 12); i++) {
+    if (!isMonthExcluded(lastYear, i)) prevVipsYTD += prevVipMonthly[i] || 0;
+    if (!isMonthExcluded(currentYear, i)) currVipsYTD += currVipMonthly[i] || 0;
+  }
+
+  // Calculate ratio YTDs
+  const prevHireToCode = prevCodesYTD > 0 ? prevHiresYTD / prevCodesYTD : 0;
+  const currHireToCode = currCodesYTD > 0 ? currHiresYTD / currCodesYTD : 0;
+
+  const prevAlpCode = prevCodesYTD > 0 ? prevAlpYTD / prevCodesYTD : 0;
+  const currAlpCode = currCodesYTD > 0 ? currAlpYTD / currCodesYTD : 0;
+
+  const prevCodeVip = prevVipsYTD > 0 ? prevCodesYTD / prevVipsYTD : 0;
+  const currCodeVip = currVipsYTD > 0 ? currCodesYTD / currVipsYTD : 0;
+
+  // Calculate growth
+  const alpGrowth = currAlpYTD - prevAlpYTD;
+  const hiresGrowth = currHiresYTD - prevHiresYTD;
+  const codesGrowth = currCodesYTD - prevCodesYTD;
+  const vipsGrowth = currVipsYTD - prevVipsYTD;
+  const hireToCodeGrowth = currHireToCode - prevHireToCode;
+  const alpCodeGrowth = currAlpCode - prevAlpCode;
+  const codeVipGrowth = currCodeVip - prevCodeVip;
+
+  const ratioFormatter = (num) => Number(num).toFixed(2);
+
+  return (
+    <div className="atlas-scorecard-section">
+      <h5>YTD Summary</h5>
+      <div style={{ overflowX: "auto" }}>
+        <div className="atlas-scorecard-custom-table-container">
+          <table className="atlas-scorecard-custom-table">
+            <thead>
+              <tr>
+                <th>Year</th>
+                <th>ALP</th>
+                <th>Hires</th>
+                <th>Codes</th>
+                <th>VIPs</th>
+                <th>Hire/Code</th>
+                <th>ALP/Code</th>
+                <th>Code/VIP</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{lastYear}</td>
+                <td>{currencyFormatter.format(prevAlpYTD)}</td>
+                <td>{prevHiresYTD}</td>
+                <td>{prevCodesYTD}</td>
+                <td>{prevVipsYTD}</td>
+                <td>{ratioFormatter(prevHireToCode)}</td>
+                <td>{ratioFormatter(prevAlpCode)}</td>
+                <td>{ratioFormatter(prevCodeVip)}</td>
+              </tr>
+              <tr>
+                <td>{currentYear}</td>
+                <td>{currencyFormatter.format(currAlpYTD)}</td>
+                <td>{currHiresYTD}</td>
+                <td>{currCodesYTD}</td>
+                <td>{currVipsYTD}</td>
+                <td>{ratioFormatter(currHireToCode)}</td>
+                <td>{ratioFormatter(currAlpCode)}</td>
+                <td>{ratioFormatter(currCodeVip)}</td>
+              </tr>
+              <tr className="atlas-scorecard-growth-row">
+                <td>Growth</td>
+                <td className={alpGrowth > 0 ? "growth-positive" : alpGrowth < 0 ? "growth-negative" : ""}>
+                  {currencyFormatter.format(alpGrowth)}
+                </td>
+                <td className={hiresGrowth > 0 ? "growth-positive" : hiresGrowth < 0 ? "growth-negative" : ""}>
+                  {hiresGrowth}
+                </td>
+                <td className={codesGrowth > 0 ? "growth-positive" : codesGrowth < 0 ? "growth-negative" : ""}>
+                  {codesGrowth}
+                </td>
+                <td className={vipsGrowth > 0 ? "growth-positive" : vipsGrowth < 0 ? "growth-negative" : ""}>
+                  {vipsGrowth}
+                </td>
+                <td className={hireToCodeGrowth < 0 ? "growth-positive" : hireToCodeGrowth > 0 ? "growth-negative" : ""}>
+                  {ratioFormatter(Math.abs(hireToCodeGrowth))}
+                </td>
+                <td className={alpCodeGrowth > 0 ? "growth-positive" : alpCodeGrowth < 0 ? "growth-negative" : ""}>
+                  {ratioFormatter(Math.abs(alpCodeGrowth))}
+                </td>
+                <td className={codeVipGrowth < 0 ? "growth-positive" : codeVipGrowth > 0 ? "growth-negative" : ""}>
+                  {ratioFormatter(Math.abs(codeVipGrowth))}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
       <hr />
@@ -2145,15 +3178,41 @@ const renderHireToCodeTable = () => {
       const { data: detailData, month: monthInfo, year } = currentDetails;
   
       if (title === "VIPs") {
-        const groupedData = (Array.isArray(detailData) ? detailData : [detailData]).reduce(
+        // Group by MGA and count VIPs per MGA
+        const mgaCounts = (Array.isArray(detailData) ? detailData : [detailData]).reduce(
           (acc, item) => {
-            const name = item.lagnname || "Unknown";
-            if (!acc[name]) acc[name] = [];
-            acc[name].push(item);
+            const mgaName = item.mga || "Unknown";
+            if (!acc[mgaName]) {
+              acc[mgaName] = {
+                count: 0,
+                agents: new Set(),
+                totalGrossAlp: 0
+              };
+            }
+            acc[mgaName].count++;
+            if (item.lagnname) {
+              acc[mgaName].agents.add(item.lagnname);
+            }
+            // Sum gross ALP
+            const grossAlp = parseFloat(item.gs) || 0;
+            acc[mgaName].totalGrossAlp += grossAlp;
             return acc;
           },
           {}
         );
+  
+        // Convert to array and sort by count descending
+        const sortedMgas = Object.entries(mgaCounts)
+          .map(([mga, data]) => ({
+            mga,
+            count: data.count,
+            uniqueAgents: data.agents.size,
+            totalGrossAlp: data.totalGrossAlp
+          }))
+          .sort((a, b) => b.count - a.count);
+        
+        const totalVips = sortedMgas.reduce((sum, m) => sum + m.count, 0);
+        const totalGrossAlp = sortedMgas.reduce((sum, m) => sum + m.totalGrossAlp, 0);
   
         return (
           <div className="atlas-scorecard-section">
@@ -2170,41 +3229,127 @@ const renderHireToCodeTable = () => {
             >
               Back
             </button>
-            <div className="details-view">
-              {Object.entries(groupedData).map(([lagnname, entries], index) => (
-                <table className="hierarchyTable" key={index}>
-                  <thead>
-                    <tr>
-                      <th colSpan={2}>{formatName(lagnname) || "N/A"}</th>
-                      <th colSpan={2}>Hierarchy</th>
+            <div style={{ marginBottom: '1rem', color: '#666', fontSize: '0.875rem' }}>
+              {sortedMgas.length} {sortedMgas.length === 1 ? 'MGA' : 'MGAs'} • {totalVips} Total VIPs
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #ddd', background: '#f8f9fa' }}>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>MGA</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600' }}>VIPs</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600' }}>Unique Agents</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600' }}>Total Gross ALP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedMgas.map((mga, index) => (
+                    <tr 
+                      key={index}
+                      style={{ 
+                        borderBottom: '1px solid #eee',
+                        background: index % 2 === 0 ? 'white' : '#f8f9fa'
+                      }}
+                    >
+                      <td style={{ padding: '0.75rem' }}>{formatName(mga.mga)}</td>
+                      <td style={{ padding: '0.75rem', textAlign: 'right' }}>{mga.count}</td>
+                      <td style={{ padding: '0.75rem', textAlign: 'right' }}>{mga.uniqueAgents}</td>
+                      <td style={{ padding: '0.75rem', textAlign: 'right' }}>{formatCurrency(mga.totalGrossAlp)}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {entries.map((entry, idx) => (
-                      <React.Fragment key={idx}>
-                        <tr>
-                          <th>Code Date</th>
-                          <td>{formatDate(entry?.softcode_date) || "N/A"}</td>
-                          <th style={{ backgroundColor: "#68B675" }}>MGA</th>
-                          <td>{formatName(entry?.mga) || "N/A"}</td>
-                        </tr>
-                        <tr>
-                          <th>Gross ALP</th>
-                          <td>{formatCurrency(entry?.gs) || "N/A"}</td>
-                          <th style={{ backgroundColor: "#ED722F" }}>GA</th>
-                          <td>{formatName(entry?.ga) || "N/A"}</td>
-                        </tr>
-                        <tr>
-                          <th>Count</th>
-                          <td>{entry?.count || "N/A"}</td>
-                          <th style={{ backgroundColor: "#B25271" }}>SA</th>
-                          <td>{formatName(entry?.sa) || "N/A"}</td>
-                        </tr>
-                      </React.Fragment>
-                    ))}
-                  </tbody>
-                </table>
-              ))}
+                  ))}
+                  <tr style={{ borderTop: '2px solid #ddd', fontWeight: 'bold', background: '#f0f8ff' }}>
+                    <td style={{ padding: '0.75rem' }}>TOTAL</td>
+                    <td style={{ padding: '0.75rem', textAlign: 'right' }}>{totalVips}</td>
+                    <td style={{ padding: '0.75rem', textAlign: 'right' }}>—</td>
+                    <td style={{ padding: '0.75rem', textAlign: 'right' }}>{formatCurrency(totalGrossAlp)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      }
+      
+      if (title === "Hires") {
+        // Group by MGA and count hires per MGA
+        const mgaCounts = (Array.isArray(detailData) ? detailData : [detailData]).reduce(
+          (acc, item) => {
+            const mgaName = item.mga || item.MGA || "Unknown";
+            if (!acc[mgaName]) {
+              acc[mgaName] = {
+                totalHires: 0,
+                agents: new Set()
+              };
+            }
+            const hireCount = parseFloat(item.Total_Hires) || 1;
+            acc[mgaName].totalHires += hireCount;
+            if (item.lagnname) {
+              acc[mgaName].agents.add(item.lagnname);
+            }
+            return acc;
+          },
+          {}
+        );
+  
+        // Convert to array and sort by total hires descending
+        const sortedMgas = Object.entries(mgaCounts)
+          .map(([mga, data]) => ({
+            mga,
+            totalHires: data.totalHires,
+            uniqueAgents: data.agents.size
+          }))
+          .sort((a, b) => b.totalHires - a.totalHires);
+        
+        const totalHires = sortedMgas.reduce((sum, m) => sum + m.totalHires, 0);
+  
+        return (
+          <div className="atlas-scorecard-section">
+            <h5>{`${title} > ${monthInfo.label} '${String(year).slice(-2)}`}</h5>
+            <button
+              className="insured-button"
+              onClick={() =>
+                setSelectedTableDetails((prev) => {
+                  const updated = { ...prev };
+                  delete updated[title];
+                  return updated;
+                })
+              }
+            >
+              Back
+            </button>
+            <div style={{ marginBottom: '1rem', color: '#666', fontSize: '0.875rem' }}>
+              {sortedMgas.length} {sortedMgas.length === 1 ? 'MGA' : 'MGAs'} • {totalHires} Total Hires
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #ddd', background: '#f8f9fa' }}>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>MGA</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600' }}>Hires</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600' }}>Unique Agents</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedMgas.map((mga, index) => (
+                    <tr 
+                      key={index}
+                      style={{ 
+                        borderBottom: '1px solid #eee',
+                        background: index % 2 === 0 ? 'white' : '#f8f9fa'
+                      }}
+                    >
+                      <td style={{ padding: '0.75rem' }}>{formatName(mga.mga)}</td>
+                      <td style={{ padding: '0.75rem', textAlign: 'right' }}>{mga.totalHires.toFixed(1)}</td>
+                      <td style={{ padding: '0.75rem', textAlign: 'right' }}>{mga.uniqueAgents}</td>
+                    </tr>
+                  ))}
+                  <tr style={{ borderTop: '2px solid #ddd', fontWeight: 'bold', background: '#f0f8ff' }}>
+                    <td style={{ padding: '0.75rem' }}>TOTAL</td>
+                    <td style={{ padding: '0.75rem', textAlign: 'right' }}>{totalHires.toFixed(1)}</td>
+                    <td style={{ padding: '0.75rem', textAlign: 'right' }}>—</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         );
@@ -2258,15 +3403,35 @@ const renderHireToCodeTable = () => {
       
       
       if (title === "Codes") {
-        const groupedData = (Array.isArray(detailData) ? detailData : [detailData]).reduce(
+        // Group by MGA and count codes per MGA
+        const mgaCounts = (Array.isArray(detailData) ? detailData : [detailData]).reduce(
           (acc, item) => {
-            const name = item.LagnName || "Unknown";
-            if (!acc[name]) acc[name] = [];
-            acc[name].push(item);
+            const mgaName = item.MGA || "Unknown";
+            if (!acc[mgaName]) {
+              acc[mgaName] = {
+                count: 0,
+                agents: new Set()
+              };
+            }
+            acc[mgaName].count++;
+            if (item.LagnName) {
+              acc[mgaName].agents.add(item.LagnName);
+            }
             return acc;
           },
           {}
         );
+  
+        // Convert to array and sort by count descending
+        const sortedMgas = Object.entries(mgaCounts)
+          .map(([mga, data]) => ({
+            mga,
+            count: data.count,
+            uniqueAgents: data.agents.size
+          }))
+          .sort((a, b) => b.count - a.count);
+        
+        const totalCodes = sortedMgas.reduce((sum, m) => sum + m.count, 0);
   
         return (
           <div className="atlas-scorecard-section">
@@ -2283,41 +3448,39 @@ const renderHireToCodeTable = () => {
             >
               Back
             </button>
-            <div className="details-view">
-              {Object.entries(groupedData).map(([lagnName, entries], index) => (
-                <table className="hierarchyTable" key={index}>
-                  <thead>
-                    <tr>
-                      <th colSpan={2}>{formatName(lagnName)}</th>
-                      <th colSpan={2}>Hierarchy</th>
+            <div style={{ marginBottom: '1rem', color: '#666', fontSize: '0.875rem' }}>
+              {sortedMgas.length} {sortedMgas.length === 1 ? 'MGA' : 'MGAs'} • {totalCodes} Total Codes
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #ddd', background: '#f8f9fa' }}>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>MGA</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600' }}>Codes</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600' }}>Unique Agents</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedMgas.map((mga, index) => (
+                    <tr 
+                      key={index}
+                      style={{ 
+                        borderBottom: '1px solid #eee',
+                        background: index % 2 === 0 ? 'white' : '#f8f9fa'
+                      }}
+                    >
+                      <td style={{ padding: '0.75rem' }}>{formatName(mga.mga)}</td>
+                      <td style={{ padding: '0.75rem', textAlign: 'right' }}>{mga.count}</td>
+                      <td style={{ padding: '0.75rem', textAlign: 'right' }}>{mga.uniqueAgents}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {entries.map((entry, idx) => (
-                      <React.Fragment key={idx}>
-                        <tr>
-                          <th>Prod Date</th>
-                          <td>{formatDate(entry?.PRODDATE) || "N/A"}</td>
-                          <th style={{ backgroundColor: "#68B675" }}>MGA</th>
-                          <td>{formatName(entry?.MGA) || "N/A"}</td>
-                        </tr>
-                        <tr>
-                          <th></th>
-                          <td></td>
-                          <th style={{ backgroundColor: "#ED722F" }}>GA</th>
-                          <td>{formatName(entry?.GA) || "N/A"}</td>
-                        </tr>
-                        <tr>
-                          <th></th>
-                          <td></td>
-                          <th style={{ backgroundColor: "#B25271" }}>SA</th>
-                          <td>{formatName(entry?.SA) || "N/A"}</td>
-                        </tr>
-                      </React.Fragment>
-                    ))}
-                  </tbody>
-                </table>
-              ))}
+                  ))}
+                  <tr style={{ borderTop: '2px solid #ddd', fontWeight: 'bold', background: '#f0f8ff' }}>
+                    <td style={{ padding: '0.75rem' }}>TOTAL</td>
+                    <td style={{ padding: '0.75rem', textAlign: 'right' }}>{totalCodes}</td>
+                    <td style={{ padding: '0.75rem', textAlign: 'right' }}>—</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         );
@@ -2393,24 +3556,60 @@ const renderHireToCodeTable = () => {
   
     let currentYearWithQuarters, previousYearWithQuarters;
     if (title === "Submitting Agent Count") {
-      currentYearWithQuarters = calculateQuarterAverages(currentYearData);
-      previousYearWithQuarters = calculateQuarterAverages(previousYearData, previousYearData);
+      currentYearWithQuarters = calculateQuarterAverages(currentYearData, null, currentYear);
+      previousYearWithQuarters = calculateQuarterAverages(previousYearData, previousYearData, previousYear);
+
+      // YTD for management count tables should use last month's number (exclude current month)
+      const todayLocal = new Date();
+      const monthsToUse = Math.max(0, todayLocal.getMonth());
+      const lastCompletedIdx = monthsToUse - 1;
+      const isMonthExcludedForYear = (yr, mIdx) => {
+        if (!mgaStartDate) return false;
+        const monthEndDate = new Date(yr, mIdx + 1, 0);
+        return monthEndDate < mgaStartDate;
+      };
+
+      // Current year YTD: value at last completed month index
+      let currentYtdVal = 0;
+      if (lastCompletedIdx >= 0 && !isMonthExcludedForYear(currentYear, lastCompletedIdx)) {
+        currentYtdVal = Number(currentYearData[lastCompletedIdx] || 0);
+      }
+      currentYearWithQuarters[16] = currentYtdVal;
+
+      // Previous year YTD: value at the same month index from previous year
+      let prevYtdVal = 0;
+      if (lastCompletedIdx >= 0 && !isMonthExcludedForYear(previousYear, lastCompletedIdx)) {
+        prevYtdVal = Number(previousYearData[lastCompletedIdx] || 0);
+      }
+      previousYearWithQuarters[16] = prevYtdVal;
+
+      // Adjust Previous Year column (index 17) to AVG of full last year of months
+      const prevMonthsAll = previousYearData
+        .map((v, idx) => ({ v, idx }))
+        .filter(x => !isMonthExcludedForYear(previousYear, x.idx));
+      const prevYearFullAvg = prevMonthsAll.length
+        ? prevMonthsAll.reduce((sum, x) => sum + (Number(x.v) || 0), 0) / prevMonthsAll.length
+        : 0;
+      previousYearWithQuarters[17] = prevYearFullAvg;
+
     } else if (title === "Hires") {
-      // For Hires table, use sums for current year but averages for previous year in the last column
-      currentYearWithQuarters = calculateQuarterSums(currentYearData);
-      previousYearWithQuarters = calculateQuarterAverages(previousYearData, previousYearData);
+      // For Hires table, use sums for both current year and previous year (full previous year sum in last column)
+      currentYearWithQuarters = calculateQuarterSums(currentYearData, null, currentYear);
+      previousYearWithQuarters = calculateQuarterSums(previousYearData, previousYearData, previousYear);
     } else {
-      currentYearWithQuarters = calculateQuarterSums(currentYearData);
-      previousYearWithQuarters = calculateQuarterSums(previousYearData, previousYearData);
+      currentYearWithQuarters = calculateQuarterSums(currentYearData, null, currentYear);
+      previousYearWithQuarters = calculateQuarterSums(previousYearData, previousYearData, previousYear);
     }
     
   
     const growthData = currentYearWithQuarters.map((current, index) => {
       let previousValue = previousYearWithQuarters[index];
       const monthInfo = monthIndexToDataIndex(index);
-      if (index === 16 && currentYear === today.getFullYear()) {
-        // Recalculate previous value as the sum of previousYearData for months that have passed (excluding current month)
-        previousValue = previousYearData.slice(0, Math.max(1, today.getMonth())).reduce((sum, val) => sum + val, 0);
+      // For Submitting Agent Count, YTD (index 16) growth should compare avg-to-date vs avg-to-date (already set above)
+      // So skip overriding previousValue for index 16 in that table
+      if (title !== "Submitting Agent Count" && index === 16 && currentYear === today.getFullYear()) {
+        // For other tables, previous YTD uses months up to last completed month, not including current
+        previousValue = previousYearData.slice(0, Math.max(0, today.getMonth())).reduce((sum, val) => sum + val, 0);
       }
       let growth = current - previousValue;
       // For monthly cells in the current year that haven't passed yet, force growth to 0.
@@ -2435,9 +3634,9 @@ const renderHireToCodeTable = () => {
     const percentGrowthData = currentYearWithQuarters.map((current, index) => {
       let previousValue = previousYearWithQuarters[index];
       const monthInfo = monthIndexToDataIndex(index);
-      if (index === 16 && currentYear === today.getFullYear()) {
-        // Recalculate previous value as the sum of previousYearData for months that have passed (excluding current month)
-        previousValue = previousYearData.slice(0, Math.max(1, today.getMonth())).reduce((sum, val) => sum + val, 0);
+      // For Submitting Agent Count, YTD (index 16) compares avg-to-date vs avg-to-date, so don't override previousValue
+      if (title !== "Submitting Agent Count" && index === 16 && currentYear === today.getFullYear()) {
+        previousValue = previousYearData.slice(0, Math.max(0, today.getMonth())).reduce((sum, val) => sum + val, 0);
       }
       let pct;
       if (previousValue === 0) {
@@ -2515,15 +3714,21 @@ const renderHireToCodeTable = () => {
     }
     
     const monthInfo = monthIndexToDataIndex(index);
-    // For the YTD column (index 16), override with sum of previousYearData for months that have passed
-// For the YTD column (index 16) in the previous-year row:
-let cellValue = (index === 16)
-  ? (currentYear === today.getFullYear()
-      ? previousYearData.slice(0, Math.max(1, today.getMonth())).reduce((sum, val) => sum + val, 0) // Exclude current month, but include at least January
-      : value)  // use full-year value if currentYear is not this year
-  : value;
+    // For Submitting Agent Count: YTD (index 16) in previous-year row should be AVG of full last year
+    let cellValue = value;
+    if (title === "Submitting Agent Count" && index === 16) {
+      // Use the precomputed previousYearWithQuarters YTD value, which
+      // is the AVG up to last completed month (excludes current month)
+      cellValue = previousYearWithQuarters[16];
+    } else if (index === 16) {
+      // Use up to last completed month for YTD comparison
+      cellValue = (currentYear === today.getFullYear()
+        ? previousYearData.slice(0, Math.max(0, today.getMonth())).reduce((sum, val) => sum + val, 0)
+        : value);
+    }
 
   const isQuarterCell = !monthInfo.isMonth;
+  const isPreStart = monthInfo.isMonth && shouldGreyOutCell(monthInfo.monthIndex, previousYear);
   const validData = Array.isArray(data) ? data : [];
   const dataItem = monthInfo.isMonth
     ? title === "Submitting Agent Count"
@@ -2545,7 +3750,7 @@ let cellValue = (index === 16)
     : null;
   
   
-  const isClickable = dataItem && dataItem.length > 0;
+  const isClickable = dataItem && dataItem.length > 0 && !isPreStart;
   return (
     <td
       key={index}
@@ -2554,13 +3759,14 @@ let cellValue = (index === 16)
         ${index === 16 ? "atlas-scorecard-ytd-cell" : ""}
         ${index === 17 ? "atlas-scorecard-prev-year-cell" : ""}
         ${isClickable ? "has-data" : ""}
+        ${isPreStart ? "atlas-scorecard-pre-start-cell" : ""}
       `}
-      title={isClickable ? "Details available" : ""}
+      title={isClickable ? "Details available" : isPreStart ? "Pre-start data" : ""}
       onClick={
         isClickable ? () => handleCellClickWrapper(dataItem, monthInfo, previousYear) : null
       }
     >
-      {isCurrency ? currencyFormatter.format(cellValue) : cellValue}
+      {isPreStart ? "—" : (isCurrency ? currencyFormatter.format(cellValue) : cellValue)}
     </td>
   );
   
@@ -2581,6 +3787,7 @@ let cellValue = (index === 16)
                   const monthInfo = monthIndexToDataIndex(index);
                   const isQuarterCell = !monthInfo.isMonth;
                   const isFutureMonth = monthInfo.isMonth && isMonthInFuture(currentYear, monthInfo.monthIndex);
+                  const isPreStart = monthInfo.isMonth && shouldGreyOutCell(monthInfo.monthIndex, currentYear);
                   const validData = Array.isArray(data) ? data : [];
                   const dataItem = monthInfo.isMonth
                     ? title === "Submitting Agent Count"
@@ -2601,21 +3808,22 @@ let cellValue = (index === 16)
                     : null;
                   
                 
-                  const isClickable = dataItem && dataItem.length > 0 && !isFutureMonth;
+                  const isClickable = dataItem && dataItem.length > 0 && !isFutureMonth && !isPreStart;
 
                   return (
                     <td
                       key={index}
-                            className={`
+                      className={`
         ${isQuarterCell ? "atlas-scorecard-quarter-cell" : ""}
         ${index === 16 ? "atlas-scorecard-ytd-cell" : ""}
         ${index === 17 ? "atlas-scorecard-prev-year-cell" : ""}
         ${isClickable ? "has-data" : ""}
+        ${isPreStart ? "atlas-scorecard-pre-start-cell" : ""}
       `}
-                      title={isClickable ? "Details available" : ""}
+                      title={isClickable ? "Details available" : isPreStart ? "Pre-start data" : ""}
                       onClick={isClickable ? () => handleCellClickWrapper(dataItem, monthInfo, currentYear) : null}
                     >
-                      {isFutureMonth ? "—" : (isCurrency ? currencyFormatter.format(value) : value)}
+                      {isFutureMonth || isPreStart ? "—" : (isCurrency ? currencyFormatter.format(value) : value)}
                     </td>
                   );
                 })}
@@ -2633,9 +3841,10 @@ let cellValue = (index === 16)
                   
                   const monthInfo = monthIndexToDataIndex(index);
                   const isFutureMonth = monthInfo.isMonth && isMonthInFuture(currentYear, monthInfo.monthIndex);
+                  const isPreStart = monthInfo.isMonth && shouldGreyOutCell(monthInfo.monthIndex, currentYear);
                   return (
-                    <td key={index} className={className}>
-                      {isFutureMonth ? "—" : (isCurrency ? currencyFormatter.format(value) : value)}
+                    <td key={index} className={`${className} ${isPreStart ? "atlas-scorecard-pre-start-cell" : ""}`}>
+                      {isFutureMonth || isPreStart ? "—" : (isCurrency ? currencyFormatter.format(value) : value)}
                     </td>
                   );
                 })}
@@ -2653,9 +3862,10 @@ let cellValue = (index === 16)
     
     const monthInfo = monthIndexToDataIndex(index);
     const isFutureMonth = monthInfo.isMonth && isMonthInFuture(currentYear, monthInfo.monthIndex);
+    const isPreStart = monthInfo.isMonth && shouldGreyOutCell(monthInfo.monthIndex, currentYear);
     return (
-      <td key={index} className={data.className}>
-        {isFutureMonth ? "—" : (data.value === "N/A" ? "N/A" : `${data.value.toFixed(1)}%`)}
+      <td key={index} className={`${data.className} ${isPreStart ? "atlas-scorecard-pre-start-cell" : ""}`}>
+        {isFutureMonth || isPreStart ? "—" : (data.value === "N/A" ? "N/A" : `${data.value.toFixed(1)}%`)}
       </td>
     );
   })}
@@ -2676,7 +3886,7 @@ let cellValue = (index === 16)
 <div className="atlas-scorecard-controls">
   {/* Left side - tabs and dropdowns */}
   <div className="atlas-scorecard-controls-left">
-    {["SA", "GA", "MGA", "RGA"].includes(userRole) && (
+    {filterMode !== 'rga' && ["SA", "GA", "MGA", "RGA"].includes(userRole) && (
       <div className="atlas-scorecard-tabs">
         <input
           type="radio"
@@ -2701,13 +3911,16 @@ let cellValue = (index === 16)
     
     {allowedRoles.includes(userRole) && (
       <div className="atlas-scorecard-mga-dropdown">
-        <label htmlFor="mga-select">Select MGA: </label>
+        <label htmlFor="mga-select">Select {filterMode === 'rga' ? 'RGA' : 'MGA'}: </label>
         <select
           id="mga-select"
           value={selectedMga}
-          onChange={(e) => setSelectedMga(e.target.value)}
+          onChange={(e) => {
+            console.log('👤 Dropdown changed to:', e.target.value, '| Filter mode:', filterMode);
+            setSelectedMga(e.target.value);
+          }}
         >
-          {showAriasOrganization && (
+          {showAriasOrganization && filterMode !== 'rga' && (
             <option value="">ARIAS ORGANIZATION</option>
           )}
           {uniqueMgas.map((mga, index) => (
@@ -2850,10 +4063,16 @@ let cellValue = (index === 16)
             {viewMode === 'table' ? (
               // Table View
               <>
+                {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderYTDSummaryTable()}
                 {renderSummedTable("ALP", alpData, null, true, true)}
+                {selectedAlpTab !== "LVL_1" && userRole !== "AGT" &&
+                  renderSummedTable("Hires", hiresData, "MORE_Date", true, false)}
                 {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderSummedTable("Codes", associatesData, "PRODDATE", false, false)}
                 {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderSummedTable("VIPs", vipsData, "vip_month", false, false)}
-                {selectedAlpTab !== "LVL_1" && userRole !== "AGT" &&
+                {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderHireToCodeTable()}
+                {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderAlpCodeRatioTable()}
+                {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderCodeVipRatioTable()}
+                {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && filterMode !== 'rga' &&
                   renderSummedTable(
                     "Submitting Agent Count",
                     subAgentData,
@@ -2861,14 +4080,10 @@ let cellValue = (index === 16)
                     true,
                     false
                   )}
-                {selectedAlpTab !== "LVL_1" && userRole !== "AGT" &&
-                  renderSummedTable("Hires", hiresData, "MORE_Date", true, false)}
-               {/*      {userRole !== "AGT" && renderHireToCodeTable()} */}
-                    {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderHireToCodeTable()}
                     {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderSingleManagementTable("SA", "Management Count - SA")}
       {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderSingleManagementTable("GA", "Management Count - GA")}
-      {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderSingleManagementTable("MGA", "Management Count - MGA")}
-      {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderSingleManagementTable("RGA", "Management Count - RGA")}
+      {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && !selectedMga && filterMode !== 'rga' && renderSingleManagementTable("MGA", "Management Count - MGA")}
+      {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && !selectedMga && filterMode !== 'rga' && renderSingleManagementTable("RGA", "Management Count - RGA")}
       {selectedAlpTab !== "LVL_1" && userRole !== "AGT" && renderSingleManagementTable("total", "Total Management Count")}
               </>
             ) : (

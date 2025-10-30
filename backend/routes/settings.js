@@ -4,6 +4,135 @@ const router = express.Router();
 const { verifyToken } = require('../middleware/authMiddleware');
 const { query } = require('../db');
 
+// Get all users by clname from MGAs table
+router.get('/hierarchy/by-clname/:clname', verifyToken, async (req, res) => {
+  try {
+    const { clname } = req.params;
+    
+    if (!clname) {
+      return res.status(400).json({
+        success: false,
+        message: 'Clname is required'
+      });
+    }
+    
+    // Get all users with the specified clname from MGAs table
+    // This ensures we get the correct Active and hide values from MGAs table
+    const usersData = await query(`
+      SELECT 
+        m.lagnname,
+        m.rept_name,
+        m.clname,
+        m.Active as active,
+        m.hide,
+        m.start,
+        m.rga,
+        m.mga
+      FROM MGAs m
+      WHERE m.clname = ?
+      ORDER BY m.lagnname
+    `, [clname]);
+    
+    return res.json({
+      success: true,
+      data: usersData
+    });
+  } catch (error) {
+    console.error('[Settings] Error getting users by clname:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error retrieving users by clname',
+      error: error.message
+    });
+  }
+});
+
+// Get team hierarchy data for a specific user (by lagnname)
+router.get('/hierarchy/team/:lagnname', verifyToken, async (req, res) => {
+  try {
+    const { lagnname } = req.params;
+    const { filterClname } = req.query; // Optional: 'MGA' or 'RGA' to filter results
+    
+    if (!lagnname) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lagnname is required'
+      });
+    }
+    
+    // Build the clname filter condition and parameters
+    let clnameCondition = '';
+    const params = [lagnname, lagnname];
+    
+    if (filterClname) {
+      clnameCondition = ` AND m.clname = ?`;
+      params.push(filterClname);
+    }
+    
+    // Get hierarchy data by joining activeusers with MGAs table
+    // This ensures we get the correct Active and hide values from MGAs table
+    // Also ensure we only get rows where the MGAs table has the matching clname
+    const hierarchyData = await query(`
+      SELECT 
+        a.id, 
+        a.lagnname, 
+        a.rept_name, 
+        a.clname, 
+        a.profpic, 
+        a.phone, 
+        a.esid, 
+        a.email, 
+        a.sa, 
+        a.ga, 
+        a.mga, 
+        a.rga,
+        COALESCE(m.Active, a.Active) as active,
+        COALESCE(m.hide, 'n') as hide,
+        m.clname as clname,
+        m.start,
+        GROUP_CONCAT(l.state) AS license_states
+      FROM activeusers a
+      LEFT JOIN MGAs m ON a.lagnname = m.lagnname
+      LEFT JOIN licenses l ON a.lagnname = l.lagnname
+      WHERE (a.mga = ? OR a.rga = ?)
+        AND (m.clname IS NOT NULL)
+        ${clnameCondition}
+      GROUP BY a.lagnname
+    `, params);
+    
+    // Process license data
+    const processedData = hierarchyData.map(user => {
+      let licenses = [];
+      if (user.license_states) {
+        const states = user.license_states.split(',');
+        states.forEach(state => {
+          if (state && state.trim()) {
+            licenses.push({ state: state.trim() });
+          }
+        });
+      }
+      
+      return {
+        ...user,
+        licenses,
+        license_states: undefined // Remove the concatenated string
+      };
+    });
+    
+    return res.json({
+      success: true,
+      data: processedData
+    });
+  } catch (error) {
+    console.error('[Settings] Error getting team hierarchy:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error retrieving team hierarchy',
+      error: error.message
+    });
+  }
+});
+
 // Get user's hierarchy data
 router.get('/hierarchy', verifyToken, async (req, res) => {
   try {
@@ -16,7 +145,6 @@ router.get('/hierarchy', verifyToken, async (req, res) => {
       });
     }
     
-    console.log(`[Settings] Getting hierarchy for user ID: ${userId}`);
     
     // First, get the user's details to determine their position in the hierarchy
     const userResult = await query(`
@@ -33,7 +161,6 @@ router.get('/hierarchy', verifyToken, async (req, res) => {
     }
     
     const user = userResult[0];
-    console.log(`[Settings] Found user: ${user.lagnname} (${user.clname})`);
     
     // Get the user's hierarchy based on their role
     let hierarchyData = [];
@@ -172,7 +299,6 @@ router.get('/hierarchy', verifyToken, async (req, res) => {
       };
     });
     
-    console.log(`[Settings] Found ${hierarchyData.length} users in hierarchy`);
     
     return res.json({
       success: true,

@@ -633,6 +633,12 @@ router.get('/submitting-agent-count', async (req, res) => {
   try {
     const { year, manager } = req.query;
     
+    // Validate and normalize year
+    const parsedYear = year ? parseInt(year, 10) : null;
+    if (year && (isNaN(parsedYear) || parsedYear < 1900 || parsedYear > 3000)) {
+      return res.status(400).json({ success: false, message: 'Invalid year parameter' });
+    }
+    
     let sqlQuery = `
       SELECT 
         date,
@@ -647,9 +653,11 @@ router.get('/submitting-agent-count', async (req, res) => {
     const params = [];
     
     // Filter by year if provided
-    if (year) {
-      sqlQuery += ` AND YEAR(date) = ?`;
-      params.push(year);
+    if (parsedYear) {
+      const start = `${parsedYear}-01-01`;
+      const end = `${parsedYear + 1}-01-01`;
+      sqlQuery += ` AND date >= ? AND date < ?`;
+      params.push(start, end);
     }
     
     // Filter by manager for SGA endpoints
@@ -660,7 +668,8 @@ router.get('/submitting-agent-count', async (req, res) => {
     
     sqlQuery += ` ORDER BY date ASC`;
     
-    const rows = await query(sqlQuery, params);
+    // Apply a per-query timeout to avoid platform (Heroku) H12 timeouts
+    const rows = await query({ sql: sqlQuery, timeout: 20000 }, params);
     
     res.json({
       success: true,

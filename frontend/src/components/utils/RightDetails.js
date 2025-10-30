@@ -5,6 +5,7 @@ import CompanyDetails from "./CompanyDetails";
 import VerificationDetails from "../production/verification/VerificationDetails";
 import ApplicationDetails from "../production/verification/ApplicationDetails";
 import ApplicantDetails from "../recruiting/ApplicantDetails";
+import PipelineChecklistDetails from "../recruiting/Pipeline/PipelineChecklistDetails";
 import "./RightDetails.css";
 
 // Default columns for company details if none are provided
@@ -156,6 +157,14 @@ const RightDetails = (props) => {
     detailProps.onShowFinalModal = props.onShowFinalModal;
     detailProps.onShowCallbackModal = props.onShowCallbackModal;
     detailProps.onShowHiredModal = props.onShowHiredModal;
+  }
+  // Check for our special pipeline checklist flag
+  else if (data && data.__isPipelineChecklist === true) {
+    console.log("Detected pipeline checklist data via flag, rendering PipelineChecklistDetails component");
+    const { __isPipelineChecklist, ...cleanData } = data;
+    DetailComponent = PipelineChecklistDetails;
+    detailData = cleanData;
+    detailFromPage = "Pipeline";
   }
   // Force the use of SalesDetails if the data appears to be a sale record
   // else if (data && (data.fromPage === "Sales" || (data.transaction_date && data.total_amount !== undefined))) {

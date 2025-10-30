@@ -120,7 +120,7 @@ export const ROLE_PERMISSIONS = {
 export const routePermissions = {
   "/dashboard": PERMISSIONS.VIEW_DASHBOARD,
   "/refs": PERMISSIONS.VIEW_REFS,
-  "/settings": PERMISSIONS.VIEW_SETTINGS,
+  "/utilities": PERMISSIONS.VIEW_SETTINGS,
   "/team-customization": PERMISSIONS.EDIT_TEAM,
   "/admin/notifications": PERMISSIONS.ADMIN,
   "/admin/hierarchy": PERMISSIONS.ADMIN,

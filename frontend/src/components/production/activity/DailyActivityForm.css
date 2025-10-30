@@ -515,6 +515,71 @@
   color: #ff6b6b;
 }
 
+/* Hierarchy toggle button styling */
+.hierarchy-toggle-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  color: var(--text-secondary);
+  user-select: none;
+  background-color: var(--button-secondary-bg);
+  border: 1px solid var(--border-color);
+}
+
+.hierarchy-toggle-button:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.hierarchy-toggle-button.active {
+  color: var(--button-primary-bg);
+  background-color: rgba(0, 85, 140, 0.1);
+  border-color: var(--button-primary-bg);
+}
+
+.hierarchy-toggle-button.active:hover {
+  background-color: rgba(0, 85, 140, 0.15);
+  color: var(--button-primary-bg);
+}
+
+.hierarchy-toggle-button svg {
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.hierarchy-toggle-button:hover svg {
+  transform: scale(1.1);
+}
+
+.hierarchy-toggle-button.icon-only {
+  padding: 6px;
+  gap: 0;
+  border-radius: 4px;
+}
+
+/* Dark mode adjustments for hierarchy toggle */
+[data-theme="dark"] .hierarchy-toggle-button.active {
+  color: #4A9FFF;
+  background-color: rgba(74, 159, 255, 0.15);
+  border-color: #4A9FFF;
+}
+
+[data-theme="dark"] .hierarchy-toggle-button.active:hover {
+  background-color: rgba(74, 159, 255, 0.2);
+  color: #4A9FFF;
+}
+
+/* Hierarchy section styling */
+.hierarchy-section {
+  background-color: var(--bg-secondary);
+  border-radius: 8px;
+}
+
 /* Weekly total row styling */
 .daily-activity-report .table tbody tr.weekly-total-row {
   background-color: rgba(0, 85, 140, 0.1) !important;

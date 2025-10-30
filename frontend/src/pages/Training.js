@@ -4,7 +4,7 @@ import { FiList } from 'react-icons/fi';
 import './Training.css';
 
 // Import component files
-import TrainingSidebar from '../components/training/TrainingSidebar';
+import SecondarySidebar from '../components/utils/SecondarySidebar';
 import Release from '../components/production/release/Release';
 import { ProgressProvider } from '../components/production/release/ProgressContext';
 
@@ -57,7 +57,7 @@ const Training = () => {
   
   return (
     <div className="training-container">
-      <TrainingSidebar 
+      <SecondarySidebar 
         items={trainingItems} 
         activeItem={activeSection} 
         onItemClick={handleSectionChange} 

@@ -142,9 +142,10 @@ const getLeaderboardData = async (baseWhereClause, baseParams, hierarchy_level, 
                     ) as conversion_rate,
                     1 as agent_count
                 FROM refvalidation r
-                LEFT JOIN activeusers au ON r.lagnname = au.lagnname
+                LEFT JOIN activeusers au ON r.lagnname = au.lagnname AND au.Active = 'y' AND au.managerActive = 'y'
             `;
             groupByClause = `GROUP BY r.lagnname`;
+            whereClause += ` AND au.Active = 'y' AND au.managerActive = 'y'`;
         } else {
             // Team-level aggregation
             const hierarchyColumn = hierarchy_level;
@@ -200,7 +201,7 @@ const getLeaderboardData = async (baseWhereClause, baseParams, hierarchy_level, 
                         ) as conversion_rate,
                         COUNT(DISTINCT CASE WHEN r.lagnname != m.lagnname THEN r.lagnname END) as agent_count
                     FROM MGAs m
-                    INNER JOIN activeusers au ON m.lagnname = au.lagnname
+                    INNER JOIN activeusers au ON m.lagnname = au.lagnname AND au.Active = 'y' AND au.managerActive = 'y'
                     LEFT JOIN refvalidation r ON (
                         (r.lagnname = m.lagnname OR r.mga = m.lagnname)
                         ${baseWhereClause.replace('WHERE 1=1', '')}
@@ -259,6 +260,7 @@ const getLeaderboardData = async (baseWhereClause, baseParams, hierarchy_level, 
                     INNER JOIN refvalidation r ON (
                         r.lagnname = au.lagnname OR r.${hierarchyColumn} = au.lagnname
                     )
+                    AND au.Active = 'y' AND au.managerActive = 'y'
                 `;
                 whereClause += ` AND au.clname = '${hierarchy_level.toUpperCase()}'`;
                 groupByClause = `GROUP BY au.lagnname, au.profpic, au.clname`;
@@ -293,7 +295,7 @@ const getLeaderboardData = async (baseWhereClause, baseParams, hierarchy_level, 
                 MAX(r.ga) as ga,
                 MAX(r.rga) as rga
             FROM refvalidation r
-            LEFT JOIN activeusers au ON r.lagnname = au.lagnname
+            LEFT JOIN activeusers au ON r.lagnname = au.lagnname AND au.Active = 'y' AND au.managerActive = 'y'
         `;
         groupByClause = `GROUP BY r.lagnname`;
     }
@@ -392,7 +394,6 @@ const getDailyBreakdown = async (baseWhereClause, baseParams, currentUser) => {
 const getPreviousPeriodComparison = async (whereClause, params, start_date, end_date, rangeType) => {
     // If no start_date/end_date provided, return empty comparison
     if (!start_date || !end_date || !rangeType) {
-        console.log('🗓️ No valid date parameters for comparison:', { start_date, end_date, rangeType });
         return { prevTotalRefs: 0, prevCompletedRefs: 0 };
     }
 
@@ -527,9 +528,7 @@ router.get("/dashboard", async (req, res) => {
         activity_limit = 10
     } = req.query;
     
-    console.log('📊 Dashboard endpoint called with params:', {
-        date_range, hierarchy_level, team, start_date, end_date, sort_by
-    });
+     
     
     try {
         let whereClause = "WHERE 1=1";
@@ -546,7 +545,6 @@ router.get("/dashboard", async (req, res) => {
             
             if (endDateObj > todayObj) {
                 adjustedEndDate = today;
-                console.log(`📅 Adjusted end date from ${end_date} to ${today} (today) for current period comparison`);
             }
         }
         

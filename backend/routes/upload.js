@@ -82,6 +82,10 @@ router.post('/imgur', verifyToken, upload.single('image'), async (req, res) => {
     });
 
     if (response.data.success) {
+      console.log('[Upload] Imgur upload success', {
+        link: response.data.data.link,
+        deletehash: response.data.data.deletehash
+      });
       res.json({
         success: true,
         data: {

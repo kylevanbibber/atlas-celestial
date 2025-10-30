@@ -1,0 +1,21 @@
+@import '../auth/Login.css';
+
+/* Namespace hooks for onboarding. Adjust or override styles here without touching agent auth. */
+.onboarding-root {}
+.onboarding-auth-background {}
+.onboarding-loading-overlay {}
+.onboarding-login-container {}
+.onboarding-login-card {}
+.onboarding-left-side {}
+.onboarding-right-side {}
+.onboarding-login-form {}
+.onboarding-form-group {}
+.onboarding-primary-button {}
+.onboarding-links {}
+
+/* Example: tweak spacing on onboarding forms only */
+.onboarding-login-card .onboarding-login-form {
+  /* reserved for onboarding-specific tweaks */
+}
+
+

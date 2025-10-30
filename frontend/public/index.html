@@ -7,11 +7,11 @@
     href="https://fonts.googleapis.com/icon?family=Material+Icons"
     rel="stylesheet"
   />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#000000" />
     <meta
       name="description"
-      content="Atlas - Your Notification App"
+      content="Atlas"
     />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     
@@ -49,28 +49,52 @@
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
     
-    <!-- OneSignal Web Push Notifications Setup -->
-    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <!-- Removed OneSignal Web Push (not used) -->
     <script>
-  // Only initialize OneSignal if NOT running as PWA (standalone mode)
-  if (window.matchMedia('(display-mode: browser)').matches) {
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    OneSignalDeferred.push(async function(OneSignal) {
-      await OneSignal.init({
-        appId: "c5dcde70-c2fd-4b3f-8544-175b57a256b4",
-        safari_web_id: "web.onesignal.auto.512e7622-1d45-4df4-947f-a5316fda3b8e",
-        notifyButton: {
-          enable: true,
-        },
-      });
-          
-          // Log OneSignal initialization status for debugging
-          console.log('OneSignal initialization complete');
-          console.log('Available OneSignal methods:', Object.keys(OneSignal));
+      // Cleanup any previously registered OneSignal service workers
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then((regs) => {
+          regs.forEach((reg) => {
+            const url = (reg.active && reg.active.scriptURL) || '';
+            if (url.includes('OneSignalSDKWorker')) {
+              reg.unregister().catch(() => {});
+            }
+          });
         });
-  } else {
-    console.log('PWA mode detected - OneSignal disabled, using native Web Push');
-  }
+      }
+
+      // Prevent all zoom behaviors with JavaScript
+      document.addEventListener('gesturestart', function (e) {
+        e.preventDefault();
+      });
+
+      document.addEventListener('gesturechange', function (e) {
+        e.preventDefault();
+      });
+
+      document.addEventListener('gestureend', function (e) {
+        e.preventDefault();
+      });
+
+      // Prevent triple-tap zoom
+      let lastTouchEnd = 0;
+      document.addEventListener('touchend', function (event) {
+        const now = (new Date()).getTime();
+        if (now - lastTouchEnd <= 300) {
+          event.preventDefault();
+        }
+        lastTouchEnd = now;
+      }, false);
+
+      // Prevent double-tap zoom
+      let lastTouchTime = 0;
+      document.addEventListener('touchstart', function(event) {
+        const now = Date.now();
+        if (now - lastTouchTime <= 300) {
+          event.preventDefault();
+        }
+        lastTouchTime = now;
+      }, { passive: false });
     </script>
     
     <title>Atlas</title>

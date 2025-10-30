@@ -158,6 +158,14 @@ const Login = () => {
                     >
                       New Agent Training Course
                     </button>
+                    <div style={{ marginTop: '10px' }}>
+                      <button
+                        className="secondary-button"
+                        onClick={() => navigate('/onboarding/login')}
+                      >
+                        Onboarding
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

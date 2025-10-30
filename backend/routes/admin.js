@@ -1,12 +1,24 @@
 const express = require('express');
 const router = express.Router();
-const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
+const { verifyToken, verifyAdmin, verifyStaff } = require('../middleware/authMiddleware');
 const { query } = require('../db');
+const nodemailer = require('nodemailer');
+
+// Log all requests to admin routes
+router.use((req, res, next) => {
+  console.log('[ADMIN] 📨 Request:', {
+    method: req.method,
+    path: req.path,
+    url: req.url,
+    baseUrl: req.baseUrl,
+    originalUrl: req.originalUrl
+  });
+  next();
+});
 
 // Get all users from activeusers table
 router.get('/getAllUsers', verifyToken, verifyAdmin, async (req, res) => {
   try {
-    console.log('[Admin] Getting all users from activeusers');
     
     const users = await query(`
       SELECT id, lagnname, clname, email, managerActive, Active 
@@ -14,14 +26,14 @@ router.get('/getAllUsers', verifyToken, verifyAdmin, async (req, res) => {
       ORDER BY clname, lagnname
     `);
     
-    console.log(`[Admin] Found ${users.length} users`);
+   
     
     return res.json({
       success: true,
       users
     });
   } catch (error) {
-    console.error('[Admin] Error getting all users:', error);
+
     return res.status(500).json({
       success: false,
       message: 'Error retrieving users',
@@ -42,7 +54,6 @@ router.get('/getUserHierarchy/:userId', verifyToken, verifyAdmin, async (req, re
       });
     }
     
-    console.log(`[Admin] Getting hierarchy for user ID: ${userId}`);
     
     // First, get the user's details to determine their position in the hierarchy
     const userResult = await query(`
@@ -59,7 +70,6 @@ router.get('/getUserHierarchy/:userId', verifyToken, verifyAdmin, async (req, re
     }
     
     const user = userResult[0];
-    console.log(`[Admin] Found user: ${user.lagnname} (${user.clname})`);
     
     // Get the user's hierarchy based on their role
     let hierarchyData = [];
@@ -190,14 +200,14 @@ router.get('/getUserHierarchy/:userId', verifyToken, verifyAdmin, async (req, re
       };
     });
     
-    console.log(`[Admin] Found ${hierarchyData.length} users in hierarchy`);
+
     
     return res.json({
       success: true,
       data: hierarchyData
     });
   } catch (error) {
-    console.error('[Admin] Error getting user hierarchy:', error);
+
     return res.status(500).json({
       success: false,
       message: 'Error retrieving user hierarchy',
@@ -210,15 +220,11 @@ router.get('/getUserHierarchy/:userId', verifyToken, verifyAdmin, async (req, re
    Admin Auth Check Route (for debugging)
 ------------------------- */
 router.get("/check-admin", verifyToken, async (req, res) => {
-  console.log('[check-admin] Request received. Checking admin status without admin verification middleware');
+
   
   try {
     // Log the incoming token and decoded user information
-    console.log('[check-admin] User from token:', {
-      userId: req.user.userId,
-      role: req.user.Role,
-      clname: req.user.clname
-    });
+
     
     // Check admin status manually
     const isAdmin = 
@@ -241,7 +247,7 @@ router.get("/check-admin", verifyToken, async (req, res) => {
         : 'User does not have admin permission'
     });
   } catch (error) {
-    console.error('[check-admin] Error checking admin status:', error);
+
     return res.status(500).json({
       success: false,
       message: 'Error checking admin status',
@@ -333,6 +339,7 @@ router.get("/getAllRGAsHierarchy", verifyToken, verifyAdmin, async (req, res) =>
                 au.pending,
                 au.profpic,
                 au.phone,
+                au.agtnum,
                 au.esid,
                 COALESCE(main_ui.email, '') AS email, 
                 au.sa, 
@@ -428,7 +435,7 @@ router.get("/getAllRGAsHierarchy", verifyToken, verifyAdmin, async (req, res) =>
                 user.relationship_data = JSON.parse(user.relationship_data);
               }
             } catch (e) {
-              console.error(`[getAllRGAsHierarchy] Error parsing JSON for user ${user.lagnname}:`, e);
+
               if (e.message.includes('licenses')) user.licenses = [];
               if (e.message.includes('pnp_data')) user.pnp_data = null;
               if (e.message.includes('relationship_data')) user.relationship_data = {};
@@ -444,7 +451,7 @@ router.get("/getAllRGAsHierarchy", verifyToken, verifyAdmin, async (req, res) =>
           }
           return null;
         } catch (rgaError) {
-          console.error(`[getAllRGAsHierarchy] Error processing RGA ${rga.lagnname}:`, rgaError);
+
           return null;
         }
       });
@@ -468,9 +475,173 @@ router.get("/getAllRGAsHierarchy", verifyToken, verifyAdmin, async (req, res) =>
     });
     
   } catch (err) {
-    console.error("[getAllRGAsHierarchy] Error retrieving RGA hierarchies:", err);
-    console.error("[getAllRGAsHierarchy] Error stack:", err.stack);
+
     res.status(500).json({ success: false, message: "Error retrieving hierarchy data" });
+  }
+});
+
+// ============ OPTIMIZED HIERARCHY ENDPOINTS ============
+
+// Optimized hierarchy loading - Phase 1: Basic structure only
+router.get("/getHierarchyStructure", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    // Get basic hierarchy structure without heavy data
+    const structureQuery = `
+      SELECT 
+        au.id,
+        au.lagnname, 
+        au.clname,
+        au.Active,
+        au.managerActive,
+        au.sa, 
+        au.ga, 
+        au.mga, 
+        au.rga,
+        COALESCE(main_ui.email, '') AS email
+      FROM activeusers au
+      LEFT JOIN usersinfo main_ui ON au.lagnname = main_ui.lagnname AND au.esid = main_ui.esid
+      WHERE au.Active = 'y' AND au.managerActive = 'y'
+      ORDER BY au.clname DESC, au.lagnname;
+    `;
+    
+    const results = await query(structureQuery);
+    
+    // Group by RGA for efficient frontend processing
+    const rgaGroups = {};
+    const rgaList = [];
+    
+    results.forEach(user => {
+      const rgaName = user.rga || user.lagnname;
+      
+      if (!rgaGroups[rgaName]) {
+        rgaGroups[rgaName] = {
+          rgaId: user.rga ? results.find(u => u.lagnname === user.rga)?.id : user.id,
+          rgaName: rgaName,
+          hierarchyData: []
+        };
+        rgaList.push(rgaGroups[rgaName]);
+      }
+      
+      rgaGroups[rgaName].hierarchyData.push(user);
+    });
+    
+    res.json({ 
+      success: true, 
+      data: rgaList,
+      rgaCount: rgaList.length,
+      totalUsers: results.length
+    });
+    
+  } catch (err) {
+
+    res.status(500).json({ success: false, message: "Error retrieving hierarchy structure" });
+  }
+});
+
+// Phase 2: Load detailed data for specific RGAs on demand
+router.post("/getHierarchyDetails", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { rgaNames } = req.body;
+    
+    if (!rgaNames || !Array.isArray(rgaNames)) {
+      return res.status(400).json({ success: false, message: "RGA names array required" });
+    }
+    
+    const placeholders = rgaNames.map(() => "?").join(", ");
+    
+    // Get detailed data for requested RGAs only
+    const detailsQuery = `
+      SELECT 
+        au.id,
+        au.lagnname,
+        au.rept_name,
+        au.redeemed,
+        au.released,
+        au.pending,
+        au.profpic,
+        au.phone,
+        au.esid,
+        au.rga,
+        lic.licenses,
+        pnp_ranked.pnp_data
+      FROM activeusers au
+      
+      LEFT JOIN (
+        SELECT 
+          userId,
+          JSON_ARRAYAGG(
+            JSON_OBJECT(
+              'id', id,
+              'state', state,
+              'license_number', license_number,
+              'expiry_date', expiry_date,
+              'resident_state', resident_state
+            )
+          ) AS licenses
+        FROM licensed_states
+        GROUP BY userId
+      ) AS lic ON lic.userId = au.id
+      
+      LEFT JOIN (
+        SELECT 
+          name_line,
+          esid,
+          JSON_OBJECT(
+            'curr_mo_4mo_rate', curr_mo_4mo_rate,
+            'proj_plus_1', proj_plus_1,
+            'pnp_date', date,
+            'agent_num', agent_num
+          ) as pnp_data,
+          ROW_NUMBER() OVER (PARTITION BY name_line, esid ORDER BY STR_TO_DATE(date, '%m/%d/%y') DESC) as rn
+        FROM pnp
+      ) AS pnp_ranked ON (pnp_ranked.name_line = au.lagnname OR au.lagnname LIKE CONCAT(pnp_ranked.name_line, ' %'))
+        AND pnp_ranked.rn = 1
+        AND ABS(DATEDIFF(STR_TO_DATE(pnp_ranked.esid, '%m/%d/%y'), STR_TO_DATE(au.esid, '%Y-%m-%d'))) <= 7
+      
+      WHERE au.Active = 'y' AND au.managerActive = 'y'
+      AND au.rga IN (${placeholders})
+      ORDER BY au.lagnname;
+    `;
+    
+    const results = await query(detailsQuery, rgaNames);
+    
+    // Process JSON fields
+    results.forEach(user => {
+      try {
+        if (user.licenses && typeof user.licenses === 'string') {
+          user.licenses = JSON.parse(user.licenses);
+        } else if (!user.licenses) {
+          user.licenses = [];
+        }
+        
+        if (user.pnp_data && typeof user.pnp_data === 'string') {
+          user.pnp_data = JSON.parse(user.pnp_data);
+        }
+      } catch (e) {
+
+        if (e.message.includes('licenses')) user.licenses = [];
+        if (e.message.includes('pnp_data')) user.pnp_data = null;
+      }
+    });
+    
+    // Group by RGA
+    const rgaDetails = {};
+    results.forEach(user => {
+      const rgaName = user.rga;
+      if (!rgaDetails[rgaName]) {
+        rgaDetails[rgaName] = [];
+      }
+      rgaDetails[rgaName].push(user);
+    });
+    
+    res.json({ 
+      success: true, 
+      data: rgaDetails
+    });
+    
+  } catch (err) {
+
+    res.status(500).json({ success: false, message: "Error retrieving hierarchy details" });
   }
 });
 
@@ -486,7 +657,7 @@ router.post('/impersonateUser', verifyToken, verifyAdmin, async (req, res) => {
       });
     }
     
-    console.log(`[Admin] Admin ${req.user.userId} attempting to impersonate user ${targetUserId}`);
+
     
     // Get the target user's full profile data
     const targetUser = await query(`
@@ -504,12 +675,13 @@ router.post('/impersonateUser', verifyToken, verifyAdmin, async (req, res) => {
     }
     
     const user = targetUser[0];
-    console.log(`[Admin] Successfully retrieved data for user: ${user.lagnname} (${user.clname})`);
+
     
     // Return the target user's data formatted for frontend
     res.json({
       success: true,
       targetUserData: {
+        id: user.id,
         userId: user.id,
         name: user.lagnname,
         email: user.email || '',
@@ -531,7 +703,7 @@ router.post('/impersonateUser', verifyToken, verifyAdmin, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Admin] Error impersonating user:', error);
+
     return res.status(500).json({
       success: false,
       message: 'Error impersonating user',
@@ -543,7 +715,7 @@ router.post('/impersonateUser', verifyToken, verifyAdmin, async (req, res) => {
 // Get users list for impersonation dropdown
 router.get('/getUsersForImpersonation', verifyToken, verifyAdmin, async (req, res) => {
   try {
-    console.log('[Admin] Getting users list for impersonation dropdown');
+
     
     const users = await query(`
       SELECT id, lagnname, clname, email, Active, esid
@@ -552,7 +724,7 @@ router.get('/getUsersForImpersonation', verifyToken, verifyAdmin, async (req, re
       ORDER BY clname, lagnname
     `);
     
-    console.log(`[Admin] Found ${users.length} active users for impersonation`);
+
     
     res.json({
       success: true,
@@ -565,7 +737,7 @@ router.get('/getUsersForImpersonation', verifyToken, verifyAdmin, async (req, re
       }))
     });
   } catch (error) {
-    console.error('[Admin] Error getting users for impersonation:', error);
+
     return res.status(500).json({
       success: false,
       message: 'Error retrieving users',
@@ -638,7 +810,7 @@ router.get('/login-logs', verifyToken, verifyAdmin, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error fetching login logs:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to fetch login logs'
@@ -649,27 +821,65 @@ router.get('/login-logs', verifyToken, verifyAdmin, async (req, res) => {
 // Get potential VIPs - agents in their 2nd to 4th month
 router.get('/potential-vips', async (req, res) => {
     try {
-        console.log('[Admin] Fetching potential VIPs...');
-        
-        // Calculate date ranges for VIP eligible months (2-4 months after start)
-        // For current month, we want agents who started 1-3 months ago
-        const currentDate = new Date();
-        
-        // Calculate start of months for VIP eligibility
-        const month4StartDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 3, 1); // 3 months ago (their 4th month)
-        const month2EndDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);   // Last day of previous month (their 2nd month)
-        
+
+
+        // Optional month filter: expect YYYY-MM; defaults to current month if not provided
+        const { month } = req.query;
+        let baseYear, baseMonthIndex;
+
+        if (month && /^\d{4}-\d{2}$/.test(month)) {
+            const [y, m] = month.split('-').map(Number);
+            baseYear = y;
+            baseMonthIndex = m - 1; // JS Date month index
+        } else {
+            const now = new Date();
+            baseYear = now.getFullYear();
+            baseMonthIndex = now.getMonth();
+        }
+
+        const baseDate = new Date(baseYear, baseMonthIndex, 1);
+
+        // Calculate start of months for VIP eligibility relative to baseDate
+        const month4StartDate = new Date(baseDate.getFullYear(), baseDate.getMonth() - 3, 1); // 3 months ago (their 4th month)
+        const month2EndDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), 0);       // Last day of previous month (their 2nd month)
+
         // Format dates for SQL
         const minStartDate = month4StartDate.toISOString().split('T')[0]; // YYYY-MM-DD
         const maxStartDate = month2EndDate.toISOString().split('T')[0];   // YYYY-MM-DD
-        
-        console.log('[Admin] VIP Date Range Calculation:');
-        console.log(`[Admin] Current Date: ${currentDate.toISOString().split('T')[0]}`);
-        console.log(`[Admin] Agents who started between: ${minStartDate} and ${maxStartDate}`);
-        console.log(`[Admin] - ${minStartDate} starters are now in Month 4 (VIP 3/3)`);
-        console.log(`[Admin] - ${maxStartDate} starters are now in Month 2 (VIP 1/3)`);
+
+        const targetYear = baseDate.getFullYear();
+        const targetMonth = baseDate.getMonth() + 1; // 1-12
+
+
         
         // Optimized query with explicit date ranges
+        // Build ALP subquery based on whether the selected month is current or prior
+        const nowRef = new Date();
+        const isCurrentMonth = (baseYear === nowRef.getFullYear() && baseMonthIndex === nowRef.getMonth());
+        const monthStr = `${String(targetMonth).padStart(2, '0')}/${targetYear}`;
+
+        const walpSubquery = isCurrentMonth
+          ? `
+                SELECT 
+                    LagnName,
+                    DATE_FORMAT(MAX(STR_TO_DATE(ReportDate, '%m/%d/%Y')), '%m/%d/%Y') as latestReportDate,
+                    CAST(SUBSTRING_INDEX(GROUP_CONCAT(LVL_1_GROSS ORDER BY STR_TO_DATE(ReportDate, '%m/%d/%Y') DESC), ',', 1) as DECIMAL(10,2)) as latestLvl1Gross
+                FROM Weekly_ALP 
+                WHERE REPORT = 'MTD Recap'
+                AND YEAR(STR_TO_DATE(ReportDate, '%m/%d/%Y')) = ?
+                AND MONTH(STR_TO_DATE(ReportDate, '%m/%d/%Y')) = ?
+                GROUP BY LagnName
+            `
+          : `
+                SELECT 
+                    LagnName,
+                    month as latestReportDate,
+                    CAST(MAX(CAST(LVL_1_GROSS AS DECIMAL(10,2))) AS DECIMAL(10,2)) as latestLvl1Gross
+                FROM Monthly_ALP
+                WHERE month = ?
+                GROUP BY LagnName
+            `;
+
         const potentialVIPsQuery = `
             SELECT 
                 au.id,
@@ -680,20 +890,12 @@ router.get('/potential-vips', async (req, res) => {
                 au.ga,
                 au.mga,
                 au.rga,
-                TIMESTAMPDIFF(MONTH, au.esid, CURDATE()) as monthsSinceStart,
+                TIMESTAMPDIFF(MONTH, au.esid, ?) as monthsSinceStart,
                 walp.latestReportDate,
                 walp.latestLvl1Gross
             FROM activeusers au
             LEFT JOIN (
-                SELECT 
-                    LagnName,
-                    MAX(STR_TO_DATE(ReportDate, '%m/%d/%Y')) as latestReportDate,
-                    CAST(SUBSTRING_INDEX(GROUP_CONCAT(LVL_1_GROSS ORDER BY STR_TO_DATE(ReportDate, '%m/%d/%Y') DESC), ',', 1) as DECIMAL(10,2)) as latestLvl1Gross
-                FROM Weekly_ALP 
-                WHERE REPORT = 'Weekly Recap'
-                AND YEAR(STR_TO_DATE(ReportDate, '%m/%d/%Y')) = YEAR(CURDATE())
-                AND MONTH(STR_TO_DATE(ReportDate, '%m/%d/%Y')) = MONTH(CURDATE())
-                GROUP BY LagnName
+                ${walpSubquery}
             ) walp ON au.lagnname = walp.LagnName
             WHERE au.Active = 'y' 
             AND au.esid IS NOT NULL 
@@ -702,86 +904,54 @@ router.get('/potential-vips', async (req, res) => {
             ORDER BY au.esid DESC
         `;
         
-        const potentialVIPs = await query(potentialVIPsQuery, [minStartDate, maxStartDate]);
+        const alpParams = isCurrentMonth
+          ? [targetYear, targetMonth]
+          : [monthStr];
+
+        const potentialVIPs = await query(potentialVIPsQuery, [
+          // For TIMESTAMPDIFF: use baseDate first-of-month
+          `${baseYear}-${String(baseMonthIndex + 1).padStart(2, '0')}-01`,
+          // ALP subquery params
+          ...alpParams,
+          // For activeusers.esid window
+          minStartDate,
+          maxStartDate
+        ]);
         
         // Format the results
         const formattedVIPs = potentialVIPs.map(vip => ({
             ...vip,
             monthsActive: vip.monthsSinceStart + 1, // For display: what month they're in
             vipMonth: vip.monthsSinceStart + 1, // What month they're in (should be 2, 3, or 4)
-            latestReportDate: vip.latestReportDate ? 
-                new Date(vip.latestReportDate).toLocaleDateString('en-US') : null,
+            // latestReportDate already formatted as mm/dd/yyyy (Weekly) or mm/yyyy (Monthly)
+            latestReportDate: vip.latestReportDate || null,
             totalLvl1Gross: vip.latestLvl1Gross ? parseFloat(vip.latestLvl1Gross).toFixed(2) : '0.00',
             // Show which VIP eligible month they're in: Month 2 = VIP 1/3, Month 3 = VIP 2/3, Month 4 = VIP 3/3
             vipEligibleMonth: vip.monthsSinceStart // monthsSinceStart is 1,2,3 which maps to VIP months 1,2,3
         }));
          
-        // Debug logging to verify calculations
-        if (formattedVIPs.length > 0) {
-            console.log('[Admin] VIP Calculation Examples:');
-            console.log('[Admin] Current date:', new Date().toLocaleDateString('en-US'));
-            console.log('[Admin] VIP Eligibility Rules:');
-            console.log('[Admin] - Month 1 (start month): NOT eligible');
-            console.log('[Admin] - Month 2: VIP eligible (1/3)');
-            console.log('[Admin] - Month 3: VIP eligible (2/3)'); 
-            console.log('[Admin] - Month 4: VIP eligible (3/3)');
-            console.log('[Admin] - Month 5+: NOT eligible');
-            console.log('');
-            formattedVIPs.slice(0, 3).forEach(vip => {
-                const startDate = new Date(vip.esid);
-                const startMonth = startDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-                const currentDate = new Date();
-                const currentMonth = currentDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-                const monthsFromStart = vip.monthsSinceStart;
-                const actualMonthTheyAreIn = monthsFromStart + 1;
-                console.log(`[Admin] ${vip.lagnname}:`);
-                console.log(`  - Start Date: ${vip.esid} (${startMonth})`);
-                console.log(`  - Current Date: ${currentDate.toISOString().split('T')[0]} (${currentMonth})`);
-                console.log(`  - Months Since Start (SQL): ${vip.monthsSinceStart}`);
-                console.log(`  - Actual Month They Are In: ${actualMonthTheyAreIn}`);
-                console.log(`  - VIP Status: ${actualMonthTheyAreIn >= 2 && actualMonthTheyAreIn <= 4 ? `ELIGIBLE (Month ${actualMonthTheyAreIn})` : `NOT ELIGIBLE (Month ${actualMonthTheyAreIn})`}`);
-                console.log(`  - Query Filter (1-3): ${vip.monthsSinceStart >= 1 && vip.monthsSinceStart <= 3 ? 'PASS' : 'FAIL'}`);
-                console.log('');
-            });
-            
-            // Check for agents who shouldn't be showing up
-            const ineligibleAgents = formattedVIPs.filter(vip => {
-                const startDate = new Date(vip.esid);
-                const actualMonth = vip.monthsSinceStart + 1;
-                return actualMonth < 2 || actualMonth > 4; // Should only show months 2-4
-            });
-            
-            if (ineligibleAgents.length > 0) {
-                console.log('[Admin] WARNING: Found agents who should NOT be VIP eligible:');
-                ineligibleAgents.forEach(agent => {
-                    const startDate = new Date(agent.esid);
-                    const actualMonth = agent.monthsSinceStart + 1;
-                    const startMonth = startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                    console.log(`  - ${agent.lagnname}: Start ${startMonth}, Currently in Month ${actualMonth} (${actualMonth < 2 ? 'TOO EARLY' : 'TOO LATE'})`);
-                });
-            }
-            
-            // Show breakdown by start month for current eligible agents
-            const agentsByStartMonth = {};
-            formattedVIPs.forEach(vip => {
-                const startDate = new Date(vip.esid);
-                const monthYear = startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                if (!agentsByStartMonth[monthYear]) agentsByStartMonth[monthYear] = 0;
-                agentsByStartMonth[monthYear]++;
-            });
-            console.log('[Admin] VIP agents by start month:', agentsByStartMonth);
-        }
-        
-        console.log(`[Admin] Found ${formattedVIPs.length} potential VIPs`);
+
+
+        // Compute total potential VIPs regardless of Active status for donut percentage
+        const totalPotentialResult = await query(
+          `SELECT COUNT(*) AS totalPotential
+           FROM activeusers au
+           WHERE au.esid IS NOT NULL
+             AND au.pending = 0
+             AND au.esid BETWEEN ? AND ?`,
+          [minStartDate, maxStartDate]
+        );
+        const totalPotentialCount = (totalPotentialResult && totalPotentialResult[0] && totalPotentialResult[0].totalPotential) ? totalPotentialResult[0].totalPotential : 0;
          
         res.status(200).json({
             success: true,
             data: formattedVIPs,
+            totalPotentialCount,
             message: `Found ${formattedVIPs.length} potential VIPs`
         });
          
     } catch (error) {
-        console.error('[Admin] Error fetching potential VIPs:', error);
+
         res.status(500).json({
             success: false,
             message: 'Error fetching potential VIPs data',
@@ -789,5 +959,374 @@ router.get('/potential-vips', async (req, res) => {
         });
     }
 });
+
+// Get pending users - users where pending = 1 and Active = 'y'
+router.get('/pending-users', verifyToken, async (req, res) => {
+    try {
+        const results = await query(`
+            SELECT 
+                id,
+                lagnname,
+                esid,
+                agtnum,
+                sa,
+                ga,
+                mga,
+                rga,
+                DATEDIFF(CURDATE(), esid) as daysPending
+            FROM activeusers 
+            WHERE pending = 1 
+            AND Active = 'y'
+            AND esid IS NOT NULL
+            ORDER BY esid ASC
+        `);
+
+        res.json({
+            success: true,
+            data: results || [],
+            totalCount: (results || []).length
+        });
+    } catch (error) {
+        console.error('Error in pending-users endpoint:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+        });
+    }
+});
+
+// Commit pending users - mark selected pending users as committed
+router.post('/pending-users/commit', verifyToken, async (req, res) => {
+    console.log('[ADMIN] 🚀 POST /admin/pending-users/commit - Request received');
+    console.log('[ADMIN] 📊 Request body:', req.body);
+    console.log('[ADMIN] 👤 User:', { id: req.user?.id, lagnname: req.user?.lagnname });
+    
+    try {
+        const { userIds } = req.body; // Array of activeusers IDs to commit
+        const committedBy = req.user.id; // User making the commit
+
+        console.log('[ADMIN] 📊 Parsed data:', { userIds, committedBy });
+
+        if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+            console.log('[ADMIN] ❌ Invalid userIds - returning 400');
+            return res.status(400).json({
+                success: false,
+                message: 'userIds array is required'
+            });
+        }
+
+        // First, get the lagnname for each user
+        const placeholders = userIds.map(() => '?').join(',');
+        console.log('[ADMIN] 🔍 Fetching users with IDs:', userIds);
+        
+        const users = await query(
+            `SELECT id, lagnname FROM activeusers WHERE id IN (${placeholders})`,
+            userIds
+        );
+
+        console.log('[ADMIN] 📋 Found users:', users);
+
+        if (!users || users.length === 0) {
+            console.log('[ADMIN] ❌ No valid users found - returning 404');
+            return res.status(404).json({
+                success: false,
+                message: 'No valid users found'
+            });
+        }
+
+        // Insert or update commits (newer commits replace older ones)
+        const commitValues = users.map(user => [user.id, user.lagnname, committedBy]);
+        const commitPlaceholders = commitValues.map(() => '(?, ?, ?)').join(',');
+        const flatValues = commitValues.flat();
+
+        console.log('[ADMIN] 💾 Inserting/updating commits:', { commitValues, flatValues });
+
+        const result = await query(
+            `INSERT INTO pending_commit (activeusers_id, lagnname, committed_by) 
+             VALUES ${commitPlaceholders}
+             ON DUPLICATE KEY UPDATE 
+                committed_at = NOW(),
+                committed_by = VALUES(committed_by),
+                lagnname = VALUES(lagnname)`,
+            flatValues
+        );
+
+        console.log('[ADMIN] ✅ Insert/Update result:', {
+            affectedRows: result.affectedRows,
+            insertId: result.insertId,
+            changedRows: result.changedRows,
+            warningCount: result.warningCount
+        });
+
+        // affectedRows will be 1 for new inserts, 2 for updates
+        const actualCommits = Math.ceil(result.affectedRows / 2); // Rough estimate
+
+        res.json({
+            success: true,
+            message: `Successfully committed ${userIds.length} pending user(s)`,
+            committed: userIds.length,
+            totalRequested: userIds.length,
+            updated: result.changedRows || 0
+        });
+        
+        console.log('[ADMIN] ✅ Response sent successfully');
+    } catch (error) {
+        console.error('[ADMIN] ❌ Error committing pending users:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        });
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+// Get committed pending users
+router.get('/pending-users/commits', verifyToken, async (req, res) => {
+    try {
+        const results = await query(`
+            SELECT 
+                pc.id,
+                pc.activeusers_id,
+                pc.lagnname,
+                pc.committed_at,
+                pc.committed_by,
+                pc.notes,
+                au.lagnname as committed_by_name
+            FROM pending_commit pc
+            LEFT JOIN activeusers au ON pc.committed_by = au.id
+            ORDER BY pc.committed_at DESC
+        `);
+
+        res.json({
+            success: true,
+            data: results || [],
+            totalCount: (results || []).length
+        });
+    } catch (error) {
+        console.error('Error fetching pending commits:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+        });
+    }
+});
+
+// Send account info (username and password) to user's email
+router.post('/users/send-account-info', verifyToken, verifyStaff, async (req, res) => {
+  try {
+    const { userId, toEmail } = req.body;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'userId is required' });
+    }
+
+    // Fetch basic user info (include password to decide on reset)
+    const results = await query(
+      `SELECT id, lagnname, agtnum, email, password FROM activeusers WHERE id = ? LIMIT 1`,
+      [userId]
+    );
+    if (!results || results.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const user = results[0];
+    const destinationEmail = (toEmail && String(toEmail).trim()) || user.email;
+    if (!destinationEmail) {
+      return res.status(400).json({ success: false, message: 'No email available. Provide toEmail.' });
+    }
+
+    // Compute username as first initial + last name based on lagnname format "Last First ..."
+    const tokens = String(user.lagnname || '').trim().split(/\s+/);
+    const lastName = (tokens[0] || '').toLowerCase();
+    const firstInitial = (tokens[1] ? tokens[1][0] : (tokens[0] ? tokens[0][0] : 'u')).toLowerCase();
+    const username = `${firstInitial}${lastName}`;
+    const agtNumberPassword = String(user.agtnum || '').trim();
+
+    // If the stored password isn't 'default', reset it to 'default'
+    const currentPassword = String(user.password || '').trim();
+    if (currentPassword !== 'default') {
+      await query(`UPDATE activeusers SET password = 'default' WHERE id = ?`, [userId]);
+    }
+
+    // Configure transporter (reuse existing org SMTP like verify routes)
+    const transporter = nodemailer.createTransport({
+      host: 'mail.ariaslife.com',
+      port: 465,
+      secure: true,
+      auth: {
+        user: 'noreply@ariaslife.com',
+        pass: 'Ariaslife123!'
+      },
+      tls: { rejectUnauthorized: false }
+    });
+
+    const frontendUrl = process.env.FRONTEND_URL || 'https://agents.ariaslife.com';
+    const loginUrl = `${frontendUrl.replace(/\/$/, '')}/login`;
+
+    const html = `
+      <div style="background:#f6f9fc;padding:32px;font-family:Arial,Helvetica,sans-serif;color:#0f172a">
+        <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+          <div style="background:linear-gradient(135deg,#e2e8f0,#93c5fd);padding:28px 24px;">
+            <h1 style="margin:0;font-size:22px;letter-spacing:.3px;color:#0f172a">Welcome to Arias Life</h1>
+            <p style="margin:8px 0 0 0;font-size:13px;color:#334155">Opportunities don't happen. You create them.</p>
+          </div>
+          <div style="padding:24px 24px 8px 24px;">
+            <p style="margin:0 0 14px 0;font-size:14px;color:#334155">Your account details are as follows:</p>
+            <div style="border:1px solid #e5e7eb;border-radius:10px;padding:16px;background:#fafafa">
+              <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:8px">
+                <span style="font-weight:600;color:#0f172a">Username</span>
+                <span style="color:#0f172a">${username}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;gap:8px">
+                <span style="font-weight:600;color:#0f172a">Password</span>
+                <span style="color:#0f172a">${agtNumberPassword || '(not set)'} </span>
+              </div>
+            </div>
+            <p style="margin:16px 0 0 0;font-size:14px;color:#334155">Log in now to start tracking activity, setting goals, and saving more time.</p>
+            <div style="margin:18px 0 8px 0">
+              <a href="${loginUrl}" style="display:inline-block;background:#0b5a8f;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600">Log In</a>
+            </div>
+          </div>
+          <div style="padding:0 24px 20px 24px;color:#64748b;font-size:12px">
+            <p style="margin:0">If you did not request this information, please contact your administrator.</p>
+          </div>
+        </div>
+      </div>`;
+
+    const mailOptions = {
+      from: 'noreply@ariaslife.com',
+      to: destinationEmail,
+      subject: 'Welcome to Arias Life – Your Account Details',
+      html
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return res.json({ success: true, message: `Account info sent to ${destinationEmail}` });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to send account info', error: error.message });
+  }
+});
+
+// Reset a user's password to "default"
+router.post('/users/reset-password', verifyToken, verifyStaff, async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'userId is required' });
+    }
+
+    await query(`UPDATE activeusers SET password = 'default' WHERE id = ?`, [userId]);
+    return res.json({ success: true, message: 'Password reset to default' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to reset password', error: error.message });
+  }
+});
+
+// Get codes data from associates table
+router.get('/codes', verifyToken, async (req, res) => {
+    try {
+        // Optional month filter: expect YYYY-MM; defaults to current month if not provided
+        const { month, includeHistorical } = req.query;
+        let baseYear, baseMonthIndex;
+
+        if (month && /^\d{4}-\d{2}$/.test(month)) {
+            const [y, m] = month.split('-').map(Number);
+            baseYear = y;
+            baseMonthIndex = m - 1; // JS Date month index
+        } else {
+            const now = new Date();
+            baseYear = now.getFullYear();
+            baseMonthIndex = now.getMonth();
+        }
+
+        const baseDate = new Date(baseYear, baseMonthIndex, 1);
+        const startOfMonth = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+        const endOfMonth = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0, 23, 59, 59);
+
+        // Format dates for SQL
+        const startDate = startOfMonth.toISOString().split('T')[0]; // YYYY-MM-DD
+        const endDate = endOfMonth.toISOString().split('T')[0];     // YYYY-MM-DD
+
+        const results = await query(`
+            SELECT 
+                a.LagnName,
+                a.AgtNum,
+                a.PRODDATE,
+                a.SA,
+                a.GA,
+                a.MGA,
+                a.RGA,
+                au.id as userId,
+                p.PendingDate,
+                DATEDIFF(a.PRODDATE, p.PendingDate) AS days_to_code
+            FROM associates a
+            LEFT JOIN activeusers au ON a.LagnName = au.lagnname
+            LEFT JOIN pending p ON a.LagnName = p.LagnName
+            WHERE a.LagnName IS NOT NULL
+            AND a.LagnName != ''
+            AND a.PRODDATE >= ?
+            AND a.PRODDATE <= ?
+            ORDER BY a.PRODDATE DESC, a.LagnName ASC
+        `, [startDate, endDate]);
+
+        // If historical data is requested, fetch previous month for comparison
+        let historicalData = null;
+        if (includeHistorical === 'true') {
+            // Calculate date range for previous month only
+            const previousMonth = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1);
+            const endOfPreviousMonth = new Date(baseDate.getFullYear(), baseDate.getMonth(), 0, 23, 59, 59);
+
+            const historicalStartDate = previousMonth.toISOString().split('T')[0];
+            const historicalEndDate = endOfPreviousMonth.toISOString().split('T')[0];
+
+            const historicalResults = await query(`
+                SELECT 
+                    a.LagnName,
+                    a.AgtNum,
+                    a.PRODDATE,
+                    a.SA,
+                    a.GA,
+                    a.MGA,
+                    a.RGA,
+                    au.id as userId,
+                    p.PendingDate,
+                    DATEDIFF(a.PRODDATE, p.PendingDate) AS days_to_code
+                FROM associates a
+                LEFT JOIN activeusers au ON a.LagnName = au.lagnname
+                LEFT JOIN pending p ON a.LagnName = p.LagnName
+                WHERE a.LagnName IS NOT NULL
+                AND a.LagnName != ''
+                AND a.PRODDATE >= ?
+                AND a.PRODDATE <= ?
+                ORDER BY a.PRODDATE DESC, a.LagnName ASC
+            `, [historicalStartDate, historicalEndDate]);
+
+            historicalData = historicalResults || [];
+        }
+
+        res.json({
+            success: true,
+            data: results || [],
+            totalCount: (results || []).length,
+            historicalData: historicalData
+        });
+    } catch (error) {
+        console.error('Error in codes endpoint:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+        });
+    }
+});
+
+// Log route registration
+console.log('[ADMIN ROUTES] ✅ Admin routes registered, including:');
+console.log('[ADMIN ROUTES]    - POST /pending-users/commit');
+console.log('[ADMIN ROUTES]    - GET /pending-users/commits');
+console.log('[ADMIN ROUTES]    - GET /pending-users');
 
 module.exports = router; 

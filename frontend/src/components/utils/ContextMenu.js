@@ -60,9 +60,27 @@ const ContextMenu = ({ options, onClose, style, className, searchable, searchPla
     const rect = targetElement.getBoundingClientRect();
     const menuRect = menuRef.current.getBoundingClientRect();
     
+    // Check available space to the right and left
+    const spaceToRight = window.innerWidth - menuRect.right;
+    const spaceToLeft = menuRect.left;
+    const submenuWidth = 180; // Approximate submenu width
+    
+    // Position to the right if there's space, otherwise to the left
+    let leftPosition;
+    if (spaceToRight >= submenuWidth) {
+      // Position to the right, adjacent to the main menu
+      leftPosition = menuRect.right + 8; // 8px gap
+    } else if (spaceToLeft >= submenuWidth) {
+      // Position to the left, adjacent to the main menu
+      leftPosition = menuRect.left - submenuWidth - 8; // 8px gap
+    } else {
+      // Not enough space on either side, overlap slightly
+      leftPosition = menuRect.right - 20;
+    }
+    
     return {
       top: rect.top,
-      left: menuRect.left - 200 // Position to the left with some spacing
+      left: leftPosition
     };
   };
 
@@ -104,10 +122,27 @@ const ContextMenu = ({ options, onClose, style, className, searchable, searchPla
       const rect = event.currentTarget.getBoundingClientRect();
       const submenuRect = submenuElement.getBoundingClientRect();
       
-      // Position nested submenu to the left of the current submenu
+      // Check available space for nested submenu positioning
+      const spaceToRight = window.innerWidth - submenuRect.right;
+      const spaceToLeft = submenuRect.left;
+      const nestedSubmenuWidth = 150; // Approximate nested submenu width
+      
+      let leftPosition;
+      if (spaceToRight >= nestedSubmenuWidth) {
+        // Position to the right, adjacent to the submenu
+        leftPosition = submenuRect.right + 8; // 8px gap
+      } else if (spaceToLeft >= nestedSubmenuWidth) {
+        // Position to the left, adjacent to the submenu
+        leftPosition = submenuRect.left - nestedSubmenuWidth - 8; // 8px gap
+      } else {
+        // Not enough space, overlap slightly
+        leftPosition = submenuRect.right - 20;
+      }
+      
+      
       setNestedSubmenuPosition({
         top: rect.top,
-        left: submenuRect.left - 200 // Position to the left
+        left: leftPosition
       });
       setActiveNestedSubmenu(subIndex);
       
@@ -131,9 +166,23 @@ const ContextMenu = ({ options, onClose, style, className, searchable, searchPla
     const rect = event.currentTarget.getBoundingClientRect();
     const submenuRect = submenuElement.getBoundingClientRect();
     
+    // Use the same smart positioning logic as click handler
+    const spaceToRight = window.innerWidth - submenuRect.right;
+    const spaceToLeft = submenuRect.left;
+    const nestedSubmenuWidth = 150;
+    
+    let leftPosition;
+    if (spaceToRight >= nestedSubmenuWidth) {
+      leftPosition = submenuRect.right + 8;
+    } else if (spaceToLeft >= nestedSubmenuWidth) {
+      leftPosition = submenuRect.left - nestedSubmenuWidth - 8;
+    } else {
+      leftPosition = submenuRect.right - 20;
+    }
+    
     setNestedSubmenuPosition({
       top: rect.top,
-      left: submenuRect.left - 200
+      left: leftPosition
     });
     setActiveNestedSubmenu(subIndex);
   };

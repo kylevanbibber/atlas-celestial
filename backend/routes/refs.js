@@ -8,9 +8,12 @@ const { pool } = require("../db");
 router.get("/", (req, res) => {
   const { archive } = req.query;
   let sqlQuery = `
-    SELECT refs.*, userinfo.first_name, userinfo.last_name, userinfo.chip_color, userinfo.active
+    SELECT refs.*, 
+           assigned_user.lagnname as assigned_to_display,
+           created_user.lagnname as created_by_display
     FROM refs
-    LEFT JOIN userinfo ON refs.assigned_to = userinfo.id
+    LEFT JOIN activeusers assigned_user ON refs.assigned_to = assigned_user.id
+    LEFT JOIN activeusers created_user ON refs.created_by = created_user.id
   `;
   const queryParams = [];
 
@@ -31,9 +34,12 @@ router.get("/", (req, res) => {
 // Get a single ref by ID
 router.get("/:id", (req, res) => {
   const sqlQuery = `
-    SELECT refs.*, userinfo.first_name, userinfo.last_name 
+    SELECT refs.*, 
+           assigned_user.lagnname as assigned_to_display,
+           created_user.lagnname as created_by_display
     FROM refs
-    LEFT JOIN userinfo ON refs.assigned_to = userinfo.id
+    LEFT JOIN activeusers assigned_user ON refs.assigned_to = assigned_user.id
+    LEFT JOIN activeusers created_user ON refs.created_by = created_user.id
     WHERE refs.id = ?
   `;
   pool.query(sqlQuery, [req.params.id], (err, results) => {
@@ -54,6 +60,22 @@ router.post("/", (req, res) => {
 
   if (!fields || Object.keys(fields).length === 0) {
     return res.status(400).json({ error: "No data provided for reference creation." });
+  }
+
+  // Handle potential userId field mapping (defensive programming)
+  if (fields.userId !== undefined) {
+    // If assigned_to is missing but userId is present, use userId for assigned_to
+    if (!fields.assigned_to) {
+      fields.assigned_to = fields.userId;
+    }
+    
+    // If created_by is missing but userId is present, use userId for created_by  
+    if (!fields.created_by) {
+      fields.created_by = fields.userId;
+    }
+    
+    // Remove the invalid userId field
+    delete fields.userId;
   }
 
   // Ensure date fields are in the correct format
@@ -112,7 +134,8 @@ const allowedFields = [
   "company_id",
   "created_by",
   "type",
-  "scheduled"
+  "scheduled",
+  "resstate"
 ];
 
 // Update a ref
@@ -120,19 +143,15 @@ router.put("/:id", (req, res) => {
   const refId = req.params.id;
   const fields = req.body;
   
-  console.log('PUT /refs/:id called with:', { refId, fields });
 
   // Ensure date fields are in the correct format
   if (fields.date_created) {
-    console.log('Processing date_created:', fields.date_created);
     fields.date_created = fields.date_created; // Keep as is since it's already formatted
   }
   if (fields.last_updated) {
-    console.log('Processing last_updated:', fields.last_updated);
     fields.last_updated = fields.last_updated; // Keep as is since it's already formatted
   }
   if (fields.scheduled) {
-    console.log('Processing scheduled:', fields.scheduled);
     fields.scheduled = fields.scheduled; // Keep as is since it's already formatted
   }
 
@@ -140,15 +159,15 @@ router.put("/:id", (req, res) => {
     if (allowedFields.includes(key)) {
       acc[key] = fields[key];
     } else {
-      console.log('Field not in allowedFields:', key);
+      console.log(`🔍 [DEBUG] Field '${key}' is not allowed for update. Skipping.`);
     }
     return acc;
   }, {});
 
-  console.log('Fields to update:', fieldsToUpdate);
+  console.log(`🔍 [DEBUG] Fields to update for ref ${refId}:`, JSON.stringify(fieldsToUpdate, null, 2));
+
 
   if (Object.keys(fieldsToUpdate).length === 0) {
-    console.log('No valid fields provided for update');
     return res.status(400).json({ error: "No valid fields provided for update." });
   }
 
@@ -158,8 +177,6 @@ router.put("/:id", (req, res) => {
   const setClause = updateKeys.map((key) => `${key} = ?`).join(", ");
   const sqlQuery = `UPDATE refs SET ${setClause} WHERE id = ?`;
   
-  console.log('SQL Query:', sqlQuery);
-  console.log('Query values:', [...updateValues, refId]);
 
   pool.query(sqlQuery, [...updateValues, refId], (err, result) => {
     if (err) {
@@ -168,11 +185,9 @@ router.put("/:id", (req, res) => {
     }
 
     if (result.affectedRows === 0) {
-      console.log('No rows affected - reference not found');
       return res.status(404).json({ error: "Reference not found." });
     }
 
-    console.log('Update successful, rows affected:', result.affectedRows);
     res.json({ message: "Reference updated successfully!" });
   });
 });
@@ -195,17 +210,13 @@ const upload = multer({
 });
 
 router.post("/import", upload.single("file"), (req, res) => {
-  console.log("POST /refs/import called.");
 
   if (req.file) {
-    console.log("File uploaded. Processing file for refs table.");
     try {
       const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
       const sheetName = workbook.SheetNames[0];
-      console.log("Using sheet:", sheetName);
       const sheet = workbook.Sheets[sheetName];
       const data = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-      console.log("Parsed data:", data);
 
       if (data.length === 0) {
         console.warn("File is empty or invalid for refs table");
@@ -213,7 +224,6 @@ router.post("/import", upload.single("file"), (req, res) => {
       }
 
       const keys = Object.keys(data[0]);
-      console.log("Detected columns:", keys);
       const placeholders = data
         .map(() => "(" + keys.map(() => "?").join(", ") + ")")
         .join(", ");
@@ -224,15 +234,12 @@ router.post("/import", upload.single("file"), (req, res) => {
         });
       });
       const sqlQuery = `INSERT INTO refs (${keys.join(", ")}) VALUES ${placeholders}`;
-      console.log("SQL Query:", sqlQuery);
-      console.log("Values length:", values.length);
 
       pool.query(sqlQuery, values, (err, result) => {
         if (err) {
           console.error("Database error during file import for refs:", err);
           return res.status(500).json({ error: err.message });
         }
-        console.log("File data imported successfully into refs table. Inserted rows:", result.affectedRows);
         res.json({
           message: "References imported successfully from file!",
           inserted: result.affectedRows,
@@ -243,31 +250,74 @@ router.post("/import", upload.single("file"), (req, res) => {
       return res.status(500).json({ error: error.message });
     }
   } else if (req.body && Object.keys(req.body).length > 0) {
-    console.log("JSON data received for import into refs table");
+    console.log("Import request received - body type:", typeof req.body);
+    console.log("Import request body:", JSON.stringify(req.body, null, 2));
+    
     const importedData = req.body;
     if (!Array.isArray(importedData) || importedData.length === 0) {
       console.warn("No valid JSON data provided for refs table");
-      return res.status(400).json({ error: "No valid data provided for import." });
+      console.log("Data is array?", Array.isArray(importedData));
+      console.log("Data length:", importedData?.length);
+      return res.status(400).json({ error: "No valid data provided for import. Expected an array of objects." });
     }
-    const keys = Object.keys(importedData[0]);
-    console.log("Detected JSON columns:", keys);
-    const placeholders = importedData
+    
+    console.log(`Processing ${importedData.length} rows for import`);
+    console.log("First row keys:", Object.keys(importedData[0]));
+    
+    // Validate and filter only allowed fields
+    const processedData = importedData.map((row, index) => {
+      const processedRow = {};
+      
+      // Add required fields if missing
+      if (!row.created_by && row.assigned_to) {
+        processedRow.created_by = row.assigned_to;
+      }
+      if (!row.assigned_to && row.created_by) {
+        processedRow.assigned_to = row.created_by;
+      }
+      
+      // Add date fields if missing
+      if (!row.date_created) {
+        processedRow.date_created = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      }
+      
+      // Filter only allowed fields
+      Object.keys(row).forEach(key => {
+        if (allowedFields.includes(key)) {
+          processedRow[key] = row[key];
+        } else {
+          console.log(`Skipping field '${key}' for row ${index} - not in allowed fields`);
+        }
+      });
+      
+      return processedRow;
+    });
+    
+    console.log("Processed data sample:", JSON.stringify(processedData[0], null, 2));
+    
+    const keys = Object.keys(processedData[0]);
+    const placeholders = processedData
       .map(() => "(" + keys.map(() => "?").join(", ") + ")")
       .join(", ");
     const values = [];
-    importedData.forEach((row) => {
+    processedData.forEach((row) => {
       keys.forEach((key) => {
-        values.push(row[key]);
+        values.push(row[key] || null);
       });
     });
+    
     const sqlQuery = `INSERT INTO refs (${keys.join(", ")}) VALUES ${placeholders}`;
-    console.log("SQL Query for JSON import:", sqlQuery);
+    console.log("SQL Query:", sqlQuery);
+    console.log("Values count:", values.length);
+    
     pool.query(sqlQuery, values, (err, result) => {
       if (err) {
         console.error("Database error during JSON import for refs:", err);
+        console.error("SQL Query that failed:", sqlQuery);
+        console.error("Values that failed:", values);
         return res.status(500).json({ error: err.message });
       }
-      console.log("JSON data imported successfully into refs table. Inserted rows:", result.affectedRows);
+      console.log(`Successfully imported ${result.affectedRows} references`);
       res.json({
         message: "References imported successfully from JSON!",
         inserted: result.affectedRows,

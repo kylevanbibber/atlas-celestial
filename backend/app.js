@@ -6,6 +6,7 @@ const dotenv = require("dotenv");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const { initNotificationScheduler } = require('./schedulers/notificationScheduler');
+const { initPipelineLinkingScheduler } = require('./schedulers/pipelineLinkingScheduler');
 const { initDiscordBot } = require('./bot');
 
 dotenv.config();
@@ -22,14 +23,13 @@ app.use(cors({
       "http://127.0.0.1:3000",
       "https://127.0.0.1:3000",
       "https://agents.ariaslife.com",
-      "https://agents.ariaslife.com",
+      "https://ariaslife.com",
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.log(`CORS blocked origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -38,6 +38,7 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
+
 
 // Mount the auth routes
 const authRoutes = require("./routes/auth");
@@ -62,8 +63,6 @@ app.use("/api/settings", settingsRoutes);
 // Schema routes for database information
 const schemaRoutes = require("./routes/schema");
 app.use("/api/schema", schemaRoutes);
-
-
 // Daily Activity routes
 const dailyActivityRoutes = require("./routes/dailyActivity");
 app.use("/api/dailyActivity", dailyActivityRoutes);
@@ -80,6 +79,22 @@ app.use("/api/goals", goalsRoutes);
 const recruitmentRoutes = require("./routes/recruitment");
 app.use("/api/recruitment", recruitmentRoutes);
 
+// Pipeline Attachments routes
+const pipelineAttachmentsRoutes = require("./routes/pipeline-attachments");
+app.use("/api/pipeline-attachments", pipelineAttachmentsRoutes);
+
+// Pipeline Linking routes
+const pipelineLinkingRoutes = require("./routes/pipelineLinking");
+app.use("/api/pipeline-linking", pipelineLinkingRoutes);
+
+// Pending Agent Sync routes
+const pendingAgentSyncRoutes = require("./routes/pendingAgentSync");
+app.use("/api/pending-agent-sync", pendingAgentSyncRoutes);
+
+// Careers custom videos routes
+const careersCustomVideosRoutes = require("./routes/careersCustomVideos");
+app.use("/api/careers-videos", careersCustomVideosRoutes);
+
 // REF Report routes
 const refReportRoutes = require("./routes/refReport");
 app.use("/api/ref-report", refReportRoutes);
@@ -88,6 +103,10 @@ app.use("/api/ref-report", refReportRoutes);
 const verifyRoutes = require("./routes/verify");
 app.use("/api/verify", verifyRoutes);
 
+// Trophy routes
+const trophyRoutes = require("./routes/trophy");
+app.use("/api/trophy", trophyRoutes);
+
 // Release routes
 const releaseRoutes = require("./routes/release");
 app.use("/api/release", releaseRoutes);
@@ -95,6 +114,10 @@ app.use("/api/release", releaseRoutes);
 // Discord routes
 const discordRoutes = require("./routes/discord");
 app.use("/api/discord", discordRoutes);
+
+// Competitions routes
+const competitionsRoutes = require("./routes/competitions");
+app.use("/api/competitions", competitionsRoutes);
 
 // Document signing routes
 const sigRoutes = require("./routes/sigRoutes");
@@ -107,10 +130,12 @@ const vipsRoutes = require("./routes/vips");
 const moreRoutes = require("./routes/more");
 const accountRoutes = require("./routes/account");
 const refsRoutes = require("./routes/refs");
+const dateOverridesRoutes = require("./routes/dateOverrides");
 const customRoutes = require("./routes/custom");
 const uploadRoutes = require("./routes/upload");
 const notificationsRoutes = require("./routes/notifications");
 const dataRoutes = require("./routes/dataRoutes");
+const trainingRoutes = require("./routes/training");
 
 app.use("/api/alp", alpRoutes);
 app.use("/api/codes", codesRoutes);
@@ -118,6 +143,7 @@ app.use("/api/vips", vipsRoutes);
 app.use("/api/more", moreRoutes);
 app.use("/api/account", accountRoutes);
 app.use("/api/refs", refsRoutes);
+app.use("/api/date-overrides", dateOverridesRoutes);
 const refvalidationRoutes = require("./routes/refvalidation");
 const adminDashboardRoutes = require("./routes/adminDashboard");
 const adminLicensingRoutes = require("./routes/adminLicensing");
@@ -130,6 +156,23 @@ app.use("/api/custom", customRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/dataroutes", dataRoutes);
+app.use("/api/training", trainingRoutes);
+
+// PnP routes
+const pnpRoutes = require("./routes/pnp");
+app.use("/api/pnp", pnpRoutes);
+
+// Commits routes
+const commitsRoutes = require("./routes/commits");
+app.use("/api/commits", commitsRoutes);
+
+// MGA Hierarchy routes (for RGA rollup calculations)
+const mgaHierarchyRoutes = require("./routes/mgaHierarchy");
+app.use("/api/mga-hierarchy", mgaHierarchyRoutes);
+
+// Email Campaigns routes
+const emailCampaignsRoutes = require("./routes/emailCampaigns");
+app.use("/api/email-campaigns", emailCampaignsRoutes);
 
 // Create HTTP server for both Express and WebSocket
 const server = http.createServer(app);
@@ -172,7 +215,6 @@ class NotificationManager {
         }
       });
 
-      console.log(`Sent real-time notification to user ${userId} (${userConnections.size} connections)`);
       return true;
     }
     return false;
@@ -194,7 +236,6 @@ class NotificationManager {
       notifiedUsers++;
     });
 
-    console.log(`Sent broadcast notification to ${notifiedUsers} users`);
     return notifiedUsers;
   }
 
@@ -295,7 +336,58 @@ server.listen(PORT, () => {
 
   initDiscordBot();
   console.log('Discord bot initialized');
-  // Initialize notification scheduler after server has started
-  initNotificationScheduler();
-  console.log('Notification scheduler initialized');
+  
+  const DISABLE_SCHEDULERS = process.env.DISABLE_SCHEDULERS === 'true' || process.env.NODE_ENV !== 'production';
+  if (!DISABLE_SCHEDULERS) {
+    // Initialize notification scheduler after server has started
+    initNotificationScheduler();
+  } else {
+    console.log('Schedulers disabled');
+  }
+  
+  // Initialize email campaign scheduler
+  const { startScheduler } = require('./scripts/process-email-campaigns');
+  startScheduler();
+  console.log('Email campaign scheduler initialized');
+  
+  // Initialize weekly report email scheduler
+  const { startWeeklyReportScheduler } = require('./scripts/weekly-report-scheduler');
+  if (!DISABLE_SCHEDULERS) {
+    startWeeklyReportScheduler();
+    console.log('Weekly report email scheduler initialized');
+  }
+  
+  // Initialize pipeline linking scheduler
+  if (!DISABLE_SCHEDULERS) {
+    initPipelineLinkingScheduler();
+    console.log('Pipeline linking scheduler initialized');
+  }
+
+  // Mount onboarding routes
+  try {
+    app.use('/api/onboarding', require('./routes/onboarding'));
+    console.log('Onboarding routes mounted at /api/onboarding');
+  } catch (e) {
+    console.error('Failed to mount onboarding routes', e);
+  }
+  
+  // Run pending agent sync on startup
+  const { syncActivateAgentNumber } = require('./scripts/sync-activate-agent-number');
+  const { syncPendingAgents } = require('./scripts/sync-pending-agents');
+  
+  if (!DISABLE_SCHEDULERS) {
+    setTimeout(() => {
+      console.log('\n🔄 Running pending agent activation sync...');
+      syncActivateAgentNumber().catch(err => {
+        console.error('Failed to run pending agent activation sync:', err);
+      });
+    }, 5000); // Wait 5 seconds after server starts
+    
+    setTimeout(() => {
+      console.log('\n🔄 Running pending agents pipeline sync...');
+      syncPendingAgents().catch(err => {
+        console.error('Failed to run pending agents pipeline sync:', err);
+      });
+    }, 7000); // Wait 7 seconds after server starts
+  }
 });

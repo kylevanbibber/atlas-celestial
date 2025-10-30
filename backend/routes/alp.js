@@ -1,7 +1,7 @@
 // routes/alp.js
 const express = require("express");
 const router = express.Router();
-const { pool } = require("../db");
+const { pool, query: dbQuery } = require("../db");
 
 /* =========================
    Daily_Activity Endpoints
@@ -11,7 +11,7 @@ const { pool } = require("../db");
 router.get("/daily", (req, res) => {
   pool.query("SELECT * FROM Daily_Activity", (err, results) => {
     if (err) {
-      console.error("Error fetching daily activity data:", err);
+
       return res.status(500).json({ error: "Database error" });
     }
     res.json(results);
@@ -20,23 +20,44 @@ router.get("/daily", (req, res) => {
 
 // GET /api/alp/daily/sum - Retrieve sum of refAlp, alp, and refs for a given date or date range
 router.get("/daily/sum", (req, res) => {
-  const { date, startDate, endDate } = req.query;
+  const { date, startDate, endDate, lagnName } = req.query;
   let query = "";
   let params = [];
   
-  if (date) {
-    query = "SELECT SUM(refAlp) AS totalRefAlp, SUM(alp) AS totalAlp, SUM(refs) AS totalRefs, COUNT(DISTINCT agent) AS agentCount FROM Daily_Activity WHERE reportDate = ?";
-    params = [date];
-  } else if (startDate && endDate) {
-    query = "SELECT SUM(refAlp) AS totalRefAlp, SUM(alp) AS totalAlp, SUM(refs) AS totalRefs, COUNT(DISTINCT agent) AS agentCount FROM Daily_Activity WHERE reportDate BETWEEN ? AND ?";
-    params = [startDate, endDate];
+  // Handle lagnName filtering - need to join with activeusers since Daily_Activity uses userId
+  if (lagnName) {
+    if (date) {
+      query = `SELECT SUM(da.refAlp) AS totalRefAlp, SUM(da.alp) AS totalAlp, SUM(da.refs) AS totalRefs, COUNT(DISTINCT da.agent) AS agentCount 
+               FROM Daily_Activity da 
+               JOIN activeusers au ON da.userId = au.id 
+               WHERE da.reportDate = ? AND au.lagnname = ?`;
+      params = [date, lagnName];
+    } else if (startDate && endDate) {
+      query = `SELECT SUM(da.refAlp) AS totalRefAlp, SUM(da.alp) AS totalAlp, SUM(da.refs) AS totalRefs, COUNT(DISTINCT da.agent) AS agentCount 
+               FROM Daily_Activity da 
+               JOIN activeusers au ON da.userId = au.id 
+               WHERE da.reportDate BETWEEN ? AND ? AND au.lagnname = ?`;
+      params = [startDate, endDate, lagnName];
+    } else {
+      return res.status(400).json({ error: "Please provide either a 'date' or both 'startDate' and 'endDate'" });
+    }
+    console.log('📊 [Daily Sum] Filtering Daily_Activity by joining with activeusers.lagnname:', lagnName);
   } else {
-    return res.status(400).json({ error: "Please provide either a 'date' or both 'startDate' and 'endDate'" });
+    // Original queries for SGA (organization-wide)
+    if (date) {
+      query = "SELECT SUM(refAlp) AS totalRefAlp, SUM(alp) AS totalAlp, SUM(refs) AS totalRefs, COUNT(DISTINCT agent) AS agentCount FROM Daily_Activity WHERE reportDate = ?";
+      params = [date];
+    } else if (startDate && endDate) {
+      query = "SELECT SUM(refAlp) AS totalRefAlp, SUM(alp) AS totalAlp, SUM(refs) AS totalRefs, COUNT(DISTINCT agent) AS agentCount FROM Daily_Activity WHERE reportDate BETWEEN ? AND ?";
+      params = [startDate, endDate];
+    } else {
+      return res.status(400).json({ error: "Please provide either a 'date' or both 'startDate' and 'endDate'" });
+    }
   }
 
   pool.query(query, params, (err, results) => {
     if (err) {
-      console.error("Error fetching daily sum data:", err);
+
       return res.status(500).json({ error: "Database error" });
     }
     res.json(results[0]);
@@ -76,12 +97,58 @@ router.get("/ref-sales", (req, res) => {
 
   pool.query(query, params, (err, results) => {
     if (err) {
-      console.error("Error fetching ref sales data:", err);
+
       return res.status(500).json({ error: "Database error" });
     }
     
     const totalRefSales = results[0].totalRefSales || 0;
     res.json({ totalRefSales });
+  });
+});
+
+// GET /api/alp/ref-sales-breakdown - Retrieve agent-level ref sales breakdown
+router.get("/ref-sales-breakdown", (req, res) => {
+  const { month, year, lagnName } = req.query;
+  
+  if (!month || !year) {
+    return res.status(400).json({ error: "Please provide both 'month' and 'year' parameters" });
+  }
+
+  // Format month to ensure it's 2 digits
+  const formattedMonth = month.toString().padStart(2, '0');
+  const startDate = `${year}-${formattedMonth}-01`;
+  
+  // Calculate end date (last day of the month)
+  const lastDay = new Date(year, month, 0).getDate();
+  const endDate = `${year}-${formattedMonth}-${String(lastDay).padStart(2, '0')}`;
+
+  let query = `
+    SELECT 
+      lagnname,
+      COUNT(*) AS refSales 
+    FROM refvalidation 
+    WHERE true_ref = 'Y' 
+    AND DATE(created_at) >= ? AND DATE(created_at) <= ?
+    AND lagnname IS NOT NULL
+  `;
+  
+  let params = [startDate, endDate];
+  
+  // If lagnName is provided, filter by mga (to get all agents under this MGA)
+  if (lagnName) {
+    query += ` AND mga = ?`;
+    params.push(lagnName);
+  }
+  
+  query += ` GROUP BY lagnname ORDER BY refSales DESC`;
+
+  pool.query(query, params, (err, results) => {
+    if (err) {
+      console.error('Error fetching ref sales breakdown:', err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    
+    res.json({ success: true, data: results });
   });
 });
 
@@ -93,7 +160,7 @@ router.get("/ref-sales", (req, res) => {
 router.get("/monthly", (req, res) => {
   pool.query("SELECT * FROM Monthly_ALP", (err, results) => {
     if (err) {
-      console.error("Error fetching monthly ALP data:", err);
+
       return res.status(500).json({ error: "Database error" });
     }
     res.json(results);
@@ -123,10 +190,33 @@ router.get("/monthly/summary", (req, res) => {
   `;
   pool.query(query, [month], (err, results) => {
     if (err) {
-      console.error("Error fetching monthly summary data:", err);
+
       return res.status(500).json({ error: "Database error" });
     }
     res.json(results[0]);
+  });
+});
+
+// GET /api/alp/monthly/user-6mo - Get last 6 months Monthly_ALP for a user (LVL_1_NET)
+router.get("/monthly/user-6mo", (req, res) => {
+  const { lagnName } = req.query;
+  if (!lagnName) {
+    return res.status(400).json({ error: "Please provide lagnName" });
+  }
+
+  const query = `
+    SELECT month, LVL_1_NET AS netAlp
+    FROM Monthly_ALP
+    WHERE LagnName = ? AND month IS NOT NULL AND month != ''
+    ORDER BY STR_TO_DATE(CONCAT('01/', month), '%d/%m/%Y') DESC
+    LIMIT 6
+  `;
+
+  pool.query(query, [lagnName], (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: "Database error" });
+    }
+    return res.json({ success: true, data: results || [] });
   });
 });
 
@@ -138,11 +228,143 @@ router.get("/monthly/summary", (req, res) => {
 router.get("/weekly", (req, res) => {
   pool.query("SELECT * FROM Weekly_ALP", (err, results) => {
     if (err) {
-      console.error("Error fetching weekly ALP data:", err);
+
       return res.status(500).json({ error: "Database error" });
     }
     res.json(results);
   });
+});
+
+// GET /api/alp/weekly-tracker - Fetch weekly production data for Production Tracker
+router.get("/weekly-tracker", async (req, res) => {
+    console.log('📊 [Weekly Tracker] GET request received');
+    
+    try {
+        const { startDate, endDate } = req.query;
+        
+        if (!startDate || !endDate) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide both startDate and endDate parameters'
+            });
+        }
+        
+        console.log('📊 [Weekly Tracker] Fetching data from', startDate, 'to', endDate);
+        
+        // Fetch all Weekly Recap reports from Weekly_ALP table for the current year
+        // The reportdate represents when the report was generated (Wed or Fri)
+        // Each report is for the PREVIOUS Wed-Tue week
+        // Note: reportdate in Weekly_ALP is stored as MM/DD/YYYY format
+        const currentYear = new Date().getFullYear();
+        const query = `
+            SELECT 
+                reportdate,
+                LVL_1_NET,
+                LVL_1_GROSS,
+                LagnName
+            FROM Weekly_ALP
+            WHERE REPORT = 'Weekly Recap'
+            AND STR_TO_DATE(reportdate, '%m/%d/%Y') >= STR_TO_DATE(?, '%Y-%m-%d')
+            AND STR_TO_DATE(reportdate, '%m/%d/%Y') <= STR_TO_DATE(?, '%Y-%m-%d')
+            AND YEAR(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+            ORDER BY STR_TO_DATE(reportdate, '%m/%d/%Y') DESC
+        `;
+        
+        const results = await dbQuery(query, [startDate, endDate, currentYear]);
+        
+        console.log('📊 [Weekly Tracker] Fetched', results.length, 'records from', startDate, 'to', endDate, 'for year', currentYear);
+        
+        // Helper function to get week start (Wed-Tue weeks)
+        // For a given date, find the Wednesday that starts its Wed-Tue week
+        const getWeekStart = (date) => {
+            const d = new Date(date);
+            const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+            
+            let daysToSubtract;
+            if (dayOfWeek >= 3) {
+                // Wed(3), Thu(4), Fri(5), Sat(6) -> subtract days to get to Wed
+                daysToSubtract = dayOfWeek - 3;
+            } else {
+                // Sun(0), Mon(1), Tue(2) -> subtract days + 4 to get to previous Wed
+                daysToSubtract = dayOfWeek + 4;
+            }
+            
+            const weekStart = new Date(d);
+            weekStart.setDate(d.getDate() - daysToSubtract);
+            return weekStart.toISOString().split('T')[0];
+        };
+        
+        // Group reports by week
+        // Since reportdate is for the PREVIOUS week, we subtract 7 days first
+        const weeklyData = {};
+        
+        results.forEach(row => {
+            if (!row.reportdate) {
+                console.warn('📊 [Weekly Tracker] Skipping row with no reportdate:', row);
+                return;
+            }
+            
+            // The report date is Wed or Fri of the current week
+            // It represents data for the PREVIOUS Wed-Tue week
+            // So we subtract 7 days to get into the previous week, then find its Wed start
+            
+            // Parse MM/DD/YYYY format
+            const [month, day, year] = row.reportdate.split('/');
+            const reportDate = new Date(year, month - 1, day); // month is 0-indexed
+            
+            if (isNaN(reportDate.getTime())) {
+                console.warn('📊 [Weekly Tracker] Invalid date:', row.reportdate);
+                return;
+            }
+            
+            reportDate.setDate(reportDate.getDate() - 7); // Go back to previous week
+            
+            const weekStart = getWeekStart(reportDate);
+            
+            if (!weeklyData[weekStart]) {
+                weeklyData[weekStart] = {
+                    weekStart: weekStart,
+                    net: 0,
+                    gross: 0,
+                    reportDates: []
+                };
+            }
+            
+            // Sum the LVL_1_NET and LVL_1_GROSS values
+            const netValue = parseFloat(row.LVL_1_NET || 0);
+            const grossValue = parseFloat(row.LVL_1_GROSS || 0);
+            weeklyData[weekStart].net += netValue;
+            weeklyData[weekStart].gross += grossValue;
+            weeklyData[weekStart].reportDates.push(row.reportdate);
+        });
+        
+        // Convert to array and sort by week start (newest first)
+        const weeklyArray = Object.values(weeklyData).sort((a, b) => {
+            return new Date(b.weekStart) - new Date(a.weekStart);
+        });
+        
+        console.log('📊 [Weekly Tracker] Aggregated into', weeklyArray.length, 'weeks');
+        if (weeklyArray.length > 0) {
+            console.log('📊 [Weekly Tracker] First week:', weeklyArray[0].weekStart, '| Net:', weeklyArray[0].net, '| Gross:', weeklyArray[0].gross);
+            console.log('📊 [Weekly Tracker] Last week:', weeklyArray[weeklyArray.length - 1].weekStart, '| Net:', weeklyArray[weeklyArray.length - 1].net, '| Gross:', weeklyArray[weeklyArray.length - 1].gross);
+        }
+        
+        res.json({
+            success: true,
+            data: weeklyArray.map(week => ({
+                reportDate: week.weekStart,
+                net: week.net,
+                gross: week.gross
+            }))
+        });
+        
+    } catch (error) {
+        console.error('❌ [Weekly Tracker] Error fetching weekly data:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
 });
 
 // GET /api/alp/weekly/summary - Retrieve summary for Weekly_ALP for a given report date (yyyy-mm-dd)
@@ -168,41 +390,200 @@ router.get("/weekly/summary", (req, res) => {
   `;
   pool.query(query, [reportDate], (err, results) => {
     if (err) {
-      console.error("Error fetching weekly summary data:", err);
+
       return res.status(500).json({ error: "Database error" });
     }
     res.json(results[0]);
   });
 });
 
+// GET /api/alp/weekly/user-alp-by-date - Get ALP for a specific user and reportdate from Weekly_ALP
+// If there are two rows for the same LagnName/reportdate, prioritize CL_Name = 'MGA'
+router.get("/weekly/user-alp-by-date", (req, res) => {
+  const { lagnname, reportdate } = req.query;
+  
+  if (!lagnname || !reportdate) {
+    return res.status(400).json({ error: "Please provide lagnname and reportdate" });
+  }
+
+  // Query to get ALP for this user at this specific reportdate
+  // If multiple rows exist (e.g., different CL_Name), prioritize CL_Name = 'MGA'
+  const query = `
+    SELECT 
+      LVL_3_NET,
+      reportdate,
+      LagnName,
+      CL_Name
+    FROM Weekly_ALP
+    WHERE LagnName = ?
+    AND REPORT = 'MTD Recap'
+    AND reportdate = ?
+    ORDER BY CASE WHEN CL_Name = 'MGA' THEN 0 ELSE 1 END
+    LIMIT 1
+  `;
+
+  pool.query(query, [lagnname, reportdate], (err, results) => {
+    if (err) {
+      console.error('[ALP] Error fetching ALP by date:', err);
+      return res.status(500).json({ error: "Database error" });
+    }
+
+    if (results && results.length > 0) {
+      res.json({ success: true, data: results[0] });
+    } else {
+      res.json({ success: true, data: { LVL_3_NET: 0 } });
+    }
+  });
+});
+
+// GET /api/alp/weekly/user-alp-mtd - Get MTD ALP for a specific user from Weekly_ALP (max reportdate in current month)
+// Handles users who may have entries in both Arias Main (Wednesday) and New York (Friday) reports
+router.get("/weekly/user-alp-mtd", (req, res) => {
+  const { lagnname, month, year, clNameFilter } = req.query;
+  
+  if (!lagnname || !month || !year) {
+    return res.status(400).json({ error: "Please provide lagnname, month, and year" });
+  }
+
+  // Build the WHERE clause for CL_Name filtering
+  let clNameCondition = '';
+  let alpColumn = 'LVL_3_NET'; // Default to LVL_3_NET for MGA/GA/RGA
+  
+  if (clNameFilter === 'MGA') {
+    clNameCondition = "AND CL_Name = 'MGA'";
+  } else if (clNameFilter === 'NOT_MGA') {
+    clNameCondition = "AND CL_Name != 'MGA'";
+  } else if (clNameFilter === 'GA') {
+    clNameCondition = "AND CL_Name = 'GA'";
+  } else if (clNameFilter === 'SA') {
+    clNameCondition = "AND CL_Name = 'SA'";
+    alpColumn = 'LVL_2_NET'; // SA uses LVL_2_NET
+  }
+
+  // First, find the max reportdate for this user in the current month
+  // We'll get the reportdate as a string and find the max by converting to date for comparison
+  const maxDateQuery = `
+    SELECT reportdate, STR_TO_DATE(reportdate, '%m/%d/%Y') as parsedDate
+    FROM Weekly_ALP
+    WHERE LagnName = ?
+    AND REPORT = 'MTD Recap'
+    AND MONTH(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+    AND YEAR(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+    ${clNameCondition}
+    ORDER BY STR_TO_DATE(reportdate, '%m/%d/%Y') DESC
+    LIMIT 1
+  `;
+
+  pool.query(maxDateQuery, [lagnname, month, year], (err, maxResults) => {
+    if (err) {
+      console.error('[ALP] Error fetching max date:', err);
+      return res.status(500).json({ error: "Database error" });
+    }
+
+    if (!maxResults || !maxResults[0] || !maxResults[0].reportdate) {
+      return res.json({ success: true, data: { LVL_3_NET: 0, reportdate: null } });
+    }
+
+    const maxReportDate = maxResults[0].reportdate; // mm/dd/yyyy format
+    const maxParsedDate = maxResults[0].parsedDate; // Date object
+
+    // Calculate date 3 days prior to catch both Arias Main (Wed) and New York (Fri) reports
+    const threeDaysPrior = new Date(maxParsedDate);
+    threeDaysPrior.setDate(threeDaysPrior.getDate() - 3);
+
+    // Now get all rows for this user within the 3-day window and sum by CL_Name
+    // This handles cases where the user appears in both Arias Main and New York reports
+    const sumQuery = `
+      SELECT 
+        SUM(${alpColumn}) as totalALP,
+        CL_Name,
+        GROUP_CONCAT(DISTINCT reportdate ORDER BY STR_TO_DATE(reportdate, '%m/%d/%Y') DESC SEPARATOR ', ') as reportdates,
+        GROUP_CONCAT(DISTINCT REPORT ORDER BY REPORT SEPARATOR ', ') as reports
+      FROM Weekly_ALP
+      WHERE LagnName = ?
+      AND REPORT = 'MTD Recap'
+      AND STR_TO_DATE(reportdate, '%m/%d/%Y') BETWEEN ? AND ?
+      ${clNameCondition}
+      GROUP BY CL_Name
+    `;
+
+    pool.query(sumQuery, [lagnname, threeDaysPrior, maxParsedDate], (err, results) => {
+      if (err) {
+        console.error('[ALP] Error fetching summed ALP:', err);
+        return res.status(500).json({ error: "Database error" });
+      }
+
+      if (results && results.length > 0) {
+        // Sum across all CL_Name groups (MGA + RGA if both exist)
+        const totalALP = results.reduce((sum, row) => sum + (row.totalALP || 0), 0);
+        const allReportDates = results.map(r => r.reportdates).join(', ');
+        
+        res.json({ 
+          success: true, 
+          data: { 
+            LVL_3_NET: totalALP,
+            reportdate: maxReportDate,
+            reportdates: allReportDates,
+            reports: results.map(r => r.reports).join(', '),
+            breakdown: results.map(r => ({
+              clName: r.CL_Name,
+              alp: r.totalALP,
+              reportdates: r.reportdates
+            }))
+          } 
+        });
+      } else {
+        res.json({ success: true, data: { LVL_3_NET: 0, reportdate: null } });
+      }
+    });
+  });
+});
+
 // GET /api/alp/weekly/user-alp - Get actual ALP data for specific user and date range from Weekly_ALP
 router.get("/weekly/user-alp", (req, res) => {
-  const { lagnName, startDate, endDate } = req.query;
+  const { lagnName, startDate, endDate, viewMode } = req.query;
   
-  console.log("🔍 [Weekly ALP API] Incoming request:");
-  console.log("📋 Request params:", { lagnName, startDate, endDate });
-  console.log("📋 Full query object:", req.query);
+
   
   if (!lagnName || !startDate || !endDate) {
-    console.log("❌ [Weekly ALP API] Missing required parameters");
+
     return res.status(400).json({ error: "Please provide lagnName, startDate, and endDate" });
   }
 
+  // Determine ALP column based on view mode and (optional) user role header
+  const userRoleHeader = (req.headers && req.headers['user-role']) || '';
+  let alpColumn = 'LVL_1_NET';
+  let clNameCondition = '';
+  
+  if (viewMode === 'team' || viewMode === 'mga' || viewMode === 'rga') {
+    const upperRole = String(userRoleHeader || '').toUpperCase();
+    alpColumn = (upperRole === 'GA' || upperRole === 'MGA' || upperRole === 'RGA') ? 'LVL_3_NET' : 'LVL_2_NET';
+    
+    // For RGA users, apply CL_Name filtering based on viewMode
+    if (upperRole === 'RGA') {
+      if (viewMode === 'mga') {
+        clNameCondition = "AND CL_Name = 'MGA'"; // MGA tab: show only MGA-level data
+      } else if (viewMode === 'rga') {
+        clNameCondition = "AND CL_Name != 'MGA'"; // RGA tab: show non-MGA data (RGA level + first-year rollups)
+      }
+    }
+  }
+
   // Query to get Weekly_ALP data for the user's lagnName within the date range
-  // Match by LagnName, filter by REPORT = 'Weekly Recap', and use LVL_1_NET
+  // Match by LagnName, filter by REPORT = 'Weekly Recap', and use dynamic ALP column
   // If multiple rows exist for same LagnName/reportdate, prioritize CL_Name = 'MGA'
   // Note: reportdate is stored as varchar in mm/dd/yyyy format, so we need to parse both sides
   const query = `
     SELECT 
       reportdate,
-      LVL_1_NET AS actualAlp,
+      ${alpColumn} AS actualAlp,
       LagnName,
       REPORT,
       CL_Name
     FROM (
       SELECT 
         reportdate,
-        LVL_1_NET,
+        ${alpColumn},
         LagnName,
         REPORT,
         CL_Name,
@@ -213,68 +594,23 @@ router.get("/weekly/user-alp", (req, res) => {
       FROM Weekly_ALP
       WHERE LagnName = ?
       AND REPORT = 'Weekly Recap'
+      ${clNameCondition}
       AND STR_TO_DATE(reportdate, '%m/%d/%Y') BETWEEN STR_TO_DATE(?, '%Y-%m-%d') AND STR_TO_DATE(?, '%Y-%m-%d')
     ) ranked
     WHERE rn = 1
     ORDER BY STR_TO_DATE(reportdate, '%m/%d/%Y') ASC
   `;
   
-  console.log("🔍 [Weekly ALP API] Executing SQL query:");
-  console.log("📋 Query:", query);
-  console.log("📋 Parameters:", [lagnName, startDate, endDate]);
+
   
-  // First, let's run some diagnostic queries to understand the data structure
-  
-  // Check table structure
-  const structureQuery = "DESCRIBE Weekly_ALP";
-  console.log("🔍 [Weekly ALP API] Checking table structure:");
-  
-  pool.query(structureQuery, [], (structErr, structResults) => {
-    if (structErr) {
-      console.error("❌ [Weekly ALP API] Structure query error:", structErr);
-    } else {
-      console.log("📊 [Weekly ALP API] Table structure:");
-      console.log("📋 Columns:", structResults);
-    }
-    
-    // Check for any records with similar LagnName
-    const sampleQuery = `
-      SELECT LagnName, REPORT, reportdate, LVL_1_NET
-      FROM Weekly_ALP 
-      WHERE LagnName LIKE ?
-      ORDER BY reportdate DESC 
-      LIMIT 5
-    `;
-    
-    pool.query(sampleQuery, [`%${lagnName}%`], (sampleErr, sampleResults) => {
-      if (sampleErr) {
-        console.error("❌ [Weekly ALP API] Sample query error:", sampleErr);
-      } else {
-        console.log("📊 [Weekly ALP API] Sample records for similar LagnName:");
-        console.log("📋 Sample count:", sampleResults.length);
-        console.log("📋 Sample data:", sampleResults);
-      }
-      
-      // Check what REPORT values exist
-      const reportQuery = "SELECT DISTINCT REPORT FROM Weekly_ALP LIMIT 10";
-      pool.query(reportQuery, [], (reportErr, reportResults) => {
-        if (reportErr) {
-          console.error("❌ [Weekly ALP API] Report query error:", reportErr);
-        } else {
-          console.log("📊 [Weekly ALP API] Available REPORT values:");
-          console.log("📋 Report values:", reportResults);
-        }
-        
-        // Now run the main query
+  // Now run the main query
     pool.query(query, [lagnName, startDate, endDate], (err, results) => {
     if (err) {
-      console.error("❌ [Weekly ALP API] Database error:", err);
+
       return res.status(500).json({ error: "Database error" });
     }
     
-    console.log("📊 [Weekly ALP API] Raw database results:");
-    console.log("📋 Results count:", results.length);
-    console.log("📋 Raw data:", results);
+
     
     // Transform results to match the expected format
     // The reportdate in Weekly_ALP represents the end of the week period
@@ -295,7 +631,7 @@ router.get("/weekly/user-alp", (req, res) => {
       monday.setDate(weekStartDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
       const weekKey = monday.toISOString().split('T')[0];
       
-      console.log(`📅 [Weekly ALP API] reportdate ${row.reportdate} (parsed: ${reportDate.toISOString().split('T')[0]}) represents week starting ${weekKey}`);
+
       
       return {
         reportDate: row.reportdate, // Keep original for reference
@@ -312,16 +648,49 @@ router.get("/weekly/user-alp", (req, res) => {
       };
     });
     
-    console.log("✅ [Weekly ALP API] Formatted results:");
-    console.log("📋 Formatted data:", formattedResults);
     
     const response = { success: true, data: formattedResults };
-    console.log("📤 [Weekly ALP API] Sending response:", response);
     
         res.json(response);
         });
-      });
-    });
+});
+
+// GET /api/alp/weekly/user-mtd - Get latest MTD Recap ALP for specific user from Weekly_ALP
+router.get("/weekly/user-mtd", (req, res) => {
+  const { lagnName } = req.query;
+
+  if (!lagnName) {
+    return res.status(400).json({ error: "Please provide lagnName" });
+  }
+
+  const query = `
+    SELECT reportdate, LVL_1_NET AS mtdAlp, LagnName, REPORT, CL_Name
+    FROM (
+      SELECT 
+        reportdate,
+        LVL_1_NET,
+        LagnName,
+        REPORT,
+        CL_Name,
+        ROW_NUMBER() OVER (
+          PARTITION BY LagnName, STR_TO_DATE(reportdate, '%m/%d/%Y')
+          ORDER BY CASE WHEN CL_Name = 'MGA' THEN 0 ELSE 1 END, CL_Name
+        ) as rn
+      FROM Weekly_ALP
+      WHERE LagnName = ?
+      AND REPORT = 'MTD Recap'
+    ) ranked
+    WHERE rn = 1
+    ORDER BY STR_TO_DATE(reportdate, '%m/%d/%Y') DESC
+    LIMIT 1
+  `;
+
+  pool.query(query, [lagnName], (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: "Database error" });
+    }
+    const row = results && results[0] ? results[0] : null;
+    return res.json({ success: true, data: row });
   });
 });
 
@@ -333,7 +702,7 @@ router.get("/weekly/user-alp", (req, res) => {
 router.get("/sga", (req, res) => {
   pool.query("SELECT * FROM SGA_ALP", (err, results) => {
     if (err) {
-      console.error("Error fetching SGA ALP data:", err);
+
       return res.status(500).json({ error: "Database error" });
     }
     res.json(results);
@@ -358,7 +727,7 @@ router.get("/sga/summary", (req, res) => {
   
   pool.query(query, params, (err, results) => {
     if (err) {
-      console.error("Error fetching SGA summary data:", err);
+
       return res.status(500).json({ error: "Database error" });
     }
     res.json(results[0]);
@@ -397,7 +766,7 @@ router.get('/getReportDates', async (req, res) => {
             // Execute both queries
             pool.query(weeklyQuery, (err, weeklyResults) => {
                 if (err) {
-                    console.error(`[GET /getReportDates] Error fetching weekly dates: ${err.message}`);
+
                     return res.status(500).json({
                         success: false,
                         message: 'Internal server error while fetching report dates',
@@ -407,7 +776,7 @@ router.get('/getReportDates', async (req, res) => {
 
                 pool.query(monthlyQuery, (err, monthlyResults) => {
                     if (err) {
-                        console.error(`[GET /getReportDates] Error fetching monthly dates: ${err.message}`);
+
                         return res.status(500).json({
                             success: false,
                             message: 'Internal server error while fetching report dates',
@@ -493,7 +862,7 @@ router.get('/getReportDates', async (req, res) => {
 
             pool.query(query, (err, results) => {
                 if (err) {
-                    console.error(`[GET /getReportDates] Error fetching report dates: ${err.message}`);
+
                     return res.status(500).json({
                         success: false,
                         message: 'Internal server error while fetching report dates',
@@ -529,7 +898,7 @@ router.get('/getReportDates', async (req, res) => {
             });
         }
     } catch (error) {
-        console.error(`[GET /getReportDates] Error fetching report dates: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching report dates',
@@ -540,7 +909,7 @@ router.get('/getReportDates', async (req, res) => {
 
 // GET /api/alp/getUniqueMGAOptions - Get unique MGA filter options
 router.get('/getUniqueMGAOptions', async (req, res) => {
-    console.log('[GET /getUniqueMGAOptions] Request received to fetch unique MGA options.');
+
 
     try {
         // Query to fetch unique combinations of MGA fields
@@ -553,11 +922,11 @@ router.get('/getUniqueMGAOptions', async (req, res) => {
             WHERE Active = 'y' AND hide = 'n'
         `;
 
-        console.log(`[GET /getUniqueMGAOptions] Executing query: ${query}`);
+
         
         pool.query(query, (err, results) => {
             if (err) {
-                console.error(`[GET /getUniqueMGAOptions] Error fetching unique MGA options: ${err.message}`);
+
                 return res.status(500).json({
                     success: false,
                     message: 'Internal server error while fetching unique MGA options.',
@@ -566,21 +935,21 @@ router.get('/getUniqueMGAOptions', async (req, res) => {
             }
 
             if (!results.length) {
-                console.warn('[GET /getUniqueMGAOptions] No active MGAs found.');
+
                 return res.status(404).json({
                     success: false,
                     message: 'No active MGAs found.',
                 });
             }
 
-            console.log(`[GET /getUniqueMGAOptions] Query executed successfully. Number of rows fetched: ${results.length}`);
+
             res.status(200).json({
                 success: true,
                 data: results,
             });
         });
     } catch (error) {
-        console.error(`[GET /getUniqueMGAOptions] Error fetching unique MGA options: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching unique MGA options.',
@@ -593,10 +962,10 @@ router.get('/getUniqueMGAOptions', async (req, res) => {
 router.get('/getweeklyall', async (req, res) => {
     const { startDate, endDate, report = 'Weekly Recap', MGA_NAME, rga, tree } = req.query;
 
-    console.log(`[GET /getweeklyall] Request received with filters - startDate: ${startDate}, endDate: ${endDate}, report: ${report}, MGA_NAME: ${MGA_NAME}, rga: ${rga}, tree: ${tree}`);
+
 
     if (!startDate || !endDate) {
-        console.warn(`[GET /getweeklyall] Missing required parameters: startDate or endDate`);
+
         return res.status(400).json({ success: false, message: 'Start date and end date are required' });
     }
 
@@ -642,11 +1011,11 @@ router.get('/getweeklyall', async (req, res) => {
             params.push(tree, tree);
         }
 
-        console.log(`[GET /getweeklyall] Executing query: ${query}`);
+
         
         pool.query(query, params, (err, results) => {
             if (err) {
-                console.error(`[GET /getweeklyall] Error fetching data: ${err.message}`);
+
                 return res.status(500).json({
                     success: false,
                     message: 'Internal server error while fetching data for getweeklyall',
@@ -654,7 +1023,7 @@ router.get('/getweeklyall', async (req, res) => {
                 });
             }
 
-            console.log(`[GET /getweeklyall] Query executed successfully. Number of rows fetched: ${results.length}`);
+
 
             // 🛠 Deduplication Logic: Keep only the row where `CTLNO = MGA` if duplicates exist
             const deduplicatedResults = [];
@@ -675,7 +1044,7 @@ router.get('/getweeklyall', async (req, res) => {
 
             const finalResults = Array.from(seen.values());
 
-            console.log(`[GET /getweeklyall] Final deduplicated results: ${finalResults.length} rows`);
+
 
             res.status(200).json({
                 success: true,
@@ -683,7 +1052,7 @@ router.get('/getweeklyall', async (req, res) => {
             });
         });
     } catch (error) {
-        console.error(`[GET /getweeklyall] Error fetching data: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching data for getweeklyall',
@@ -696,10 +1065,10 @@ router.get('/getweeklyall', async (req, res) => {
 router.get('/getweeklysa', async (req, res) => {
     const { startDate, endDate, report = 'Weekly Recap', MGA_NAME, rga, tree } = req.query;
 
-    console.log(`[GET /getweeklysa] Request received with startDate: ${startDate}, endDate: ${endDate}, report: ${report}, MGA_NAME: ${MGA_NAME}, rga: ${rga}, tree: ${tree}`);
+
 
     if (!startDate || !endDate) {
-        console.warn(`[GET /getweeklysa] Missing required parameters: startDate or endDate`);
+
         return res.status(400).json({ success: false, message: 'Start date and end date are required' });
     }
 
@@ -747,11 +1116,11 @@ router.get('/getweeklysa', async (req, res) => {
             filters.push(tree);
         }
 
-        console.log(`[GET /getweeklysa] Executing query: ${query}`);
+
         
         pool.query(query, filters, (err, results) => {
             if (err) {
-                console.error(`[GET /getweeklysa] Error fetching data: ${err.message}`);
+
                 return res.status(500).json({
                     success: false,
                     message: 'Internal server error while fetching data for getweeklysa',
@@ -759,14 +1128,14 @@ router.get('/getweeklysa', async (req, res) => {
                 });
             }
 
-            console.log(`[GET /getweeklysa] Query executed successfully. Number of rows fetched: ${results.length}`);
+
             res.status(200).json({
                 success: true,
                 data: results,
             });
         });
     } catch (error) {
-        console.error(`[GET /getweeklysa] Error fetching data: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching data for getweeklysa',
@@ -779,10 +1148,10 @@ router.get('/getweeklysa', async (req, res) => {
 router.get('/getweeklyga', async (req, res) => {
     const { startDate, endDate, report = 'Weekly Recap', MGA_NAME, rga, tree } = req.query;
 
-    console.log(`[GET /getweeklyga] Request received with startDate: ${startDate}, endDate: ${endDate}, report: ${report}, MGA_NAME: ${MGA_NAME}, rga: ${rga}, tree: ${tree}`);
+
 
     if (!startDate || !endDate) {
-        console.warn(`[GET /getweeklyga] Missing required parameters: startDate or endDate`);
+
         return res.status(400).json({ success: false, message: 'Start date and end date are required' });
     }
 
@@ -830,11 +1199,11 @@ router.get('/getweeklyga', async (req, res) => {
             filters.push(tree);
         }
 
-        console.log(`[GET /getweeklyga] Executing query: ${query}`);
+
         
         pool.query(query, filters, (err, results) => {
             if (err) {
-                console.error(`[GET /getweeklyga] Error fetching data: ${err.message}`);
+
                 return res.status(500).json({
                     success: false,
                     message: 'Internal server error while fetching data for getweeklyga',
@@ -842,14 +1211,14 @@ router.get('/getweeklyga', async (req, res) => {
                 });
             }
 
-            console.log(`[GET /getweeklyga] Query executed successfully. Number of rows fetched: ${results.length}`);
+
             res.status(200).json({
                 success: true,
                 data: results,
             });
         });
     } catch (error) {
-        console.error(`[GET /getweeklyga] Error fetching data: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching data for getweeklyga',
@@ -862,7 +1231,7 @@ router.get('/getweeklyga', async (req, res) => {
 router.get('/getweeklymga', async (req, res) => {
     const { startDate, endDate, report = 'Weekly Recap', rga, tree } = req.query;
 
-    console.log(`[GET /getweeklymga] Request received with filters - startDate: ${startDate}, endDate: ${endDate}, report: ${report}, rga: ${rga}, tree: ${tree}`);
+
 
     if (!startDate || !endDate) {
         return res.status(400).json({ success: false, message: 'Start date and end date are required' });
@@ -909,11 +1278,11 @@ router.get('/getweeklymga', async (req, res) => {
             params.push(tree);
         }
 
-        console.log(`[GET /getweeklymga] Executing query: ${query}`);
+
         
         pool.query(query, params, (err, results) => {
             if (err) {
-                console.error(`[GET /getweeklymga] Error: ${err.message}`);
+
                 return res.status(500).json({
                     success: false,
                     message: 'Internal server error',
@@ -939,7 +1308,7 @@ router.get('/getweeklymga', async (req, res) => {
 
             const finalResults = Array.from(seen.values());
 
-            console.log(`[GET /getweeklymga] Final deduplicated results: ${finalResults.length} rows`);
+
 
             res.status(200).json({
                 success: true,
@@ -947,7 +1316,7 @@ router.get('/getweeklymga', async (req, res) => {
             });
         });
     } catch (error) {
-        console.error(`[GET /getweeklymga] Error: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error',
@@ -960,7 +1329,7 @@ router.get('/getweeklymga', async (req, res) => {
 router.get('/getweeklyrga', async (req, res) => {
     const { startDate, endDate, report = 'Weekly Recap', rga, tree } = req.query;
 
-    console.log(`[GET /getweeklyrga] Request received with filters - startDate: ${startDate}, endDate: ${endDate}, report: ${report}, rga: ${rga}, tree: ${tree}`);
+
 
     if (!startDate || !endDate) {
         return res.status(400).json({ success: false, message: 'Start date and end date are required' });
@@ -1006,11 +1375,11 @@ router.get('/getweeklyrga', async (req, res) => {
             params.push(tree);
         }
 
-        console.log(`[GET /getweeklyrga] Executing query: ${query}`);
+
         
         pool.query(query, params, (err, results) => {
             if (err) {
-                console.error(`[GET /getweeklyrga] Error: ${err.message}`);
+
                 return res.status(500).json({
                     success: false,
                     message: 'Internal server error',
@@ -1036,7 +1405,7 @@ router.get('/getweeklyrga', async (req, res) => {
 
             const finalResults = Array.from(seen.values());
 
-            console.log(`[GET /getweeklyrga] Final deduplicated results: ${finalResults.length} rows`);
+
 
             res.status(200).json({
                 success: true,
@@ -1044,7 +1413,7 @@ router.get('/getweeklyrga', async (req, res) => {
             });
         });
     } catch (error) {
-        console.error(`[GET /getweeklyrga] Error: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error',
@@ -1061,10 +1430,10 @@ router.get('/getweeklyrga', async (req, res) => {
 router.get('/getmonthlyall', async (req, res) => {
     const { month, MGA_NAME, rga, tree } = req.query;
 
-    console.log(`[GET /getmonthlyall] Request received with filters - month: ${month}, MGA_NAME: ${MGA_NAME}, rga: ${rga}, tree: ${tree}`);
+
 
     if (!month) {
-        console.warn(`[GET /getmonthlyall] Missing required parameter: month`);
+
         return res.status(400).json({ success: false, message: 'Month is required' });
     }
 
@@ -1109,11 +1478,11 @@ router.get('/getmonthlyall', async (req, res) => {
             params.push(tree, tree);
         }
 
-        console.log(`[GET /getmonthlyall] Executing query: ${query}`);
+
         
         pool.query(query, params, (err, results) => {
             if (err) {
-                console.error(`[GET /getmonthlyall] Error fetching data: ${err.message}`);
+
                 return res.status(500).json({
                     success: false,
                     message: 'Internal server error while fetching data for getmonthlyall',
@@ -1121,7 +1490,7 @@ router.get('/getmonthlyall', async (req, res) => {
                 });
             }
 
-            console.log(`[GET /getmonthlyall] Query executed successfully. Number of rows fetched: ${results.length}`);
+
 
             // Deduplication Logic: Keep only the row where `CTLNO = MGA` if duplicates exist
             const deduplicatedResults = [];
@@ -1142,7 +1511,7 @@ router.get('/getmonthlyall', async (req, res) => {
 
             const finalResults = Array.from(seen.values());
 
-            console.log(`[GET /getmonthlyall] Final deduplicated results: ${finalResults.length} rows`);
+
 
             res.status(200).json({
                 success: true,
@@ -1150,7 +1519,7 @@ router.get('/getmonthlyall', async (req, res) => {
             });
         });
     } catch (error) {
-        console.error(`[GET /getmonthlyall] Error fetching data: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching data for getmonthlyall',
@@ -1163,10 +1532,10 @@ router.get('/getmonthlyall', async (req, res) => {
 router.get('/getmonthlysa', async (req, res) => {
     const { month, MGA_NAME, rga, tree } = req.query;
 
-    console.log(`[GET /getmonthlysa] Request received with month: ${month}, MGA_NAME: ${MGA_NAME}, rga: ${rga}, tree: ${tree}`);
+
 
     if (!month) {
-        console.warn(`[GET /getmonthlysa] Missing required parameter: month`);
+
         return res.status(400).json({ success: false, message: 'Month is required' });
     }
 
@@ -1212,11 +1581,11 @@ router.get('/getmonthlysa', async (req, res) => {
             params.push(tree, tree);
         }
 
-        console.log(`[GET /getmonthlysa] Executing query: ${query}`);
+
         
         pool.query(query, params, (err, results) => {
             if (err) {
-                console.error(`[GET /getmonthlysa] Error fetching data: ${err.message}`);
+
                 return res.status(500).json({
                     success: false,
                     message: 'Internal server error while fetching data for getmonthlysa',
@@ -1224,7 +1593,7 @@ router.get('/getmonthlysa', async (req, res) => {
                 });
             }
 
-            console.log(`[GET /getmonthlysa] Query executed successfully. Number of rows fetched: ${results.length}`);
+
 
             res.status(200).json({
                 success: true,
@@ -1232,7 +1601,7 @@ router.get('/getmonthlysa', async (req, res) => {
             });
         });
     } catch (error) {
-        console.error(`[GET /getmonthlysa] Error fetching data: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching data for getmonthlysa',
@@ -1245,10 +1614,10 @@ router.get('/getmonthlysa', async (req, res) => {
 router.get('/getmonthlyga', async (req, res) => {
     const { month, MGA_NAME, rga, tree } = req.query;
 
-    console.log(`[GET /getmonthlyga] Request received with month: ${month}, MGA_NAME: ${MGA_NAME}, rga: ${rga}, tree: ${tree}`);
+
 
     if (!month) {
-        console.warn(`[GET /getmonthlyga] Missing required parameter: month`);
+
         return res.status(400).json({ success: false, message: 'Month is required' });
     }
 
@@ -1294,11 +1663,11 @@ router.get('/getmonthlyga', async (req, res) => {
             params.push(tree, tree);
         }
 
-        console.log(`[GET /getmonthlyga] Executing query: ${query}`);
+
         
         pool.query(query, params, (err, results) => {
             if (err) {
-                console.error(`[GET /getmonthlyga] Error fetching data: ${err.message}`);
+
                 return res.status(500).json({
                     success: false,
                     message: 'Internal server error while fetching data for getmonthlyga',
@@ -1306,7 +1675,7 @@ router.get('/getmonthlyga', async (req, res) => {
                 });
             }
 
-            console.log(`[GET /getmonthlyga] Query executed successfully. Number of rows fetched: ${results.length}`);
+
 
             res.status(200).json({
                 success: true,
@@ -1314,7 +1683,7 @@ router.get('/getmonthlyga', async (req, res) => {
             });
         });
     } catch (error) {
-        console.error(`[GET /getmonthlyga] Error fetching data: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching data for getmonthlyga',
@@ -1327,10 +1696,10 @@ router.get('/getmonthlyga', async (req, res) => {
 router.get('/getmonthlymga', async (req, res) => {
     const { month, rga, tree } = req.query;
 
-    console.log(`[GET /getmonthlymga] Request received with filters - month: ${month}, rga: ${rga}, tree: ${tree}`);
+
 
     if (!month) {
-        console.warn(`[GET /getmonthlymga] Missing required parameter: month`);
+
         return res.status(400).json({ success: false, message: 'Month is required' });
     }
 
@@ -1373,11 +1742,11 @@ router.get('/getmonthlymga', async (req, res) => {
             params.push(tree);
         }
 
-        console.log(`[GET /getmonthlymga] Executing query: ${query}`);
+
         
         pool.query(query, params, (err, results) => {
             if (err) {
-                console.error(`[GET /getmonthlymga] Error fetching data: ${err.message}`);
+
                 return res.status(500).json({
                     success: false,
                     message: 'Internal server error while fetching data for getmonthlymga',
@@ -1385,7 +1754,7 @@ router.get('/getmonthlymga', async (req, res) => {
                 });
             }
 
-            console.log(`[GET /getmonthlymga] Query executed successfully. Number of rows fetched: ${results.length}`);
+
 
             // Deduplication Logic
             const deduplicatedResults = [];
@@ -1405,7 +1774,7 @@ router.get('/getmonthlymga', async (req, res) => {
 
             const finalResults = Array.from(seen.values());
 
-            console.log(`[GET /getmonthlymga] Final deduplicated results: ${finalResults.length} rows`);
+
 
             res.status(200).json({
                 success: true,
@@ -1413,7 +1782,7 @@ router.get('/getmonthlymga', async (req, res) => {
             });
         });
     } catch (error) {
-        console.error(`[GET /getmonthlymga] Error fetching data: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching data for getmonthlymga',
@@ -1426,10 +1795,10 @@ router.get('/getmonthlymga', async (req, res) => {
 router.get('/getmonthlyrga', async (req, res) => {
     const { month, rga, tree } = req.query;
 
-    console.log(`[GET /getmonthlyrga] Request received with filters - month: ${month}, rga: ${rga}, tree: ${tree}`);
+
 
     if (!month) {
-        console.warn(`[GET /getmonthlyrga] Missing required parameter: month`);
+
         return res.status(400).json({ success: false, message: 'Month is required' });
     }
 
@@ -1472,11 +1841,11 @@ router.get('/getmonthlyrga', async (req, res) => {
             params.push(tree);
         }
 
-        console.log(`[GET /getmonthlyrga] Executing query: ${query}`);
+
         
         pool.query(query, params, (err, results) => {
             if (err) {
-                console.error(`[GET /getmonthlyrga] Error fetching data: ${err.message}`);
+
                 return res.status(500).json({
                     success: false,
                     message: 'Internal server error while fetching data for getmonthlyrga',
@@ -1484,7 +1853,7 @@ router.get('/getmonthlyrga', async (req, res) => {
                 });
             }
 
-            console.log(`[GET /getmonthlyrga] Query executed successfully. Number of rows fetched: ${results.length}`);
+
 
             // Deduplication Logic
             const deduplicatedResults = [];
@@ -1504,7 +1873,7 @@ router.get('/getmonthlyrga', async (req, res) => {
 
             const finalResults = Array.from(seen.values());
 
-            console.log(`[GET /getmonthlyrga] Final deduplicated results: ${finalResults.length} rows`);
+
 
             res.status(200).json({
                 success: true,
@@ -1512,7 +1881,7 @@ router.get('/getmonthlyrga', async (req, res) => {
             });
         });
     } catch (error) {
-        console.error(`[GET /getmonthlyrga] Error fetching data: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching data for getmonthlyrga',
@@ -1569,7 +1938,7 @@ router.get("/associates-raw", async (req, res) => {
         });
         
     } catch (error) {
-        console.error(`[GET /associates-raw] Error fetching data: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching raw associates data',
@@ -1623,7 +1992,7 @@ router.get("/hires-raw", async (req, res) => {
         });
         
     } catch (error) {
-        console.error(`[GET /hires-raw] Error fetching data: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching raw hires data',
@@ -1637,28 +2006,71 @@ router.get("/hires-raw", async (req, res) => {
 // GET /api/alp/mga/weekly-ytd - Get YTD data from Weekly_ALP for MGA dashboard
 router.get("/mga/weekly-ytd", async (req, res) => {
     try {
-        const { lagnName } = req.query;
+        const { lagnName, viewMode } = req.query;
+        
+        console.log('[YTD Backend] Fetching YTD data for lagnName:', lagnName, 'viewMode:', viewMode);
         
         if (!lagnName) {
+            console.log('[YTD Backend] ERROR: lagnName parameter missing');
             return res.status(400).json({ error: "lagnName parameter is required" });
         }
         
-        // Get the max reportdate where REPORT = 'YTD Recap' for the specific MGA
+        // Determine CL_Name filtering based on viewMode (for RGA users)
+        const userRoleHeader = (req.headers && req.headers['user-role']) || '';
+        const upperRole = String(userRoleHeader || '').toUpperCase();
+        let clNameCondition = '';
+        
+        if (upperRole === 'RGA') {
+            if (viewMode === 'mga') {
+                clNameCondition = "AND CL_Name = 'MGA'"; // MGA tab: show only MGA-level data
+            } else if (viewMode === 'rga') {
+                clNameCondition = "AND (CL_Name = '' OR CL_Name IS NULL)"; // RGA tab: show blank CL_Name rows
+            }
+        }
+        
+        // Get the max reportdate where REPORT = 'YTD Recap' for the specific MGA in the current year
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        
         const query = `
             SELECT *
             FROM Weekly_ALP 
             WHERE LagnName = ? 
             AND REPORT = 'YTD Recap' 
+            ${clNameCondition}
+            AND YEAR(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
             AND reportdate = (
                 SELECT MAX(reportdate) 
                 FROM Weekly_ALP 
                 WHERE LagnName = ? 
                 AND REPORT = 'YTD Recap'
+                ${clNameCondition}
+                AND YEAR(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
             )
         `;
         
+        console.log('[YTD Backend] Executing query:', query);
+        console.log('[YTD Backend] Query parameters:', [lagnName, currentYear, lagnName, currentYear]);
+        console.log('[YTD Backend] Current year filter:', currentYear);
+        console.log('[YTD Backend] CL_Name condition:', clNameCondition || 'None (no filtering)');
+        
         const { query: dbQuery } = require('../db');
-        const results = await dbQuery(query, [lagnName, lagnName]);
+        const results = await dbQuery(query, [lagnName, currentYear, lagnName, currentYear]);
+        
+        console.log('[YTD Backend] Query returned', results.length, 'rows');
+        
+        if (results.length > 0) {
+            const row = results[0];
+            console.log('[YTD Backend] First row data:');
+            console.log('[YTD Backend] - LagnName:', row.LagnName);
+            console.log('[YTD Backend] - REPORT:', row.REPORT);
+            console.log('[YTD Backend] - reportdate:', row.reportdate);
+            console.log('[YTD Backend] - LVL_1_NET:', row.LVL_1_NET);
+            console.log('[YTD Backend] - LVL_2_F6_NET:', row.LVL_2_F6_NET);
+            console.log('[YTD Backend] - Available fields:', Object.keys(row));
+        } else {
+            console.log('[YTD Backend] No data found for lagnName:', lagnName);
+        }
         
         res.json({
             success: true,
@@ -1666,7 +2078,7 @@ router.get("/mga/weekly-ytd", async (req, res) => {
         });
         
     } catch (error) {
-        console.error(`[GET /mga/weekly-ytd] Error: ${error.message}`);
+        console.error('[YTD Backend] Error fetching YTD data:', error);
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching MGA Weekly_ALP YTD data',
@@ -1678,12 +2090,25 @@ router.get("/mga/weekly-ytd", async (req, res) => {
 // GET /api/alp/mga/monthly-alp - Get Monthly_ALP data for MGA dashboard
 router.get("/mga/monthly-alp", async (req, res) => {
     try {
-        const { lagnName, month } = req.query;
+        const { lagnName, month, viewMode } = req.query;
         
-        console.log(`🔍 [MGA Monthly ALP] Request params:`, { lagnName, month });
+
         
         if (!lagnName) {
             return res.status(400).json({ error: "lagnName parameter is required" });
+        }
+        
+        // Determine CL_Name filtering based on viewMode (for RGA users)
+        const userRoleHeader = (req.headers && req.headers['user-role']) || '';
+        const upperRole = String(userRoleHeader || '').toUpperCase();
+        let clNameCondition = '';
+        
+        if (upperRole === 'RGA') {
+            if (viewMode === 'mga') {
+                clNameCondition = "AND CL_Name = 'MGA'"; // MGA tab: show only MGA-level data
+            } else if (viewMode === 'rga') {
+                clNameCondition = "AND (CL_Name = '' OR CL_Name IS NULL)"; // RGA tab: show blank CL_Name rows
+            }
         }
         
         // First, get all rows for the agent (with or without month filter)
@@ -1691,6 +2116,7 @@ router.get("/mga/monthly-alp", async (req, res) => {
             SELECT *
             FROM Monthly_ALP 
             WHERE LagnName = ?
+            ${clNameCondition}
         `;
         
         let params = [lagnName];
@@ -1699,21 +2125,24 @@ router.get("/mga/monthly-alp", async (req, res) => {
         if (month) {
             baseQuery += ` AND month = ?`;
             params.push(month);
-            console.log(`🔍 [MGA Monthly ALP] Filtering by specific month: ${month}`);
+
         }
         
         baseQuery += ` ORDER BY month DESC, CL_Name DESC`;
         
-        console.log(`🔍 [MGA Monthly ALP] Base query:`, baseQuery);
-        console.log(`🔍 [MGA Monthly ALP] Query params:`, params);
+
         
         const { query: dbQuery } = require('../db');
         const allResults = await dbQuery(baseQuery, params);
         
-        console.log(`🔍 [MGA Monthly ALP] All results count: ${allResults.length}`);
-        console.log(`🔍 [MGA Monthly ALP] All results:`, allResults.slice(0, 5));
+        console.log('[Monthly ALP] Query results:', {
+            lagnName,
+            viewMode,
+            clNameCondition: clNameCondition || 'None',
+            rowCount: allResults.length
+        });
         
-        // Group by month and prefer MGA records when multiple exist
+        // Group by month and prefer MGA records when multiple exist (unless filtered by CL_Name)
         const groupedByMonth = {};
         allResults.forEach(row => {
             const monthKey = row.month;
@@ -1724,23 +2153,33 @@ router.get("/mga/monthly-alp", async (req, res) => {
         });
         
         // For each month, prefer MGA record if multiple exist, otherwise take the single record
+        // Note: If CL_Name is already filtered in query, this step is mostly redundant but safe
         const finalResults = [];
         Object.keys(groupedByMonth).forEach(monthKey => {
             const monthRecords = groupedByMonth[monthKey];
             if (monthRecords.length === 1) {
                 // Only one record for this month, use it regardless of CL_Name
                 finalResults.push(monthRecords[0]);
-                console.log(`🔍 [MGA Monthly ALP] Single record for ${monthKey}: CL_Name=${monthRecords[0].CL_Name}`);
+
             } else {
-                // Multiple records, prefer MGA
-                const mgaRecord = monthRecords.find(r => r.CL_Name === 'MGA');
-                if (mgaRecord) {
-                    finalResults.push(mgaRecord);
-                    console.log(`🔍 [MGA Monthly ALP] Multiple records for ${monthKey}, using MGA record`);
+                // Multiple records, prefer MGA unless we're filtering for non-MGA
+                if (viewMode === 'rga') {
+                    // For RGA view, prefer non-MGA records
+                    const nonMgaRecord = monthRecords.find(r => r.CL_Name !== 'MGA');
+                    if (nonMgaRecord) {
+                        finalResults.push(nonMgaRecord);
+                    } else {
+                        finalResults.push(monthRecords[0]);
+                    }
                 } else {
-                    // No MGA record, take the first one
-                    finalResults.push(monthRecords[0]);
-                    console.log(`🔍 [MGA Monthly ALP] Multiple records for ${monthKey}, no MGA found, using: CL_Name=${monthRecords[0].CL_Name}`);
+                    // Default: prefer MGA
+                    const mgaRecord = monthRecords.find(r => r.CL_Name === 'MGA');
+                    if (mgaRecord) {
+                        finalResults.push(mgaRecord);
+                    } else {
+                        // No MGA record, take the first one
+                        finalResults.push(monthRecords[0]);
+                    }
                 }
             }
         });
@@ -1752,8 +2191,7 @@ router.get("/mga/monthly-alp", async (req, res) => {
             return 0;
         });
         
-        console.log(`🔍 [MGA Monthly ALP] Final results count: ${finalResults.length}`);
-        console.log(`🔍 [MGA Monthly ALP] Final results:`, finalResults.slice(0, 3));
+
         
         res.json({
             success: true,
@@ -1761,7 +2199,7 @@ router.get("/mga/monthly-alp", async (req, res) => {
         });
         
     } catch (error) {
-        console.error(`[GET /mga/monthly-alp] Error: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching MGA Monthly_ALP data',
@@ -1773,21 +2211,45 @@ router.get("/mga/monthly-alp", async (req, res) => {
 // GET /api/alp/mga/associates - Get Associates data filtered by MGA (same table as SGA)
 router.get("/mga/associates", async (req, res) => {
     try {
-        const { lagnName } = req.query;
+        const { lagnName, userRole, viewMode } = req.query;
         
         if (!lagnName) {
             return res.status(400).json({ error: "lagnName parameter is required" });
         }
         
-        const query = `
-            SELECT *
-            FROM associates 
-            WHERE MGA = ?
-            ORDER BY PRODDATE DESC
-        `;
+        let query, queryParams;
+        
+        // For SA and GA users, check multiple columns (sa, ga, mga) for their name
+        if (userRole === 'SA' || userRole === 'GA') {
+            query = `
+                SELECT *
+                FROM associates 
+                WHERE sa = ? OR ga = ? OR mga = ?
+                ORDER BY PRODDATE DESC
+            `;
+            queryParams = [lagnName, lagnName, lagnName];
+        } else if (userRole === 'RGA' && viewMode === 'rga') {
+            // For RGA users in RGA view mode, filter by RGA column (includes first-year MGA rollups)
+            query = `
+                SELECT *
+                FROM associates 
+                WHERE RGA = ?
+                ORDER BY PRODDATE DESC
+            `;
+            queryParams = [lagnName];
+        } else {
+            // For other roles (MGA, AGT) or RGA in MGA view mode, use MGA filtering
+            query = `
+                SELECT *
+                FROM associates 
+                WHERE MGA = ?
+                ORDER BY PRODDATE DESC
+            `;
+            queryParams = [lagnName];
+        }
         
         const { query: dbQuery } = require('../db');
-        const results = await dbQuery(query, [lagnName]);
+        const results = await dbQuery(query, queryParams);
         
         res.json({
             success: true,
@@ -1795,7 +2257,7 @@ router.get("/mga/associates", async (req, res) => {
         });
         
     } catch (error) {
-        console.error(`[GET /mga/associates] Error: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching MGA Associates data',
@@ -1807,21 +2269,45 @@ router.get("/mga/associates", async (req, res) => {
 // GET /api/alp/mga/vips - Get VIPs data filtered by MGA (from VIPs table)
 router.get("/mga/vips", async (req, res) => {
     try {
-        const { lagnName } = req.query;
+        const { lagnName, userRole, viewMode } = req.query;
         
         if (!lagnName) {
             return res.status(400).json({ error: "lagnName parameter is required" });
         }
         
-        const query = `
-            SELECT *
-            FROM VIPs 
-            WHERE mga = ?
-            ORDER BY vip_month DESC
-        `;
+        let query, queryParams;
+        
+        // For SA and GA users, check multiple columns (sa, ga, mga) for their name
+        if (userRole === 'SA' || userRole === 'GA') {
+            query = `
+                SELECT *
+                FROM VIPs 
+                WHERE sa = ? OR ga = ? OR mga = ?
+                ORDER BY vip_month DESC
+            `;
+            queryParams = [lagnName, lagnName, lagnName];
+        } else if (userRole === 'RGA' && viewMode === 'rga') {
+            // For RGA users in RGA view mode, filter by RGA column (includes first-year MGA rollups)
+            query = `
+                SELECT *
+                FROM VIPs 
+                WHERE rga = ?
+                ORDER BY vip_month DESC
+            `;
+            queryParams = [lagnName];
+        } else {
+            // For other roles (MGA, AGT) or RGA in MGA view mode, use MGA filtering
+            query = `
+                SELECT *
+                FROM VIPs 
+                WHERE mga = ?
+                ORDER BY vip_month DESC
+            `;
+            queryParams = [lagnName];
+        }
         
         const { query: dbQuery } = require('../db');
-        const results = await dbQuery(query, [lagnName]);
+        const results = await dbQuery(query, queryParams);
         
         res.json({
             success: true,
@@ -1829,7 +2315,7 @@ router.get("/mga/vips", async (req, res) => {
         });
         
     } catch (error) {
-        console.error(`[GET /mga/vips] Error: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching MGA VIPs data',
@@ -1841,21 +2327,36 @@ router.get("/mga/vips", async (req, res) => {
 // GET /api/alp/mga/hires - Get Hires data from amore_data where MGA matches
 router.get("/mga/hires", async (req, res) => {
     try {
-        const { lagnName } = req.query;
+        const { lagnName, userRole, viewMode } = req.query;
         
         if (!lagnName) {
             return res.status(400).json({ error: "lagnName parameter is required" });
         }
         
-        const query = `
-            SELECT *
-            FROM amore_data 
-            WHERE MGA = ?
-            ORDER BY MORE_Date DESC
-        `;
+        let query, queryParams;
+        
+        if (userRole === 'RGA' && viewMode === 'rga') {
+            // For RGA users in RGA view mode, filter by RGA column (includes first-year MGA rollups)
+            query = `
+                SELECT *
+                FROM amore_data 
+                WHERE RGA = ?
+                ORDER BY MORE_Date DESC
+            `;
+            queryParams = [lagnName];
+        } else {
+            // For other roles (MGA, AGT) or RGA in MGA view mode, use MGA filtering
+            query = `
+                SELECT *
+                FROM amore_data 
+                WHERE MGA = ?
+                ORDER BY MORE_Date DESC
+            `;
+            queryParams = [lagnName];
+        }
         
         const { query: dbQuery } = require('../db');
-        const results = await dbQuery(query, [lagnName]);
+        const results = await dbQuery(query, queryParams);
         
         res.json({
             success: true,
@@ -1863,11 +2364,428 @@ router.get("/mga/hires", async (req, res) => {
         });
         
     } catch (error) {
-        console.error(`[GET /mga/hires] Error: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching MGA Hires data',
             error: error.message,
+        });
+    }
+});
+
+// GET /api/alp/sa/team-daily-activity - Get Daily_Activity data for SA team mode (agent's own ALP + all agents where SA = agent)
+router.get("/sa/team-daily-activity", async (req, res) => {
+    try {
+        const { lagnName, startDate, endDate } = req.query;
+        
+        if (!lagnName) {
+            return res.status(400).json({ error: "lagnName parameter is required" });
+        }
+        
+        const { query: dbQuery } = require('../db');
+        
+        console.log('📊 [SA Team Daily Activity] Request params:', {
+            lagnName,
+            startDate,
+            endDate,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Build the query to get:
+        // 1. This agent's own Daily_Activity.alp where agent = lagnName
+        // 2. All Daily_Activity.alp where SA = lagnName
+        let query = `
+            SELECT 
+                SUM(alp) AS totalAlp,
+                SUM(refAlp) AS totalRefAlp, 
+                SUM(refs) AS totalRefs,
+                COUNT(DISTINCT agent) AS agentCount
+            FROM Daily_Activity 
+            WHERE (agent = ? OR SA = ?)
+        `;
+        
+        let params = [lagnName, lagnName];
+        
+        // Add date filtering if provided
+        if (startDate && endDate) {
+            query += ` AND reportDate >= ? AND reportDate <= ?`;
+            params.push(startDate, endDate);
+        }
+        
+        console.log('📊 [SA Team Daily Activity] Query:', {
+            query: query.replace(/\s+/g, ' ').trim(),
+            params,
+            description: 'Summing ALP where user is agent OR where user is SA'
+        });
+        
+        const results = await dbQuery(query, params);
+        const result = results[0] || {};
+        
+        const responseData = {
+            totalAlp: parseFloat(result.totalAlp) || 0,
+            totalRefAlp: parseFloat(result.totalRefAlp) || 0,
+            totalRefs: parseInt(result.totalRefs) || 0,
+            agentCount: parseInt(result.agentCount) || 0
+        };
+        
+        console.log('📊 [SA Team Daily Activity] Response:', {
+            lagnName,
+            responseData,
+            rawResult: result,
+            explanation: 'Combined ALP from user as agent + user as SA'
+        });
+        
+        res.json(responseData);
+        
+    } catch (error) {
+        console.error('❌ [SA Team Daily Activity] Error:', error);
+        res.status(500).json({ 
+            error: "Failed to fetch SA team daily activity data",
+            details: error.message 
+        });
+    }
+});
+
+// GET /api/alp/ga/team-daily-activity - Get Daily_Activity data for GA team mode (agent's own ALP + all agents where SA = agent OR GA = agent)
+router.get("/ga/team-daily-activity", async (req, res) => {
+    try {
+        const { lagnName, startDate, endDate } = req.query;
+        
+        if (!lagnName) {
+            return res.status(400).json({ error: "lagnName parameter is required" });
+        }
+        
+        const { query: dbQuery } = require('../db');
+        
+        console.log('📊 [GA Team Daily Activity] Request params:', {
+            lagnName,
+            startDate,
+            endDate,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Build the query to get:
+        // 1. This agent's own Daily_Activity.alp where agent = lagnName
+        // 2. All Daily_Activity.alp where SA = lagnName (GA supervises SAs)
+        // 3. All Daily_Activity.alp where GA = lagnName (GA supervises agents directly)
+        let query = `
+            SELECT 
+                SUM(alp) AS totalAlp,
+                SUM(refAlp) AS totalRefAlp, 
+                SUM(refs) AS totalRefs,
+                COUNT(DISTINCT agent) AS agentCount
+            FROM Daily_Activity 
+            WHERE (agent = ? OR SA = ? OR GA = ?)
+        `;
+        
+        let params = [lagnName, lagnName, lagnName];
+        
+        // Add date filtering if provided
+        if (startDate && endDate) {
+            query += ` AND reportDate >= ? AND reportDate <= ?`;
+            params.push(startDate, endDate);
+        }
+        
+        console.log('📊 [GA Team Daily Activity] Query:', {
+            query: query.replace(/\s+/g, ' ').trim(),
+            params,
+            description: 'Summing ALP where user is agent OR where user is SA OR where user is GA'
+        });
+        
+        const results = await dbQuery(query, params);
+        const result = results[0] || {};
+        
+        const responseData = {
+            totalAlp: parseFloat(result.totalAlp) || 0,
+            totalRefAlp: parseFloat(result.totalRefAlp) || 0,
+            totalRefs: parseInt(result.totalRefs) || 0,
+            agentCount: parseInt(result.agentCount) || 0
+        };
+        
+        console.log('📊 [GA Team Daily Activity] Response:', {
+            lagnName,
+            responseData,
+            rawResult: result,
+            explanation: 'Combined ALP from user as agent + user as SA + user as GA'
+        });
+        
+        res.json(responseData);
+        
+    } catch (error) {
+        console.error('❌ [GA Team Daily Activity] Error:', error);
+        res.status(500).json({ 
+            error: "Failed to fetch GA team daily activity data",
+            details: error.message 
+        });
+    }
+});
+
+// GET /api/alp/ga/monthly-alp - Get Monthly_ALP data for GA users with LVL_3_NET for team mode, LVL_1_NET for personal mode
+router.get("/ga/monthly-alp", async (req, res) => {
+    try {
+        const { lagnName, viewMode } = req.query;
+        
+        if (!lagnName) {
+            return res.status(400).json({ error: "lagnName parameter is required" });
+        }
+        
+        const { query: dbQuery } = require('../db');
+        
+        // Calculate previous month in mm/yyyy format
+        const now = new Date();
+        const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const monthStr = `${String(prevMonth.getMonth() + 1).padStart(2, '0')}/${prevMonth.getFullYear()}`;
+        
+        console.log('📊 [GA Monthly ALP] Request params:', {
+            lagnName,
+            viewMode,
+            targetMonth: monthStr,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Determine which ALP column to use based on viewMode
+        // GA team mode uses LVL_3_NET, personal mode uses LVL_1_NET
+        const alpColumn = (viewMode === 'team') ? 'LVL_3_NET' : 'LVL_1_NET';
+        
+        console.log('📊 [GA Monthly ALP] Using ALP column:', {
+            viewMode,
+            alpColumn,
+            explanation: viewMode === 'team' ? 'GA Team mode uses LVL_3_NET' : 'Personal mode uses LVL_1_NET'
+        });
+        
+        // Query Monthly_ALP table for the specific user and month
+        const query = `
+            SELECT 
+                ${alpColumn} as monthlyAlp,
+                month,
+                LagnName
+            FROM Monthly_ALP 
+            WHERE LagnName = ? AND month = ?
+        `;
+        
+        const params = [lagnName, monthStr];
+        
+        console.log('📊 [GA Monthly ALP] Query:', {
+            query: query.replace(/\s+/g, ' ').trim(),
+            params,
+            description: `Getting ${alpColumn} from Monthly_ALP for ${lagnName} in ${monthStr}`
+        });
+        
+        const results = await dbQuery(query, params);
+        const result = results[0] || {};
+        
+        // Format the response to match the expected structure from mga/monthly-alp
+        // Frontend expects { success: true, data: [array of monthly records] }
+        // The calculateGaAlpMetrics function expects LVL_3_NET (with fallback to LVL_2_NET)
+        // So we put team mode values in LVL_3_NET and personal mode values in LVL_2_NET
+        const alpValue = parseFloat(result.monthlyAlp) || 0;
+        const monthlyRecord = {
+            month: result.month || monthStr,
+            LagnName: result.LagnName || lagnName,
+            CL_Name: 'GA',
+            // Put values in appropriate columns based on viewMode for frontend calculation compatibility
+            LVL_3_NET: (viewMode === 'team') ? alpValue : 0,
+            LVL_2_NET: (viewMode === 'personal') ? alpValue : 0,
+            LVL_1_NET: 0, // Not used for GA calculations
+            // Debugging fields
+            alpColumn: alpColumn,
+            viewMode: viewMode,
+            originalValue: alpValue
+        };
+        
+        const responseData = {
+            success: true,
+            data: [monthlyRecord] // Wrap in array like mga/monthly-alp does
+        };
+        
+        console.log('📊 [GA Monthly ALP] Response:', {
+            lagnName,
+            targetMonth: monthStr,
+            viewMode,
+            alpColumn,
+            monthlyRecord,
+            rawResult: result,
+            explanation: `Monthly ALP from Monthly_ALP.${alpColumn} for previous month, formatted for frontend compatibility`
+        });
+        
+        res.json(responseData);
+        
+    } catch (error) {
+        console.error('❌ [GA Monthly ALP] Error:', error);
+        res.status(500).json({ 
+            error: "Failed to fetch GA monthly ALP data",
+            details: error.message 
+        });
+    }
+});
+
+// GET /api/alp/mga/team-daily-activity - Get Daily_Activity data for MGA team mode (agent's own ALP + all agents where GA/SA = agent)
+router.get("/mga/team-daily-activity", async (req, res) => {
+    try {
+        const { lagnName, startDate, endDate } = req.query;
+        
+        if (!lagnName) {
+            return res.status(400).json({ error: "lagnName parameter is required" });
+        }
+        
+        const { query: dbQuery } = require('../db');
+        
+        console.log('📊 [MGA Team Daily Activity] Request params:', {
+            lagnName,
+            startDate,
+            endDate,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Build the query to get:
+        // 1. This agent's own Daily_Activity.alp where agent = lagnName
+        // 2. All Daily_Activity.alp where SA = lagnName (MGA supervises SAs)
+        // 3. All Daily_Activity.alp where GA = lagnName (MGA supervises GAs)
+        // 4. All Daily_Activity.alp where MGA = lagnName (MGA supervises agents directly)
+        let query = `
+            SELECT 
+                SUM(alp) AS totalAlp,
+                SUM(refAlp) AS totalRefAlp, 
+                SUM(refs) AS totalRefs,
+                COUNT(DISTINCT agent) AS agentCount
+            FROM Daily_Activity 
+            WHERE (agent = ? OR SA = ? OR GA = ? OR MGA = ?)
+        `;
+        
+        let params = [lagnName, lagnName, lagnName, lagnName];
+        
+        // Add date filtering if provided
+        if (startDate && endDate) {
+            query += ` AND reportDate >= ? AND reportDate <= ?`;
+            params.push(startDate, endDate);
+        }
+        
+        console.log('📊 [MGA Team Daily Activity] Query:', {
+            query: query.replace(/\s+/g, ' ').trim(),
+            params,
+            description: 'Summing ALP where user is agent OR where user is SA OR where user is GA OR where user is MGA'
+        });
+        
+        const results = await dbQuery(query, params);
+        const result = results[0] || {};
+        
+        const responseData = {
+            totalAlp: parseFloat(result.totalAlp) || 0,
+            totalRefAlp: parseFloat(result.totalRefAlp) || 0,
+            totalRefs: parseInt(result.totalRefs) || 0,
+            agentCount: parseInt(result.agentCount) || 0
+        };
+        
+        console.log('📊 [MGA Team Daily Activity] Response:', {
+            lagnName,
+            responseData,
+            rawResult: result,
+            explanation: 'Combined ALP from user as agent + user as SA + user as GA + user as MGA'
+        });
+        
+        res.json(responseData);
+        
+    } catch (error) {
+        console.error('❌ [MGA Team Daily Activity] Error:', error);
+        res.status(500).json({ 
+            error: "Failed to fetch MGA team daily activity data",
+            details: error.message 
+        });
+    }
+});
+
+// GET /api/alp/rga/team-daily-activity - Get Daily_Activity data for RGA team mode (agent's own ALP + all agents in hierarchy)
+router.get("/rga/team-daily-activity", async (req, res) => {
+    try {
+        const { lagnName, startDate, endDate, viewMode } = req.query;
+        
+        if (!lagnName) {
+            return res.status(400).json({ error: "lagnName parameter is required" });
+        }
+        
+        const { query: dbQuery } = require('../db');
+        
+        console.log('📊 [RGA Team Daily Activity] Request params:', {
+            lagnName,
+            startDate,
+            endDate,
+            viewMode,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Build the query based on viewMode:
+        // - viewMode='mga': Get MGA-level data (WHERE MGA = lagnName OR agent = lagnName)
+        // - viewMode='rga': Get RGA-level data (WHERE RGA = lagnName OR agent = lagnName)
+        // - viewMode='team' or undefined: Get all levels (legacy behavior)
+        let whereClause;
+        let params;
+        
+        if (viewMode === 'mga') {
+            // MGA tab: Only MGA-level data
+            whereClause = '(agent = ? OR MGA = ?)';
+            params = [lagnName, lagnName];
+        } else if (viewMode === 'rga') {
+            // RGA tab: Only RGA-level data (includes first-year MGA rollups)
+            whereClause = '(agent = ? OR RGA = ?)';
+            params = [lagnName, lagnName];
+        } else {
+            // Legacy: All levels (for backward compatibility)
+            whereClause = '(agent = ? OR SA = ? OR GA = ? OR MGA = ? OR RGA = ?)';
+            params = [lagnName, lagnName, lagnName, lagnName, lagnName];
+        }
+        
+        let query = `
+            SELECT 
+                SUM(alp) AS totalAlp,
+                SUM(refAlp) AS totalRefAlp, 
+                SUM(refs) AS totalRefs,
+                COUNT(DISTINCT agent) AS agentCount
+            FROM Daily_Activity 
+            WHERE ${whereClause}
+        `;
+        
+        // Add date filtering if provided
+        if (startDate && endDate) {
+            query += ` AND reportDate >= ? AND reportDate <= ?`;
+            params.push(startDate, endDate);
+        }
+        
+        console.log('📊 [RGA Team Daily Activity] Query:', {
+            query: query.replace(/\s+/g, ' ').trim(),
+            params,
+            viewMode,
+            description: viewMode === 'mga' ? 'MGA-level data (agent + MGA)' : 
+                        viewMode === 'rga' ? 'RGA-level data (agent + RGA)' :
+                        'All levels (agent + SA + GA + MGA + RGA)'
+        });
+        
+        const results = await dbQuery(query, params);
+        const result = results[0] || {};
+        
+        const responseData = {
+            totalAlp: parseFloat(result.totalAlp) || 0,
+            totalRefAlp: parseFloat(result.totalRefAlp) || 0,
+            totalRefs: parseInt(result.totalRefs) || 0,
+            agentCount: parseInt(result.agentCount) || 0
+        };
+        
+        console.log('📊 [RGA Team Daily Activity] Response:', {
+            lagnName,
+            viewMode,
+            responseData,
+            rawResult: result,
+            explanation: viewMode === 'mga' ? 'MGA-level: agent + MGA hierarchy' :
+                        viewMode === 'rga' ? 'RGA-level: agent + RGA hierarchy' :
+                        'All levels: agent + SA + GA + MGA + RGA'
+        });
+        
+        res.json(responseData);
+        
+    } catch (error) {
+        console.error('❌ [RGA Team Daily Activity] Error:', error);
+        res.status(500).json({ 
+            error: "Failed to fetch RGA team daily activity data",
+            details: error.message 
         });
     }
 });
@@ -1903,11 +2821,1108 @@ router.get("/mga/daily-activity", async (req, res) => {
         res.json(results[0] || { totalRefAlp: 0, totalAlp: 0, totalRefs: 0, agentCount: 0 });
         
     } catch (error) {
-        console.error(`[GET /mga/daily-activity] Error: ${error.message}`);
+
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching MGA Daily_Activity data',
             error: error.message,
+        });
+    }
+});
+
+// GET /api/alp/weekly-alp-sum - Get Weekly_ALP data summed for SGA dashboard
+router.get('/weekly-alp-sum', async (req, res) => {
+    try {
+        const { query: dbQuery } = require('../db');
+        
+        // Get max reportdate in current month for Weekly Recap
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentYear = currentDate.getFullYear();
+        
+        console.log('📊 [Weekly ALP Sum] Current date info:', {
+            now: currentDate.toISOString(),
+            currentYear,
+            currentMonth,
+            currentMonthName: currentDate.toLocaleString('default', { month: 'long' })
+        });
+        
+        // First, let's see what REPORT values exist in current month (reportdate is mm/dd/yyyy format)
+        const reportTypesQuery = `
+            SELECT DISTINCT REPORT, COUNT(*) as count
+            FROM Weekly_ALP 
+            WHERE STR_TO_DATE(reportdate, '%m/%d/%Y') IS NOT NULL
+            AND YEAR(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+            AND MONTH(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+            GROUP BY REPORT
+        `;
+        
+        const reportTypesResult = await dbQuery(reportTypesQuery, [currentYear, currentMonth]);
+        console.log('📊 [Weekly ALP Sum] Available REPORT types for current month:', reportTypesResult);
+        
+        // Let's also see all records for current month (reportdate is mm/dd/yyyy format)
+        const currentMonthQuery = `
+            SELECT reportdate, REPORT, LagnName, LVL_1_NET
+            FROM Weekly_ALP 
+            WHERE STR_TO_DATE(reportdate, '%m/%d/%Y') IS NOT NULL
+            AND YEAR(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+            AND MONTH(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+            ORDER BY STR_TO_DATE(reportdate, '%m/%d/%Y') DESC
+            LIMIT 10
+        `;
+        
+        const currentMonthResult = await dbQuery(currentMonthQuery, [currentYear, currentMonth]);
+        console.log('📊 [Weekly ALP Sum] Recent records for current month:', currentMonthResult);
+        
+        // Get the latest Weekly Recap reportdate from this month (reportdate is mm/dd/yyyy format)
+        const maxDateQuery = `
+            SELECT reportdate as maxDate
+            FROM Weekly_ALP 
+            WHERE REPORT = 'Weekly Recap'
+            AND STR_TO_DATE(reportdate, '%m/%d/%Y') IS NOT NULL
+            AND YEAR(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+            AND MONTH(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+            ORDER BY STR_TO_DATE(reportdate, '%m/%d/%Y') DESC
+            LIMIT 1
+        `;
+        
+        const maxDateResult = await dbQuery(maxDateQuery, [currentYear, currentMonth]);
+        console.log('📊 [Weekly ALP Sum] Max date query result:', { 
+            maxDateResult, 
+            query: maxDateQuery, 
+            params: [currentYear, currentMonth] 
+        });
+        const maxReportDate = maxDateResult[0]?.maxDate;
+        
+        if (!maxReportDate) {
+            console.log('📊 [Weekly ALP Sum] No max report date found for current month');
+            return res.json({ weeklyAlp: 0, comparisonAlp: 0 });
+        }
+        
+        // Calculate the week range (previous Thursday to current Wednesday)
+        // maxReportDate is in mm/dd/yyyy format, convert to Date object
+        const [month, day, year] = maxReportDate.split('/').map(num => parseInt(num, 10));
+        const reportDate = new Date(year, month - 1, day); // month is 0-based in Date constructor
+        const dayOfWeek = reportDate.getDay(); // 0=Sunday, 3=Wednesday, 5=Friday
+        
+        console.log('📊 [Weekly ALP Sum] Date calculations:', {
+            maxReportDate,
+            parsedDate: `${month}/${day}/${year}`,
+            reportDate: reportDate.toISOString().split('T')[0],
+            dayOfWeek,
+            dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek]
+        });
+        
+        // Calculate the Thursday that starts this week
+        let weekStart = new Date(reportDate);
+        if (dayOfWeek === 3) { // Wednesday
+            weekStart.setDate(reportDate.getDate() - 6); // Go back 6 days to previous Thursday
+        } else if (dayOfWeek === 5) { // Friday  
+            weekStart.setDate(reportDate.getDate() - 8); // Go back 8 days to previous Thursday
+        }
+        
+        // Calculate the Wednesday that ends this week
+        let weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6); // Thursday + 6 days = Wednesday
+        
+        console.log('📊 [Weekly ALP Sum] Calculated week range:', {
+            weekStart: weekStart.toISOString().split('T')[0],
+            weekEnd: weekEnd.toISOString().split('T')[0],
+            weekSpan: `${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`
+        });
+        
+        // Look back 3 days from max date to capture both Wednesday and Friday from same week
+        const lookbackDate = new Date(reportDate);
+        lookbackDate.setDate(reportDate.getDate() - 3);
+        
+        console.log('📊 [Weekly ALP Sum] Lookback range:', {
+            maxReportDate,
+            lookbackDate: lookbackDate.toISOString().split('T')[0],
+            lookbackRange: `${lookbackDate.toISOString().split('T')[0]} to ${reportDate.toISOString().split('T')[0]}`
+        });
+        
+        // Get Weekly_ALP data for this week (both Wednesday=Arias main and Friday=NY ALP)
+        const weeklyAlpQuery = `
+            SELECT 
+                reportdate,
+                SUM(LVL_1_NET) as totalWeeklyAlp,
+                COUNT(*) as recordCount
+            FROM Weekly_ALP 
+            WHERE REPORT = 'Weekly Recap'
+            AND STR_TO_DATE(reportdate, '%m/%d/%Y') >= ?
+            AND STR_TO_DATE(reportdate, '%m/%d/%Y') <= ?
+            GROUP BY reportdate
+            ORDER BY STR_TO_DATE(reportdate, '%m/%d/%Y') ASC
+        `;
+        
+        const weeklyAlpResults = await dbQuery(weeklyAlpQuery, [lookbackDate, reportDate]);
+        
+        console.log('📊 [Weekly ALP Sum] Weekly ALP breakdown by date:', weeklyAlpResults);
+        
+        // Separate Wednesday (Arias main) and Friday (NY) data
+        let ariasMainAlp = 0;
+        let nyAlp = 0;
+        let totalWeeklyAlp = 0;
+        
+        weeklyAlpResults.forEach(result => {
+            const [month, day, year] = result.reportdate.split('/').map(num => parseInt(num, 10));
+            const dateObj = new Date(year, month - 1, day);
+            const dayOfWeek = dateObj.getDay();
+            
+            const alpValue = parseFloat(result.totalWeeklyAlp) || 0;
+            totalWeeklyAlp += alpValue;
+            
+            if (dayOfWeek === 3) { // Wednesday = Arias main
+                ariasMainAlp += alpValue;
+            } else if (dayOfWeek === 5) { // Friday = NY ALP
+                nyAlp += alpValue;
+            }
+        });
+        
+        console.log('📊 [Weekly ALP Sum] ALP breakdown:', {
+            ariasMainAlp,
+            nyAlp,
+            totalWeeklyAlp,
+            recordsFound: weeklyAlpResults.length
+        });
+        
+        const weeklyAlp = totalWeeklyAlp;
+        
+        // Get Daily_Activity data for comparison (same week range)
+        const dailyActivityQuery = `
+            SELECT SUM(alp) as totalDailyAlp
+            FROM Daily_Activity 
+            WHERE reportDate >= ?
+            AND reportDate <= ?
+        `;
+        
+        const dailyActivityResult = await dbQuery(dailyActivityQuery, [weekStart, weekEnd]);
+        const comparisonAlp = dailyActivityResult[0]?.totalDailyAlp || 0;
+        
+        const response = {
+            success: true,
+            weeklyAlp: parseFloat(weeklyAlp) || 0,
+            comparisonAlp: parseFloat(comparisonAlp) || 0,
+            weekStart: weekStart.toISOString().split('T')[0],
+            weekEnd: weekEnd.toISOString().split('T')[0],
+            maxReportDate: maxReportDate,
+            // Separate ALP breakdown
+            ariasMainAlp: parseFloat(ariasMainAlp) || 0,
+            nyAlp: parseFloat(nyAlp) || 0,
+            breakdown: {
+                ariasMain: parseFloat(ariasMainAlp) || 0,
+                newYork: parseFloat(nyAlp) || 0,
+                total: parseFloat(totalWeeklyAlp) || 0
+            }
+        };
+        
+        console.log('📊 [Weekly ALP Sum] Response data:', {
+            weeklyAlp: response.weeklyAlp,
+            comparisonAlp: response.comparisonAlp,
+            weekRange: `${response.weekStart} to ${response.weekEnd}`,
+            maxReportDate: response.maxReportDate,
+            breakdown: response.breakdown,
+            weeklyAlpResults: weeklyAlpResults,
+            rawDailyActivityResult: dailyActivityResult[0],
+            note: 'Using LVL_1_NET column from Weekly_ALP table, handling Wed+Fri dates'
+        });
+        
+        res.json(response);
+        
+    } catch (error) {
+        console.error('Error fetching weekly ALP sum:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error while fetching weekly ALP data',
+            error: error.message,
+        });
+    }
+});
+
+// GET /api/alp/mga/weekly-alp - Get Weekly_ALP data for MGA/RGA/SA/GA/AGT roles
+router.get('/mga/weekly-alp', async (req, res) => {
+    try {
+        const { lagnName, viewMode } = req.query;
+        
+        if (!lagnName) {
+            return res.status(400).json({ error: "lagnName parameter is required" });
+        }
+        
+        const { query: dbQuery } = require('../db');
+        
+        // Get max reportdate in current month for Weekly Recap
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentYear = currentDate.getFullYear();
+        
+        // Get the latest Weekly Recap reportdate from this month (reportdate is mm/dd/yyyy format)
+        const maxDateQuery = `
+            SELECT reportdate as maxDate
+            FROM Weekly_ALP 
+            WHERE REPORT = 'Weekly Recap'
+            AND STR_TO_DATE(reportdate, '%m/%d/%Y') IS NOT NULL
+            AND YEAR(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+            AND MONTH(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+            ORDER BY STR_TO_DATE(reportdate, '%m/%d/%Y') DESC
+            LIMIT 1
+        `;
+        
+        const maxDateResult = await dbQuery(maxDateQuery, [currentYear, currentMonth]);
+        const maxReportDate = maxDateResult[0]?.maxDate;
+        
+        if (!maxReportDate) {
+            return res.json({ weeklyAlp: 0, comparisonAlp: 0 });
+        }
+        
+        // Calculate the week range (previous Thursday to current Wednesday)
+        // maxReportDate is in mm/dd/yyyy format, convert to Date object
+        const [month, day, year] = maxReportDate.split('/').map(num => parseInt(num, 10));
+        const reportDate = new Date(year, month - 1, day); // month is 0-based in Date constructor
+        const dayOfWeek = reportDate.getDay();
+        
+        let weekStart = new Date(reportDate);
+        if (dayOfWeek === 3) { // Wednesday
+            weekStart.setDate(reportDate.getDate() - 6);
+        } else if (dayOfWeek === 5) { // Friday  
+            weekStart.setDate(reportDate.getDate() - 8);
+        }
+        
+        let weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        
+        // Look back 3 days from max date to capture both Wednesday and Friday from same week
+        const lookbackDate = new Date(reportDate);
+        lookbackDate.setDate(reportDate.getDate() - 3);
+        
+        // Get Weekly_ALP data for this user and week (both Wednesday=Arias main and Friday=NY ALP)
+        // Use different ALP columns based on user role and view mode
+        let alpColumn;
+        let clNameCondition = '';
+        
+        if (viewMode === 'team' || viewMode === 'mga' || viewMode === 'rga') {
+          // Determine user role from request or user context
+          const userRole = req.headers['user-role'] || 'SA'; // Default to SA for backward compatibility
+          if (userRole === 'GA' || userRole === 'MGA' || userRole === 'RGA') {
+            alpColumn = 'LVL_3_NET'; // GA, MGA, RGA use LVL_3_NET for team mode
+            
+            // For RGA users, apply CL_Name filtering based on viewMode
+            if (userRole === 'RGA') {
+              if (viewMode === 'mga') {
+                clNameCondition = "AND CL_Name = 'MGA'"; // MGA tab: show only MGA-level data
+              } else if (viewMode === 'rga') {
+                clNameCondition = "AND CL_Name != 'MGA'"; // RGA tab: show non-MGA data (RGA level + first-year rollups)
+              }
+            }
+          } else {
+            alpColumn = 'LVL_2_NET'; // SA uses LVL_2_NET for team mode
+          }
+        } else {
+          alpColumn = 'LVL_1_NET'; // All roles use LVL_1_NET for personal mode
+        }
+        const weeklyAlpQuery = `
+            SELECT 
+                reportdate,
+                SUM(${alpColumn}) as totalWeeklyAlp,
+                COUNT(*) as recordCount
+            FROM Weekly_ALP 
+            WHERE REPORT = 'Weekly Recap'
+            AND LagnName = ?
+            ${clNameCondition}
+            AND STR_TO_DATE(reportdate, '%m/%d/%Y') >= ?
+            AND STR_TO_DATE(reportdate, '%m/%d/%Y') <= ?
+            GROUP BY reportdate
+            ORDER BY STR_TO_DATE(reportdate, '%m/%d/%Y') ASC
+        `;
+        
+        console.log(`📊 [Backend] Weekly ALP query for ${lagnName}:`, {
+            lagnName,
+            viewMode,
+            alpColumn,
+            query: weeklyAlpQuery.replace(/\s+/g, ' ').trim()
+        });
+        
+        const weeklyAlpResults = await dbQuery(weeklyAlpQuery, [lagnName, lookbackDate, reportDate]);
+        
+        // Separate Wednesday (Arias main) and Friday (NY) data for this user
+        let ariasMainAlp = 0;
+        let nyAlp = 0;
+        let totalWeeklyAlp = 0;
+        
+        weeklyAlpResults.forEach(result => {
+            const [month, day, year] = result.reportdate.split('/').map(num => parseInt(num, 10));
+            const dateObj = new Date(year, month - 1, day);
+            const dayOfWeek = dateObj.getDay();
+            
+            const alpValue = parseFloat(result.totalWeeklyAlp) || 0;
+            totalWeeklyAlp += alpValue;
+            
+            if (dayOfWeek === 3) { // Wednesday = Arias main
+                ariasMainAlp += alpValue;
+            } else if (dayOfWeek === 5) { // Friday = NY ALP
+                nyAlp += alpValue;
+            }
+        });
+        
+        const weeklyAlp = totalWeeklyAlp;
+        
+        // Get Daily_Activity data for comparison (same user and week)
+        const dailyActivityQuery = `
+            SELECT SUM(alp) as totalDailyAlp
+            FROM Daily_Activity 
+            WHERE agent = ?
+            AND reportDate >= ?
+            AND reportDate <= ?
+        `;
+        
+        const dailyActivityResult = await dbQuery(dailyActivityQuery, [lagnName, weekStart, weekEnd]);
+        const comparisonAlp = dailyActivityResult[0]?.totalDailyAlp || 0;
+        
+        const response = {
+            success: true,
+            weeklyAlp: parseFloat(weeklyAlp) || 0,
+            comparisonAlp: parseFloat(comparisonAlp) || 0,
+            weekStart: weekStart.toISOString().split('T')[0],
+            weekEnd: weekEnd.toISOString().split('T')[0],
+            maxReportDate: maxReportDate,
+            // Separate ALP breakdown for this user
+            ariasMainAlp: parseFloat(ariasMainAlp) || 0,
+            nyAlp: parseFloat(nyAlp) || 0,
+            breakdown: {
+                ariasMain: parseFloat(ariasMainAlp) || 0,
+                newYork: parseFloat(nyAlp) || 0,
+                total: parseFloat(totalWeeklyAlp) || 0
+            }
+        };
+        
+        console.log(`📊 [MGA Weekly ALP] Response data for ${lagnName}:`, {
+            weeklyAlp: response.weeklyAlp,
+            comparisonAlp: response.comparisonAlp,
+            weekRange: `${response.weekStart} to ${response.weekEnd}`,
+            maxReportDate: response.maxReportDate,
+            breakdown: response.breakdown,
+            weeklyAlpResults: weeklyAlpResults,
+            rawDailyActivityResult: dailyActivityResult[0],
+            note: 'Using LVL_1_NET column from Weekly_ALP table, handling Wed+Fri dates'
+        });
+        
+        res.json(response);
+        
+    } catch (error) {
+        console.error('Error fetching MGA weekly ALP:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error while fetching MGA weekly ALP data',
+            error: error.message,
+        });
+    }
+});
+
+// GET /api/alp/weekly-hires-sum - Get weekly hires from amore_data for SGA dashboard
+router.get('/weekly-hires-sum', async (req, res) => {
+    try {
+        const { query: dbQuery } = require('../db');
+        
+        // Get max MORE_Date from amore_data
+        const maxDateQuery = `
+            SELECT MAX(MORE_Date) as maxDate
+            FROM amore_data
+        `;
+        
+        const maxDateResult = await dbQuery(maxDateQuery);
+        const maxDate = maxDateResult[0]?.maxDate;
+        
+        console.log('📊 [Weekly Hires Sum] Max MORE_Date found:', { maxDate });
+        
+        if (!maxDate) {
+            console.log('📊 [Weekly Hires Sum] No max date found in amore_data');
+            return res.json({ weeklyHires: 0 });
+        }
+        
+        // Get Total_Hires for the max date (this represents the week's hires)
+        const hiresQuery = `
+            SELECT SUM(Total_Hires) as totalHires
+            FROM amore_data 
+            WHERE MORE_Date = ?
+        `;
+        
+        const hiresResult = await dbQuery(hiresQuery, [maxDate]);
+        const weeklyHires = hiresResult[0]?.totalHires || 0;
+        
+        console.log('📊 [Weekly Hires Sum] Response data:', {
+            weeklyHires: weeklyHires,
+            maxDate: maxDate,
+            rawResult: hiresResult[0]
+        });
+        
+        res.json({
+            success: true,
+            weeklyHires: parseInt(weeklyHires) || 0,
+            maxDate: maxDate
+        });
+        
+    } catch (error) {
+        console.error('Error fetching weekly hires sum:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
+// GET /api/alp/weekly-codes-sum - Get weekly codes from associates.PRODDATE for SGA dashboard
+router.get('/weekly-codes-sum', async (req, res) => {
+    try {
+        const { query: dbQuery } = require('../db');
+        
+        // Get max reportdate from Weekly_ALP (same as Weekly ALP endpoint)
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentYear = currentDate.getFullYear();
+        
+        const maxDateQuery = `
+            SELECT reportdate as maxDate
+            FROM Weekly_ALP 
+            WHERE REPORT = 'Weekly Recap'
+            AND STR_TO_DATE(reportdate, '%m/%d/%Y') IS NOT NULL
+            AND YEAR(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+            AND MONTH(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+            ORDER BY STR_TO_DATE(reportdate, '%m/%d/%Y') DESC
+            LIMIT 1
+        `;
+        
+        const maxDateResult = await dbQuery(maxDateQuery, [currentYear, currentMonth]);
+        const maxReportDate = maxDateResult[0]?.maxDate;
+        
+        if (!maxReportDate) {
+            console.log('📊 [Weekly Codes Sum] No max report date found in Weekly_ALP');
+            return res.json({ weeklyCodes: 0 });
+        }
+        
+        // Parse mm/dd/yyyy format and calculate week range (same logic as Weekly ALP)
+        const [month, day, year] = maxReportDate.split('/').map(num => parseInt(num, 10));
+        const reportDate = new Date(year, month - 1, day);
+        const dayOfWeek = reportDate.getDay();
+        
+        // Calculate the Thursday that starts this week
+        let weekStart = new Date(reportDate);
+        if (dayOfWeek === 3) { // Wednesday
+            weekStart.setDate(reportDate.getDate() - 6); // Go back 6 days to previous Thursday
+        } else if (dayOfWeek === 5) { // Friday  
+            weekStart.setDate(reportDate.getDate() - 8); // Go back 8 days to previous Thursday
+        } else {
+            // For other days, find the most recent Thursday
+            const daysToSubtract = (dayOfWeek + 7 - 4) % 7; // 4 = Thursday
+            weekStart.setDate(reportDate.getDate() - daysToSubtract);
+        }
+        
+        // Calculate the Wednesday that ends this week
+        let weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6); // Thursday + 6 days = Wednesday
+        
+        console.log('📊 [Weekly Codes Sum] Week range calculated from Weekly_ALP:', {
+            maxReportDate: maxReportDate,
+            parsedDate: `${month}/${day}/${year}`,
+            reportDate: reportDate.toISOString().split('T')[0],
+            dayOfWeek,
+            dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek],
+            weekStart: weekStart.toISOString().split('T')[0],
+            weekEnd: weekEnd.toISOString().split('T')[0]
+        });
+        
+        // Get codes count from associates table where PRODDATE falls within the week
+        const codesQuery = `
+            SELECT COUNT(*) as totalCodes
+            FROM associates 
+            WHERE PRODDATE >= ?
+            AND PRODDATE <= ?
+            AND LagnName IS NOT NULL
+            AND LagnName != ''
+        `;
+        
+        const codesResult = await dbQuery(codesQuery, [weekStart, weekEnd]);
+        const weeklyCodes = codesResult[0]?.totalCodes || 0;
+        
+        console.log('📊 [Weekly Codes Sum] Response data:', {
+            weeklyCodes: weeklyCodes,
+            weekRange: `${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`,
+            maxReportDate: maxReportDate,
+            rawResult: codesResult[0]
+        });
+        
+        res.json({
+            success: true,
+            weeklyCodes: parseInt(weeklyCodes) || 0,
+            weekStart: weekStart.toISOString().split('T')[0],
+            weekEnd: weekEnd.toISOString().split('T')[0],
+            maxReportDate: maxReportDate
+        });
+        
+    } catch (error) {
+        console.error('Error fetching weekly codes sum:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
+// GET /api/alp/weekly-ref-sales-sum - Get weekly ref sales using same week range as ALP for SGA dashboard
+router.get('/weekly-ref-sales-sum', async (req, res) => {
+    try {
+        const { query: dbQuery } = require('../db');
+        
+        // Get max reportdate from Weekly_ALP (same as Weekly ALP endpoint)
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentYear = currentDate.getFullYear();
+        
+        const maxDateQuery = `
+            SELECT reportdate as maxDate
+            FROM Weekly_ALP 
+            WHERE REPORT = 'Weekly Recap'
+            AND STR_TO_DATE(reportdate, '%m/%d/%Y') IS NOT NULL
+            AND YEAR(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+            AND MONTH(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+            ORDER BY STR_TO_DATE(reportdate, '%m/%d/%Y') DESC
+            LIMIT 1
+        `;
+        
+        const maxDateResult = await dbQuery(maxDateQuery, [currentYear, currentMonth]);
+        const maxReportDate = maxDateResult[0]?.maxDate;
+        
+        if (!maxReportDate) {
+            console.log('📊 [Weekly Ref Sales Sum] No max report date found in Weekly_ALP');
+            return res.json({ weeklyRefSales: 0 });
+        }
+        
+        // Parse mm/dd/yyyy format and calculate week range (same logic as Weekly ALP)
+        const [month, day, year] = maxReportDate.split('/').map(num => parseInt(num, 10));
+        const reportDate = new Date(year, month - 1, day);
+        const dayOfWeek = reportDate.getDay();
+        
+        // Calculate the Thursday that starts this week
+        let weekStart = new Date(reportDate);
+        if (dayOfWeek === 3) { // Wednesday
+            weekStart.setDate(reportDate.getDate() - 6); // Go back 6 days to previous Thursday
+        } else if (dayOfWeek === 5) { // Friday  
+            weekStart.setDate(reportDate.getDate() - 8); // Go back 8 days to previous Thursday
+        } else {
+            // For other days, find the most recent Thursday
+            const daysToSubtract = (dayOfWeek + 7 - 4) % 7; // 4 = Thursday
+            weekStart.setDate(reportDate.getDate() - daysToSubtract);
+        }
+        
+        // Calculate the Wednesday that ends this week
+        let weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6); // Thursday + 6 days = Wednesday
+        
+        console.log('📊 [Weekly Ref Sales Sum] Week range calculated from Weekly_ALP:', {
+            maxReportDate: maxReportDate,
+            parsedDate: `${month}/${day}/${year}`,
+            reportDate: reportDate.toISOString().split('T')[0],
+            dayOfWeek,
+            dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek],
+            weekStart: weekStart.toISOString().split('T')[0],
+            weekEnd: weekEnd.toISOString().split('T')[0]
+        });
+        
+        // Get ref sales count for the week range using refvalidation.created_at
+        // Handle lagnName parameter for role-based filtering (AGT, MGA, RGA, etc.)
+        const { lagnName } = req.query;
+        
+        let refSalesQuery = `
+            SELECT COUNT(*) as totalRefSales
+            FROM refvalidation 
+            WHERE DATE(created_at) >= ?
+            AND DATE(created_at) <= ?
+            AND created_at IS NOT NULL
+            AND true_ref = 'Y'
+        `;
+        
+        let queryParams = [weekStart, weekEnd];
+        
+        // If lagnName is provided, filter by lagnname or mga (same as monthly ref sales)
+        if (lagnName) {
+            refSalesQuery += ` AND (lagnname = ? OR mga = ?)`;
+            queryParams.push(lagnName, lagnName);
+            console.log('📊 [Weekly Ref Sales Sum] Filtering by lagnName:', lagnName);
+        }
+        
+        const refSalesResult = await dbQuery(refSalesQuery, queryParams);
+        const weeklyRefSales = refSalesResult[0]?.totalRefSales || 0;
+        
+        console.log('📊 [Weekly Ref Sales Sum] Response data:', {
+            weeklyRefSales: weeklyRefSales,
+            weekRange: `${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`,
+            maxReportDate: maxReportDate,
+            rawResult: refSalesResult[0],
+            note: 'Using refvalidation.created_at for ref sales count where true_ref = Y'
+        });
+        
+        res.json({
+            success: true,
+            weeklyRefSales: parseInt(weeklyRefSales) || 0,
+            weekStart: weekStart.toISOString().split('T')[0],
+            weekEnd: weekEnd.toISOString().split('T')[0],
+            maxReportDate: maxReportDate
+        });
+        
+    } catch (error) {
+        console.error('Error fetching weekly ref sales sum:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
+// GET /api/alp/monthly-alp-sum - Get monthly ALP from Weekly_ALP where REPORT = 'MTD Recap'
+router.get('/monthly-alp-sum', async (req, res) => {
+    try {
+        const { query: dbQuery } = require('../db');
+        
+        // Get max reportdate from Weekly_ALP for MTD Recap in current month
+        // Handle lagnName parameter for role-based filtering (AGT, MGA, RGA, etc.)
+        const { lagnName, viewMode } = req.query;
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentYear = currentDate.getFullYear();
+        
+        console.log('📊 [Monthly ALP Sum] Current date info:', {
+            now: currentDate.toISOString(),
+            currentYear,
+            currentMonth,
+            currentMonthName: currentDate.toLocaleString('default', { month: 'long' }),
+            lagnName: lagnName || 'SGA (organization-wide)'
+        });
+        
+        // Build max date query with optional lagnName filtering
+        let maxDateQuery = `
+            SELECT reportdate as maxDate
+            FROM Weekly_ALP 
+            WHERE REPORT = 'MTD Recap'
+            AND STR_TO_DATE(reportdate, '%m/%d/%Y') IS NOT NULL
+            AND YEAR(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+            AND MONTH(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+        `;
+        
+        let maxDateParams = [currentYear, currentMonth];
+        
+        // Add lagnName filtering for non-SGA users
+        if (lagnName) {
+            maxDateQuery += ` AND LagnName = ?`;
+            maxDateParams.push(lagnName);
+            console.log('📊 [Monthly ALP Sum] Filtering by LagnName:', lagnName);
+        }
+        
+        maxDateQuery += `
+            ORDER BY STR_TO_DATE(reportdate, '%m/%d/%Y') DESC
+            LIMIT 1
+        `;
+        
+        const maxDateResult = await dbQuery(maxDateQuery, maxDateParams);
+        const maxReportDate = maxDateResult[0]?.maxDate;
+        
+        if (!maxReportDate) {
+            console.log('📊 [Monthly ALP Sum] No max report date found for MTD Recap in current month');
+            return res.json({ monthlyAlp: 0, comparisonAlp: 0 });
+        }
+
+        console.log('📊 [Monthly ALP Sum] Max MTD Recap date found:', { maxReportDate });
+        
+        // Get Monthly ALP data from Weekly_ALP where REPORT = 'MTD Recap' for max date
+        // Apply same lagnName filtering as the max date query
+        // Use different ALP columns based on user role and view mode
+        let alpColumn;
+        let clNameCondition = '';
+        
+        if (viewMode === 'team' || viewMode === 'mga' || viewMode === 'rga') {
+          // Determine user role from request or user context
+          const userRole = req.headers['user-role'] || 'SA'; // Default to SA for backward compatibility
+          if (userRole === 'GA' || userRole === 'MGA' || userRole === 'RGA') {
+            alpColumn = 'LVL_3_NET'; // GA, MGA, RGA use LVL_3_NET for team mode
+            
+            // For RGA users, apply CL_Name filtering based on viewMode
+            if (userRole === 'RGA') {
+              if (viewMode === 'mga') {
+                clNameCondition = "AND CL_Name = 'MGA'"; // MGA tab: show only MGA-level data
+              } else if (viewMode === 'rga') {
+                clNameCondition = "AND CL_Name != 'MGA'"; // RGA tab: show non-MGA data (RGA level + first-year rollups)
+              }
+            }
+          } else {
+            alpColumn = 'LVL_2_NET'; // SA uses LVL_2_NET for team mode
+          }
+        } else {
+          alpColumn = 'LVL_1_NET'; // All roles use LVL_1_NET for personal mode
+        }
+        let monthlyAlpQuery = `
+            SELECT SUM(${alpColumn}) as totalMonthlyAlp
+            FROM Weekly_ALP 
+            WHERE REPORT = 'MTD Recap'
+            AND reportdate = ?
+            ${clNameCondition}
+        `;
+        
+        console.log(`📊 [Monthly ALP Sum] Query for ${lagnName || 'SGA'}:`, {
+            lagnName,
+            viewMode,
+            alpColumn,
+            maxReportDate
+        });
+        
+        let monthlyAlpParams = [maxReportDate];
+        
+        // Add lagnName filtering for non-SGA users
+        if (lagnName) {
+            monthlyAlpQuery += ` AND LagnName = ?`;
+            monthlyAlpParams.push(lagnName);
+        }
+        
+        const monthlyAlpResult = await dbQuery(monthlyAlpQuery, monthlyAlpParams);
+        const monthlyAlp = monthlyAlpResult[0]?.totalMonthlyAlp || 0;
+        
+        // Get Daily_Activity data for comparison (current month)
+        // Apply same lagnName filtering if provided - need to join with activeusers since Daily_Activity uses userId
+        const monthStart = new Date(currentYear, currentMonth - 1, 1);
+        const monthEnd = new Date(currentYear, currentMonth, 0);
+        
+        let dailyActivityQuery = `
+            SELECT SUM(da.alp) as totalDailyAlp
+            FROM Daily_Activity da
+            WHERE da.reportDate >= ?
+            AND da.reportDate <= ?
+        `;
+        
+        let dailyActivityParams = [monthStart, monthEnd];
+        
+        // Add lagnName filtering for non-SGA users (need to join with activeusers since Daily_Activity uses userId)
+        if (lagnName) {
+            dailyActivityQuery = `
+                SELECT SUM(da.alp) as totalDailyAlp
+                FROM Daily_Activity da
+                JOIN activeusers au ON da.userId = au.id
+                WHERE da.reportDate >= ?
+                AND da.reportDate <= ?
+                AND au.lagnname = ?
+            `;
+            dailyActivityParams.push(lagnName);
+            console.log('📊 [Monthly ALP Sum] Filtering Daily_Activity by joining with activeusers.lagnname:', lagnName);
+        }
+        
+        const dailyActivityResult = await dbQuery(dailyActivityQuery, dailyActivityParams);
+        const comparisonAlp = dailyActivityResult[0]?.totalDailyAlp || 0;
+        
+        const response = {
+            success: true,
+            monthlyAlp: parseFloat(monthlyAlp) || 0,
+            comparisonAlp: parseFloat(comparisonAlp) || 0,
+            maxReportDate: maxReportDate,
+            monthStart: monthStart.toISOString().split('T')[0],
+            monthEnd: monthEnd.toISOString().split('T')[0]
+        };
+        
+        console.log('📊 [Monthly ALP Sum] Response data:', {
+            monthlyAlp: response.monthlyAlp,
+            comparisonAlp: response.comparisonAlp,
+            maxReportDate: response.maxReportDate,
+            monthRange: `${response.monthStart} to ${response.monthEnd}`,
+            rawMonthlyAlpResult: monthlyAlpResult[0],
+            rawDailyActivityResult: dailyActivityResult[0],
+            note: 'Using LVL_1_NET from Weekly_ALP where REPORT = MTD Recap'
+        });
+        
+        res.json(response);
+        
+    } catch (error) {
+        console.error('Error fetching monthly ALP sum:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
+// GET /api/alp/monthly-hires-sum - Get monthly hires from amore_data for current month
+router.get('/monthly-hires-sum', async (req, res) => {
+    try {
+        const { query: dbQuery } = require('../db');
+        
+        // Get current month range
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentYear = currentDate.getFullYear();
+        
+        const monthStart = new Date(currentYear, currentMonth - 1, 1);
+        const monthEnd = new Date(currentYear, currentMonth, 0);
+        
+        console.log('📊 [Monthly Hires Sum] Month range:', {
+            currentYear,
+            currentMonth,
+            monthStart: monthStart.toISOString().split('T')[0],
+            monthEnd: monthEnd.toISOString().split('T')[0]
+        });
+        
+        // Get Total_Hires sum for current month
+        const hiresQuery = `
+            SELECT SUM(Total_Hires) as totalHires
+            FROM amore_data 
+            WHERE MORE_Date >= ?
+            AND MORE_Date <= ?
+        `;
+        
+        const hiresResult = await dbQuery(hiresQuery, [monthStart, monthEnd]);
+        const monthlyHires = hiresResult[0]?.totalHires || 0;
+        
+        console.log('📊 [Monthly Hires Sum] Response data:', {
+            monthlyHires: monthlyHires,
+            monthRange: `${monthStart.toISOString().split('T')[0]} to ${monthEnd.toISOString().split('T')[0]}`,
+            rawResult: hiresResult[0]
+        });
+        
+        res.json({
+            success: true,
+            monthlyHires: parseInt(monthlyHires) || 0,
+            monthStart: monthStart.toISOString().split('T')[0],
+            monthEnd: monthEnd.toISOString().split('T')[0]
+        });
+        
+    } catch (error) {
+        console.error('Error fetching monthly hires sum:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
+// GET /api/alp/monthly-codes-sum - Get monthly codes from associates.PRODDATE for current month
+router.get('/monthly-codes-sum', async (req, res) => {
+    try {
+        const { query: dbQuery } = require('../db');
+        
+        // Get current month range
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentYear = currentDate.getFullYear();
+        
+        const monthStart = new Date(currentYear, currentMonth - 1, 1);
+        const monthEnd = new Date(currentYear, currentMonth, 0);
+        
+        console.log('📊 [Monthly Codes Sum] Month range:', {
+            currentYear,
+            currentMonth,
+            monthStart: monthStart.toISOString().split('T')[0],
+            monthEnd: monthEnd.toISOString().split('T')[0]
+        });
+        
+        // Get codes count from associates table for current month
+        const codesQuery = `
+            SELECT COUNT(*) as totalCodes
+            FROM associates 
+            WHERE PRODDATE >= ?
+            AND PRODDATE <= ?
+            AND LagnName IS NOT NULL
+            AND LagnName != ''
+        `;
+        
+        const codesResult = await dbQuery(codesQuery, [monthStart, monthEnd]);
+        const monthlyCodes = codesResult[0]?.totalCodes || 0;
+        
+        console.log('📊 [Monthly Codes Sum] Response data:', {
+            monthlyCodes: monthlyCodes,
+            monthRange: `${monthStart.toISOString().split('T')[0]} to ${monthEnd.toISOString().split('T')[0]}`,
+            rawResult: codesResult[0]
+        });
+        
+        res.json({
+            success: true,
+            monthlyCodes: parseInt(monthlyCodes) || 0,
+            monthStart: monthStart.toISOString().split('T')[0],
+            monthEnd: monthEnd.toISOString().split('T')[0]
+        });
+        
+    } catch (error) {
+        console.error('Error fetching monthly codes sum:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
+// GET /api/alp/monthly-ref-sales-sum - Get monthly ref sales from refvalidation.created_at for current month
+router.get('/monthly-ref-sales-sum', async (req, res) => {
+    try {
+        const { query: dbQuery } = require('../db');
+        
+        // Get current month range
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentYear = currentDate.getFullYear();
+        
+        const monthStart = new Date(currentYear, currentMonth - 1, 1);
+        const monthEnd = new Date(currentYear, currentMonth, 0);
+        
+        console.log('📊 [Monthly Ref Sales Sum] Month range:', {
+            currentYear,
+            currentMonth,
+            monthStart: monthStart.toISOString().split('T')[0],
+            monthEnd: monthEnd.toISOString().split('T')[0]
+        });
+        
+        // Get ref sales count for current month using refvalidation.created_at
+        // Handle lagnName parameter for role-based filtering (AGT, MGA, RGA, etc.)
+        const { lagnName } = req.query;
+        
+        let refSalesQuery = `
+            SELECT COUNT(*) as totalRefSales
+            FROM refvalidation 
+            WHERE DATE(created_at) >= ?
+            AND DATE(created_at) <= ?
+            AND created_at IS NOT NULL
+            AND true_ref = 'Y'
+        `;
+        
+        let queryParams = [monthStart, monthEnd];
+        
+        // If lagnName is provided, filter by lagnname or mga (same as monthly ref sales)
+        if (lagnName) {
+            refSalesQuery += ` AND (lagnname = ? OR mga = ?)`;
+            queryParams.push(lagnName, lagnName);
+            console.log('📊 [Monthly Ref Sales Sum] Filtering by lagnName:', lagnName);
+        }
+        
+        const refSalesResult = await dbQuery(refSalesQuery, queryParams);
+        const monthlyRefSales = refSalesResult[0]?.totalRefSales || 0;
+        
+        console.log('📊 [Monthly Ref Sales Sum] Response data:', {
+            monthlyRefSales: monthlyRefSales,
+            monthRange: `${monthStart.toISOString().split('T')[0]} to ${monthEnd.toISOString().split('T')[0]}`,
+            rawResult: refSalesResult[0],
+            note: 'Using refvalidation.created_at where true_ref = Y for current month'
+        });
+        
+        res.json({
+            success: true,
+            monthlyRefSales: parseInt(monthlyRefSales) || 0,
+            monthStart: monthStart.toISOString().split('T')[0],
+            monthEnd: monthEnd.toISOString().split('T')[0]
+        });
+        
+    } catch (error) {
+        console.error('Error fetching monthly ref sales sum:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
+/* =========================
+   SGA Monthly Production Tracker (sga_alp table)
+   ========================= */
+
+// GET /api/alp/sga-monthly - Fetch monthly production data from sga_alp table
+router.get("/sga-monthly", async (req, res) => {
+    console.log('📊 [SGA Monthly] GET request received');
+    
+    try {
+        // Fetch all monthly data from sga_alp table
+        const query = `
+            SELECT 
+                id,
+                month,
+                net,
+                gross,
+                rowcolor
+            FROM sga_alp
+            ORDER BY 
+                SUBSTRING(month, 4, 4) DESC,
+                SUBSTRING(month, 1, 2) DESC
+        `;
+        
+        const results = await dbQuery(query);
+        
+        console.log('📊 [SGA Monthly] Fetched records:', results.length);
+        
+        res.json({
+            success: true,
+            data: results
+        });
+        
+    } catch (error) {
+        console.error('❌ [SGA Monthly] Error fetching monthly data:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// POST /api/alp/sga-monthly - Update monthly production data in sga_alp table
+router.post("/sga-monthly", async (req, res) => {
+    console.log('📊 [SGA Monthly] POST request received');
+    console.log('📊 [SGA Monthly] Request body:', req.body);
+    
+    try {
+        const { updates } = req.body;
+        
+        if (!updates || typeof updates !== 'object') {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid request body. Expected { updates: { "MM/YYYY": { gross, net }, ... } }'
+            });
+        }
+        
+        let successCount = 0;
+        let errorCount = 0;
+        
+        // Process each month update
+        for (const [month, data] of Object.entries(updates)) {
+            try {
+                const { gross, net } = data;
+                
+                console.log(`📊 [SGA Monthly] Updating month ${month}:`, { gross, net });
+                
+                // Use INSERT ... ON DUPLICATE KEY UPDATE to handle both insert and update
+                const query = `
+                    INSERT INTO sga_alp (month, gross, net)
+                    VALUES (?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                        gross = VALUES(gross),
+                        net = VALUES(net)
+                `;
+                
+                await dbQuery(query, [
+                    month,
+                    gross !== undefined && gross !== '' ? parseFloat(gross) : null,
+                    net !== undefined && net !== '' ? parseFloat(net) : null
+                ]);
+                
+                successCount++;
+                console.log(`✅ [SGA Monthly] Successfully updated month ${month}`);
+                
+            } catch (error) {
+                errorCount++;
+                console.error(`❌ [SGA Monthly] Error updating month ${month}:`, error);
+            }
+        }
+        
+        console.log(`📊 [SGA Monthly] Update complete: ${successCount} success, ${errorCount} errors`);
+        
+        res.json({
+            success: true,
+            message: `Successfully updated ${successCount} month(s)`,
+            successCount,
+            errorCount
+        });
+        
+    } catch (error) {
+        console.error('❌ [SGA Monthly] Error updating monthly data:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 });

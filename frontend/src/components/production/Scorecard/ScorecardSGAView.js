@@ -4,6 +4,34 @@ import { useAuth } from "../../../context/AuthContext";
 import "../../../pages/abc.css";
 import Placeholder from "../../utils/Placeholder";
 
+// Helper function to parse MGA start date from MM/DD/YYYY format
+const parseMgaStartDate = (startDateString) => {
+  if (!startDateString) return null;
+  
+  try {
+    // Handle MM/DD/YYYY format
+    const parts = startDateString.split('/');
+    if (parts.length === 3) {
+      const month = parseInt(parts[0], 10) - 1; // months are 0-indexed in JS
+      const day = parseInt(parts[1], 10);
+      const year = parseInt(parts[2], 10);
+      return new Date(year, month, day);
+    }
+  } catch (error) {
+    console.warn('Failed to parse MGA start date:', startDateString, error);
+  }
+  
+  return null;
+};
+
+// Helper function to check if a date is before the MGA's start date
+const isDataBeforeMgaStart = (dataDate, mgaStartDate) => {
+  if (!mgaStartDate || !dataDate) return false;
+  
+  const parsedDataDate = typeof dataDate === 'string' ? new Date(dataDate) : dataDate;
+  return parsedDataDate < mgaStartDate;
+};
+
 // Define the header layout in the desired order.
 const headers = [
   { key: "mga", label: "MGA" },
@@ -47,25 +75,36 @@ const getHeaderClass = (key) => {
   return "";
 };
 
+// Helpers to detect month/quarter keys for filtering
+const isMonthKey = (key) => Object.prototype.hasOwnProperty.call(monthOrder, key);
+const isQuarterKey = (key) => ["Q1","Q2","Q3","Q4"].includes(key);
+
 const calculateQuarterTotals = (counts, isCurrentYear = false) => {
-  // Use the last month of each quarter for quarter values
-  const Q1 = counts[2]; // March (index 2)
-  const Q2 = counts[5]; // June (index 5)
-  const Q3 = counts[8]; // September (index 8)
-  const Q4 = counts[11]; // December (index 11)
-  
-  let YTD;
+  // Sum months for each quarter
+  const val = (i) => Number(counts[i] || 0);
+  const Q1 = val(0) + val(1) + val(2);
+  const Q2 = val(3) + val(4) + val(5);
+  const Q3 = val(6) + val(7) + val(8);
+  const Q4 = val(9) + val(10) + val(11);
+
+  // Compute YTD as a sum rather than a single month
   const today = new Date();
   const currentMonth = today.getMonth(); // 0-indexed
   const lastMonthIndex = currentMonth === 0 ? 0 : currentMonth - 1; // If January, use January (0), otherwise use previous month
-  
+
+  let YTD = 0;
   if (isCurrentYear) {
-    YTD = counts[lastMonthIndex] || 0;
+    // Sum from January through the last completed month
+    for (let i = 0; i <= lastMonthIndex; i++) {
+      YTD += Number(counts[i] || 0);
+    }
   } else {
-    // For previous year, use the same month as current year YTD for proper comparison
-    YTD = counts[lastMonthIndex] || 0;
+    // Sum all 12 months for past years
+    for (let i = 0; i < 12; i++) {
+      YTD += Number(counts[i] || 0);
+    }
   }
-  
+
   return { Q1, Q2, Q3, Q4, YTD };
 };
 
@@ -373,9 +412,11 @@ const groupDataByMGA = (
   type = "count",
   sumField = "total",
   mgaField = null,
-  uniqueField = null
+  uniqueField = null,
+  mgaStartDates = {} // New parameter to pass MGA start dates
 ) => {
   const grouped = {};
+  const preStartData = {}; // Track data before MGA start dates
   console.log(`Grouping ${data.length} items for ${dateField}, year ${selectedYear}, type ${type}`);
   
   data.forEach((item) => {
@@ -394,20 +435,60 @@ const groupDataByMGA = (
       if (d.getFullYear() !== selectedYear) return;
     }
     const monthIndex = d.getMonth();
+    
+    // Check if this data should be excluded based on MGA start date
+    const mgaStartDate = parseMgaStartDate(mgaStartDates[mga]);
+    let shouldExclude = false;
+    let isPreStart = false;
+    
+    if (mgaStartDate) {
+      // Only exclude if the data is from a month that's entirely before the start date
+      const monthEndDate = new Date(d.getFullYear(), monthIndex + 1, 0); // Last day of the month
+      if (monthEndDate < mgaStartDate) {
+        shouldExclude = true; // Skip this data entirely
+      } else {
+        // For partial months, check if this individual data point is before the start date
+        isPreStart = d < mgaStartDate;
+      }
+    }
+    
+    if (shouldExclude) return; // Skip data from months entirely before start date
+    
+    // Initialize grouped data structures
     if (grouped[mga] === undefined) {
       if (type === "unique") {
         grouped[mga] = Array.from({ length: 12 }, () => new Set());
+        preStartData[mga] = Array.from({ length: 12 }, () => new Set());
       } else {
         grouped[mga] = Array(12).fill(0);
+        preStartData[mga] = Array(12).fill(0);
       }
     }
+    
+    // Add to the appropriate bucket (all data or pre-start only)
     if (type === "count") {
-      grouped[mga][monthIndex] += 1;
+      if (!isPreStart) {
+        grouped[mga][monthIndex] += 1;
+      }
+      if (isPreStart) {
+        preStartData[mga][monthIndex] += 1;
+      }
     } else if (type === "sum") {
-      grouped[mga][monthIndex] += parseFloat(item[sumField]) || 0;
+      const value = parseFloat(item[sumField]) || 0;
+      if (!isPreStart) {
+        grouped[mga][monthIndex] += value;
+      }
+      if (isPreStart) {
+        preStartData[mga][monthIndex] += value;
+      }
     } else if (type === "unique") {
       if (uniqueField && item[uniqueField] !== undefined && item[uniqueField] !== null) {
-        grouped[mga][monthIndex].add(item[uniqueField]);
+        if (!isPreStart) {
+          grouped[mga][monthIndex].add(item[uniqueField]);
+        }
+        if (isPreStart) {
+          preStartData[mga][monthIndex].add(item[uniqueField]);
+        }
       }
     }
   });
@@ -416,11 +497,12 @@ const groupDataByMGA = (
     // Convert each set to its size.
     for (const mga in grouped) {
       grouped[mga] = grouped[mga].map((set) => set.size);
+      preStartData[mga] = preStartData[mga].map((set) => set.size);
     }
   }
   
   console.log(`Grouped into ${Object.keys(grouped).length} MGAs:`, Object.keys(grouped));
-  return grouped;
+  return { grouped, preStartData };
 };
 
 const ScorecardSGAData = () => {
@@ -463,6 +545,7 @@ const ScorecardSGAData = () => {
   const [showInactiveMgas, setShowInactiveMgas] = useState(false);
   const [showFutureMonths, setShowFutureMonths] = useState(true);
   const [quartersMode, setQuartersMode] = useState('show'); // 'show', 'hide', 'only'
+  const [onlySortedColumn, setOnlySortedColumn] = useState(false); // show only MGA + sorted col
   const currencyFormatter = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -536,6 +619,18 @@ const ScorecardSGAData = () => {
       if (year !== selectedYear) return;
       const key = item.LagnName;
       if (!key) return;
+      
+      // Check if this data should be excluded based on MGA start date
+      const mgaStartDate = parseMgaStartDate(mgaStartDates[key]);
+      if (mgaStartDate) {
+        // For ALP data, we assume it represents the entire month
+        // Only exclude if the entire month is before the start date
+        const monthEndDate = new Date(year, monthIndex + 1, 0); // Last day of the month
+        if (monthEndDate < mgaStartDate) {
+          return; // Skip this data entirely
+        }
+      }
+      
       const rawValue = item.LVL_3_NET;
       const cleanedValue =
         parseFloat(
@@ -639,11 +734,31 @@ const ScorecardSGAData = () => {
     return { monthly: avgMonthly, Q1, Q2, Q3, Q4, YTD };
   };
   
-  const formatCellValue = (title, key, value) => {
+  const formatCellValue = (title, key, value, isPreStart = false) => {
     if (key === "mga") return value;
-    if (title === "Net ALP") return currencyFormatter.format(value);
-    if (title === "Hire to Code") return Number(value).toFixed(2); // e.g., show 2 decimals
+    if (title === "Net ALP" || title === "ALP / Code") return currencyFormatter.format(value);
+    if (title === "Hire to Code" || title === "VIP / Code" || title === "Code / VIP") {
+      const num = Number(value) || 0;
+      return num === 0 ? "—" : num.toFixed(2);
+    }
     return value;
+  };
+
+  // Helper function to determine if a cell should be greyed out due to pre-start data
+  const shouldGreyOutCell = (row, headerKey) => {
+    if (!row.mgaStartDate) return false;
+    
+    const monthIndex = monthOrder[headerKey];
+    if (monthIndex !== undefined) {
+      // Check if this entire month is before the MGA start date
+      // Only grey out if the entire month is before the start date
+      const monthStartDate = new Date(selectedYear, monthIndex, 1);
+      const monthEndDate = new Date(selectedYear, monthIndex + 1, 0); // Last day of the month
+      
+      return monthEndDate < row.mgaStartDate;
+    }
+    
+    return false;
   };
   
   
@@ -713,6 +828,60 @@ const ScorecardSGAData = () => {
   // All MGA data for totals calculation (always includes all MGAs)
   const [allMgaData, setAllMgaData] = useState([]);
 
+  // Deduplicate MGAs by lagnname with stable preference and latest start
+  const dedupedMgaByName = useMemo(() => {
+    if (!allMgaData.length) return new Map();
+
+    const toEpoch = (start) => {
+      const d = parseMgaStartDate(start);
+      return d ? d.getTime() : -Infinity;
+    };
+
+    const score = (mga) => {
+      const isActive = mga.Active?.toLowerCase() === 'y';
+      const isHidden = mga.hide?.toLowerCase() === 'y';
+      // Higher is better: active > inactive; visible > hidden; newer start > older
+      return (
+        (isActive ? 2 : 0) +
+        (!isHidden ? 1 : 0) +
+        0 // base; tie-break by start date separately
+      );
+    };
+
+    const map = new Map();
+    allMgaData.forEach((mga) => {
+      const key = mga.lagnname;
+      if (!key) return;
+      const prev = map.get(key);
+      if (!prev) {
+        map.set(key, mga);
+        return;
+      }
+      const prevScore = score(prev);
+      const currScore = score(mga);
+      if (currScore > prevScore) {
+        map.set(key, mga);
+      } else if (currScore === prevScore) {
+        // Prefer latest start date when scores tie
+        if (toEpoch(mga.start) > toEpoch(prev.start)) {
+          map.set(key, mga);
+        }
+      }
+    });
+    return map;
+  }, [allMgaData]);
+
+  // Create MGA start dates lookup object from deduped set
+  const mgaStartDates = useMemo(() => {
+    const startDatesLookup = {};
+    dedupedMgaByName.forEach((mga, name) => {
+      if (name && mga.start) {
+        startDatesLookup[name] = mga.start;
+      }
+    });
+    return startDatesLookup;
+  }, [dedupedMgaByName]);
+
   // Fetch all MGAs for filtering and totals calculation
   useEffect(() => {
     const fetchAllMgaData = async () => {
@@ -731,66 +900,100 @@ const ScorecardSGAData = () => {
     fetchAllMgaData();
   }, []);
 
-  // Filter MGA data based on showInactiveMgas state
+  // Filter MGA data based on showInactiveMgas state (deduped, one per lagnname)
   const filteredMgaData = useMemo(() => {
-    if (!allMgaData.length) return [];
-    
-    return allMgaData.filter((mgaObj) => {
-      const isActive = mgaObj.Active?.toLowerCase() === 'y';
-      const isHidden = mgaObj.hide?.toLowerCase() === 'y';
-      
-      // Show active, non-hidden MGAs
-      if (isActive && !isHidden) {
-        return true;
-      }
-      
-      // Show inactive MGAs only if showInactiveMgas is true
-      return showInactiveMgas;
-    });
-  }, [allMgaData, showInactiveMgas]);
+    if (dedupedMgaByName.size === 0) return [];
 
-  // Get inactive MGAs for the "Inactive MGAs" row
-  const inactiveMgaData = useMemo(() => {
-    if (!allMgaData.length) return [];
-    
-    return allMgaData.filter((mgaObj) => {
-      const isActive = mgaObj.Active?.toLowerCase() === 'y';
-      const isHidden = mgaObj.hide?.toLowerCase() === 'y';
-      
-      // Include inactive MGAs
-      if (!isActive) return true;
-      
-      // Include hidden active MGAs (since we're not showing them in the main table)
-      if (isActive && isHidden) return true;
-      
-      return false;
+    const result = [];
+    dedupedMgaByName.forEach((mga) => {
+      const isActive = mga.Active?.toLowerCase() === 'y';
+      const isHidden = mga.hide?.toLowerCase() === 'y';
+
+      if (!showInactiveMgas) {
+        // Default view: only active, visible MGAs
+        if (isActive && !isHidden) result.push(mga);
+      } else {
+        // Include one record per MGA (best deduped record)
+        result.push(mga);
+      }
     });
-  }, [allMgaData]);
+    return result;
+  }, [dedupedMgaByName, showInactiveMgas]);
+
+  // Get inactive MGAs for the "Inactive MGAs" row (disjoint from main list)
+  const inactiveMgaData = useMemo(() => {
+    if (!allMgaData.length || dedupedMgaByName.size === 0) return [];
+
+    const includedNames = new Set(filteredMgaData.map((m) => m.lagnname));
+
+    // Group by name and pick best record among inactive or hidden ones
+    const groups = new Map();
+    allMgaData.forEach((mga) => {
+      const name = mga.lagnname;
+      if (!name || includedNames.has(name)) return; // skip names already included in main list
+
+      const isActive = mga.Active?.toLowerCase() === 'y';
+      const isHidden = mga.hide?.toLowerCase() === 'y';
+      const isInactiveOrHidden = !isActive || isHidden;
+      if (!isInactiveOrHidden) return;
+
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name).push(mga);
+    });
+
+    const toEpoch = (start) => {
+      const d = parseMgaStartDate(start);
+      return d ? d.getTime() : -Infinity;
+    };
+    const pickBest = (records) => {
+      return records.reduce((best, curr) => {
+        if (!best) return curr;
+        const bestHidden = best.hide?.toLowerCase() === 'y';
+        const currHidden = curr.hide?.toLowerCase() === 'y';
+        if (bestHidden !== currHidden) return currHidden ? best : curr; // prefer visible
+        return toEpoch(curr.start) > toEpoch(best.start) ? curr : best; // latest start
+      }, null);
+    };
+
+    const result = [];
+    groups.forEach((records) => {
+      const chosen = pickBest(records);
+      if (chosen) result.push(chosen);
+    });
+    return result;
+  }, [allMgaData, dedupedMgaByName, filteredMgaData]);
 
   // Group each dataset by MGA.
   // For VIP, use the "vip_month" field, count occurrences, and use the "mga" field.
-  const vipGrouped = groupDataByMGA(vipData, "vip_month", selectedYear, "count", "total", "mga");
+  const vipGroupedResult = groupDataByMGA(vipData, "vip_month", selectedYear, "count", "total", "mga", null, mgaStartDates);
+  const vipGrouped = vipGroupedResult.grouped;
+  const vipPreStartData = vipGroupedResult.preStartData;
   console.log(`VIP grouped data:`, Object.keys(vipGrouped));
   
   // For Associates, use "PRODDATE", count occurrences, and use the "MGA" field.
-  const associatesGrouped = groupDataByMGA(associatesData, "PRODDATE", selectedYear, "count", "total", "MGA");
+  const associatesGroupedResult = groupDataByMGA(associatesData, "PRODDATE", selectedYear, "count", "total", "MGA", null, mgaStartDates);
+  const associatesGrouped = associatesGroupedResult.grouped;
+  const associatesPreStartData = associatesGroupedResult.preStartData;
   console.log(`Associates grouped data:`, Object.keys(associatesGrouped));
   
   // For Hires, use "MORE_Date", sum the "Total_Hires" field, and use the "MGA" field.
-  const hiresGrouped = groupDataByMGA(hiresData, "MORE_Date", selectedYear, "sum", "Total_Hires", "MGA");
+  const hiresGroupedResult = groupDataByMGA(hiresData, "MORE_Date", selectedYear, "sum", "Total_Hires", "MGA", null, mgaStartDates);
+  const hiresGrouped = hiresGroupedResult.grouped;
+  const hiresPreStartData = hiresGroupedResult.preStartData;
   console.log(`Hires grouped data:`, Object.keys(hiresGrouped));
   
   // For Subagent, use "month", count unique LagnName values, and use the "MGA_NAME" field.
 
   // Build table rows for each dataset by iterating over filtered MGA records.
   // If an MGA does not have data, default monthly counts to 0.
-  const buildTableRows = (groupedData, isSubagent = false) => {
+  const buildTableRows = (groupedData, isSubagent = false, preStartData = {}) => {
     console.log(`Building table rows for ${filteredMgaData.length} MGAs`);
     console.log(`Grouped data keys:`, Object.keys(groupedData));
     
     return filteredMgaData.map((mgaObj) => {
       const mgaName = mgaObj.lagnname;
       let monthlyCounts, Q1, Q2, Q3, Q4, YTD;
+      let preStartMonthlyCounts = Array(12).fill(0);
       
       if (isSubagent) {
         if (groupedData[mgaName]) {
@@ -806,7 +1009,11 @@ const ScorecardSGAData = () => {
         }
       } else {
         monthlyCounts = groupedData[mgaName] || Array(12).fill(0);
-        const totals = calculateQuarterTotals(monthlyCounts, selectedYear === new Date().getFullYear());
+        preStartMonthlyCounts = preStartData[mgaName] || Array(12).fill(0);
+        
+        // Calculate totals excluding pre-start data
+        const validMonthlyCounts = monthlyCounts.map((total, idx) => total - preStartMonthlyCounts[idx]);
+        const totals = calculateQuarterTotals(validMonthlyCounts, selectedYear === new Date().getFullYear());
         Q1 = totals.Q1;
         Q2 = totals.Q2;
         Q3 = totals.Q3;
@@ -817,12 +1024,14 @@ const ScorecardSGAData = () => {
       return {
         mga: mgaName,
         monthlyCounts,
+        preStartMonthlyCounts, // Add pre-start data for rendering decisions
         Q1,
         Q2,
         Q3,
         Q4,
         YTD,
         treeValue: getTreeValue(mgaObj),
+        mgaStartDate: parseMgaStartDate(mgaObj.start), // Add parsed start date
       };
     });
   };
@@ -1084,9 +1293,9 @@ const ScorecardSGAData = () => {
     setFinalAlpData(buildAlpTableRows(alpGrouped, filteredMgaData));
   }, [alpData, selectedYear, filteredMgaData]);
 
-  const vipRows = buildTableRows(vipGrouped);
-  const associatesRows = buildTableRows(associatesGrouped);
-  const hiresRows = buildTableRows(hiresGrouped);
+  const vipRows = buildTableRows(vipGrouped, false, vipPreStartData);
+  const associatesRows = buildTableRows(associatesGrouped, false, associatesPreStartData);
+  const hiresRows = buildTableRows(hiresGrouped, false, hiresPreStartData);
   const subagentGrouped = processSubAgentDataFromDatabase(subagentData, selectedYear);
   const subagentRows = buildTableRows(subagentGrouped, true);
 
@@ -1135,7 +1344,10 @@ const ScorecardSGAData = () => {
   const finalAssociatesRows = sortRows(filterRowsByTree([...associatesRows]));
   const finalHiresRows = sortRows(filterRowsByTree([...hiresRows]));
   const finalSubagentRows = sortRows(filterRowsByTree([...subagentRows]));
-  const finalHireToCodeRows = useMemo(() => buildHireToCodeRows(finalAssociatesRows, finalHiresRows), [finalAssociatesRows, finalHiresRows]);
+  const finalHireToCodeRows = useMemo(
+    () => sortRows(buildHireToCodeRows(finalAssociatesRows, finalHiresRows)),
+    [finalAssociatesRows, finalHiresRows, sortColumn, sortOrder]
+  );
   const hireToCodeTotals = useMemo(() => computeRatioTotals(finalHireToCodeRows), [finalHireToCodeRows]);
 
   // Add inactive rows to the final rows if they exist and inactive MGAs are not being shown
@@ -1150,12 +1362,22 @@ const ScorecardSGAData = () => {
   const finalAssociatesRowsWithInactive = addInactiveRows(finalAssociatesRows, associatesInactiveRow);
   const finalHiresRowsWithInactive = addInactiveRows(finalHiresRows, hiresInactiveRow);
   const finalSubagentRowsWithInactive = addInactiveRows(finalSubagentRows, subagentInactiveRow);
+  const finalVipCodeRows = useMemo(
+    () => sortRows(buildVipCodeRows(finalVipRowsWithInactive, finalAssociatesRowsWithInactive)),
+    [finalVipRowsWithInactive, finalAssociatesRowsWithInactive, sortColumn, sortOrder]
+  );
+  const finalAlpCodeRows = useMemo(
+    () => sortRows(buildAlpCodeRows(finalAlpRows, finalAssociatesRowsWithInactive)),
+    [finalAlpRows, finalAssociatesRowsWithInactive, sortColumn, sortOrder]
+  );
   // Compute totals for a set of rows (for individual table calculations)
   const computeTotals = (rows) => {
     return rows.reduce(
       (acc, row) => {
         row.monthlyCounts.forEach((count, idx) => {
-          acc.monthly[idx] += count;
+          // Subtract pre-start data from totals
+          const preStartCount = row.preStartMonthlyCounts ? row.preStartMonthlyCounts[idx] : 0;
+          acc.monthly[idx] += (count - preStartCount);
         });
         acc.Q1 += row.Q1;
         acc.Q2 += row.Q2;
@@ -1223,6 +1445,88 @@ const ScorecardSGAData = () => {
     return computeTotals(allRows);
   };
 
+  // Build VIP/Code rows (per MGA: monthly ratio = VIPs / Codes, quarter/YTD as averages)
+  function buildVipCodeRows(vipRowsIn, codeRowsIn) {
+    // Map by MGA for quick lookup
+    const codeByMga = new Map(codeRowsIn.map(r => [r.mga, r]));
+    const rows = vipRowsIn.map(vr => {
+      const cr = codeByMga.get(vr.mga);
+      const monthlyRatios = Array(12).fill(0);
+      const now = new Date();
+      const isCurrentYear = selectedYear === now.getFullYear();
+      const lastCompletedMonth = isCurrentYear ? Math.max(0, now.getMonth()) : 12; // exclude current month when current year
+
+      // Calculate monthly ratios (Code / VIP)
+      for (let i = 0; i < 12; i++) {
+        const vipVal = (vr.monthlyCounts?.[i] || 0) - (vr.preStartMonthlyCounts?.[i] || 0);
+        const codeVal = (cr?.monthlyCounts?.[i] || 0) - (cr?.preStartMonthlyCounts?.[i] || 0);
+        monthlyRatios[i] = vipVal > 0 ? (codeVal / vipVal) : 0;
+      }
+
+      // Helper to average non-zero entries in a slice (if none, 0)
+      const avgSlice = (arr, start, end) => {
+        const slice = arr.slice(start, end).filter(v => v > 0);
+        if (slice.length === 0) return 0;
+        return slice.reduce((a,b)=>a+b,0) / slice.length;
+      };
+
+      const Q1 = avgSlice(monthlyRatios, 0, 3);
+      const Q2 = avgSlice(monthlyRatios, 3, 6);
+      const Q3 = avgSlice(monthlyRatios, 6, 9);
+      const Q4 = avgSlice(monthlyRatios, 9, 12);
+
+      let YTD;
+      if (isCurrentYear) {
+        const ytdSlice = monthlyRatios.slice(0, lastCompletedMonth);
+        const nonZero = ytdSlice.filter(v => v > 0);
+        YTD = nonZero.length > 0 ? nonZero.reduce((a,b)=>a+b,0) / nonZero.length : 0;
+      } else {
+        const nonZero = monthlyRatios.filter(v => v > 0);
+        YTD = nonZero.length > 0 ? nonZero.reduce((a,b)=>a+b,0) / nonZero.length : 0;
+      }
+
+      return {
+        mga: vr.mga,
+        monthlyCounts: monthlyRatios,
+        preStartMonthlyCounts: Array(12).fill(0), // not used for ratios in rendering
+        Q1, Q2, Q3, Q4, YTD,
+        treeValue: vr.treeValue
+      };
+    });
+    return rows;
+  }
+
+  // Build ALP/Code rows (per MGA: monthly ratio = ALP / Codes, quarter/YTD as averages)
+  function buildAlpCodeRows(alpRowsIn, codeRowsIn) {
+    const codeByMga = new Map(codeRowsIn.map(r => [r.mga, r]));
+    const rows = alpRowsIn.map(ar => {
+      const cr = codeByMga.get(ar.mga);
+      const now = new Date();
+      const isCurrentYear = selectedYear === now.getFullYear();
+      const lastCompletedMonth = isCurrentYear ? Math.max(0, now.getMonth()) : 12; // exclude current month when current year
+      // Sum ALP and Codes across the year (exclude current month if current year)
+      let sumAlp = 0;
+      let sumCodes = 0;
+      const monthsToConsider = lastCompletedMonth; // already excludes current month when current year
+      for (let i = 0; i < (isCurrentYear ? monthsToConsider : 12); i++) {
+        const alpVal = (ar.monthlyCounts?.[i] || 0);
+        const codeVal = ((cr?.monthlyCounts?.[i] || 0) - (cr?.preStartMonthlyCounts?.[i] || 0));
+        sumAlp += alpVal;
+        sumCodes += codeVal > 0 ? codeVal : 0;
+      }
+      const YTD = sumCodes > 0 ? (sumAlp / sumCodes) : 0;
+
+      return {
+        mga: ar.mga,
+        monthlyCounts: Array(12).fill(0),
+        preStartMonthlyCounts: Array(12).fill(0),
+        Q1: 0, Q2: 0, Q3: 0, Q4: 0, YTD,
+        treeValue: ar.treeValue
+      };
+    });
+    return rows;
+  }
+
   // Header click handler to toggle sorting.
   const handleSort = (column) => {
     if (sortColumn === column) {
@@ -1259,13 +1563,18 @@ const ScorecardSGAData = () => {
 
   const renderTable = (title, rows, totals) => {
     // Filter headers based on quarters mode and future months
-    const filteredHeaders = headers.filter((header, index) => {
+    let filteredHeaders = headers.filter((header, index) => {
       const isQuarter = ["Q1", "Q2", "Q3", "Q4"].includes(header.key);
       const isFuture = monthOrder.hasOwnProperty(header.key) && 
         isMonthInFuture(selectedYear, monthOrder[header.key]);
       
       return shouldShowColumn(index, isQuarter, isFuture, header.key);
     });
+
+    // If toggled and sorting by a month or quarter, show only MGA and that column
+    if (onlySortedColumn && (isMonthKey(sortColumn) || isQuarterKey(sortColumn))) {
+      filteredHeaders = headers.filter(h => h.key === 'mga' || h.key === sortColumn);
+    }
 
     return (
       <div className="atlas-scorecard-section">
@@ -1276,22 +1585,30 @@ const ScorecardSGAData = () => {
           <table className="atlas-scorecard-custom-table">
             <thead>
               <tr>
-                {filteredHeaders.map((header) => (
-                  <th
-                    key={header.key}
-                    className={`${getHeaderClass(header.key)} ${
-                      header.key === "Q1" || header.key === "Q2" || header.key === "Q3" || header.key === "Q4" 
-                        ? "atlas-scorecard-quarter-header" 
-                        : header.key === "YTD" 
-                          ? "atlas-scorecard-ytd-header" 
-                          : ""
-                    }`}
-                    onClick={() => handleSort(header.key)}
-                  >
-                    {header.label}
-                    {getSortIndicator(header.key)}
-                  </th>
-                ))}
+                {filteredHeaders.map((header) => {
+                  const isSortedCol = sortColumn === header.key;
+                  const baseHeaderStyle = header.key === 'mga'
+                    ? { position: 'sticky', left: 0, zIndex: 3, background: '#ffffff' }
+                    : {};
+                  const highlightStyle = isSortedCol ? { background: '#FFE5CC' } : {};
+                  return (
+                    <th
+                      key={header.key}
+                      className={`${getHeaderClass(header.key)} ${
+                        header.key === "Q1" || header.key === "Q2" || header.key === "Q3" || header.key === "Q4" 
+                          ? "atlas-scorecard-quarter-header" 
+                          : header.key === "YTD" 
+                            ? "atlas-scorecard-ytd-header" 
+                            : ""
+                      }`}
+                      onClick={() => handleSort(header.key)}
+                      style={{ ...baseHeaderStyle, ...highlightStyle }}
+                    >
+                      {header.label}
+                      {getSortIndicator(header.key)}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
           <tbody>
@@ -1310,6 +1627,13 @@ const ScorecardSGAData = () => {
                   const isFutureCell = monthOrder.hasOwnProperty(header.key) && 
                     isMonthInFuture(selectedYear, monthOrder[header.key]);
                   
+                  // Check if this cell should be greyed out due to pre-start data
+                  const isGreyedOut = shouldGreyOutCell(row, header.key);
+                  const rowBg = row.isInactiveRow 
+                    ? "#fff3cd" 
+                    : index % 2 === 0 ? "white" : "#f9fafb";
+                  const isSortedCol = sortColumn === header.key;
+                  
                   return (
                     <td 
                       key={header.key} 
@@ -1319,13 +1643,18 @@ const ScorecardSGAData = () => {
                           : header.key === "YTD" 
                             ? "atlas-scorecard-ytd-cell" 
                             : ""
-                      }`}
+                      } ${isGreyedOut ? "atlas-scorecard-pre-start-cell" : ""}`}
+                      style={header.key === 'mga'
+                        ? { position: 'sticky', left: 0, zIndex: 2, background: isSortedCol ? '#FFEFE0' : rowBg }
+                        : (isSortedCol ? { background: '#FFF2E6' } : undefined)}
                     >
                       {isFutureCell ? 
                         "—" : // Display dash for future months
-                        (monthOrder.hasOwnProperty(header.key) ?
-                          formatCellValue(title, header.key, row.monthlyCounts[monthOrder[header.key]]) :
-                          formatCellValue(title, header.key, row[header.key]))
+                        isGreyedOut ?
+                          "—" : // Display dash for entire months before start date
+                          (monthOrder.hasOwnProperty(header.key) ?
+                            formatCellValue(title, header.key, row.monthlyCounts[monthOrder[header.key]] - (row.preStartMonthlyCounts?.[monthOrder[header.key]] || 0)) :
+                            formatCellValue(title, header.key, row[header.key]))
                       }
                     </td>
                   );
@@ -1334,7 +1663,7 @@ const ScorecardSGAData = () => {
             ))}
             {/* Totals Row */}
             <tr className="atlas-scorecard-totals-row">
-              <td className="atlas-scorecard-metric-cell">
+              <td className="atlas-scorecard-metric-cell" style={{ position: 'sticky', left: 0, zIndex: 2, background: '#ffffff' }}>
                 <strong>Totals</strong>
               </td>
               {filteredHeaders.slice(1).map((header) => {
@@ -1502,25 +1831,33 @@ const ScorecardSGAData = () => {
               )}
             </button>
           </div>
+          {(isMonthKey(sortColumn) || isQuarterKey(sortColumn)) && (
+            <div className="atlas-scorecard-only-sorted-toggle" style={{ marginLeft: '8px' }}>
+              <button 
+                className={`only-sorted-toggle-btn ${onlySortedColumn ? 'active' : ''}`}
+                onClick={() => setOnlySortedColumn(!onlySortedColumn)}
+                title={onlySortedColumn ? 'Show All Columns' : `Show Only ${sortColumn}`}
+              >
+                {onlySortedColumn ? 'Show All' : `Only ${sortColumn}`}
+              </button>
+            </div>
+          )}
         </div>
       </div>
       
       <div className="atlas-scorecard-tables">
-        {renderTable("Net ALP", finalAlpRows, computeAllAlpTotals(processAlpDataForMGA(alpData, selectedYear)))}
-        {renderTable("VIPs", finalVipRowsWithInactive, computeAllTotals(vipGrouped))}
+        {renderTable("Net ALP", finalAlpRows, computeTotals(finalAlpRows))}
+        {renderTable("Hires", finalHiresRowsWithInactive, computeTotals(finalHiresRowsWithInactive))}
         {renderTable(
           "Codes",
           finalAssociatesRowsWithInactive,
-          computeAllTotals(associatesGrouped)
+          computeTotals(finalAssociatesRowsWithInactive)
         )}
-        {renderTable("Hires", finalHiresRowsWithInactive, computeAllTotals(hiresGrouped))}
-        {renderTable(
-          "Submitting Agent Count",
-          finalSubagentRowsWithInactive,
-          computeAllTotals(subagentGrouped, true)
-        )}
-        
+        {renderTable("VIPs", finalVipRowsWithInactive, computeTotals(finalVipRowsWithInactive))}
         {renderTable("Hire to Code", finalHireToCodeRows, hireToCodeTotals)}
+        {renderTable("Code / VIP", finalVipCodeRows, computeTotals(finalVipCodeRows))}
+        {renderTable("ALP / Code", finalAlpCodeRows.map(r=>({ ...r, monthlyCounts: Array(12).fill(0) })), computeTotals(finalAlpCodeRows))}
+        {/* Submitting Agent Count hidden in SGA view */}
       </div>
     </div>
   );

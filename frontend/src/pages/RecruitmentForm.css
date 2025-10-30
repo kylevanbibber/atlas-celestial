@@ -1,0 +1,288 @@
+/* Recruitment Form CSS */
+
+.recruitment-form-page {
+  background-color: #ffffff;
+  font-family: "Calibri", sans-serif;
+  margin: 0;
+  min-height: 100vh;
+}
+
+.recruitment-form-page h2 {
+  color: #00558C;
+}
+
+.recruitment-form-page label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: bold;
+}
+
+.recruitment-form-page select {
+  width: 100%;
+  padding: 8px;
+  margin: 10px 0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.recruitment-form-page input[type="submit"] {
+  background-color: #00558C;
+  color: #ffffff;
+  cursor: pointer;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  width: 100%;
+  transition: background-color 0.3s ease;
+}
+
+.recruitment-form-page input[type="submit"]:hover:not(:disabled) {
+  background-color: #319B42;
+}
+
+.recruitment-form-page input[type="submit"]:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.recruitment-form-page input[type="radio"] {
+  width: unset;
+  padding: 0px;
+  border-radius: 0px;
+  margin-bottom: 0px;
+  margin-right: 8px;
+}
+
+.recruitment-form-page .invalid {
+  border: 2px solid red !important;
+}
+
+/* Header */
+.recruitment-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  background-color: rgba(0, 85, 140);
+  height: 80px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  box-shadow: 0 5px 5px rgba(0, 0, 0, 0.3);
+}
+
+.recruitment-header-content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+/* Container */
+.recruitment-container {
+  margin: 0 auto;
+}
+
+/* Hero Section */
+.img-grid {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  margin-top: 80px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  height: 220px;
+  position: relative;
+}
+
+.img-grid-edge {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  background-repeat: repeat-x;
+  background-position: center;
+  background-size: cover;
+  pointer-events: none;
+}
+
+.img-grid h1 {
+  font-weight: bold;
+  color: white;
+  font-size: 40px;
+  text-shadow: 2px 2px 2px rgba(0, 0, 0, 1.00);
+}
+
+/* Grid Layouts */
+.top-grid {
+  text-align: left;
+  width: 95vw;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.bottom-grid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 95vw;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Video Container */
+.video-container {
+  position: relative;
+  width: 100%;
+  height: 0;
+  padding-bottom: 56.25%; /* 16:9 aspect ratio (1080p) */
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 0px 25px rgba(0, 0, 0, 0.5);
+  background-color: #000;
+}
+
+.video-container #youtube-player,
+.video-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Horizontal Divider */
+.horizontal-bar {
+  width: 90%;
+  height: 2px;
+  background-color: #00558C;
+}
+
+/* Name Fields */
+.name-fields {
+  display: flex;
+  width: 100%;
+  gap: 5px;
+  margin-bottom: 20px;
+  box-sizing: border-box;
+}
+
+.name-fields > div:first-child, /* First Name */
+.name-fields > div:nth-child(3) { /* Last Name */
+  flex-grow: 1;
+}
+
+.name-fields > div:nth-child(2), /* Middle Initial */
+.name-fields > div:last-child { /* Suffix */
+  flex-basis: 80px;
+  flex-grow: 0;
+}
+
+.name-fields input[type="text"] {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #00558C;
+  border-radius: 4px;
+  font-size: 12pt;
+  font-family: "Calibri", sans-serif;
+  box-sizing: border-box;
+}
+
+/* Contact Fields */
+.contact-fields {
+  display: flex;
+  width: 100%;
+  gap: 5px;
+  margin-bottom: 20px;
+  box-sizing: border-box;
+}
+
+.contact-fields > div:nth-child(1), /* Phone Number */
+.contact-fields > div:nth-child(3) { /* Hiring Manager */
+  flex-grow: 1;
+}
+
+.contact-fields > div:nth-child(2) { /* Email */
+  flex-grow: 0;
+  flex-basis: 350px;
+}
+
+.contact-fields input[type="text"],
+.contact-fields input[type="email"] {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #00558C;
+  border-radius: 4px;
+  font-size: 12pt;
+  font-family: "Calibri", sans-serif;
+  box-sizing: border-box;
+}
+
+/* Textarea */
+.recruitment-form-page textarea {
+  width: 100%;
+  font-size: 12pt;
+  padding: 5px;
+  border: 1px solid #00558C;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  resize: none;
+  font-family: "Calibri", sans-serif;
+}
+
+/* Loading Overlay */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+.loading-overlay.visible {
+  display: flex;
+}
+
+.loading-spinner {
+  border: 8px solid rgba(255, 255, 255, 0.3);
+  border-top: 8px solid white;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .name-fields,
+  .contact-fields {
+    flex-direction: column;
+  }
+  
+  .name-fields > div,
+  .contact-fields > div {
+    flex-basis: auto !important;
+    width: 100%;
+  }
+  
+  .img-grid h1 {
+    font-size: 28px;
+  }
+}
+

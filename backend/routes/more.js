@@ -65,7 +65,6 @@ router.post('/submit-personal-hires', verifyToken, async (req, res) => {
             const existingRecords = await db.query(checkQuery, checkValues);
 
             if (existingRecords.length > 0) {
-                console.log('Duplicate personal hire detected, not inserting:', hire);
                 continue; // Skip this record and move to the next one
             }
 
@@ -77,7 +76,6 @@ router.post('/submit-personal-hires', verifyToken, async (req, res) => {
             `, values);
         }
 
-        console.log('Personal hires successfully submitted:', personalHires);
         res.status(201).json({ 
             success: true, 
             message: 'Personal hires successfully submitted to PersonalHires table.' 
@@ -106,7 +104,6 @@ router.post('/update-more-data', verifyToken, async (req, res) => {
             tree 
         } = req.body;
         
-        console.log('Body:', req.body);
 
         // Validate input
         if (!MGA || !MORE_Date || !updates) {
@@ -121,7 +118,6 @@ router.post('/update-more-data', verifyToken, async (req, res) => {
         const existingRecords = await db.query(checkQuery, [MGA, MORE_Date]);
 
         if (existingRecords.length === 0) {
-            console.log('No existing row found for MGA and MORE_Date. Creating a new row...');
 
             const defaultValues = {
                 MGA,
@@ -161,7 +157,6 @@ router.post('/update-more-data', verifyToken, async (req, res) => {
                 message: 'aMORE data created successfully' 
             });
         } else {
-            console.log('Existing row found for MGA and MORE_Date. Updating row...');
 
             // Update the existing row with the new values
             const updateFields = Object.keys(updates)
@@ -502,6 +497,57 @@ router.get('/filter-options', verifyToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching filter options',
+            error: error.message
+        });
+    }
+});
+
+// Get MGA hierarchy data (rga, legacy, tree) for a specific MGA
+router.get('/mga-hierarchy/:mgaName', verifyToken, async (req, res) => {
+    try {
+        const { mgaName } = req.params;
+        
+        if (!mgaName) {
+            return res.status(400).json({
+                success: false,
+                message: 'MGA name is required'
+            });
+        }
+
+        const hierarchyQuery = `
+            SELECT rga, legacy, tree
+            FROM MGAs 
+            WHERE lagnname = ? 
+            AND (active = 'y' OR active IS NULL) 
+            AND (hide = 'n' OR hide IS NULL)
+            LIMIT 1
+        `;
+        
+        const results = await db.query(hierarchyQuery, [mgaName]);
+        
+        if (results.length === 0) {
+            return res.json({
+                success: false,
+                message: 'MGA not found or inactive',
+                data: null
+            });
+        }
+
+        const hierarchyData = results[0];
+        
+        res.json({
+            success: true,
+            data: {
+                rga: hierarchyData.rga || mgaName,
+                legacy: hierarchyData.legacy || mgaName,
+                tree: hierarchyData.tree || mgaName
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching MGA hierarchy:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching MGA hierarchy',
             error: error.message
         });
     }

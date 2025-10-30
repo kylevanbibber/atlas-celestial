@@ -60,14 +60,41 @@ const ClientSigning = () => {
 
     (async () => {
       try {
-        const pdfPath = `${window.location.origin}/pdfs/gift-certificate-fillable.pdf`;
+        // Select PDF based on document type from token
+        const pdfFileName = clientData.documentType === 'ny' 
+          ? '2k-ADD-NIL.pdf' 
+          : 'gift-certificate-fillable.pdf';
+        const pdfPath = `${window.location.origin}/pdfs/${pdfFileName}`;
+        console.log('ClientSigning - Loading PDF:', pdfPath, 'Document type:', clientData.documentType);
+        
         const res = await fetch(pdfPath);
-        if (!res.ok) throw new Error(`HTTP ${res.status} fetching PDF`);
+        if (!res.ok) throw new Error(`HTTP ${res.status} fetching PDF: ${pdfPath}`);
         const bytes = await res.arrayBuffer();
 
         const pdfDoc = await PDFDocument.load(bytes);
         const form = pdfDoc.getForm();
         const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+        // Log all available form fields for debugging
+        const fields = form.getFields();
+        console.log(`ClientSigning - PDF loaded: ${pdfFileName}`);
+        console.log(`ClientSigning - Total form fields found: ${fields.length}`);
+        
+        if (fields.length === 0) {
+          console.warn(`⚠️ ${pdfFileName} has NO FILLABLE FORM FIELDS!`);
+          console.warn('This PDF might be a static form that cannot be filled programmatically.');
+          console.warn('You may need:');
+          console.warn('1. A fillable version of this PDF');
+          console.warn('2. To use a different PDF with form fields');
+          console.warn('3. To create form fields in the PDF using Adobe Acrobat');
+        } else {
+          console.log('ClientSigning - Available form fields:');
+          fields.forEach((field, index) => {
+            const fieldName = field.getName();
+            const fieldType = field.constructor.name;
+            console.log(`  ${index + 1}. "${fieldName}" (${fieldType})`);
+          });
+        }
 
         // Safely set form fields with fallbacks
         const setFieldSafely = (fieldName, value) => {
@@ -79,26 +106,82 @@ const ClientSigning = () => {
           }
         };
 
-        // Map clientData to PDF fields
-        setFieldSafely('arne', clientData.clientName);
-        setFieldSafely('Insureds Name', clientData.clientName);
-        setFieldSafely('Date of Birth', clientData.dateOfBirth);
-        setFieldSafely('lnsureds Date of Birth', clientData.dateOfBirth);
-        setFieldSafely('Street Address', clientData.address);
-        setFieldSafely('City', clientData.city);
-        setFieldSafely('State', clientData.state);
-        setFieldSafely('Zip', clientData.zip);
-        setFieldSafely('Phone', clientData.phoneNumber);
-        setFieldSafely('Beneficiary', clientData.beneficiary);
-        setFieldSafely('Relationship to Insured_2', clientData.relationshipToInsured);
-        setFieldSafely('Relationship to Insured', 'Agent');
-        setFieldSafely('Agency', 'Arias Organization');
-        setFieldSafely('Agency Phone', '412-235-2385');
-        setFieldSafely('Agent', clientData.agentName);
-        setFieldSafely('Sponsors Name', clientData.agentName);
-        setFieldSafely('Text1', clientData.agentName);
-        setFieldSafely('Text2', clientData.agentName);
-        setFieldSafely('Date Certificate Delivered', today);
+        // Map clientData to PDF fields based on document type
+        if (clientData.documentType === 'ny') {
+          // Handle NY AD&D form
+          console.log('ClientSigning - Processing NY AD&D form');
+          
+          if (fields.length === 0) {
+            // Static PDF - use coordinate-based text overlay
+            console.log('ClientSigning - Using coordinate-based text overlay for static PDF');
+            const [page] = pdfDoc.getPages();
+            const { width, height } = page.getSize();
+            
+            // You'll need to adjust these coordinates based on your PDF layout
+            const fontSize = 10;
+            page.drawText(clientData.clientName || '', { x: 150, y: height - 120, size: fontSize });
+            page.drawText(clientData.dateOfBirth || '', { x: 150, y: height - 140, size: fontSize });
+            page.drawText(clientData.address || '', { x: 150, y: height - 160, size: fontSize });
+            page.drawText(clientData.city || '', { x: 150, y: height - 180, size: fontSize });
+            page.drawText(clientData.state || '', { x: 300, y: height - 180, size: fontSize });
+            page.drawText(clientData.zip || '', { x: 350, y: height - 180, size: fontSize });
+            page.drawText(clientData.phoneNumber || '', { x: 150, y: height - 200, size: fontSize });
+            page.drawText(clientData.beneficiary || '', { x: 150, y: height - 220, size: fontSize });
+            page.drawText(clientData.relationshipToInsured || '', { x: 150, y: height - 240, size: fontSize });
+            page.drawText(clientData.agentName || '', { x: 150, y: height - 260, size: fontSize });
+            page.drawText(today || '', { x: 150, y: height - 280, size: fontSize });
+            
+            console.log('ClientSigning - Text overlayed on static PDF');
+          } else {
+            // Fillable PDF - use form fields with actual field names
+            console.log('ClientSigning - Using form fields for fillable 2k-ADD-NIL.pdf');
+            
+            // Map client data to actual PDF field names
+            setFieldSafely('name1', clientData.clientName);        // Primary name field
+            setFieldSafely('name', clientData.clientName);         // Secondary name field
+            setFieldSafely('dob1', clientData.dateOfBirth);        // Primary DOB field  
+            setFieldSafely('dob', clientData.dateOfBirth);         // Secondary DOB field
+            setFieldSafely('street', clientData.address);          // Street address
+            setFieldSafely('city', clientData.city);               // City
+            setFieldSafely('state', clientData.state);             // State
+            setFieldSafely('zip', clientData.zip);                 // Zip code
+            setFieldSafely('phone', clientData.phoneNumber);       // Phone number
+            setFieldSafely('ben', clientData.beneficiary);         // Beneficiary name
+            setFieldSafely('relation', clientData.relationshipToInsured); // Relationship
+            setFieldSafely('spon_name', clientData.agentName);     // Sponsor/Agent name
+            setFieldSafely('agent', clientData.agentName);         // Agent field
+            setFieldSafely('sig_sponsor', clientData.agentName);   // Sponsor signature field
+            setFieldSafely('sig_agent', clientData.agentName);     // Agent signature field
+            setFieldSafely('date_delivered', today);               // Date delivered
+            setFieldSafely('agency', 'Arias Organization');        // Agency name
+            setFieldSafely('agency_phone', '412-235-2385');        // Agency phone
+            setFieldSafely('relation_to_insured', 'Agent');        // Agent relationship
+            
+            console.log('ClientSigning - All fields mapped for 2k-ADD-NIL.pdf');
+          }
+        } else {
+          // Field mapping for gift certificate form (default)
+          console.log('ClientSigning - Filling gift certificate form fields');
+          setFieldSafely('arne', clientData.clientName);
+          setFieldSafely('Insureds Name', clientData.clientName);
+          setFieldSafely('Date of Birth', clientData.dateOfBirth);
+          setFieldSafely('lnsureds Date of Birth', clientData.dateOfBirth);
+          setFieldSafely('Street Address', clientData.address);
+          setFieldSafely('City', clientData.city);
+          setFieldSafely('State', clientData.state);
+          setFieldSafely('Zip', clientData.zip);
+          setFieldSafely('Phone', clientData.phoneNumber);
+          setFieldSafely('Beneficiary', clientData.beneficiary);
+          setFieldSafely('Relationship to Insured_2', clientData.relationshipToInsured);
+          setFieldSafely('Relationship to Insured', 'Agent');
+          setFieldSafely('Agency', 'Arias Organization');
+          setFieldSafely('Agency Phone', '412-235-2385');
+          setFieldSafely('Agent', clientData.agentName);
+          setFieldSafely('Sponsors Name', clientData.agentName);
+          setFieldSafely('Text1', clientData.agentName);
+          setFieldSafely('Text2', clientData.agentName);
+          setFieldSafely('Date Certificate Delivered', today);
+        }
 
         form.flatten();
 
@@ -319,7 +402,7 @@ const ClientSigning = () => {
     <div style={styles.container}>
       <div style={styles.content}>
         <div style={styles.header}>
-          <h1>AD&D Gift Certificate</h1>
+          <h1>{clientData?.documentType === 'ny' ? '2K ADD NIL Certificate' : 'AD&D Gift Certificate'}</h1>
           <p>Please review the document and sign below</p>
         </div>
         

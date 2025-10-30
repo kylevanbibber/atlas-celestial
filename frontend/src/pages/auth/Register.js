@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../../api';
+import { US_STATES } from '../../constants';
 import dodontimg from '../../img/dodont.png';
+import ProfilePicture from '../../components/utilities/ProfilePicture';
+import { useAuth } from '../../context/AuthContext';
 const AccountSetupPage = ({ onBackToLogin, lagnname, email: defaultEmail, phone: defaultPhone, id }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     email: defaultEmail || '',
     phone: defaultPhone || '',
@@ -22,9 +27,15 @@ const AccountSetupPage = ({ onBackToLogin, lagnname, email: defaultEmail, phone:
   const navigate = useNavigate();
 
   const [errors, setErrors] = useState({ email: '', phone: '' });
-  const [imagePreview, setImagePreview] = useState('https://via.placeholder.com/150');
-  const [profilePicture, setProfilePicture] = useState('');
+  const defaultProfilePic = 'https://www.gravatar.com/avatar/?d=mp';
+  const [imagePreview, setImagePreview] = useState(defaultProfilePic);
+  const [profilePicture, setProfilePicture] = useState(defaultProfilePic);
   const [userData, setUserData] = useState(null);
+  // License fields for resident state on register
+  const [licenseState, setLicenseState] = useState('');
+  const [licenseNumber, setLicenseNumber] = useState('');
+  const [licenseExpiry, setLicenseExpiry] = useState('');
+  const [licenseError, setLicenseError] = useState('');
   const [showInfoOverlay, setShowInfoOverlay] = useState(false); // Control overlay visibility
   const handleToggleInfoOverlay = () => setShowInfoOverlay(!showInfoOverlay); // Toggle overlay
   const [notification, setNotification] = useState({
@@ -75,6 +86,19 @@ const [modalContent, setModalContent] = useState({
     setErrors({ email: emailError, phone: phoneError });
   
     if (emailError || phoneError) return;
+
+    // Determine if we should bypass requiring resident state
+    const bypassResidentRequirement = (
+      (user?.teamRole === 'app') ||
+      (user?.Role === 'Admin') ||
+      ((user?.clname || '').toUpperCase() === 'SGA')
+    );
+
+    // Require resident state on register unless bypass applies
+    if (!licenseState && !bypassResidentRequirement) {
+      setLicenseError('Please select your resident state');
+      return;
+    }
   
     const fullPhoneNumber = `1(${phoneNumber.areaCode})${phoneNumber.prefix}-${phoneNumber.lineNumber}`;
   
@@ -113,6 +137,51 @@ const [modalContent, setModalContent] = useState({
         const createData = await createResponse.json();
   
         if (createData.success) {
+          // Add resident license immediately if provided (skip when bypassing and not selected)
+          if (licenseState) {
+            try {
+              // Attempt immediate create; backend may require auth → could return 403
+              const url = `${api.defaults.baseURL}/licenses`;
+              const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                  userId: id,
+                  lagnname: lagnname || formData.screenName || '',
+                  state: licenseState,
+                  license_number: licenseNumber || '',
+                  expiry_date: licenseExpiry || '',
+                  resident_state: 1
+                })
+              });
+              if (!res.ok) {
+                // Queue for after first login
+                localStorage.setItem('pending_resident_license', JSON.stringify({
+                  userId: id,
+                  lagnname: lagnname || formData.screenName || '',
+                  state: licenseState,
+                  license_number: licenseNumber || '',
+                  expiry_date: licenseExpiry || '',
+                  resident_state: 1
+                }));
+              } else {
+                localStorage.removeItem('pending_resident_license');
+              }
+            } catch (e) {
+              console.warn('Failed to add resident license during register:', e);
+              // Queue for after first login
+              localStorage.setItem('pending_resident_license', JSON.stringify({
+                userId: id,
+                lagnname: lagnname || formData.screenName || '',
+                state: licenseState,
+                license_number: licenseNumber || '',
+                expiry_date: licenseExpiry || '',
+                resident_state: 1
+              }));
+            }
+          }
+
           alert('Account setup completed successfully!');
           onBackToLogin();
         } else {
@@ -204,18 +273,21 @@ const [modalContent, setModalContent] = useState({
 
 
   return (
-    <div className="app-container">
-      <div className="account-setup-register-container">
-        <a href="#" onClick={onBackToLogin} className="account-setup-back-link">
-          &larr; Back to Login
-        </a>
-        <h2 className="account-setup-register-header">Welcome, {formData.screenName}.</h2>
-        <p className="account-setup-description">
-          Enter the info below to complete your Arias Life account setup.
-        </p>
-        <p className="account-setup-description-small">
-          It is not required to have an Arias Life account to maintain a contract with Arias Organization. This site is meant to be used as a tool for your convenience.
-        </p>
+    <div className="auth-background">
+      <div className="login-container">
+        <div className="register-card">
+          <div className="left-side">
+            <h2>Welcome, {formData.screenName}.</h2>
+            <p>Enter the info below to complete your Arias Life account setup.</p>
+            <p style={{ opacity: 0.9 }}>
+              It is not required to have an Arias Life account to maintain a contract with Arias Organization. This site is meant to be used as a tool for your convenience.
+            </p>
+          </div>
+          <div className="right-side">
+        <div className="account-setup-register-container">
+          <a href="#" onClick={onBackToLogin} className="account-setup-back-link">
+            &larr; Back to Login
+          </a>
         {/* Info Overlay */}
         {showInfoOverlay && (
           <div className="info-overlay">
@@ -248,58 +320,30 @@ const [modalContent, setModalContent] = useState({
 
 
         <div className="image-container">
-  <img
-    src={imagePreview}
-    alt="Profile"
-    className="profile-image"
-  />
-  <p className="account-setup-description-small">Setting a profile picture is not required for account setup.</p>
-        <div className="image-options" style={{ marginTop: '5px'}}>
-          <button
-            onClick={handleToggleInfoOverlay}
-            className="insured-button"
-            style={{ marginRight: '5px' }}
-          >
-            ℹ
-          </button>
-
-          {/* Upload Button */}
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              document.getElementById('fileInput').click();
+          <ProfilePicture 
+            pictureUrl={imagePreview}
+            onUpdate={(file) => {
+              // Reuse existing handler
+              handleFileChange({ target: { files: [file] } });
             }}
-            className="insured-button"
-          >
-            Upload
-          </button>
-
-          {/* Remove Button */}
-          {formData.profilePicture && (
+            onRemove={handleRemovePicture}
+            isLoading={false}
+          />
+          <p className="account-setup-description-small">Setting a profile picture is not required for account setup.</p>
+          <div className="image-options" style={{ marginTop: '5px'}}>
             <button
-              onClick={() => handleRemovePicture()}
+              onClick={handleToggleInfoOverlay}
               className="insured-button"
+              style={{ marginRight: '5px' }}
             >
-              Remove
+              ℹ
             </button>
-          )}
+          </div>
         </div>
 
 
-
-
-</div>
-<input
-  type="file"
-  id="fileInput"
-  style={{ display: 'none' }}
-  accept="image/*"
-  onChange={handleFileChange}
-/>
-
-
         <form onSubmit={handleSubmit} className="account-setup-register-form">
-          <div className="account-setup-form-field">
+          <div className="account-setup-form-field desktop-only">
             <label className="account-setup-form-label">*Email</label>
             <input
               type="email"
@@ -311,7 +355,7 @@ const [modalContent, setModalContent] = useState({
             {errors.email && <span className="account-setup-error-message">{errors.email}</span>}
           </div>
 
-          <div className="account-setup-form-field">
+          <div className="account-setup-form-field desktop-only">
             <label className="account-setup-form-label">*Phone</label>
             <div className="phone-number-container">
               <input
@@ -351,10 +395,47 @@ const [modalContent, setModalContent] = useState({
             {errors.phone && <span className="account-setup-error-message">{errors.phone}</span>}
           </div>
 
+          {/* Resident License Section */}
+          <div className="account-setup-form-field desktop-only">
+            <label className="account-setup-form-label">*Resident State</label>
+            <select
+              value={licenseState}
+              onChange={(e) => { setLicenseState(e.target.value); setLicenseError(''); }}
+              className="account-setup-form-input"
+            >
+              <option value="">Select</option>
+              {US_STATES.map(s => (
+                <option key={s.code} value={s.code}>{s.code}</option>
+              ))}
+            </select>
+            {licenseError && <span className="account-setup-error-message">{licenseError}</span>}
+          </div>
+          <div className="account-setup-form-field desktop-only">
+            <label className="account-setup-form-label">License Number (optional)</label>
+            <input
+              type="text"
+              value={licenseNumber}
+              onChange={(e) => setLicenseNumber(e.target.value)}
+              className="account-setup-form-input"
+            />
+          </div>
+          <div className="account-setup-form-field desktop-only">
+            <label className="account-setup-form-label">Expires (optional)</label>
+            <input
+              type="date"
+              value={licenseExpiry}
+              onChange={(e) => setLicenseExpiry(e.target.value)}
+              className="account-setup-form-input"
+            />
+          </div>
+
           <button type="submit" className="account-setup-submit-button">
             Submit
           </button>
         </form>
+        </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -15,6 +15,11 @@
   flex-wrap: wrap;
   gap: 10px;
   width: 100%;
+  position: sticky; /* Keep controls visible when scrolling */
+  top: 0;
+  z-index: 1000;
+  background-color: var(--card-bg);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .controls-left-section {
@@ -180,6 +185,16 @@
   box-shadow: 0 2px 4px var(--shadow-color);
 }
 
+/* Highlight search results similarly to card view */
+.hierarchy-table tbody tr.search-match {
+  background-color: rgba(0, 123, 255, 0.08);
+}
+
+.hierarchy-table tbody tr.search-upline {
+  background-color: var(--sidebar-hover);
+  border-left: 3px solid var(--button-primary-bg);
+}
+
 .hierarchy-table {
   width: 100%;
   border-collapse: collapse;
@@ -322,57 +337,7 @@
   border: 1px solid grey;
 }
 
-.hierarchy-table .status-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  min-width: 120px;
-}
-
-.hierarchy-table .status-badge {
-  display: inline-block;
-  font-size: 0.7rem;
-  padding: 2px 6px;
-  border-radius: 12px;
-  white-space: nowrap;
-  background-color: var(--sidebar-hover);
-  color: var(--text-primary);
-}
-
-.hierarchy-table .status-badge.active {
-  background-color: #d4edda;
-  color: #155724;
-}
-
-.hierarchy-table .status-badge.inactive {
-  background-color: #f8d7da;
-  color: #721c24;
-}
-
-.hierarchy-table .status-badge.redeemed {
-  background-color: #cce5ff;
-  color: #004085;
-}
-
-.hierarchy-table .status-badge.released {
-  background-color: #d1ecf1;
-  color: #0c5460;
-}
-
-.hierarchy-table .status-badge.f6 {
-  background-color: #fff3cd;
-  color: #856404;
-}
-
-.hierarchy-table .status-badge.vip-eligible {
-  background-color: #d6d8db;
-  color: #383d41;
-}
-
-.hierarchy-table .status-badge.rfc {
-  background-color: #8a2be2;
-  color: white;
-}
+/* status badge styles moved to App.css */
 
 .hierarchy-table .license-badges {
   display: flex;
@@ -390,7 +355,52 @@
   color: var(--text-primary);
 }
 
+/* Make status badges compact like license-state-badge */
+.hierarchy-table .table-status-badges,
+.hierarchy-table .table-status-badges .status-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.hierarchy-table .table-status-badges .status-badge {
+  display: inline-block !important;
+  font-size: 0.7rem !important;
+  padding: 1px 4px !important;
+  border-radius: 3px !important;
+  line-height: 1.2;
+  white-space: nowrap;
+  margin: 0 !important;
+}
+
 .hierarchy-table .license-state-badge.resident {
+  background-color: #d1ecf1;
+  color: #0c5460;
+  font-weight: 500;
+}
+
+/* Table-specific license badges for MGA view to avoid vertical gaps */
+.hierarchy-table .table-license-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+}
+
+.hierarchy-table .table-license-state-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  background-color: var(--sidebar-hover);
+  color: var(--text-primary);
+  line-height: 1.2;
+  margin: 0;
+}
+
+.hierarchy-table .table-license-state-badge.resident {
   background-color: #d1ecf1;
   color: #0c5460;
   font-weight: 500;
@@ -593,10 +603,7 @@
 }
 
 /* Hover tooltips for badges when they might be cut off */
-.status-badge-tooltip,
-.license-badge-tooltip {
-  cursor: help;
-}
+/* status badge tooltip styles moved to App.css */
 
 /* Add dynamic tooltips */
 @media (max-width: 768px) {
@@ -853,6 +860,26 @@
 .view-toggle-button:hover:not(.active) {
   background-color: var(--sidebar-hover);
   color: var(--hover-color);
+}
+
+/* Buttons for scrolling managers in table view reuse card styles */
+.view-toggle .admin-scroll-prev-button,
+.view-toggle .admin-scroll-next-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--sidebar-hover);
+  color: var(--text-primary);
+  border-radius: 4px;
+  height: 40px;
+}
+
+.view-toggle .admin-scroll-prev-button:hover,
+.view-toggle .admin-scroll-next-button:hover {
+  background: var(--border-color);
 }
 
 .admin-rga-role {

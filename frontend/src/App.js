@@ -16,29 +16,41 @@ import Production from "./pages/Production";
 import Reports from "./pages/Reports";
 import Training from "./pages/Training";
 import Recruiting from "./pages/Recruiting";
-import Settings from "./pages/settings/Settings";
-import TeamCustomization from "./pages/settings/TeamCustomization";
+import Utilities from "./pages/utilities/Utilities";
+import OneOnOne from "./pages/OneOnOne";
+import TeamCustomization from "./pages/utilities/TeamCustomization";
 import NotificationsAdmin from "./pages/admin/Notifications";
+import EmailCampaigns from "./pages/admin/EmailCampaigns";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/auth/Login";
+import OnboardingLogin from "./pages/onboarding/OnboardingLogin";
+import OnboardingRegister from "./pages/onboarding/OnboardingRegister";
+import OnboardingForgot from "./pages/onboarding/OnboardingForgot";
+import OnboardingHome from "./pages/onboarding/OnboardingHome";
 // Removed AdminLogin import - admin users now use unified login system
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { useTeamStyles, TeamStyleProvider } from './context/TeamStyleContext';
 import { LicenseWarningProvider } from "./context/LicenseWarningContext";
 import { NotificationProvider } from "./context/NotificationContext";
-import NotificationSettings from "./components/settings/notification/NotificationSettings";
+import NotificationUtilities from "./components/utilities/notification/NotificationUtilities";
 import InPageNotificationContainer from "./components/notifications/InPageNotificationContainer";
 import RefEntry from "./components/refvalidation/RefEntry";
 import DocumentSigning from "./components/tools/DocumentSigning";
 import ClientSigning from "./components/tools/ClientSigning";
+import AgentDocumentSigning from "./components/tools/AgentDocumentSigning";
+import AgentSigning from "./components/tools/AgentSigning";
 import { PromotionTracking } from "./components/promotion-tracking";
 import { Toaster } from 'react-hot-toast';
+import LicenseOnboardingModal from "./components/utilities/LicenseOnboardingModal";
+import CalendlyCallback from "./pages/CalendlyCallback";
+import ZoomCallback from "./pages/ZoomCallback";
+import RecruitmentForm from "./pages/RecruitmentForm";
+import RecruitmentSuccess from "./pages/RecruitmentSuccess";
 
 
 import AdminHierarchySettings from "./components/admin/AdminHierarchySettings";
 import LoginLogs from "./components/admin/LoginLogs";
-import { HierarchyTablePage } from "./pages/settings";
 import AdminCheck from "./pages/admin/AdminCheck";
 import { logRedirect, logNavigation } from "./utils/navigationLogger";
 import "./App.css";
@@ -75,12 +87,89 @@ function AppContent() {
     }
   }, [location.pathname, location.search, isAuthenticated, user, authLoading]);
 
-  // Update document title with team name
+  // Helper function to get dynamic page title based on route and section
+  const getPageTitle = () => {
+    const pathname = location.pathname;
+    const searchParams = new URLSearchParams(location.search);
+    const section = searchParams.get('section');
+    const active = searchParams.get('active');
+
+    // Base page titles
+    const baseTitles = {
+      "/dashboard": "Dashboard",
+      "/refs": "Refs",
+      "/ref-entry": "Ref Entry",
+      "/production": "Production",
+      "/resources": "Resources",
+      "/reports": "Reports", 
+      "/training": "Training",
+      "/recruiting": "Recruiting",
+      "/utilities": "Utilities",
+      "/1on1": "1-on-1 Meeting",
+      "/team-customization": "Team Customization",
+      "/admin/notifications": "Notifications Management",
+      "/admin/hierarchy": "Hierarchy Management", 
+      "/admin/hierarchy-table": "Hierarchy Table View",
+      "/admin/login-logs": "Login Logs",
+      "/admin/check": "Admin Permissions Check",
+      "/notifications": "Notifications",
+      "/notification-settings": "Notification Settings",
+      "/promotion-tracking": "Promotion Tracking",
+      "/other": "Other Page",
+    };
+
+    // Section-specific titles
+    const sectionTitles = {
+      production: {
+        'daily-activity': 'Daily Activity',
+        'scorecard': 'Scorecard',
+        'leaderboard': 'Leaderboard',
+        'verification': 'Verification',
+        'release': 'Release',
+        'vips': 'Codes and VIPs'
+      },
+      settings: {
+        'account': 'Account',
+        'trophy': 'Trophy Case',
+        'hierarchy': 'Hierarchy',
+        'notifications': 'Notifications',
+        'discord': 'Discord',
+        'licensing': 'Licensing'
+      },
+      training: {
+        'release': 'Release'
+      },
+      resources: {
+        'reports': 'Reports',
+        'updates': 'Updates'
+      }
+    };
+
+    let baseTitle = baseTitles[pathname] || "Atlas";
+    
+    // Use section title if available, otherwise use base title
+    if (section || active) {
+      const pageKey = pathname.replace('/', '');
+      const sectionKey = section || active;
+      const sectionMap = sectionTitles[pageKey];
+      
+      if (sectionMap && sectionMap[sectionKey]) {
+        baseTitle = sectionMap[sectionKey];
+      }
+    }
+
+    return baseTitle;
+  };
+
+  const pageTitle = getPageTitle();
+
+  // Update document title with page title and team name
   useEffect(() => {
     if (!stylesLoading && teamName) {
-      document.title = `${teamName} - Atlas`;
+      const title = pageTitle === teamName ? `${teamName} - Atlas` : `${pageTitle} | ${teamName} - Atlas`;
+      document.title = title;
     }
-  }, [teamName, stylesLoading]);
+  }, [teamName, stylesLoading, pageTitle]);
 
   // Apply team styles to the root element
   useEffect(() => {
@@ -99,33 +188,15 @@ function AppContent() {
   const isAuthPage = authPaths.includes(location.pathname);
   
   // Check if current path is a public route that doesn't require authentication
-  const publicPaths = ["/login", "/register", "/adminlogin"];
+  const publicPaths = ["/login", "/register", "/adminlogin", "/onboarding/login", "/onboarding/register", "/onboarding/forgot", "/onboarding"];
   const isClientSigningPage = location.pathname.startsWith("/client-sign/");
-  const isPublicPage = publicPaths.includes(location.pathname) || isClientSigningPage;
-
-  // Map routes to page titles (for pages with header)
-  const pageTitleMap = {
-    "/dashboard": "Dashboard",
-
-    "/refs": "Refs",
-    "/ref-entry": "Ref Entry",
-    "/production": "Production",
-    "/reports": "Reports",
-    "/training": "Training",
-    "/recruiting": "Recruiting",
-    "/settings": user?.Role === 'Admin' && user?.teamRole === 'app' ? "Utilities" : "Settings",
-    "/team-customization": "Team Customization",
-    "/admin/notifications": "Notifications Management",
-    "/admin/hierarchy": "Hierarchy Management",
-    "/admin/hierarchy-table": "Hierarchy Table View",
-    "/admin/login-logs": "Login Logs",
-    "/admin/check": "Admin Permissions Check",
-    "/notifications": "Notifications",
-    "/notification-settings": "Notification Settings",
-    "/other": "Other Page",
-  };
-
-  const pageTitle = pageTitleMap[location.pathname] || "Atlas";
+  const isAgentSigningPage = location.pathname.startsWith("/agent-sign/");
+  const isAgentDocumentSigningPage = location.pathname === "/agent-document-signing";
+  const isCareersPage = location.pathname === "/careers" || location.pathname === "/careers-success";
+  const isOnboardingPage = location.pathname.startsWith('/onboarding');
+  const isOnboardingHomePath = location.pathname === '/onboarding/home';
+  const isOnboardingAuth = isOnboardingPage && !isOnboardingHomePath;
+  const isPublicPage = publicPaths.includes(location.pathname) || isClientSigningPage || isAgentSigningPage || isAgentDocumentSigningPage || isCareersPage || isOnboardingAuth || isOnboardingHomePath;
 
   // Handle redirects only once auth is no longer loading
   React.useEffect(() => {
@@ -200,9 +271,9 @@ function AppContent() {
       return;
     }
     
-    // If we're on a public page (including client signing) and not authenticated, allow it
-    if (!isAuthenticated && isClientSigningPage) {
-      console.log(`[App] On public client signing page ${location.pathname}, allowing access without redirect`);
+    // If we're on a public page (including client/agent signing and careers) and not authenticated, allow it
+    if (!isAuthenticated && (isClientSigningPage || isAgentSigningPage || isAgentDocumentSigningPage || isCareersPage)) {
+      console.log(`[App] On public page ${location.pathname}, allowing access without redirect`);
       return;
     }
     
@@ -234,7 +305,7 @@ function AppContent() {
       // Log the redirect
       logRedirect(
         '/admin-legacy/hierarchy',
-        '/settings?section=hierarchy',
+        '/utilities?section=hierarchy',
         'Legacy admin hierarchy path',
         {
           userId: user?.userId,
@@ -242,7 +313,7 @@ function AppContent() {
         }
       );
       
-      navigate("/settings?section=hierarchy", { replace: true });
+      navigate("/utilities?section=hierarchy", { replace: true });
     }
 
     // Add debug logging for the admin hierarchy path
@@ -255,7 +326,7 @@ function AppContent() {
       });
     }
 
-  }, [isAuthenticated, isAuthPage, location.pathname, location.search, navigate, authLoading, user, hasPermission, isPublicPage, isClientSigningPage]);
+  }, [isAuthenticated, isAuthPage, location.pathname, location.search, navigate, authLoading, user, hasPermission, isPublicPage, isClientSigningPage, isAgentDocumentSigningPage, isCareersPage]);
 
   // If we're on an auth page, we render only the auth routes
   if (isAuthPage) {
@@ -272,6 +343,33 @@ function AppContent() {
     );
   }
 
+  // Onboarding auth routes (no header/sidebar)
+  if (isOnboardingAuth) {
+    return (
+      <Routes>
+        <Route path="/onboarding" element={<OnboardingLogin />} />
+        <Route path="/onboarding/login" element={<OnboardingLogin />} />
+        <Route path="/onboarding/register" element={<OnboardingRegister />} />
+        <Route path="/onboarding/forgot" element={<OnboardingForgot />} />
+        <Route path="*" element={<Navigate to="/onboarding/login" replace />} />
+      </Routes>
+    );
+  }
+  
+  // If we're on a careers page, render without header/sidebar
+  if (isCareersPage) {
+    return (
+      <Routes>
+        <Route path="/careers" element={<RecruitmentForm />} />
+        <Route path="/careers-success" element={<RecruitmentSuccess />} />
+        {/* Redirect any unknown careers route to dashboard or careers form */}
+        <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/careers"} replace />} />
+      </Routes>
+    );
+  }
+
+  // Note: Onboarding HOME renders inside main layout (auth screens above render bare)
+
   // If we're on a client signing page, render without header/sidebar
   if (isClientSigningPage) {
     return (
@@ -283,14 +381,54 @@ function AppContent() {
     );
   }
 
+  // If we're on the agent document signing page, render without header/sidebar
+  if (isAgentDocumentSigningPage) {
+    return (
+      <Routes>
+        <Route path="/agent-document-signing" element={<AgentDocumentSigning />} />
+        {/* Redirect any unknown route to the agent signing page */}
+        <Route path="*" element={<Navigate to="/agent-document-signing" replace />} />
+      </Routes>
+    );
+  }
+
+  // If we're on an agent signing page, render without header/sidebar
+  if (isAgentSigningPage) {
+    return (
+      <Routes>
+        <Route path="/agent-sign/:token" element={<AgentSigning />} />
+        {/* Redirect any unknown agent signing route to dashboard */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    );
+  }
+
   // Otherwise, render the main app layout with header, sidebar, etc.
+  const isOnboardingHome = location.pathname.startsWith('/onboarding/home');
   return (
     <div className={`app-container ${isExpanded ? "expanded" : ""}`}>
-      <Sidebar isExpanded={isExpanded} setIsExpanded={setIsExpanded} />
-      <Header pageTitle={pageTitle} isExpanded={isExpanded} />
+      <Sidebar isExpanded={isExpanded} setIsExpanded={setIsExpanded} onboardingMode={isOnboardingHome} />
+      <Header pageTitle={pageTitle} isExpanded={isExpanded} onboardingMode={isOnboardingHome} />
       <div className="main-content">
         <div className="page-content">
           <Routes>
+            {/* Root path handler */}
+            <Route
+              path="/"
+              element={
+                isAuthenticated ? (
+                  user?.Role === 'Admin' && user?.teamRole === 'app' ? (
+                    <Navigate to="/production" replace />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
+            {/* Onboarding home inside main layout */}
+            <Route path="/onboarding/home" element={<OnboardingHome />} />
             <Route
               path="/dashboard"
               element={
@@ -351,7 +489,7 @@ function AppContent() {
               }
             />
             <Route
-              path="/reports"
+              path="/resources"
               element={
                 <ProtectedRoute>
                   <Reports />
@@ -375,12 +513,41 @@ function AppContent() {
               }
             />
             <Route
-              path="/settings"
+              path="/utilities"
               element={
                 <ProtectedRoute>
-                  <Settings />
+                  <Utilities />
                 </ProtectedRoute>
               }
+            />
+            <Route
+              path="/auth/calendly/callback"
+              element={
+                <ProtectedRoute>
+                  <CalendlyCallback />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/auth/zoom/callback"
+              element={
+                <ProtectedRoute>
+                  <ZoomCallback />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/1on1"
+              element={
+                <ProtectedRoute>
+                  <OneOnOne />
+                </ProtectedRoute>
+              }
+            />
+            {/* Redirect old /settings path to /utilities for backward compatibility */}
+            <Route
+              path="/settings"
+              element={<Navigate to="/utilities" replace />}
             />
             <Route
               path="/team-customization"
@@ -406,19 +573,20 @@ function AppContent() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/admin/hierarchy-table"
-              element={
-                <ProtectedRoute requiredPermission="admin">
-                  <HierarchyTablePage key="admin-hierarchy-table" />
-                </ProtectedRoute>
-              }
-            />
+ 
             <Route
               path="/admin/login-logs"
               element={
                 <ProtectedRoute requiredPermission="admin">
                   <LoginLogs />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/email-campaigns"
+              element={
+                <ProtectedRoute requiredPermission="admin">
+                  <EmailCampaigns />
                 </ProtectedRoute>
               }
             />
@@ -432,7 +600,7 @@ function AppContent() {
               path="/notification-settings"
               element={
                 <ProtectedRoute>
-                  <NotificationSettings />
+                  <NotificationUtilities />
                 </ProtectedRoute>
               }
             />
@@ -452,6 +620,7 @@ function AppContent() {
                 </ProtectedRoute>
               }
             />
+
             {/* Redirect unknown routes to dashboard */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
@@ -460,6 +629,7 @@ function AppContent() {
       {/* Add BottomNav for mobile */}
       <BottomNav />
       <InPageNotificationContainer />
+      <LicenseOnboardingModal />
       <Toaster 
         position="top-right"
         toastOptions={{

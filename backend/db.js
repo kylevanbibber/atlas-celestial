@@ -3,8 +3,10 @@ const dotenv = require("dotenv");
 
 dotenv.config();
 
+// IMPORTANT: Avoid defaulting to production credentials in local/dev.
+// Use environment variables; fall back to safe localhost defaults.
 const dbConfig = {
-  host: process.env.DB_HOST || '208.109.78.44',
+  host: process.env.DB_HOST || '216.69.162.18',
   user: process.env.DB_USER || 'kvanbibber',
   password: process.env.DB_PASS || 'Atlas2024!',
   database: process.env.DB_NAME || 'AriasLifeUsers',
@@ -32,24 +34,67 @@ pool.on("error", (err) => {
 });
 
 const getConnection = (callback) => {
-  pool.getConnection((err, connection) => {
-    if (err) {
-      console.error("Error getting MySQL connection:", err);
-      return callback(err, null);
-    }
-    callback(null, connection);
+  // Support both callback and promise styles
+  if (typeof callback === 'function') {
+    pool.getConnection((err, connection) => {
+      if (err) {
+        console.error("Error getting MySQL connection:", err);
+        return callback(err, null);
+      }
+      callback(null, connection);
+    });
+    return;
+  }
+  // Promise style when no callback provided
+  return new Promise((resolve, reject) => {
+    pool.getConnection((err, connection) => {
+      if (err) {
+        console.error("Error getting MySQL connection:", err);
+        return reject(err);
+      }
+      resolve(connection);
+    });
   });
 };
 
 // Add this query helper function:
 const query = (sql, params) => {
   return new Promise((resolve, reject) => {
-    pool.query(sql, params, (err, results) => {
-      if (err) {
-        console.error('Database query error:', err);
-        return reject(err);
+    const acquireStart = Date.now();
+    pool.getConnection((connErr, connection) => {
+      const acquireMs = Date.now() - acquireStart;
+      if (connErr) {
+        console.error('[DB] ❌ Error acquiring connection:', connErr.code || connErr.message);
+        return reject(connErr);
       }
-      resolve(results);
+
+      if (acquireMs > 1000) {
+        const poolStats = {
+          all: pool._allConnections?.length,
+          free: pool._freeConnections?.length,
+          queue: (pool._connectionQueue?.length ?? pool._acquiringConnections?.length)
+        };
+        console.warn(`[DB] ⚠️ Slow acquire (${acquireMs}ms)`, poolStats);
+      }
+
+      const queryStart = Date.now();
+      connection.query(sql, params, (err, results) => {
+        const queryMs = Date.now() - queryStart;
+        const totalMs = Date.now() - acquireStart;
+
+        if (queryMs > 3000) {
+          const sqlText = typeof sql === 'string' ? sql.trim() : (sql.sql || '').trim();
+          console.warn(`[DB] ⚠️ Slow query (${queryMs}ms, total ${totalMs}ms):`, sqlText);
+        }
+
+        connection.release();
+
+        if (err) {
+          console.error('[DB] ❌ Query error after', totalMs, 'ms:', err.code || err.message);
+          return reject(err);
+        }
+        resolve(results);
+      });
     });
   });
 };

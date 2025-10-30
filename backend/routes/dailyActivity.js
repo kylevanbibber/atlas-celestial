@@ -4,6 +4,10 @@ const { pool, query } = require("../db");
 
 // POST /api/dailyActivity/submit - Submit daily activity data
 router.post("/submit", async (req, res) => {
+    // Get user information from authenticated context (via middleware)
+    const authenticatedUserId = req.user?.id;
+    const authenticatedUser = req.user; // Should contain lagnname, MGA, etc.
+    
     let {
         reportDate,
         esid,
@@ -32,22 +36,29 @@ router.post("/submit", async (req, res) => {
         alp,
         refs,
         rga,
-        agent,
+        agent, // This will be overridden with authenticated user's lagnname
         Legacy,
         Tree,
         SA,
         GA,
         userId
     } = req.body;
+    
+    // Override critical fields with authenticated user data to prevent spoofing
+    agent = authenticatedUser?.lagnname || agent; // Use authenticated user's lagnname
+    userId = authenticatedUserId || userId; // Use authenticated userId
+    esid = authenticatedUser?.esid || esid;
+    MGA = authenticatedUser?.MGA || MGA;
+    rga = authenticatedUser?.rga || rga;
+    SA = authenticatedUser?.SA || SA;
+    GA = authenticatedUser?.GA || GA;
 
-    console.log('Received daily activity submission:', req.body);
 
     try {
         const checkQuery = `SELECT * FROM Daily_Activity WHERE agent = ? AND reportDate = ?`;
         const existingRecord = await query(checkQuery, [agent, reportDate]);
 
         if (existingRecord && existingRecord.length > 0) {
-            console.log('Updating existing record');
             const updateQuery = `
                 UPDATE Daily_Activity SET
                     esid = ?,
@@ -92,7 +103,6 @@ router.post("/submit", async (req, res) => {
             ];
             await query(updateQuery, updateValues);
         } else {
-            console.log('Inserting new record');
             const insertQuery = `
                 INSERT INTO Daily_Activity (
                     reportDate, esid, MGA, Work, HC_Appt, HC_Sit, HC_Sale, HC_ALP,
@@ -119,37 +129,97 @@ router.post("/submit", async (req, res) => {
 
 // GET /api/dailyActivity/user-summary - Get user activity summary for date range
 router.get("/user-summary", async (req, res) => {
-    const { userId, startDate, endDate } = req.query;
-
-    console.log(`Received request: userId=${userId}, startDate=${startDate}, endDate=${endDate}`);
+    const { startDate, endDate, roleScope } = req.query;
+    
+    // Get userId from authenticated user context (via middleware) or query parameter
+    let userId = req.user?.id || req.query.userId;
 
     if (!userId || !startDate || !endDate) {
         return res.status(400).json({ error: 'Missing required parameters: userId, startDate, and endDate' });
     }
 
+    // Ensure userId is a number
+    userId = parseInt(userId, 10);
+    
+    if (isNaN(userId)) {
+        return res.status(400).json({ error: 'Invalid userId parameter' });
+    }
+
+    console.log('[dailyActivity/user-summary] Request params:', { userId, startDate, endDate });
+
     try {
         const queryStr = `
             SELECT 
                 reportDate, calls, appts, sits, sales, alp, refs, 
-                refAppt, refSit, refSale, refAlp
+                refAppt, refSit, refSale, refAlp,
+                agent, userId
             FROM Daily_Activity
             WHERE userId = ? 
             AND reportDate BETWEEN STR_TO_DATE(?, '%Y-%m-%d') AND STR_TO_DATE(?, '%Y-%m-%d')
             ORDER BY reportDate ASC
         `;
 
-        console.log(`Executing query: ${queryStr} with values`, [userId, startDate, endDate]);
-
         const result = await query(queryStr, [userId, startDate, endDate]);
 
+        console.log('[dailyActivity/user-summary] Query result:', { rowCount: result.length, userId, startDate, endDate });
+
         if (result.length > 0) {
-            console.log(`Query successful. Retrieved ${result.length} rows.`);
             res.status(200).json({ success: true, data: result });
         } else {
             res.status(200).json({ success: true, data: [] });
         }
     } catch (err) {
-        console.error('Database query error:', err);
+        console.error('[dailyActivity/user-summary] Database query error:', err);
+        res.status(500).json({ error: 'Internal server error', details: err.message });
+    }
+});
+
+// GET /api/dailyActivity/team-summary - Get team activity summary for date range
+// Team is defined as any Daily_Activity row where SA, GA, or MGA equals the current user's lagnname,
+// or userId equals the current user's id (include leader's own rows)
+router.get("/team-summary", async (req, res) => {
+    const { startDate, endDate, roleScope } = req.query;
+
+    // Accept from auth or query (dev fallback)
+    const userIdRaw = (req.user?.id ?? req.user?.userId ?? req.query.userId);
+    const lagnRaw = (req.user?.lagnname ?? req.query.lagnname);
+
+    // Sanitize possible array inputs (e.g., duplicated query params)
+    const currentUserId = Array.isArray(userIdRaw) ? userIdRaw[0] : userIdRaw;
+    const currentUserLagn = Array.isArray(lagnRaw) ? lagnRaw[0] : lagnRaw;
+
+    if (!startDate || !endDate) {
+        return res.status(400).json({ error: 'Missing required parameters: startDate and endDate' });
+    }
+
+    try {
+        // Build role-aware condition: default (SA/GA/MGA) or include RGA when roleScope=rga
+        let whereCond = '(SA = ? OR GA = ? OR MGA = ? OR userId = ?)';
+        if (String(roleScope || '').toLowerCase() === 'rga') {
+            whereCond = '(SA = ? OR GA = ? OR MGA = ? OR RGA = ? OR userId = ?)';
+        }
+
+        const queryStr = `
+            SELECT 
+                reportDate, calls, appts, sits, sales, alp, refs,
+                refAppt, refSit, refSale, refAlp,
+                agent, userId
+            FROM Daily_Activity
+            WHERE ${whereCond}
+              AND reportDate BETWEEN STR_TO_DATE(?, '%Y-%m-%d') AND STR_TO_DATE(?, '%Y-%m-%d')
+            ORDER BY reportDate ASC
+        `;
+
+        const userIdParam = Number(currentUserId) || 0;
+        const lagnParam = currentUserLagn || '';
+        const params = (String(roleScope || '').toLowerCase() === 'rga')
+            ? [lagnParam, lagnParam, lagnParam, lagnParam, userIdParam, startDate, endDate]
+            : [lagnParam, lagnParam, lagnParam, userIdParam, startDate, endDate];
+        const result = await query(queryStr, params);
+
+        res.status(200).json({ success: true, data: result || [] });
+    } catch (err) {
+        console.error('Database query error (team-summary):', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -162,9 +232,17 @@ router.post("/update", async (req, res) => {
         return res.status(400).json({ success: false, message: 'Missing userId or updates' });
     }
 
-    console.log("📥 Received updates:", updates);
-
     try {
+        // Fetch user hierarchy data for populating new records
+        const userQuery = `SELECT lagnname, esid, SA, GA, MGA, rga FROM activeusers WHERE id = ? LIMIT 1`;
+        const userResult = await query(userQuery, [userId]);
+        
+        if (userResult.length === 0) {
+            return res.status(400).json({ success: false, message: 'User not found' });
+        }
+        
+        const user = userResult[0];
+
         const promises = Object.keys(updates).map(async (reportDate) => {
             const data = updates[reportDate];
             
@@ -199,18 +277,37 @@ router.post("/update", async (req, res) => {
                     return query(updateQuery, valuesToUpdate);
                 }
             } else {
-                // Insert new record
+                // Insert new record with full hierarchy data
                 const insertQuery = `
                     INSERT INTO Daily_Activity (
-                        userId, reportDate, calls, appts, sits, sales, alp,
-                        refs, refAppt, refSit, refSale, refAlp
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        reportDate, esid, MGA, Work, rga, agent, SA, GA, userId,
+                        calls, appts, sits, sales, alp, refs, refAppt, refSit, refSale, refAlp
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `;
-                return query(insertQuery, [
-                    userId, reportDate,
-                    data.calls || 0, data.appts || 0, data.sits || 0, data.sales || 0, data.alp || 0,
-                    data.refs || 0, data.refAppt || 0, data.refSit || 0, data.refSale || 0, data.refAlp || 0
-                ]);
+                
+                const insertValues = [
+                    reportDate,
+                    user.esid,
+                    user.MGA,
+                    new Date().toISOString().split('T')[0], // Work = current date
+                    user.rga,
+                    user.lagnname, // agent = user's lagnname
+                    user.SA,
+                    user.GA,
+                    userId,
+                    data.calls || 0,
+                    data.appts || 0,
+                    data.sits || 0,
+                    data.sales || 0,
+                    data.alp || 0,
+                    data.refs || 0,
+                    data.refAppt || 0,
+                    data.refSit || 0,
+                    data.refSale || 0,
+                    data.refAlp || 0
+                ];
+                
+                return query(insertQuery, insertValues);
             }
         });
 
@@ -227,7 +324,6 @@ router.post("/update", async (req, res) => {
 router.put("/", async (req, res) => {
     const { reportDate, ...updateFields } = req.body;
     
-    console.log(`[DAILY-ACTIVITY-API] 📝 PUT request:`, { reportDate, updateFields });
 
     if (!reportDate) {
         return res.status(400).json({ 
@@ -259,7 +355,6 @@ router.put("/", async (req, res) => {
         }
         
         const user = userResult[0];
-        console.log(`[DAILY-ACTIVITY-API] 👤 User details:`, user);
 
         // Check if record exists
         const existingQuery = `SELECT * FROM Daily_Activity WHERE agent = ? AND reportDate = ?`;
@@ -285,7 +380,6 @@ router.put("/", async (req, res) => {
             
             await query(updateQuery, [...values, reportDate, user.lagnname]);
             
-            console.log(`[DAILY-ACTIVITY-API] ✅ Updated fields: ${fields.join(', ')} for agent: ${user.lagnname}`);
             
             res.status(200).json({ 
                 success: true, 
@@ -294,7 +388,6 @@ router.put("/", async (req, res) => {
             });
         } else {
             // Create new record with all required fields
-            console.log(`[DAILY-ACTIVITY-API] ➕ Creating new record for agent: ${user.lagnname} on ${reportDate}`);
             
             const insertQuery = `
                 INSERT INTO Daily_Activity (
@@ -327,7 +420,6 @@ router.put("/", async (req, res) => {
             
             await query(insertQuery, insertValues);
             
-            console.log(`[DAILY-ACTIVITY-API] ✅ Created new record with fields: ${Object.keys(updateFields).join(', ')}`);
             
             res.status(200).json({ 
                 success: true, 
@@ -385,7 +477,6 @@ router.get("/filtered", async (req, res) => {
     try {
         const { startDate, endDate, MGA_NAME, rga, tree } = req.query;
         
-        console.log(`[GET /dailyActivity/filtered] Request received with filters - startDate: ${startDate}, endDate: ${endDate}, MGA_NAME: ${MGA_NAME}, rga: ${rga}, tree: ${tree}`);
 
         let queryStr = `
             SELECT 
@@ -434,12 +525,9 @@ router.get("/filtered", async (req, res) => {
 
         queryStr += ' ORDER BY da.reportDate DESC';
 
-        console.log(`[GET /dailyActivity/filtered] Executing query: ${queryStr}`);
-        console.log(`[GET /dailyActivity/filtered] Parameters:`, params);
 
         const result = await query(queryStr, params);
 
-        console.log(`[GET /dailyActivity/filtered] Query returned ${result.length} records`);
 
         res.status(200).json({ success: true, data: result });
     } catch (err) {
@@ -453,7 +541,6 @@ router.get("/codes", async (req, res) => {
     try {
         const { startDate, endDate, MGA_NAME, rga, tree } = req.query;
         
-        console.log(`[GET /dailyActivity/codes] Request received with filters - startDate: ${startDate}, endDate: ${endDate}, MGA_NAME: ${MGA_NAME}, rga: ${rga}, tree: ${tree}`);
 
         let queryStr = `
             SELECT 
@@ -499,12 +586,10 @@ router.get("/codes", async (req, res) => {
 
         queryStr += ' ORDER BY a.PRODDATE DESC';
 
-        console.log(`[GET /dailyActivity/codes] Executing query: ${queryStr}`);
-        console.log(`[GET /dailyActivity/codes] Parameters:`, params);
+      
 
         const result = await query(queryStr, params);
 
-        console.log(`[GET /dailyActivity/codes] Query returned ${result.length} records`);
 
         res.status(200).json({ success: true, data: result });
     } catch (err) {
@@ -518,10 +603,9 @@ router.get("/vips", async (req, res) => {
     try {
         const { period, month, year, MGA_NAME, rga, tree } = req.query;
         
-        console.log(`[GET /dailyActivity/vips] Request received with filters - period: ${period}, month: ${month}, year: ${year}, MGA_NAME: ${MGA_NAME}, rga: ${rga}, tree: ${tree}`);
 
         let queryStr = `
-            SELECT 
+            SELECT DISTINCT
                 v.*,
                 m.rga as mga_rga,
                 m.tree as mga_tree
@@ -571,12 +655,10 @@ router.get("/vips", async (req, res) => {
 
         queryStr += ' ORDER BY v.vip_month DESC';
 
-        console.log(`[GET /dailyActivity/vips] Executing query: ${queryStr}`);
-        console.log(`[GET /dailyActivity/vips] Parameters:`, params);
+      
 
         const result = await query(queryStr, params);
 
-        console.log(`[GET /dailyActivity/vips] Query returned ${result.length} records`);
 
         res.status(200).json({ success: true, data: result });
     } catch (err) {
@@ -586,3 +668,51 @@ router.get("/vips", async (req, res) => {
 });
 
 module.exports = router; 
+ 
+// Add new endpoint to sum ALP by user for a given month
+// GET /api/dailyActivity/sum-by-users?userIds=1,2,3&month=YYYY-MM
+router.get("/sum-by-users", async (req, res) => {
+    try {
+        const { userIds, month } = req.query;
+        if (!userIds || !month) {
+            return res.status(400).json({ success: false, message: "Missing required params: userIds, month (YYYY-MM)" });
+        }
+
+        const ids = userIds
+            .split(",")
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0)
+            .map((s) => Number(s))
+            .filter((n) => Number.isFinite(n));
+
+        if (ids.length === 0) {
+            return res.status(200).json({ success: true, data: [] });
+        }
+
+        // Compute month date range [start, nextMonthStart)
+        const [y, m] = month.split("-").map((v) => parseInt(v, 10));
+        if (!y || !m || m < 1 || m > 12) {
+            return res.status(400).json({ success: false, message: "Invalid month format. Use YYYY-MM" });
+        }
+        const startDate = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
+        const endDate = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+
+        // Build placeholders for IN clause
+        const placeholders = ids.map(() => "?").join(",");
+        const sql = `
+            SELECT userId, CAST(SUM(alp) AS DECIMAL(12,2)) as monthlyAlp
+            FROM Daily_Activity
+            WHERE userId IN (${placeholders})
+              AND reportDate >= ?
+              AND reportDate < ?
+            GROUP BY userId
+        `;
+
+        const rows = await query(sql, [...ids, startDate, endDate]);
+
+        res.status(200).json({ success: true, data: rows });
+    } catch (err) {
+        console.error("[dailyActivity] Error in /sum-by-users:", err);
+        res.status(500).json({ success: false, message: "Error fetching monthly sums" });
+    }
+});

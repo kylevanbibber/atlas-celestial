@@ -1,53 +1,15 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { FaTrash, FaRegCopy, FaArrowLeft, FaArrowRight } from "react-icons/fa";
+import { FiSearch } from "react-icons/fi";
 import { v4 as uuidv4 } from 'uuid';
+import { debounce } from 'lodash';
 import { useAuth } from "../../context/AuthContext";
 import api from "../../api";
 import DataTable from "../utils/DataTable";
 import "../../App.css";
 
-const RefEntry = () => {
-  const { user } = useAuth();
-  const [tableData, setTableData] = useState([]);
-  const [agentOptions, setAgentOptions] = useState([]);
-  const currentMonth = new Date().toISOString().slice(0, 7); // Format YYYY-MM
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
-  const [monthOptions, setMonthOptions] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedTab, setSelectedTab] = useState("All");
-  const [adminNames, setAdminNames] = useState([]);
-  const [trueRefFilter, setTrueRefFilter] = useState("all");
-  const [currentUserData, setCurrentUserData] = useState(null);
-  const [savingNewRow, setSavingNewRow] = useState(false);
-  const [unsavedChanges, setUnsavedChanges] = useState(false);
-
-  // Debug logging for unsavedChanges state
-  useEffect(() => {
-    console.log("RefEntry - unsavedChanges state changed:", {
-      unsavedChanges,
-      timestamp: new Date().toISOString(),
-      stackTrace: new Error().stack
-    });
-  }, [unsavedChanges]);
-
-  // Format date for display
-  const formatDateForDisplay = (date) => {
-    if (!date) return "-";
-    return new Date(date).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  };
-
-  // Define columns for DataTable - moved before any early returns
-  const columns = useMemo(() => {
-    const cols = [
-      {
-        Header: "Actions",
-        accessor: "actions",
-        width: 100,
-        Cell: ({ row }) => {
+// Actions cell component outside component to prevent re-creation
+const ActionsCell = React.memo(({ row, onDelete, onCopy }) => {
           const [deleteHover, setDeleteHover] = React.useState(false);
           const [copyHover, setCopyHover] = React.useState(false);
           
@@ -57,15 +19,9 @@ const RefEntry = () => {
                 onClick={(e) => {
                   e.stopPropagation();
                   const rowIdToDelete = row.original.id || row.original.uuid;
-                  console.log("RefEntry - Delete button clicked:", {
-                    rowOriginal: row.original,
-                    rowIdToDelete,
-                    rowOriginalId: row.original.id,
-                    rowOriginalUuid: row.original.uuid
-                  });
                   const confirmDelete = window.confirm("Are you sure you want to delete this row?");
                   if (confirmDelete) {
-                    handleDeleteRow(rowIdToDelete);
+            onDelete(rowIdToDelete);
                   }
                 }}
                 onMouseEnter={() => setDeleteHover(true)}
@@ -86,11 +42,7 @@ const RefEntry = () => {
               <FaRegCopy
                 onClick={(e) => {
                   e.stopPropagation();
-                  const firstName = row.original.client_name ? row.original.client_name.split(",")[0].trim() : "";
-                  const copyText = `${firstName} ${row.original.zip_code || ""}`;
-                  navigator.clipboard.writeText(copyText)
-                    .then(() => console.log(`Copied: ${copyText}`))
-                    .catch(err => console.error("Failed to copy text:", err));
+          onCopy(row.original);
                 }}
                 onMouseEnter={() => setCopyHover(true)}
                 onMouseLeave={() => setCopyHover(false)}
@@ -105,144 +57,69 @@ const RefEntry = () => {
               />
             </div>
           );
-        },
-      },
-      {
-        Header: "True Ref",
-        accessor: "true_ref",
-        width: 100,
-        DropdownOptions: ["", "Y", "N"],
-        dropdownBackgroundColor: (value) => {
-          switch (value) {
-            case "Y":
-              return "#d4edda"; // Light green - True referral
-            case "N":
-              return "#f8d7da"; // Light red - Not a true referral
-            default:
-              return "#e9ecef"; // Grey - No selection
-          }
-        }
-      },
-      {
-        Header: "Ref Detail",
-        accessor: "ref_detail",
-        width: 200,
-      },
-      {
-        Header: "Agent Name",
-        accessor: "agentName",
-        width: 150,
-        DropdownOptions: ["", ...Array.from(new Set(agentOptions.map(agent => agent.lagnname)))],
-        dropdownBackgroundColor: (value) => {
-          return value ? "#f8f9fa" : "#e9ecef"; // Light background for selected, grey for blank
-        },
-        // Add custom cell renderer to log dropdown changes
-        Cell: ({ value, row, column }) => {
-          console.log("RefEntry - Agent dropdown cell rendering:", {
-            currentValue: value,
-            rowId: row.original.uuid || row.original.id,
-            agentOptions: agentOptions.map(a => ({ id: a.id, lagnname: a.lagnname }))
-          });
-          return value || "";
-        },
-        // Add onChange handler for debugging
-        onDropdownChange: (rowId, field, newValue) => {
-          console.log("RefEntry - Agent dropdown changed:", {
-            rowId,
-            field,
-            newValue,
-            timestamp: new Date().toISOString()
-          });
-          
-          // Find the agent that matches the selected name
-          const matchedAgent = agentOptions.find(agent => agent.lagnname === newValue);
-          console.log("RefEntry - Matched agent for dropdown selection:", {
-            selectedName: newValue,
-            matchedAgent,
-            allAgents: agentOptions
-          });
-        }
-      },
-      {
-        Header: "Client Name",
-        accessor: "client_name",
-        width: 200,
-      },
-      {
-        Header: "Zip Code",
-        accessor: "zip_code",
-        width: 100,
-      },
-      {
-        Header: "Existing Policy",
-        accessor: "existing_policy",
-        width: 120,
-        DropdownOptions: ["", "Y", "N"],
-        dropdownBackgroundColor: (value) => {
-          switch (value) {
-            case "Y":
-              return "#d4edda"; // Light green - Has existing policy
-            case "N":
-              return "#f8d7da"; // Light red - No existing policy
-            default:
-              return "#e9ecef"; // Grey - No selection
-          }
-        }
-      },
-      {
-        Header: "Trial",
-        accessor: "trial",
-        width: 80,
-        DropdownOptions: ["", "Y", "N"],
-        dropdownBackgroundColor: (value) => {
-          switch (value) {
-            case "Y":
-              return "#d4edda"; // Light green - Trial period
-            case "N":
-              return "#f8d7da"; // Light red - Not a trial
-            default:
-              return "#e9ecef"; // Grey - No selection
-          }
-        }
-      },
-      {
-        Header: "Date App Checked",
-        accessor: "date_app_checked",
-        width: 140,
-        Cell: ({ value }) => formatDateForDisplay(value),
-      },
-      {
-        Header: "Notes",
-        accessor: "notes",
-        width: 200,
-      },
-    ];
+});
 
-    return cols;
-  }, [agentOptions]);
+const RefEntry = () => {
+  const { user } = useAuth();
+  const [tableData, setTableData] = useState([]);
+  const [agentOptions, setAgentOptions] = useState([]);
+  const currentMonth = new Date().toISOString().slice(0, 7); // Format YYYY-MM
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [monthOptions, setMonthOptions] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedTab, setSelectedTab] = useState("All");
+  const [adminNames, setAdminNames] = useState([]);
+  const [trueRefFilter, setTrueRefFilter] = useState("all");
+  const [currentUserData, setCurrentUserData] = useState(null);
+  const [savingNewRow, setSavingNewRow] = useState(false);
+  const [unsavedChanges, setUnsavedChanges] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
-  // Prepare data for DataTable (ensure each row has an id) - moved before any early returns
-  const dataTableData = useMemo(() => {
-    return tableData.map(row => ({
-      ...row,
-      id: row.uuid || row.id || Math.random().toString(36),
-    }));
-  }, [tableData]);
-
-  // Filter data based on search and filters - moved before any early returns
-  const filteredData = useMemo(() => {
-    return dataTableData.filter(row => {
-      // Apply admin tab filter
-      const passesAdminFilter = selectedTab === "All" || row.admin_name === selectedTab;
-
-      // Apply true_ref filter
-      const passesRefFilter = trueRefFilter === "all" || 
-        (trueRefFilter === "blank" && (!row.true_ref || row.true_ref === "")) ||
-        row.true_ref === trueRefFilter;
-
-      return passesAdminFilter && passesRefFilter;
+  // Debug logging for unsavedChanges state
+  useEffect(() => {
+    console.log("RefEntry - unsavedChanges state changed:", {
+      unsavedChanges,
+      timestamp: new Date().toISOString(),
+      stackTrace: new Error().stack
     });
-  }, [dataTableData, selectedTab, trueRefFilter]);
+  }, [unsavedChanges]);
+
+  // Format date for display
+  const formatDateForDisplay = useCallback((date) => {
+    if (!date) return "-";
+    return new Date(date).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+  }, []);
+
+  // Debounced search to improve performance
+  const debouncedSetSearch = useCallback(
+    debounce((term) => {
+      setDebouncedSearchTerm(term);
+      setIsSearching(false);
+    }, 150),
+    []
+  );
+
+  // Update debounced search when searchTerm changes
+  useEffect(() => {
+    if (searchTerm !== debouncedSearchTerm) {
+      setIsSearching(true);
+    }
+    debouncedSetSearch(searchTerm);
+    return () => {
+      debouncedSetSearch.cancel();
+    };
+  }, [searchTerm, debouncedSearchTerm, debouncedSetSearch]);
+
+  // Handle search input changes with immediate visual feedback
+  const handleSearchChange = useCallback((e) => {
+    setSearchTerm(e.target.value);
+  }, []);
 
   // Filter admin tabs to only show current user + admins who have data in selected month
   const visibleAdminTabs = useMemo(() => {
@@ -696,7 +573,7 @@ const RefEntry = () => {
   };
 
   // Delete row
-  const handleDeleteRow = async (rowId) => {
+  const handleDeleteRow = useCallback(async (rowId) => {
     console.log("RefEntry - handleDeleteRow called with rowId:", rowId);
     console.log("RefEntry - Current tableData for delete:", tableData.map(row => ({
       uuid: row.uuid,
@@ -777,7 +654,198 @@ const RefEntry = () => {
     } catch (error) {
       console.error("RefEntry - Error deleting row:", error);
     }
-  };
+  }, [tableData]);
+
+  // Stable callback for handling copy
+  const handleCopyClick = useCallback((rowData) => {
+    const firstName = rowData.client_name ? rowData.client_name.split(",")[0].trim() : "";
+    const copyText = `${firstName} ${rowData.zip_code || ""}`;
+    console.log("RefEntry - Direct copy attempt:", copyText);
+    
+    navigator.clipboard.writeText(copyText)
+      .then(() => console.log(`Copied directly: ${copyText}`))
+      .catch(err => console.error("Failed to copy text:", err));
+  }, []);
+
+  // Stable callback for actions cell
+  const actionsCellRenderer = useCallback((props) => {
+    return React.createElement(ActionsCell, {
+      ...props,
+      onDelete: handleDeleteRow,
+      onCopy: handleCopyClick
+    });
+  }, [handleDeleteRow, handleCopyClick]);
+
+  // Define columns for DataTable (now defined after ActionsCell)
+  const columns = useMemo(() => {
+    const cols = [
+      {
+        Header: "Actions",
+        accessor: "actions",
+        width: 100,
+        Cell: actionsCellRenderer,
+      },
+      {
+        Header: "True Ref",
+        accessor: "true_ref",
+        width: 100,
+        DropdownOptions: ["", "Y", "N"],
+        dropdownBackgroundColor: (value) => {
+          switch (value) {
+            case "Y":
+              return "#d4edda"; // Light green - True referral
+            case "N":
+              return "#f8d7da"; // Light red - Not a true referral
+            default:
+              return "#e9ecef"; // Grey - No selection
+          }
+        }
+      },
+      {
+        Header: "Ref Detail",
+        accessor: "ref_detail",
+        width: 200,
+      },
+      {
+        Header: "Agent Name",
+        accessor: "agentName",
+        width: 150,
+        DropdownOptions: ["", ...Array.from(new Set(agentOptions.map(agent => agent.lagnname)))],
+        dropdownBackgroundColor: (value) => {
+          return value ? "#f8f9fa" : "#e9ecef"; // Light background for selected, grey for blank
+        },
+        // Add custom cell renderer to log dropdown changes
+        Cell: ({ value, row, column }) => {
+          console.log("RefEntry - Agent dropdown cell rendering:", {
+            currentValue: value,
+            rowId: row.original.uuid || row.original.id,
+            agentOptions: agentOptions.map(a => ({ id: a.id, lagnname: a.lagnname }))
+          });
+          return value || "";
+        },
+        // Add onChange handler for debugging
+        onDropdownChange: (rowId, field, newValue) => {
+          console.log("RefEntry - Agent dropdown changed:", {
+            rowId,
+            field,
+            newValue,
+            timestamp: new Date().toISOString()
+          });
+          
+          // Find the agent that matches the selected name
+          const matchedAgent = agentOptions.find(agent => agent.lagnname === newValue);
+          console.log("RefEntry - Matched agent for dropdown selection:", {
+            selectedName: newValue,
+            matchedAgent,
+            allAgents: agentOptions
+          });
+        }
+      },
+      {
+        Header: "Client Name",
+        accessor: "client_name",
+        width: 200,
+      },
+      {
+        Header: "Zip Code",
+        accessor: "zip_code",
+        width: 100,
+      },
+      {
+        Header: "Existing Policy",
+        accessor: "existing_policy",
+        width: 120,
+        DropdownOptions: ["", "Y", "N"],
+        dropdownBackgroundColor: (value) => {
+          switch (value) {
+            case "Y":
+              return "#d4edda"; // Light green - Has existing policy
+            case "N":
+              return "#f8d7da"; // Light red - No existing policy
+            default:
+              return "#e9ecef"; // Grey - No selection
+          }
+        }
+      },
+      {
+        Header: "Trial",
+        accessor: "trial",
+        width: 80,
+        DropdownOptions: ["", "Y", "N"],
+        dropdownBackgroundColor: (value) => {
+          switch (value) {
+            case "Y":
+              return "#d4edda"; // Light green - Trial period
+            case "N":
+              return "#f8d7da"; // Light red - Not a trial
+            default:
+              return "#e9ecef"; // Grey - No selection
+          }
+        }
+      },
+      {
+        Header: "Date App Checked",
+        accessor: "date_app_checked",
+        width: 140,
+        Cell: ({ value }) => formatDateForDisplay(value),
+      },
+      {
+        Header: "Notes",
+        accessor: "notes",
+        width: 200,
+      },
+    ];
+
+    return cols;
+  }, [agentOptions, actionsCellRenderer, formatDateForDisplay]);
+
+  // Prepare data for DataTable (ensure each row has an id)
+  const dataTableData = useMemo(() => {
+    return tableData.map(row => ({
+      ...row,
+      id: row.uuid || row.id || Math.random().toString(36),
+    }));
+  }, [tableData]);
+
+  // Pre-indexed search data for ultra-fast filtering
+  const searchIndex = useMemo(() => {
+    return dataTableData.map(row => ({
+      ...row,
+      searchableText: [
+        row.agentName || '',
+        row.client_name || '',
+        row.ref_detail || '',
+        row.notes || '',
+        row.zip_code || ''
+      ].join(' ').toLowerCase()
+    }));
+  }, [dataTableData]);
+
+  // Filter data based on search and filters
+  const filteredData = useMemo(() => {
+    // First apply existing filters
+    let filtered = searchIndex.filter(row => {
+      // Apply admin tab filter
+      const passesAdminFilter = selectedTab === "All" || row.admin_name === selectedTab;
+
+      // Apply true_ref filter
+      const passesRefFilter = trueRefFilter === "all" || 
+        (trueRefFilter === "blank" && (!row.true_ref || row.true_ref === "")) ||
+        row.true_ref === trueRefFilter;
+
+      return passesAdminFilter && passesRefFilter;
+    });
+
+    // Then apply search filter if there's a search term
+    if (debouncedSearchTerm.trim()) {
+      const searchLower = debouncedSearchTerm.toLowerCase();
+      filtered = filtered.filter(row => 
+        row.searchableText.includes(searchLower)
+      );
+    }
+
+    return filtered;
+  }, [searchIndex, selectedTab, trueRefFilter, debouncedSearchTerm]);
 
   // Handle delete from DataTable (can be single ID or array of IDs)
   const handleDelete = async (ids) => {
@@ -984,27 +1052,38 @@ const RefEntry = () => {
           });
         });
         
-        // Update table data with saved rows (which now have IDs)
+        // Only update the rows that were actually sent for saving
+        const sentRowIds = new Set(rowsToSave.map(row => row.uuid || row.id));
+        
         setTableData(prevData => {
-          const savedDataMap = new Map(data.savedRows.map(row => [row.uuid, row]));
+          const savedDataMap = new Map(data.savedRows.map(row => [row.uuid || row.id, row]));
           
-          console.log("RefEntry - savedDataMap:", savedDataMap);
+          console.log("RefEntry - Only updating rows that were sent for saving:", {
+            sentRowCount: sentRowIds.size,
+            savedRowCount: data.savedRows.length,
+            sentRowIds: Array.from(sentRowIds)
+          });
           
           const updatedData = prevData.map(row => {
-            if (savedDataMap.has(row.uuid)) {
-              const mergedRow = { ...row, ...savedDataMap.get(row.uuid), isModified: false };
-              console.log("RefEntry - Updating row:", {
-                originalUuid: row.uuid,
+            const rowIdentifier = row.uuid || row.id;
+            
+            // Only update rows that were actually sent for saving
+            if (sentRowIds.has(rowIdentifier) && savedDataMap.has(rowIdentifier)) {
+              const savedRow = savedDataMap.get(rowIdentifier);
+              const mergedRow = { ...row, ...savedRow, isModified: false };
+              console.log("RefEntry - Updating sent row:", {
+                rowIdentifier,
                 originalId: row.id,
-                savedData: savedDataMap.get(row.uuid),
-                mergedRow: mergedRow
+                savedId: savedRow.id,
+                wasNew: !row.id
               });
               return mergedRow;
             }
-            return row;
+            
+            return row; // Don't change rows that weren't sent for saving
           });
           
-          console.log("RefEntry - Updated table data after save:", updatedData);
+          console.log("RefEntry - Updated only the sent rows. Total rows unchanged:", updatedData.length);
           return updatedData;
         });
 
@@ -1063,6 +1142,64 @@ const RefEntry = () => {
 
   return (
     <div style={{ padding: "1rem" }}>
+      
+      {/* Search Bar */}
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ position: 'relative', width: '100%' }}>
+          <FiSearch 
+            style={{ 
+              color: isSearching ? '#00558c' : '#666',
+              opacity: isSearching ? 0.8 : 0.6,
+              position: 'absolute',
+              left: '12px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 1,
+              fontSize: '16px'
+            }} 
+          />
+          <input
+            type="text"
+            placeholder="Search by agent name, client name, notes, ref detail, or zip code..."
+            value={searchTerm}
+            onChange={handleSearchChange}
+            style={{
+              width: '100%',
+              padding: '10px 12px 10px 40px',
+              border: `1px solid ${isSearching ? '#00558c' : '#ddd'}`,
+              borderRadius: '6px',
+              fontSize: '14px',
+              transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+              outline: 'none',
+              boxShadow: isSearching ? '0 0 0 2px rgba(0, 85, 140, 0.1)' : 'none',
+              backgroundColor: '#fff'
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = '#00558c';
+              e.target.style.boxShadow = '0 0 0 2px rgba(0, 85, 140, 0.1)';
+            }}
+            onBlur={(e) => {
+              if (!searchTerm) {
+                e.target.style.borderColor = '#ddd';
+                e.target.style.boxShadow = 'none';
+              }
+            }}
+          />
+          {isSearching && (
+            <div style={{
+              position: 'absolute',
+              right: '12px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: '#00558c',
+              fontSize: '12px',
+              fontWeight: '500'
+            }}>
+              Searching...
+            </div>
+          )}
+        </div>
+      </div>
       
       {/* Filters */}
       <div style={{ display: "flex", gap: "10px", marginBottom: "20px", alignItems: "flex-start", flexWrap: "wrap" }}>

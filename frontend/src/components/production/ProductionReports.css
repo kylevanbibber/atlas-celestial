@@ -181,9 +181,6 @@
   transition: all 0.2s ease;
 }
 
-.view-toggle:hover {
-  background-color: var(--bg-tertiary);
-}
 
 .view-toggle.active {
   background-color: var(--button-primary-bg);

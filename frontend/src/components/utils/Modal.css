@@ -17,7 +17,6 @@
     background: var(--bg-primary);
     border-radius: 8px;
     width: 90%;
-    max-width: 500px;
     padding: 1.5rem;
     box-shadow: 0 2px 8px var(--shadow-color);
     animation: fadeIn 0.3s ease-out;

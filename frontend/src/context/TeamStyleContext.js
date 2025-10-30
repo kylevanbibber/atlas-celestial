@@ -12,11 +12,7 @@ export const TeamStyleProvider = ({ children }) => {
   const [teamName, setTeamName] = useState('Arias Organization');
   const [logoUrl, setLogoUrl] = useState(null);
   
-  // Debug render cycles
-  console.log('[TeamStyleProvider] Rendering with:', {
-    userId: user?.userId,
-    hasTeamStyles: !!user?.teamStyles
-  });
+
   
   // Convert hex to RGB for CSS variables - This doesn't depend on any state, so define outside
   const hexToRgb = useCallback((hex) => {
@@ -73,7 +69,6 @@ export const TeamStyleProvider = ({ children }) => {
     if (!user?.userId) return;
     
     try {
-      console.log('[TeamStyleProvider] Refreshing team styles');
       
       // Get the latest team settings from the API
       const teamType = user.clname === 'RGA' ? 'RGA' : 
@@ -83,7 +78,6 @@ export const TeamStyleProvider = ({ children }) => {
       const response = await api.get(`/custom/team/${teamType}/${user.userId}`);
       
       if (response.data.success && response.data.settings) {
-        console.log('[TeamStyleProvider] Refreshed team styles successfully', response.data.settings);
         setTeamStyles(response.data.settings);
         setTeamName(response.data.settings.team_name || 'Arias Organization');
         setLogoUrl(response.data.settings.logo_url || null);
@@ -103,12 +97,10 @@ export const TeamStyleProvider = ({ children }) => {
   // Update styles when user changes
   useEffect(() => {
     if (user?.teamStyles) {
-      console.log('[TeamStyleProvider] Setting team styles from user object');
       setTeamStyles(user.teamStyles);
       setTeamName(user.teamStyles.team_name || 'Arias Organization');
       setLogoUrl(user.teamStyles.logo_url || null);
     } else {
-      console.log('[TeamStyleProvider] No team styles in user, using defaults');
       setTeamStyles(null);
       setTeamName('Arias Organization');
       setLogoUrl(null);

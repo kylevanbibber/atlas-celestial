@@ -1,0 +1,18 @@
+/* AllotmentTab specific styles */
+
+/* Grey row styling for inactive managers */
+.inactive-manager-row {
+  background-color: #f5f5f5 !important;
+  color: #666666 !important;
+  opacity: 0.8;
+}
+
+/* Ensure inactive rows maintain grey styling even on hover */
+.inactive-manager-row:hover {
+  background-color: #eeeeee !important;
+}
+
+/* Style text in inactive rows */
+.inactive-manager-row td {
+  color: #666666 !important;
+}

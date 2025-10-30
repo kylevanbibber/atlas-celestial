@@ -1,7 +1,8 @@
 /* eslint-disable no-restricted-globals */
 
 // Cache name for the app
-const CACHE_NAME = 'atlas-app-cache-v1';
+// Bump this version on deploys to invalidate old cached assets automatically
+const CACHE_NAME = 'atlas-app-cache-v3';
 
 // Assets to cache initially
 const STATIC_ASSETS = [
@@ -73,23 +74,25 @@ self.addEventListener('fetch', (event) => {
         })
     );
   } else {
-    // For non-API requests, try cache first, then network
+    // For non-API requests, use stale-while-revalidate to keep cache fresh
+    // This preserves fast loads while updating assets in the background
     event.respondWith(
-      caches.match(event.request).then((cachedResponse) => {
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-        return fetch(event.request).then((response) => {
-          // Cache the response
-          if (response.status === 200) {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseClone);
-            });
-          }
-          return response;
-        });
-      })
+      (async () => {
+        const cache = await caches.open(CACHE_NAME);
+        const cached = await cache.match(event.request);
+
+        const fetchPromise = fetch(event.request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              cache.put(event.request, networkResponse.clone());
+            }
+            return networkResponse;
+          })
+          .catch(() => undefined);
+
+        // Return cached first for speed; fall back to network if not cached
+        return cached || (await fetchPromise);
+      })()
     );
   }
 });

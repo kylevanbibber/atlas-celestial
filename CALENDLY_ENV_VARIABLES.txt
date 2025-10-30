@@ -1,0 +1,10 @@
+# Add these to your backend/.env file
+
+# Calendly OAuth Configuration
+CALENDLY_CLIENT_ID=your_calendly_client_id_here
+CALENDLY_CLIENT_SECRET=your_calendly_client_secret_here
+CALENDLY_REDIRECT_URI=http://localhost:3000/auth/calendly/callback
+
+# For production, use your actual domain:
+# CALENDLY_REDIRECT_URI=https://yourdomain.com/auth/calendly/callback
+

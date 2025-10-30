@@ -135,47 +135,36 @@ const NotificationProvider = ({ children }) => {
   useEffect(() => {
     const fetchVapidKey = async () => {
       try {
-        console.log('Fetching VAPID key...');
         const response = await api.get('/notifications/vapid-key');
-        console.log('VAPID key response:', response.data);
         
         if (response.data?.publicKey) {
-          console.log('Setting VAPID public key');
           setVapidPublicKey(response.data.publicKey);
           
           // Store the subscription status for later use
           if (response.data.hasSubscription) {
-            console.log('User has subscription in database');
             // We'll handle this after all functions are defined
           }
         } else {
-          console.error('Invalid VAPID key response:', response.data);
           setError('Failed to initialize push notifications: Invalid server response');
         }
       } catch (err) {
-        console.error('Error fetching VAPID key:', err);
         setError('Failed to initialize push notifications: ' + (err.response?.data?.error || err.message));
       }
     };
 
     if (isAuthenticated) {
-      console.log('User is authenticated, fetching VAPID key');
       fetchVapidKey();
-    } else {
-      console.log('User is not authenticated, skipping VAPID key fetch');
     }
   }, [isAuthenticated]);
 
   // Fetch notifications with smart caching
   const fetchNotifications = useCallback(async (includeRead = false, forceRefresh = false) => {
     if (!isAuthenticated || !token) {
-      console.log('Not authenticated or missing token, skipping notification fetch');
       return;
     }
 
     // ✨ SMART CACHING: Check if we should skip the fetch
     if (!forceRefresh && shouldUseCachedData()) {
-      console.log('⚡ [FETCH-CACHE] Using cached notifications - skipping API call');
       return;
     }
 
@@ -183,26 +172,13 @@ const NotificationProvider = ({ children }) => {
     setError(null);
 
     try {
-      console.log(`📥 [FETCH] Making notification request (includeRead: ${includeRead}, force: ${forceRefresh})`);
       const response = await api.get(`/notifications?includeRead=${includeRead}`);
-      
-      console.log(`📊 [FETCH] Received ${response.data.notifications.length} notifications, ${response.data.unreadCount} unread`);
-      
-      // Log read status for debugging
-      const readCount = response.data.notifications.filter(n => n.is_read).length;
-      const unreadNotifications = response.data.notifications.filter(n => !n.is_read);
-      console.log(`📖 [FETCH] Read: ${readCount}, Unread: ${unreadNotifications.length}`);
-      
-      if (unreadNotifications.length > 0) {
-        console.log(`📋 [FETCH] Unread notifications:`, unreadNotifications.map(n => `${n.id}: "${n.title}"`));
-      }
       
       setNotifications(response.data.notifications);
       setUnreadCount(response.data.unreadCount);
       setLastFetched(new Date());
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to fetch notifications');
-      console.error('❌ [FETCH] Error fetching notifications:', err);
     } finally {
       setLoading(false);
     }
@@ -217,7 +193,6 @@ const NotificationProvider = ({ children }) => {
     
     // If WebSocket is connected, data is fresh via real-time updates
     if (wsConnected) {
-      console.log('🔗 [CACHE-CHECK] WebSocket connected - data is real-time fresh');
       return true;
     }
     
@@ -227,10 +202,8 @@ const NotificationProvider = ({ children }) => {
       const twoMinutes = 2 * 60 * 1000;
       
       if (timeSinceLastFetch < twoMinutes) {
-        console.log(`🕐 [CACHE-CHECK] Data is fresh (${Math.round(timeSinceLastFetch/1000)}s old)`);
         return true;
       } else {
-        console.log(`🕐 [CACHE-CHECK] Data is stale (${Math.round(timeSinceLastFetch/1000)}s old) - will fetch`);
         return false;
       }
     }
@@ -240,7 +213,6 @@ const NotificationProvider = ({ children }) => {
 
   // Force refresh function for manual refreshes
   const forceRefreshNotifications = useCallback(() => {
-    console.log('🔄 [FORCE-REFRESH] Manual refresh requested');
     return fetchNotifications(false, true);
   }, [fetchNotifications]);
 
@@ -255,7 +227,6 @@ const NotificationProvider = ({ children }) => {
     }));
 
     // 🚀 OPTIMISTIC UPDATE: Update UI immediately for better UX
-    console.log(`📖 [READ-OPTIMISTIC] Immediately updating UI for notification ${notificationId}`);
     
     // Store the original notification in case we need to rollback
     let originalNotification = null;
@@ -270,7 +241,6 @@ const NotificationProvider = ({ children }) => {
         return notification;
       });
       
-      console.log(`📝 [READ-OPTIMISTIC] UI updated optimistically for notification ${notificationId}`);
       return updatedNotifications;
     });
 
@@ -280,7 +250,6 @@ const NotificationProvider = ({ children }) => {
       if (originalNotification && !originalNotification.is_read) {
         wasUnread = true;
         const newCount = Math.max(0, prev - 1);
-        console.log(`📊 [COUNT-OPTIMISTIC] markAsRead: ${prev} → ${newCount} (optimistic)`);
         return newCount;
       }
       return prev;
@@ -288,16 +257,11 @@ const NotificationProvider = ({ children }) => {
 
     // Now perform the backend call
     try {
-      console.log(`📖 [READ-BACKEND] Syncing with backend for notification ${notificationId}...`);
-      
       const response = await api.put(`/notifications/${notificationId}/read`);
-      console.log(`✅ [READ-BACKEND] Backend confirmed read status:`, response.data);
       
       // Backend call succeeded - no need to update UI again since we already did optimistically
-      console.log(`🎉 [READ-SUCCESS] Notification ${notificationId} successfully marked as read`);
       
     } catch (err) {
-      console.error('❌ [READ-ROLLBACK] Backend call failed, rolling back optimistic update:', err);
       
       // 🔄 ROLLBACK: Backend failed, revert the optimistic changes
       if (originalNotification) {
@@ -312,10 +276,7 @@ const NotificationProvider = ({ children }) => {
         // Restore unread count if we decremented it
         if (wasUnread) {
           setUnreadCount(prev => prev + 1);
-          console.log(`📊 [COUNT-ROLLBACK] Restored unread count after rollback`);
         }
-        
-        console.log(`🔄 [READ-ROLLBACK] UI reverted to original state for notification ${notificationId}`);
       }
       
       // Still refresh from backend to ensure we have the correct state
@@ -338,7 +299,6 @@ const NotificationProvider = ({ children }) => {
     if (!isAuthenticated || !token) return;
 
     // 🚀 OPTIMISTIC UPDATE: Update UI immediately for better UX
-    console.log(`📚 [READ-ALL-OPTIMISTIC] Immediately updating UI for all notifications`);
     
     // Store original state for potential rollback
     let originalNotifications = null;
@@ -352,36 +312,27 @@ const NotificationProvider = ({ children }) => {
         is_read: true 
       }));
       
-      console.log(`📝 [READ-ALL-OPTIMISTIC] UI updated optimistically for all notifications`);
       return updatedNotifications;
     });
 
     // Update unread count immediately
     setUnreadCount(prev => {
       originalUnreadCount = prev;
-      console.log(`📊 [COUNT-OPTIMISTIC] markAllAsRead: ${prev} → 0 (optimistic)`);
       return 0;
     });
 
     // Now perform the backend call
     try {
-      console.log(`📚 [READ-ALL-BACKEND] Syncing with backend for mark all as read...`);
-      
       await api.put('/notifications/read-all');
-      console.log(`✅ [READ-ALL-BACKEND] Backend confirmed all notifications marked as read`);
       
       // Backend call succeeded - no need to update UI again since we already did optimistically
-      console.log(`🎉 [READ-ALL-SUCCESS] All notifications successfully marked as read`);
       
     } catch (err) {
-      console.error('❌ [READ-ALL-ROLLBACK] Backend call failed, rolling back optimistic update:', err);
       
       // 🔄 ROLLBACK: Backend failed, revert the optimistic changes
       if (originalNotifications) {
         setNotifications(originalNotifications);
         setUnreadCount(originalUnreadCount);
-        console.log(`🔄 [READ-ALL-ROLLBACK] UI reverted to original state`);
-        console.log(`📊 [COUNT-ROLLBACK] Restored unread count: ${originalUnreadCount}`);
       }
       
       // Still refresh from backend to ensure we have the correct state
@@ -394,7 +345,6 @@ const NotificationProvider = ({ children }) => {
     if (!isAuthenticated || !token) return;
 
     // 🚀 OPTIMISTIC UPDATE: Update UI immediately for better UX
-    console.log(`🗑️ [DISMISS-OPTIMISTIC] Immediately updating UI for notification ${notificationId}`);
     
     // Store original state for potential rollback
     let originalNotification = null;
@@ -411,7 +361,6 @@ const NotificationProvider = ({ children }) => {
         return notification;
       });
       
-      console.log(`📝 [DISMISS-OPTIMISTIC] UI updated optimistically for notification ${notificationId}`);
       return updatedNotifications;
     });
 
@@ -421,25 +370,17 @@ const NotificationProvider = ({ children }) => {
       setUnreadCount(prev => {
         originalUnreadCount = prev;
         const newCount = Math.max(0, prev - 1);
-        console.log(`📊 [COUNT-OPTIMISTIC] dismissNotification (was unread): ${prev} → ${newCount} (optimistic)`);
         return newCount;
       });
-    } else {
-      console.log(`📊 [COUNT-OPTIMISTIC] dismissNotification (was read): no count change needed`);
     }
 
     // Now perform the backend call
     try {
-      console.log(`🗑️ [DISMISS-BACKEND] Syncing with backend for notification ${notificationId}...`);
-      
       await api.put(`/notifications/${notificationId}/dismiss`);
-      console.log(`✅ [DISMISS-BACKEND] Backend confirmed dismissal`);
       
       // Backend call succeeded - no need to update UI again since we already did optimistically
-      console.log(`🎉 [DISMISS-SUCCESS] Notification ${notificationId} successfully dismissed`);
       
     } catch (err) {
-      console.error('❌ [DISMISS-ROLLBACK] Backend call failed, rolling back optimistic update:', err);
       
       // 🔄 ROLLBACK: Backend failed, revert the optimistic changes
       if (originalNotification) {
@@ -454,10 +395,7 @@ const NotificationProvider = ({ children }) => {
         // Restore unread count if we decremented it
         if (wasUnread) {
           setUnreadCount(prev => prev + 1);
-          console.log(`📊 [COUNT-ROLLBACK] Restored unread count after dismiss rollback`);
         }
-        
-        console.log(`🔄 [DISMISS-ROLLBACK] UI reverted to original state for notification ${notificationId}`);
       }
       
       // Still refresh from backend to ensure we have the correct state
@@ -492,7 +430,6 @@ const NotificationProvider = ({ children }) => {
 
       setUnreadCount(0);
     } catch (err) {
-      console.error('Error dismissing all notifications:', err);
       // Fallback: refresh notifications to get accurate state
       fetchNotifications();
     }
@@ -508,55 +445,42 @@ const NotificationProvider = ({ children }) => {
       }
       
       if (!vapidPublicKey) {
-        console.error('VAPID public key not available');
         setError('Push notifications are not properly configured. Please contact support.');
         return false;
       }
       
-      console.log('Starting push notification subscription process...');
       setError(null);
       
       const registration = await navigator.serviceWorker.ready;
       
       if (!registration) {
-        console.error('Service worker not ready');
         setError('Service worker not available. Please refresh the page and try again.');
         return false;
       }
       
-      console.log('Service worker ready, checking for existing subscription...');
       let subscription = await registration.pushManager.getSubscription();
-      
-      console.log('Existing subscription:', subscription);
       
       if (!subscription) {
         // Check current permission status
         const permission = await Notification.permission;
-        console.log('Current notification permission:', permission);
         
         if (permission === 'denied') {
-          console.log('Notification permission denied');
           setError('Please enable notifications in your browser settings');
           return false;
         }
         
         if (permission === 'default') {
           // Request permission first
-          console.log('Requesting notification permission...');
           const newPermission = await Notification.requestPermission();
-          console.log('New permission status:', newPermission);
           if (newPermission !== 'granted') {
-            console.log('Notification permission denied');
             setError('Please allow notifications to enable push notifications');
             return false;
           }
         }
 
         // Create a new subscription with retry logic for iOS PWA
-        console.log('Creating new push subscription...');
         const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
         if (!applicationServerKey) {
-          console.error('Failed to convert VAPID key');
           setError('Invalid server configuration. Please contact support.');
           return false;
         }
@@ -567,19 +491,15 @@ const NotificationProvider = ({ children }) => {
         
         while (!subscription && retryCount < maxRetries) {
           try {
-            console.log(`Subscription attempt ${retryCount + 1}/${maxRetries}...`);
-            
             subscription = await registration.pushManager.subscribe({
               userVisibleOnly: true,
               applicationServerKey
             });
             
-            console.log('Successfully created push subscription:', subscription);
             break;
             
           } catch (subscribeError) {
             retryCount++;
-            console.error(`Subscription attempt ${retryCount} failed:`, subscribeError);
             
             if (retryCount >= maxRetries) {
               let errorMessage = 'Failed to create push subscription. ';
@@ -609,14 +529,11 @@ const NotificationProvider = ({ children }) => {
         }
         
       } else {
-        console.log('Using existing push subscription');
         
         // Validate the existing subscription
         try {
           // Test if the subscription is still valid by checking its properties
           if (!subscription.endpoint || !subscription.keys) {
-            console.warn('Existing subscription appears invalid, creating new one...');
-            
             // Unsubscribe the invalid one
             await subscription.unsubscribe();
             
@@ -627,10 +544,8 @@ const NotificationProvider = ({ children }) => {
               applicationServerKey
             });
             
-            console.log('Created new subscription to replace invalid one:', subscription);
           }
         } catch (validationError) {
-          console.error('Error validating existing subscription:', validationError);
           setError('Existing subscription is invalid. Please try disabling and re-enabling notifications.');
           return false;
         }
@@ -640,7 +555,6 @@ const NotificationProvider = ({ children }) => {
       
       // Save the subscription on the server with retry logic
       if (isAuthenticated && user?.userId) {
-        console.log('Saving subscription to server...');
         
         try {
           const response = await api.post('/notifications/subscribe', {
@@ -649,21 +563,16 @@ const NotificationProvider = ({ children }) => {
           });
           
           if (response.data.success) {
-            console.log('Push subscription saved on server successfully');
-            
             // Verify the subscription was saved by checking status
             try {
               const statusResponse = await api.get('/notifications/subscription-status');
               if (statusResponse.data.hasSubscription) {
-                console.log('✅ Subscription verified on server');
                 return true;
               } else {
-                console.warn('⚠️ Subscription not found on server after saving');
                 setError('Subscription was created but not properly saved. Please try again.');
                 return false;
               }
             } catch (verifyError) {
-              console.error('Error verifying subscription:', verifyError);
               // Don't fail completely if verification fails
               return true;
             }
@@ -673,8 +582,6 @@ const NotificationProvider = ({ children }) => {
           }
           
         } catch (saveError) {
-          console.error('Error saving subscription to server:', saveError);
-          
           let errorMessage = 'Failed to save subscription: ';
           if (saveError.response?.status === 401) {
             errorMessage += 'Please log in again.';
@@ -688,14 +595,11 @@ const NotificationProvider = ({ children }) => {
           return false;
         }
       } else {
-        console.error('Cannot save subscription: user not authenticated');
         setError('Please log in to enable push notifications.');
         return false;
       }
       
     } catch (error) {
-      console.error('Error in push notification subscription process:', error);
-      
       let errorMessage = 'Failed to enable push notifications: ';
       if (error.name === 'NotSupportedError') {
         errorMessage += 'Not supported in this browser.';
@@ -731,7 +635,6 @@ const NotificationProvider = ({ children }) => {
             subscription: JSON.stringify(subscription),
             userId: user.userId
           });
-          console.log('Unsubscribed from push notifications');
         }
         
         setPushSubscription(null);
@@ -740,7 +643,6 @@ const NotificationProvider = ({ children }) => {
       
       return false;
     } catch (err) {
-      console.error('Failed to unsubscribe from push notifications:', err);
       return false;
     }
   }, [isAuthenticated, user, isPushSupported]);
@@ -754,7 +656,6 @@ const NotificationProvider = ({ children }) => {
       const isStale = timeSinceLastPong > 90000; // 90 seconds without pong = stale
 
       if (isStale && !document.hidden) {
-        console.warn('⚠️ WebSocket connection appears stale, forcing reconnection');
         if (wsConnection) {
           wsConnection.close();
         }
@@ -772,14 +673,10 @@ const NotificationProvider = ({ children }) => {
       const visible = !document.hidden;
       setIsAppVisible(visible);
       
-      console.log(`📱 App visibility changed: ${visible ? 'visible' : 'hidden'}`);
       
       if (visible && isAuthenticated) {
-        console.log('🔄 App became visible, checking WebSocket connection...');
-        
         // If WebSocket is disconnected and we're authenticated, try to reconnect
         if (!wsConnected && !isReconnecting) {
-          console.log('📡 WebSocket disconnected, attempting to reconnect...');
           // Reset reconnect attempts when app becomes visible
           setReconnectAttempts(0);
           
@@ -795,22 +692,17 @@ const NotificationProvider = ({ children }) => {
         // ✨ OPTIMIZED: Only fetch if WebSocket is not connected since WebSocket keeps us in sync
         setTimeout(() => {
           if (!wsConnected) {
-            console.log('📡 WebSocket not connected, fetching notifications on visibility change');
             fetchNotifications();
-          } else {
-            console.log('🔗 WebSocket connected, skipping fetch on visibility change');
           }
         }, 500);
       }
     };
 
     const handleFocus = () => {
-      console.log('🎯 App gained focus');
       handleVisibilityChange();
     };
 
     const handleBlur = () => {
-      console.log('😴 App lost focus');
     };
 
     // Listen for visibility changes
@@ -853,12 +745,10 @@ const NotificationProvider = ({ children }) => {
               wsConnection.close();
             }
             
-            console.log('Connecting to WebSocket:', wsUrl);
             setIsReconnecting(true);
             const ws = new WebSocket(wsUrl);
             
             ws.onopen = () => {
-              console.log('🔗 WebSocket connected for notifications');
               setWsConnected(true);
               setWsError(null);
               setReconnectAttempts(0);
@@ -867,8 +757,6 @@ const NotificationProvider = ({ children }) => {
               
               // If this is a reconnection after the app was in background, show a brief message
               if (reconnectAttempts > 0) {
-                console.log('📱 WebSocket reconnected after app returned from background');
-                
                 // Show brief in-page notification about reconnection
                 if (window.showInPageNotification && !document.hidden) {
                   setTimeout(() => {
@@ -882,7 +770,6 @@ const NotificationProvider = ({ children }) => {
               }
               
               // Send authentication
-              console.log('🔐 Sending WebSocket authentication...');
               ws.send(JSON.stringify({ 
                 type: 'auth', 
                 token: token 
@@ -891,22 +778,23 @@ const NotificationProvider = ({ children }) => {
 
             ws.onmessage = (event) => {
               try {
-                console.log('🔔 WebSocket message received:', event.data);
                 const data = JSON.parse(event.data);
-                console.log('🔔 Parsed WebSocket data:', data);
                 
                 if (data.type === 'auth_success') {
-                  console.log('✅ WebSocket authentication successful');
                 } else if (data.type === 'auth_error') {
-                  console.error('❌ WebSocket authentication failed:', data.message);
                   setWsError('Authentication failed');
                   ws.close();
                 } else if (data.type === 'notification') {
-                  console.log('🔔 Received real-time notification:', data.notification);
+                  // Validate payload to prevent blank notifications
+                  const raw = data && data.notification ? data.notification : {};
+                  const hasRequired = raw && raw.id && raw.title && raw.message;
+                  if (!hasRequired) {
+                    return;
+                  }
                   
                   // ✨ OPTIMIZED: Directly add the new notification to state instead of refetching all
                   const newNotification = {
-                    ...data.notification,
+                    ...raw,
                     is_read: false,
                     is_dismissed: false
                   };
@@ -915,25 +803,21 @@ const NotificationProvider = ({ children }) => {
                     // Check if notification already exists (prevent duplicates)
                     const exists = prevNotifications.some(n => n.id === newNotification.id);
                     if (exists) {
-                      console.log('📝 Notification already exists, skipping duplicate');
                       return prevNotifications;
                     }
                     
                     // Add new notification to the beginning of the array (newest first)
-                    console.log('📝 Adding new notification to state directly');
                     return [newNotification, ...prevNotifications];
                   });
                   
                   // Update unread count immediately
                   setUnreadCount(prevCount => {
                     const newCount = prevCount + 1;
-                    console.log(`📊 Updated unread count: ${prevCount} → ${newCount}`);
                     return newCount;
                   });
                   
                   // Show in-page notification if tab is active
                   if (document.visibilityState === 'visible' && !document.hidden) {
-                    console.log('📱 Tab is active, showing in-page notification');
                     if (window.showInPageNotification) {
                       window.showInPageNotification(data.notification);
                     }
@@ -941,10 +825,7 @@ const NotificationProvider = ({ children }) => {
                     playNotificationSound();
                   }
                   
-                  console.log('✅ Real-time notification processed instantly without API call');
-                  
                 } else if (data.type === 'notification_read') {
-                  console.log('🔔 Received notification read update:', data.notificationId);
                   
                   // ✨ OPTIMIZED: Update specific notification's read status directly
                   setNotifications(prevNotifications => 
@@ -960,17 +841,12 @@ const NotificationProvider = ({ children }) => {
                     const notification = notifications.find(n => n.id === data.notificationId);
                     if (notification && !notification.is_read) {
                       const newCount = Math.max(0, prevCount - 1);
-                      console.log(`📊 Updated unread count: ${prevCount} → ${newCount}`);
                       return newCount;
                     }
                     return prevCount;
                   });
                   
-                  console.log('✅ Notification read status updated instantly across tabs');
-                  
                 } else if (data.type === 'all_notifications_read') {
-                  console.log('🔔 Received mark all as read update');
-                  
                   // ✨ OPTIMIZED: Mark all notifications as read directly
                   setNotifications(prevNotifications => 
                     prevNotifications.map(notification => 
@@ -980,17 +856,11 @@ const NotificationProvider = ({ children }) => {
                   
                   // Reset unread count to 0
                   setUnreadCount(0);
-                  console.log('📊 All notifications marked as read, unread count reset to 0');
-                  
-                  console.log('✅ All notifications read status updated instantly across tabs');
                   
                 } else if (data.type === 'notification_dismissed') {
-                  console.log('🔔 Received notification dismissed update:', data.notificationId);
-                  
                   // ✨ OPTIMIZED: Remove dismissed notification from state directly
                   setNotifications(prevNotifications => {
                     const updatedNotifications = prevNotifications.filter(n => n.id !== data.notificationId);
-                    console.log(`📝 Removed dismissed notification ${data.notificationId} from state`);
                     return updatedNotifications;
                   });
                   
@@ -999,29 +869,21 @@ const NotificationProvider = ({ children }) => {
                     const notification = notifications.find(n => n.id === data.notificationId);
                     if (notification && !notification.is_read) {
                       const newCount = Math.max(0, prevCount - 1);
-                      console.log(`📊 Updated unread count: ${prevCount} → ${newCount}`);
                       return newCount;
                     }
                     return prevCount;
                   });
                   
-                  console.log('✅ Notification dismissed and removed instantly across tabs');
-                  
                 } else if (data.type === 'ping') {
-                  console.log('🏓 Received ping, sending pong');
                   ws.send(JSON.stringify({ type: 'pong' }));
                   setLastPongReceived(Date.now()); // Update last pong received time
-                } else {
-                  console.log('❓ Unknown WebSocket message type:', data.type);
                 }
               } catch (error) {
-                console.error('❌ Error parsing WebSocket message:', error);
+                // Error parsing WebSocket message
               }
             };
 
             ws.onclose = (event) => {
-              console.log('WebSocket disconnected', event.code, event.reason);
-              console.log('📱 App visibility state:', document.visibilityState, 'Hidden:', document.hidden);
               setWsConnected(false);
               setIsReconnecting(false);
               
@@ -1030,34 +892,26 @@ const NotificationProvider = ({ children }) => {
               const isAppInBackground = document.hidden || document.visibilityState === 'hidden';
               
               if (isAppInBackground) {
-                console.log('📱 App is in background, skipping immediate WebSocket reconnection');
-                console.log('ℹ️ WebSocket will reconnect when app becomes visible again');
                 return;
               }
               
               // Only attempt to reconnect if still authenticated and not intentional close
               if (event.code !== 1000 && isAuthenticated && reconnectAttempts < 3) {
                 const backoffDelay = Math.min(1000 * Math.pow(1.5, reconnectAttempts), 5000);
-                console.log(`Will attempt to reconnect WebSocket in ${backoffDelay/1000} seconds... (attempt ${reconnectAttempts + 1}/3)`);
                 
                 setTimeout(() => {
                   // Double-check app is still visible before reconnecting
                   if (!document.hidden && isAuthenticated) {
                     setReconnectAttempts(prev => prev + 1);
-                  } else {
-                    console.log('📱 App became hidden before reconnection, skipping');
                   }
                 }, backoffDelay);
               } else if (reconnectAttempts >= 3) {
-                console.log('Max reconnection attempts reached. Using polling fallback for notifications.');
                 setWsError('WebSocket connection failed. Using polling fallback.');
                 setIsReconnecting(false);
               }
             };
 
             ws.onerror = (error) => {
-              console.error('WebSocket error:', error);
-              console.error('Failed to connect to:', wsUrl);
               setWsConnected(false);
               setWsError(`Connection failed to ${wsUrl}. Backend server may not be running.`);
               setIsReconnecting(false);
@@ -1065,8 +919,6 @@ const NotificationProvider = ({ children }) => {
 
             setWsConnection(ws);
           } catch (error) {
-            console.error('Failed to connect WebSocket:', error);
-            console.error('WebSocket URL was:', wsUrl);
             setWsError(`Failed to connect to WebSocket server at ${wsUrl}. Please ensure the backend server is running.`);
             setIsReconnecting(false);
           }
@@ -1077,7 +929,6 @@ const NotificationProvider = ({ children }) => {
       const fallbackInterval = setInterval(() => {
         // Only poll if WebSocket is not connected, app is visible, and user is authenticated
         if (!wsConnected && isAuthenticated && !document.hidden) {
-          console.log('📡 WebSocket not connected and app is visible, using fallback polling for notifications');
           fetchNotifications();
         }
       }, 30000); // Every 30 seconds when WebSocket is down and app is visible
@@ -1092,7 +943,6 @@ const NotificationProvider = ({ children }) => {
   // Separate effect for handling WebSocket cleanup on logout
   useEffect(() => {
     if (!isAuthenticated && wsConnection) {
-      console.log('User logged out, disconnecting WebSocket');
       wsConnection.close(1000, 'User logout');
       setWsConnection(null);
       setWsConnected(false);
@@ -1104,7 +954,6 @@ const NotificationProvider = ({ children }) => {
   // Handle reconnection attempts
   useEffect(() => {
     if (reconnectAttempts > 0 && reconnectAttempts < 3 && isAuthenticated && !wsConnected && !isReconnecting) {
-      console.log(`Triggering reconnection attempt ${reconnectAttempts}`);
       // Trigger the main connection effect to retry
       const retryTimeout = setTimeout(() => {
         if (isAuthenticated && !wsConnected && !isReconnecting) {
@@ -1123,12 +972,8 @@ const NotificationProvider = ({ children }) => {
 
     // Helper function to handle service worker registration
     async function handleServiceWorkerRegistration(registration) {
-      console.log('✅ Service worker registered successfully:', registration);
-      console.log('🔧 Registration state:', registration.installing, registration.waiting, registration.active);
-      
       // Wait for service worker to become active if it's installing
       if (registration.installing) {
-        console.log('🔧 Service worker is installing, waiting for activation...');
         await new Promise((resolve) => {
           const installing = registration.installing;
           const handleStateChange = (event) => {
@@ -1146,7 +991,6 @@ const NotificationProvider = ({ children }) => {
       const isPWA = window.matchMedia('(display-mode: standalone)').matches;
       
       if (isIOS && isPWA) {
-        console.log('🍎 Detected iOS PWA, adding extra initialization time...');
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
@@ -1159,23 +1003,19 @@ const NotificationProvider = ({ children }) => {
           try {
             subscription = await registration.pushManager.getSubscription();
             if (!subscription && retries > 1) {
-              console.log('🔄 Subscription not found, retrying...', retries - 1, 'attempts left');
               await new Promise(resolve => setTimeout(resolve, 1000));
             }
           } catch (err) {
-            console.log('⚠️ Error getting subscription, retrying...', err);
             await new Promise(resolve => setTimeout(resolve, 1000));
           }
           retries--;
         }
         
-        console.log('🔔 Found existing push subscription:', subscription);
         if (subscription) {
           setPushSubscription(subscription);
-          console.log('✅ Push subscription state updated');
         }
       } catch (err) {
-        console.error('❌ Error checking push subscription:', err);
+        // Error checking push subscription
       }
     }
 
@@ -1183,13 +1023,10 @@ const NotificationProvider = ({ children }) => {
     async function setupServiceWorker() {
       // Check if the browser supports service workers and push notifications
       if ('serviceWorker' in navigator && 'PushManager' in window) {
-        console.log('🔧 Setting up service worker...');
-        
         // Special handling for iOS
         if (isIOSPWA()) {
-          console.log('📱 iOS PWA detected - using optimized setup');
+          // iOS PWA detected - using optimized setup
         } else if (isIOSSafari()) {
-          console.log('🚫 iOS Safari detected - push notifications not supported');
           setError('Push notifications are only available when this app is added to your iPhone home screen. Tap the Share button and select "Add to Home Screen".');
           return;
         }
@@ -1209,13 +1046,11 @@ const NotificationProvider = ({ children }) => {
           const existingRegistrations = await navigator.serviceWorker.getRegistrations();
           if (existingRegistrations.length > 0) {
             registration = existingRegistrations[0];
-            console.log('🔧 Found existing service worker registration:', registration);
             
             // Make sure the registration is active
             if (registration.active) {
               await handleServiceWorkerRegistration(registration);
             } else {
-              console.log('🔄 Waiting for service worker to activate...');
               await new Promise((resolve) => {
                 if (registration.installing) {
                   const installing = registration.installing;
@@ -1240,28 +1075,24 @@ const NotificationProvider = ({ children }) => {
                   scope: '/',
                   updateViaCache: 'none' // Important for PWAs
                 });
-                console.log('🔧 Successfully registered service worker with path:', path);
                 
                 // Wait for the service worker to be ready
                 await navigator.serviceWorker.ready;
                 await handleServiceWorkerRegistration(registration);
                 break;
               } catch (error) {
-                console.log('🔧 Failed to register with path:', path, error);
+                // Failed to register with this path, try next
               }
             }
           }
           
           if (!registration) {
-            console.error('❌ Failed to register service worker with any path');
             setError('Failed to set up push notifications. Please try refreshing the page.');
           }
           
           // Set up message listener for service worker messages
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.addEventListener('message', (event) => {
-              console.log('📨 Message from service worker:', event.data);
-              
               switch (event.data.type) {
                 case 'NEW_NOTIFICATION':
                   // Refresh notifications when new one arrives
@@ -1271,7 +1102,6 @@ const NotificationProvider = ({ children }) => {
                 case 'SHOW_IN_PAGE_NOTIFICATION':
                   // Show in-page notification if tab is active
                   if (document.visibilityState === 'visible' && !document.hidden) {
-                    console.log('🔔 Showing in-page notification for active tab');
                     if (window.showInPageNotification) {
                       window.showInPageNotification(event.data.notification);
                     }
@@ -1288,7 +1118,6 @@ const NotificationProvider = ({ children }) => {
                     }
                   } else if (event.data.fallbackToBrowser) {
                     // If app is not visible and this was an iOS PWA test, tell service worker to show browser notification
-                    console.log('📱 App not visible, requesting browser notification fallback');
                     if (navigator.serviceWorker && navigator.serviceWorker.controller) {
                       navigator.serviceWorker.controller.postMessage({
                         type: 'SHOW_BROWSER_NOTIFICATION_FALLBACK',
@@ -1301,17 +1130,14 @@ const NotificationProvider = ({ children }) => {
                   
                 case 'CHECK_VISIBILITY':
                   // Respond with current tab visibility state
-                  console.log('🔍 Service worker checking tab visibility');
                   // The service worker will handle this by checking client.focused
                   break;
                   
                 case 'NOTIFICATION_CLICKED':
                   // Handle notification click if needed
-                  console.log('🖱️ Notification was clicked:', event.data);
                   
                   // If there's a URL in the notification data, navigate to it
                   if (event.data.url && event.data.url !== '/') {
-                    console.log('🔗 Navigating to:', event.data.url);
                     navigate(event.data.url);
                   }
                   
@@ -1323,25 +1149,22 @@ const NotificationProvider = ({ children }) => {
                   
                 case 'NAVIGATE_TO':
                   // Handle navigation requests from service worker
-                  console.log('🧭 Service worker requesting navigation to:', event.data.url);
                   if (event.data.url) {
                     navigate(event.data.url);
                   }
                   break;
                   
                 case 'NOTIFICATION_ERROR':
-                  console.error('❌ Notification error from service worker:', event.data.error);
+                  // Notification error from service worker
                   break;
                   
                 default:
-                  console.log('📨 Unknown message from service worker:', event.data);
+                  // Unknown message from service worker
               }
             });
           }
           
         } catch (error) {
-          console.error('❌ Service worker setup failed:', error);
-          
           // Provide helpful error messages for different scenarios
           if (isIOSPWA()) {
             setError('Failed to set up notifications. Please try closing and reopening the app.');
@@ -1352,7 +1175,6 @@ const NotificationProvider = ({ children }) => {
           }
         }
       } else {
-        console.warn('⚠️ Service Worker or Push Manager not supported');
         setError('Push notifications are not supported in this browser.');
       }
     }
@@ -1385,15 +1207,12 @@ const NotificationProvider = ({ children }) => {
         const response = await api.get('/notifications/subscription-status');
         
         if (response.data.hasSubscription) {
-          console.log('Found subscription in database, checking browser status');
-          
           // Check if there's a browser subscription
           if ('serviceWorker' in navigator && 'PushManager' in window) {
             try {
               // Use getRegistrations instead of ready for better iOS PWA compatibility
               const registrations = await navigator.serviceWorker.getRegistrations();
               if (registrations.length === 0) {
-                console.log('No service worker registrations found');
                 return;
               }
               
@@ -1402,20 +1221,18 @@ const NotificationProvider = ({ children }) => {
               
               if (!existingSubscription && Notification.permission === 'granted') {
                 // Browser allows notifications but subscription is missing - recreate it
-                console.log('Permission granted but subscription missing - recreating subscription');
                 subscribeToPushNotifications();
               } else if (existingSubscription) {
                 // We have both database record and browser subscription
-                console.log('Found existing browser subscription, syncing state');
                 setPushSubscription(existingSubscription);
               }
             } catch (err) {
-              console.error('Error checking service worker registration:', err);
+              // Error checking service worker registration
             }
           }
         }
       } catch (err) {
-        console.error('Error syncing subscription status:', err);
+        // Error syncing subscription status
       }
     };
     
@@ -1426,8 +1243,6 @@ const NotificationProvider = ({ children }) => {
 
   // Clean up stale subscriptions - useful when DB and browser are out of sync
   const cleanupStaleSubscription = useCallback(async () => {
-    console.log('🧹 Cleaning up stale subscription...');
-    
     try {
       // First, try to unsubscribe from any existing browser subscription
       if ('serviceWorker' in navigator) {
@@ -1436,11 +1251,10 @@ const NotificationProvider = ({ children }) => {
           try {
             const subscription = await registration.pushManager.getSubscription();
             if (subscription) {
-              console.log('🗑️ Unsubscribing existing browser subscription');
               await subscription.unsubscribe();
             }
           } catch (err) {
-            console.warn('Could not unsubscribe existing subscription:', err);
+            // Could not unsubscribe existing subscription
           }
         }
       }
@@ -1451,26 +1265,21 @@ const NotificationProvider = ({ children }) => {
       // Delete subscription from server
       if (isAuthenticated && user?.userId) {
         try {
-          console.log('🗑️ Removing subscription from server');
           await api.post('/notifications/unsubscribe', { userId: user.userId });
-          console.log('✅ Server subscription cleaned up');
         } catch (err) {
-          console.warn('Could not clean up server subscription:', err);
+          // Could not clean up server subscription
         }
       }
       
-      console.log('✅ Stale subscription cleanup completed');
       return true;
       
     } catch (error) {
-      console.error('❌ Error during subscription cleanup:', error);
       return false;
     }
   }, [isAuthenticated, user?.userId]);
 
   // Force fresh subscription - cleans up and creates new
   const forceRefreshSubscription = useCallback(async () => {
-    console.log('🔄 Force refreshing subscription status...');
     setError(null);
     
     if (!isPushSupported()) {
@@ -1491,11 +1300,9 @@ const NotificationProvider = ({ children }) => {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Now create a fresh subscription
-      console.log('🆕 Creating fresh subscription after cleanup');
       const success = await subscribeToPushNotifications();
       
       if (success) {
-        console.log('✅ Fresh subscription created successfully');
         setError(null);
         return true;
       } else {
@@ -1504,7 +1311,6 @@ const NotificationProvider = ({ children }) => {
       }
       
     } catch (error) {
-      console.error('❌ Error during force refresh:', error);
       setError('Failed to refresh subscription: ' + (error.message || 'Unknown error'));
       return false;
     }

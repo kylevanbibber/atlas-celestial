@@ -12,6 +12,7 @@ const ReportMore = ({ user, onDataUpdate }) => {
   const [countdown, setCountdown] = useState("");
   const [loading, setLoading] = useState(false); // Track loading state
   const [pendingUpdates, setPendingUpdates] = useState({}); // Track pending updates
+  const [mgaHierarchy, setMgaHierarchy] = useState({ rga: null, legacy: null, tree: null }); // Store MGA hierarchy data
   
   const [formData, setFormData] = useState({
     MGA: user?.agnname || user?.lagnname || "",
@@ -34,6 +35,36 @@ const ReportMore = ({ user, onDataUpdate }) => {
 
   const toggleCollapse = () => {
     setIsCollapsed((prev) => !prev);
+  };
+
+  // Fetch MGA hierarchy data (rga, legacy, tree) from the backend
+  const fetchMgaHierarchy = async (mgaName) => {
+    try {
+      if (!mgaName) return;
+      
+      const response = await api.get(`/more/mga-hierarchy/${encodeURIComponent(mgaName)}`);
+      
+      if (response.data.success && response.data.data) {
+        setMgaHierarchy(response.data.data);
+        console.log('✅ MGA Hierarchy fetched:', response.data.data);
+      } else {
+        console.warn('MGA hierarchy not found, using fallback values');
+        // Fallback to using the MGA name itself
+        setMgaHierarchy({
+          rga: mgaName,
+          legacy: mgaName,
+          tree: mgaName
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching MGA hierarchy:', error);
+      // Fallback to using the MGA name itself
+      setMgaHierarchy({
+        rga: mgaName,
+        legacy: mgaName,
+        tree: mgaName
+      });
+    }
   };
 
   const calculateCountdown = (weekOffset = 0) => {
@@ -135,10 +166,7 @@ const ReportMore = ({ user, onDataUpdate }) => {
 
   const handleNoRecruit = async () => {
     const currentMGA = formData.MGA || user?.agnname || user?.lagnname;
-    const rga = user?.rga || currentMGA;
-    const legacy = user?.legacy || currentMGA;
-    const tree = user?.tree || currentMGA;
-
+    
     const zeroData = {
       External_Sets: 0,
       External_Shows: 0,
@@ -154,9 +182,9 @@ const ReportMore = ({ user, onDataUpdate }) => {
       Non_PR_Hires: 0,
       PR_Hires: 0,
       Total_Hires: 0,
-      RGA: rga,
-      Legacy: legacy,
-      Tree: tree,
+      RGA: mgaHierarchy.rga || currentMGA,
+      Legacy: mgaHierarchy.legacy || currentMGA,
+      Tree: mgaHierarchy.tree || currentMGA,
     };
 
     const isOnTime = currentWeek === 0 && countdown !== "Deadline passed";
@@ -187,9 +215,6 @@ const ReportMore = ({ user, onDataUpdate }) => {
     try {
       const currentMGA = MGA || user?.agnname || user?.lagnname;
       const userRole = user?.clname || 'MGA';
-      const RGA = user?.rga || currentMGA;
-      const Legacy = user?.legacy || currentMGA;
-      const Tree = user?.tree || currentMGA;
 
       const payload = {
         MGA: currentMGA,
@@ -197,9 +222,9 @@ const ReportMore = ({ user, onDataUpdate }) => {
         updates,
         userRole,
         on_time: onTime,
-        rga: RGA,
-        legacy: Legacy,
-        tree: Tree,
+        rga: mgaHierarchy.rga || currentMGA,
+        legacy: mgaHierarchy.legacy || currentMGA,
+        tree: mgaHierarchy.tree || currentMGA,
       };
 
       console.log("Payload being sent:", payload);
@@ -276,9 +301,9 @@ const ReportMore = ({ user, onDataUpdate }) => {
         updates: pendingUpdates,
         userRole: user?.clname,
         on_time: isOnTime,
-        rga: user?.rga || currentMGA,
-        legacy: user?.legacy || currentMGA,
-        tree: user?.tree || currentMGA,
+        rga: mgaHierarchy.rga || currentMGA,
+        legacy: mgaHierarchy.legacy || currentMGA,
+        tree: mgaHierarchy.tree || currentMGA,
       });
 
       setPendingUpdates({});
@@ -388,6 +413,9 @@ const ReportMore = ({ user, onDataUpdate }) => {
             ...prevFormData,
             MGA: userMGA,
           }));
+
+          // Fetch proper hierarchy data from MGAs table
+          await fetchMgaHierarchy(userMGA);
 
           setMgaData({
             lagnname: userMGA,

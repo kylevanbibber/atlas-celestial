@@ -16,7 +16,8 @@ const DocumentSigning = () => {
     phonePrefix: '',
     phoneLineNumber: '',
     beneficiary: '',
-    relationshipToInsured: ''
+    relationshipToInsured: '',
+    documentType: 'ariasMain' // 'ariasMain' or 'ny'
   });
 
   const [generatedUrl, setGeneratedUrl] = useState('');
@@ -79,13 +80,14 @@ const DocumentSigning = () => {
         dateOfBirth: `${formData.dateOfBirthYear}-${formData.dateOfBirthMonth}-${formData.dateOfBirthDay}`,
         address: formData.address,
         city: formData.city,
-        state: formData.state,
+        state: formData.documentType === 'ny' ? 'NY' : formData.state,
         zip: formData.zip,
         phoneNumber: `${formData.phoneAreaCode}${formData.phonePrefix}${formData.phoneLineNumber}`,
         beneficiary: formData.beneficiary,
         relationshipToInsured: formData.relationshipToInsured,
         agentEmail: agentEmail,
         agentName: agentName,
+        documentType: formData.documentType,
         issuedAt: new Date().toISOString()
       };
 
@@ -107,9 +109,50 @@ const DocumentSigning = () => {
 
   return (
     <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
-      <h2 style={{ marginBottom: '2rem', color: '#333' }}>AD&D Gift Certificate</h2>
+      <h2 style={{ marginBottom: '2rem', color: '#333' }}>AD&D Signing</h2>
       
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {/* Document Type Selection */}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+     
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem' }}>
+              <input
+                type="radio"
+                value="ariasMain"
+                checked={formData.documentType === 'ariasMain'}
+                onChange={e => {
+                  const newDocType = e.target.value;
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    documentType: newDocType,
+                    state: newDocType === 'ariasMain' && prev.state === 'NY' ? '' : prev.state
+                  }));
+                }}
+                style={{ transform: 'scale(1.2)' }}
+              />
+              Arias Main 
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem' }}>
+              <input
+                type="radio"
+                value="ny"
+                checked={formData.documentType === 'ny'}
+                onChange={e => {
+                  const newDocType = e.target.value;
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    documentType: newDocType,
+                    state: newDocType === 'ny' ? 'NY' : prev.state
+                  }));
+                }}
+                style={{ transform: 'scale(1.2)' }}
+              />
+              New York 
+            </label>
+          </div>
+        </div>
+
         {/* Client Name */}
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <label htmlFor="clientName" style={{ marginBottom: '0.5rem', fontWeight: 'bold' }}>
@@ -229,15 +272,20 @@ const DocumentSigning = () => {
             <input
               id="state"
               type="text"
-              value={formData.state}
+              value={formData.documentType === 'ny' ? 'NY' : formData.state}
               onChange={e => setFormData(prev => ({ ...prev, state: e.target.value }))}
               required
               maxLength={2}
+              disabled={formData.documentType === 'ny'}
+              readOnly={formData.documentType === 'ny'}
               style={{
                 padding: '0.75rem',
                 border: '1px solid #ddd',
                 borderRadius: '4px',
-                fontSize: '1rem'
+                fontSize: '1rem',
+                backgroundColor: formData.documentType === 'ny' ? '#f8f9fa' : '#fff',
+                color: formData.documentType === 'ny' ? '#6c757d' : '#000',
+                cursor: formData.documentType === 'ny' ? 'not-allowed' : 'text'
               }}
             />
           </div>

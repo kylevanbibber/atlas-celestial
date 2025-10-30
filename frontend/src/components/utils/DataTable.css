@@ -1,3 +1,6 @@
+.expanded-parent-row {
+	background-color: rgba(0, 123, 255, 0.06); /* subtle highlight */
+}
 .data-table {
     width: 100%;
     display: block;
@@ -31,8 +34,31 @@
   .table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 800px;
+    min-width: max(800px, fit-content);
     table-layout: fixed;
+  }
+
+  /* Allow table to be wider than container for horizontal scrolling */
+  .table.table-overflow {
+    width: max-content;
+    table-layout: auto;
+  }
+
+  /* On desktop screens, allow overflow but try to utilize available width */
+  @media (min-width: 1024px) {
+    .table.table-overflow {
+      width: max-content; /* Allow table to be wider than container if needed */
+      min-width: 100%; /* Try to fill container width when possible */
+      table-layout: auto; /* Auto-sizing allows natural column distribution */
+    }
+    
+    /* On desktop, auto-width columns get reasonable space without dominating */
+    .table.table-overflow th.auto-width-column,
+    .table.table-overflow td.auto-width-column {
+      width: auto; /* Natural sizing based on content */
+      min-width: 150px; /* Minimum for readability */
+      max-width: 250px; /* Cap to prevent dominance */
+    }
   }
   th, td {
     border: 1px solid var(--border-color);
@@ -42,7 +68,21 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  
+
+  /* Allow name columns to auto-size to content */
+  th.auto-width-column, 
+  td.auto-width-column {
+    width: max-content;
+    min-width: 120px; /* Minimum width for readability */
+    max-width: 300px; /* Maximum width to prevent excessive expansion */
+  }
+
+  /* For overflow tables, auto-width columns work naturally with table-layout: auto */
+  .table.table-overflow th.auto-width-column,
+  .table.table-overflow td.auto-width-column {
+    width: auto; /* Let table-layout: auto handle the sizing */
+  }
+
   .table th:first-child, .table td:first-child {
     border-left: none;
     border-right: none;
@@ -88,6 +128,10 @@
   
   .table .editing-row {
     background-color: rgba(255, 240, 180, 0.5);
+  }
+  
+  .table .row-stale-esid {
+    background-color: rgba(255, 0, 0, 0.08) !important;
   }
   
   .table input {
@@ -299,6 +343,88 @@
   color: var(--text-primary);
   font-weight: 500;
   white-space: nowrap;
+}
+
+/* Banded Row Styles (Zebra Striping) */
+/* Enables alternating row colors for better readability in wide tables */
+.banded-row-even {
+  background-color: var(--bg-primary, #ffffff);
+}
+
+.banded-row-odd {
+  background-color: var(--bg-secondary, #f8f9fa);
+}
+
+/* Hover states for banded rows */
+.banded-row-even:hover,
+.banded-row-odd:hover {
+  background-color: var(--bg-hover, #e9ecef) !important;
+}
+
+/* Column Group Visual Separation */
+/* Creates visual separation between daily/weekly column groups */
+.group-first-column {
+  border-left: 3px solid var(--border-secondary, #dee2e6) !important;
+}
+
+.day-separator {
+  border-left: 2px solid var(--border-accent, #6c757d) !important;
+}
+
+/* Header styling for column groups */
+.column-group-weekly {
+  background-color: var(--header-bg-weekly, #e3f2fd) !important;
+}
+
+.column-group-daily {
+  background-color: var(--header-bg-daily, #f3e5f5) !important;
+}
+
+.column-group-period {
+  background-color: var(--header-bg-period, #e8f5e8) !important;
+}
+
+/* Weekly column groups for monthly view */
+.column-group-week {
+  background-color: var(--header-bg-week, #fff3e0) !important;
+}
+
+.column-group-week1 {
+  background-color: var(--header-bg-week1, #fff8e1) !important;
+}
+
+.column-group-week2 {
+  background-color: var(--header-bg-week2, #f1f8e9) !important;
+}
+
+.column-group-week3 {
+  background-color: var(--header-bg-week3, #e8f5e8) !important;
+}
+
+.column-group-week4 {
+  background-color: var(--header-bg-week4, #e0f2f1) !important;
+}
+
+.column-group-week5 {
+  background-color: var(--header-bg-week5, #e1f5fe) !important;
+}
+
+/* Individual day group header colors for better distinction */
+th.column-group-monday { background-color: var(--day-monday, #fff3e0) !important; }
+th.column-group-tuesday { background-color: var(--day-tuesday, #f1f8e9) !important; }
+th.column-group-wednesday { background-color: var(--day-wednesday, #e8f5e8) !important; }
+th.column-group-thursday { background-color: var(--day-thursday, #e0f2f1) !important; }
+th.column-group-friday { background-color: var(--day-friday, #e1f5fe) !important; }
+th.column-group-saturday { background-color: var(--day-saturday, #fce4ec) !important; }
+th.column-group-sunday { background-color: var(--day-sunday, #fff8e1) !important; }
+
+/* Column separations within table body */
+td.group-first-column {
+  border-left: 3px solid var(--border-secondary, #dee2e6) !important;
+}
+
+td.day-separator {
+  border-left: 2px solid var(--border-accent, #6c757d) !important;
 }
 
 /* No Data Styles */

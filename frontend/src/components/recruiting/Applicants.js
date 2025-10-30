@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FaRegCopy, FaCheck, FaEllipsisV } from 'react-icons/fa';
+import { FaRegCopy, FaCheck, FaEllipsisV, FaDownload, FaQrcode, FaTrash, FaVideo } from 'react-icons/fa';
+import QRCode from 'qrcode';
 import Modal from '../utils/Modal';
 import RightDetails from '../utils/RightDetails';
 import ContextMenu from '../utils/ContextMenu';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api';
+import toast from 'react-hot-toast';
 import './Applicants.css';
 
 const Applicants = () => {
@@ -19,9 +21,22 @@ const Applicants = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [qrCopied, setQrCopied] = useState(false);
   const [showTeam, setShowTeam] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [activeTab, setActiveTab] = useState('applicants');
   const [teamUserIds, setTeamUserIds] = useState([]);
+  
+  // Custom videos state
+  const [customVideos, setCustomVideos] = useState([]);
+  const [availableTeams, setAvailableTeams] = useState([]);
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [showCustomizeForm, setShowCustomizeForm] = useState(false);
+  const [videoForm, setVideoForm] = useState({
+    target_mga: '',
+    video_url: '',
+    video_type: 'youtube'
+  });
   
   // Modal states
   const [finalTimeModalVisible, setFinalTimeModalVisible] = useState(false);
@@ -48,7 +63,9 @@ const Applicants = () => {
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [contextMenuApplicant, setContextMenuApplicant] = useState(null);
 
-  const affiliateLink = `https://ariaslife.com/careers/?hm=${userId}`;
+  const affiliateLink = userId === "26911" 
+    ? `https://agents.ariaslife.com/careers`
+    : `https://agents.ariaslife.com/careers?hm=${userId}`;
 
   // Fetch team hierarchy data for managers
   const fetchTeamData = async () => {
@@ -83,6 +100,11 @@ const Applicants = () => {
   useEffect(() => {
     loadApplicants();
   }, [showTeam, userId, teamUserIds]);
+
+  // Generate QR code on component mount
+  useEffect(() => {
+    generateQRCode();
+  }, [userId]);
 
   const loadApplicants = async () => {
     try {
@@ -156,6 +178,57 @@ const Applicants = () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 4000);
     });
+  };
+
+  // QR Code functions
+  const generateQRCode = async () => {
+    try {
+      const qrUrl = await QRCode.toDataURL(affiliateLink, {
+        width: 200,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+      setQrCodeUrl(qrUrl);
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+    }
+  };
+
+  const handleCopyQR = async () => {
+    try {
+      // Convert data URL to blob
+      const response = await fetch(qrCodeUrl);
+      const blob = await response.blob();
+      
+      // Copy to clipboard
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob })
+      ]);
+      
+      setQrCopied(true);
+      setTimeout(() => setQrCopied(false), 4000);
+    } catch (error) {
+      console.error('Error copying QR code:', error);
+      // Fallback: copy the affiliate link text instead
+      navigator.clipboard.writeText(affiliateLink).then(() => {
+        setQrCopied(true);
+        setTimeout(() => setQrCopied(false), 4000);
+      });
+    }
+  };
+
+  const handleDownloadQR = () => {
+    if (!qrCodeUrl) return;
+    
+    const link = document.createElement('a');
+    link.download = `recruiting-qr-code-${userId}.png`;
+    link.href = qrCodeUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleToggleView = () => {
@@ -257,9 +330,10 @@ const Applicants = () => {
         course,
         expected_complete_date: expectedCompleteDate
       });
-      await handleAdvanceStep(selectedApplicant.id, "Pre-Lic");
+      // Backend now automatically sets step to "Licensing" and completes checklist items
       setHiredModalVisible(false);
       resetHiredForm();
+      loadApplicants(); // Reload to show updated data
     } catch (error) {
       console.error('Error saving hired info:', error);
       setError('Failed to save hired information');
@@ -410,6 +484,109 @@ const Applicants = () => {
     </div>
   );
 
+  // Custom video management functions
+  const loadCustomVideos = async () => {
+    if (!isManager) return;
+    
+    try {
+      setVideoLoading(true);
+      const [videosRes, teamsRes] = await Promise.all([
+        api.get('/careers-videos'),
+        api.get('/careers-videos/available-teams')
+      ]);
+      
+      if (videosRes.data.success) {
+        setCustomVideos(videosRes.data.videos || []);
+      }
+      
+      if (teamsRes.data.success) {
+        setAvailableTeams(teamsRes.data.teams || []);
+      }
+    } catch (error) {
+      console.error('Error loading custom videos:', error);
+      toast.error('Failed to load custom videos');
+    } finally {
+      setVideoLoading(false);
+    }
+  };
+
+  const handleVideoSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!videoForm.video_url) {
+      toast.error('Please enter a video URL');
+      return;
+    }
+    
+    // Validate URL is YouTube or Vimeo
+    const isYouTube = videoForm.video_url.includes('youtube.com') || videoForm.video_url.includes('youtu.be');
+    const isVimeo = videoForm.video_url.includes('vimeo.com');
+    
+    if (!isYouTube && !isVimeo) {
+      toast.error('Please enter a valid YouTube or Vimeo URL');
+      return;
+    }
+    
+    try {
+      setVideoLoading(true);
+      const response = await api.post('/careers-videos', {
+        target_mga: videoForm.target_mga || null,
+        video_url: videoForm.video_url,
+        video_type: isYouTube ? 'youtube' : 'vimeo'
+      });
+      
+      if (response.data.success) {
+        toast.success(response.data.action === 'created' ? 'Video added successfully!' : 'Video updated successfully!');
+        setVideoForm({ target_mga: '', video_url: '', video_type: 'youtube' });
+        loadCustomVideos();
+      }
+    } catch (error) {
+      console.error('Error saving video:', error);
+      toast.error(error.response?.data?.error || 'Failed to save video');
+    } finally {
+      setVideoLoading(false);
+    }
+  };
+
+  const handleDeleteVideo = async (videoId) => {
+    if (!window.confirm('Are you sure you want to delete this custom video?')) {
+      return;
+    }
+    
+    try {
+      setVideoLoading(true);
+      const response = await api.delete(`/careers-videos/${videoId}`);
+      
+      if (response.data.success) {
+        toast.success('Video deleted successfully!');
+        loadCustomVideos();
+      }
+    } catch (error) {
+      console.error('Error deleting video:', error);
+      toast.error('Failed to delete video');
+    } finally {
+      setVideoLoading(false);
+    }
+  };
+
+  const extractVideoId = (url, type) => {
+    if (type === 'youtube') {
+      const match = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+      return match ? match[1] : null;
+    } else if (type === 'vimeo') {
+      const match = url.match(/vimeo\.com\/(?:.*\/)?(\d+)/);
+      return match ? match[1] : null;
+    }
+    return null;
+  };
+
+  // Load custom videos for managers on mount
+  useEffect(() => {
+    if (isManager) {
+      loadCustomVideos();
+    }
+  }, [isManager]);
+
   if (loading) {
     return <div className="padded-content">Loading applicants...</div>;
   }
@@ -431,11 +608,240 @@ const Applicants = () => {
             {copied ? <FaCheck color="green" /> : <FaRegCopy />}
           </span>
         </p>
-        <br />
-        <a href={affiliateLink} target="_blank" rel="noopener noreferrer">
+        <a href={affiliateLink} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginBottom: '10px' }}>
           {affiliateLink}
         </a>
+        <p style={{ fontSize: '14px', display: 'inline-flex', alignItems: 'center', marginBottom: '10px' }}>
+          <FaQrcode style={{ marginRight: '8px' }} /> QR Code
+        </p>
+        <div style={{ display: 'flex', gap: '15px', alignItems: 'center', justifyContent: 'center', marginBottom: '15px' }}>
+          <button 
+            onClick={handleCopyQR}
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              cursor: 'pointer',
+              fontSize: '14px',
+              color: qrCopied ? 'green' : '#666',
+              padding: '5px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}
+            title="Copy QR Code"
+          >
+            {qrCopied ? <FaCheck /> : <FaRegCopy />}
+            {qrCopied ? 'Copied!' : 'Copy QR'}
+          </button>
+          <button 
+            onClick={handleDownloadQR}
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              cursor: 'pointer',
+              fontSize: '14px',
+              color: '#666',
+              padding: '5px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}
+            title="Download QR Code"
+          >
+            <FaDownload />
+            Download QR
+          </button>
+        </div>
+        
+        {/* Customize Form Button for Managers */}
+        {isManager && (
+          <div style={{ textAlign: 'center', marginTop: '15px' }}>
+            <button
+              onClick={() => setShowCustomizeForm(!showCustomizeForm)}
+              className="primary-button"
+              style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                margin: '0 auto'
+              }}
+            >
+              <FaVideo />
+              {showCustomizeForm ? 'Close' : 'Customize Form'}
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Custom Video Form - Shows when button is clicked */}
+      {showCustomizeForm && isManager && (
+        <div style={{ marginBottom: '30px' }}>
+          <div style={{ 
+            background: 'var(--card-bg)', 
+            padding: '20px', 
+            borderRadius: '8px', 
+            border: '1px solid var(--border-color)'
+          }}>
+            <h3>Custom Careers Page Video</h3>
+            <p style={{ marginBottom: '20px', color: 'var(--text-secondary)' }}>
+              Set a custom YouTube or Vimeo video to display on your careers page. 
+              When someone visits your affiliate link, they'll see this video instead of the default.
+            </p>
+
+            {/* Video Form */}
+            <div style={{ 
+              background: 'var(--card-bg)', 
+              padding: '20px', 
+              borderRadius: '8px', 
+              marginBottom: '30px',
+              border: '1px solid var(--border-color)'
+            }}>
+              <h4>Add/Update Custom Video</h4>
+              <form onSubmit={handleVideoSubmit}>
+                {availableTeams.length > 0 && (
+                  <div className="form-group" style={{ marginBottom: '15px' }}>
+                    <label>Apply To:</label>
+                    <select
+                      value={videoForm.target_mga}
+                      onChange={(e) => setVideoForm({ ...videoForm, target_mga: e.target.value })}
+                      className="settings-row select"
+                      style={{ width: '100%' }}
+                      required
+                    >
+                      <option value="">Select Targeting Level...</option>
+                      {availableTeams.map((team, index) => (
+                        <option key={`${team.value}-${index}`} value={team.value}>
+                          {team.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="form-group" style={{ marginBottom: '15px' }}>
+                  <label>Video URL:</label>
+                  <input
+                    type="url"
+                    value={videoForm.video_url}
+                    onChange={(e) => setVideoForm({ ...videoForm, video_url: e.target.value })}
+                    placeholder="https://www.youtube.com/watch?v=... or https://vimeo.com/..."
+                    className="settings-row input"
+                    style={{ width: '100%' }}
+                    required
+                  />
+                  <small style={{ color: 'var(--text-secondary)', marginTop: '5px', display: 'block' }}>
+                    Enter a YouTube or Vimeo URL
+                  </small>
+                </div>
+
+                <button 
+                  type="submit" 
+                  className="primary-button"
+                  disabled={videoLoading}
+                >
+                  {videoLoading ? 'Saving...' : 'Save Video'}
+                </button>
+              </form>
+            </div>
+
+            {/* Current Videos List */}
+            <div>
+              <h4>Your Custom Videos</h4>
+              {videoLoading && <p>Loading videos...</p>}
+              
+              {!videoLoading && customVideos.length === 0 && (
+                <p style={{ color: 'var(--text-secondary)' }}>
+                  No custom videos configured yet. Add one above to get started!
+                </p>
+              )}
+
+              {!videoLoading && customVideos.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {customVideos.map(video => (
+                    <div 
+                      key={video.id} 
+                      style={{ 
+                        background: 'var(--card-bg)', 
+                        padding: '20px', 
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-color)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
+                        <div>
+                          <h5 style={{ margin: '0 0 5px 0' }}>
+                            {video.target_mga 
+                              ? (video.target_mga.startsWith('RGA:') 
+                                  ? `RGA`
+                                  : video.target_mga.startsWith('TREE:')
+                                  ? `Tree`
+                                  : video.target_mga.startsWith('MGA:')
+                                  ? `MGA`
+                                  : video.target_mga)
+                              : 'Default'}
+                          </h5>
+                          <p style={{ margin: '0', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                            {video.video_type === 'youtube' ? 'YouTube' : 'Vimeo'} Video
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteVideo(video.id)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#e74c3c',
+                            cursor: 'pointer',
+                            padding: '5px 10px',
+                            fontSize: '14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}
+                          title="Delete video"
+                        >
+                          <FaTrash /> Delete
+                        </button>
+                      </div>
+
+                      {/* Video Preview */}
+                      <div style={{ marginTop: '10px' }}>
+                        {video.video_type === 'youtube' && extractVideoId(video.video_url, 'youtube') && (
+                          <iframe
+                            width="100%"
+                            height="315"
+                            src={`https://www.youtube.com/embed/${extractVideoId(video.video_url, 'youtube')}`}
+                            frameBorder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            title="Video preview"
+                            style={{ borderRadius: '8px' }}
+                          />
+                        )}
+                        {video.video_type === 'vimeo' && extractVideoId(video.video_url, 'vimeo') && (
+                          <iframe
+                            src={`https://player.vimeo.com/video/${extractVideoId(video.video_url, 'vimeo')}`}
+                            width="100%"
+                            height="315"
+                            frameBorder="0"
+                            allow="autoplay; fullscreen; picture-in-picture"
+                            allowFullScreen
+                            title="Video preview"
+                            style={{ borderRadius: '8px' }}
+                          />
+                        )}
+                      </div>
+
+                      <p style={{ marginTop: '10px', fontSize: '12px', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>
+                        URL: {video.video_url}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toggle View - Only show for managers/admins */}
       {(isManager || isAdmin) && (
@@ -488,7 +894,7 @@ const Applicants = () => {
           className={`settings-tab ${activeTab === 'hired' ? 'active' : ''}`} 
           onClick={() => setActiveTab('hired')}
         >
-          Hired ({getApplicantsByStep('Pre-Lic').length})
+          Hired ({getApplicantsByStep('Licensing').length})
         </button>
       </div>
 
@@ -531,8 +937,8 @@ const Applicants = () => {
         
         {activeTab === 'hired' && (
           <div>
-            <h3>Hired</h3>
-            {renderApplicantTable(getApplicantsByStep('Pre-Lic'), false)}
+            <h3>Hired - Licensing</h3>
+            {renderApplicantTable(getApplicantsByStep('Licensing'), false)}
           </div>
         )}
       </div>

@@ -51,6 +51,168 @@
     padding: 0;
 }
 
+/* New Controls Row */
+.controls-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.tracking-controls {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.period-toggle,
+.net-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.toggle-label {
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.toggle-btn {
+    padding: 0.4rem 0.8rem;
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.toggle-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--text-primary);
+}
+
+.toggle-btn.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
+.toggle-btn.enabled {
+    background: var(--success-color);
+    border-color: var(--success-color);
+}
+
+.toggle-btn.disabled {
+    background: var(--danger-color);
+    border-color: var(--danger-color);
+    color: white;
+}
+
+.net-disabled-note {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.9rem;
+}
+
+/* Threshold overrides */
+.threshold-overrides {
+    display: flex;
+    gap: 0.75rem;
+    align-items: end;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.override-control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.override-control label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.override-control input[type="number"] {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    width: 140px;
+}
+
+.clear-overrides-btn {
+    padding: 0.45rem 0.8rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.clear-overrides-btn:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+/* Export Controls */
+.export-controls {
+    display: flex;
+    align-items: center;
+}
+
+.export-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: 2px solid #4CAF50;
+    border-radius: 6px;
+    background: #4CAF50;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.export-btn:hover:not(:disabled) {
+    background: #45a049;
+    border-color: #45a049;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.export-btn:disabled {
+    background: #ccc;
+    border-color: #ccc;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.export-btn.exporting {
+    background: #ff9800;
+    border-color: #ff9800;
+}
+
+.export-btn .spinning {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
 .agent-type-tabs {
     display: flex;
     gap: 0.5rem;
@@ -190,16 +352,7 @@
     font-size: 1.1rem;
 }
 
-.status-badge {
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: white;
-    text-align: center;
-    display: inline-block;
-    min-width: 100px;
-}
+/* status-badge base styles moved to App.css - component-specific overrides can remain here */
 
 .error-message {
     text-align: center;

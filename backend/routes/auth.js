@@ -44,7 +44,7 @@ router.get("/activeusers/:id", async (req, res) => {
     
     res.json(result[0]);
   } catch (error) {
-    console.error("Error fetching user:", error);
+    console.error('Error fetching user data:', error);
     res.status(500).json({ success: false, message: "Error fetching user data" });
   }
 });
@@ -73,8 +73,148 @@ router.get("/activeusers", async (req, res) => {
     const results = await query(queryText, params);
     res.json(results);
   } catch (error) {
-    console.error("Error fetching active users:", error);
+    console.error('Error fetching active users:', error);
     res.status(500).json({ success: false, message: "Error fetching active users" });
+  }
+});
+
+/* ----------------------
+   Username → MGA helper (public)
+------------------------- */
+router.get('/username-mgas', async (req, res) => {
+  try {
+    const rawUsername = String(req.query.username || '').trim().toLowerCase();
+    if (!rawUsername) {
+      return res.status(400).json({ success: false, message: 'username is required' });
+    }
+
+    // Pull minimal fields to derive usernames client-side
+    const rows = await query(
+      `SELECT lagnname, mga FROM activeusers WHERE Active = 'y'`
+    );
+
+    const computeUsername = (lagnname) => {
+      if (!lagnname) return null;
+      const parts = String(lagnname).trim().split(/\s+/);
+      const lastName = (parts[0] || '').toLowerCase();
+      const firstInitial = (parts[1] ? parts[1][0] : (parts[0] ? parts[0][0] : '')).toLowerCase();
+      return (firstInitial + lastName) || null;
+    };
+
+    const matching = rows.filter(r => computeUsername(r.lagnname) === rawUsername);
+    const mgaOptions = Array.from(new Set(matching.map(r => r.mga).filter(Boolean)));
+
+    return res.json({ success: true, username: rawUsername, mgaOptions });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Error searching username options' });
+  }
+});
+
+/* ----------------------
+   Password Assist: send credentials to MGA email (public)
+------------------------- */
+router.post('/password-assist/send-to-mga', async (req, res) => {
+  try {
+    const { username, mga } = req.body || {};
+    if (!username || !mga) {
+      return res.status(400).json({ success: false, message: 'username and mga are required' });
+    }
+
+    // Find user by derived username and MGA
+    const users = await query(
+      `SELECT id, lagnname, agtnum, email, password, mga FROM activeusers WHERE Active = 'y'`
+    );
+
+    const computeUsername = (lagnname) => {
+      if (!lagnname) return null;
+      const parts = String(lagnname).trim().split(/\s+/);
+      const lastName = (parts[0] || '').toLowerCase();
+      const firstInitial = (parts[1] ? parts[1][0] : (parts[0] ? parts[0][0] : '')).toLowerCase();
+      return (firstInitial + lastName) || null;
+    };
+
+    const target = users.find(u => (computeUsername(u.lagnname) === String(username).trim().toLowerCase()) && String(u.mga || '') === mga);
+    if (!target) {
+      return res.status(404).json({ success: false, message: 'No user found for that username and MGA' });
+    }
+
+    // Find MGA email (prefer usersinfo, fallback to activeusers)
+    const mgaRow = await query(
+      `SELECT au.lagnname, COALESCE(ui.email, au.email, '') AS email
+       FROM activeusers au
+       LEFT JOIN usersinfo ui ON ui.lagnname = au.lagnname AND ui.esid = au.esid
+       WHERE au.lagnname = ? LIMIT 1`,
+      [mga]
+    );
+    const destinationEmail = (mgaRow && mgaRow[0] && mgaRow[0].email) ? mgaRow[0].email : '';
+    if (!destinationEmail) {
+      return res.status(400).json({ success: false, message: 'MGA does not have an email on file' });
+    }
+
+    // Reset password to default if needed
+    const currentPassword = String(target.password || '').trim();
+    if (currentPassword !== 'default') {
+      await query(`UPDATE activeusers SET password = 'default' WHERE id = ?`, [target.id]);
+    }
+
+    // Build email
+    const subject = `Arias Life – Account Details for ${target.lagnname}`;
+    const derivedUsername = computeUsername(target.lagnname);
+    const agtNumberPassword = String(target.agtnum || '').trim();
+    const frontendUrl = process.env.FRONTEND_URL || 'https://agents.ariaslife.com';
+    const loginUrl = `${frontendUrl.replace(/\/$/, '')}/login`;
+
+    const html = `
+      <div style="background:#f6f9fc;padding:32px;font-family:Arial,Helvetica,sans-serif;color:#0f172a">
+        <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+          <div style="background:linear-gradient(135deg,#e2e8f0,#93c5fd);padding:24px 20px;">
+            <h2 style="margin:0;font-size:20px;color:#0f172a">Account Assistance Request</h2>
+            <p style="margin:8px 0 0 0;font-size:13px;color:#334155">The following user requested help with their login.</p>
+          </div>
+          <div style="padding:18px 20px 8px 20px;">
+            <div style="border:1px solid #e5e7eb;border-radius:10px;padding:14px;background:#fafafa">
+              <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:8px">
+                <span style="font-weight:600;color:#0f172a">Agent</span>
+                <span style="color:#0f172a">${target.lagnname}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:8px">
+                <span style="font-weight:600;color:#0f172a">Username</span>
+                <span style="color:#0f172a">${derivedUsername}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;gap:8px">
+                <span style="font-weight:600;color:#0f172a">Password</span>
+                <span style="color:#0f172a">${agtNumberPassword || '(not set)'} </span>
+              </div>
+            </div>
+            <p style="margin:14px 0 0 0;font-size:13px;color:#334155">You can share these credentials with the agent and direct them to log in.</p>
+            <div style="margin:16px 0 8px 0">
+              <a href="${loginUrl}" style="display:inline-block;background:#0b5a8f;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600">Open Login</a>
+            </div>
+          </div>
+          <div style="padding:0 20px 18px 20px;color:#64748b;font-size:12px">
+            <p style="margin:0">This message was sent to your MGA email because an agent under your hierarchy requested login help.</p>
+          </div>
+        </div>
+      </div>`;
+
+    const transporter = require('nodemailer').createTransport({
+      host: 'mail.ariaslife.com',
+      port: 465,
+      secure: true,
+      auth: { user: 'noreply@ariaslife.com', pass: 'Ariaslife123!' },
+      tls: { rejectUnauthorized: false }
+    });
+
+    await transporter.sendMail({
+      from: 'noreply@ariaslife.com',
+      to: destinationEmail,
+      subject,
+      html
+    });
+
+    return res.json({ success: true, message: `Account details sent to MGA ${mga}` });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to send details to MGA' });
   }
 });
 
@@ -85,12 +225,34 @@ router.post("/toggleActive", verifyToken, async (req, res) => {
   try {
     const { userId, currentStatus } = req.body;
     
+    console.log('🔄 toggleActive called with:', { userId, currentStatus });
+    
     if (!userId) {
+      console.log('❌ No userId provided');
       return res.status(400).json({ success: false, message: "User ID is required" });
     }
     
+    // First, let's get the user's ID from activeusers table to log it
+    const userQuery = await query(
+      'SELECT id, lagnname, managerActive FROM activeusers WHERE lagnname = ?',
+      [userId]
+    );
+    
+    if (userQuery.length === 0) {
+      console.log('❌ User not found in activeusers table:', userId);
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    
+    const user = userQuery[0];
+    console.log('👤 Found user:', { 
+      id: user.id, 
+      lagnname: user.lagnname, 
+      currentManagerActive: user.managerActive 
+    });
+    
     // Toggle the managerActive status (from 'y' to 'n' or 'n' to 'y')
     const newStatus = currentStatus && currentStatus.toLowerCase() === 'y' ? 'n' : 'y';
+    console.log('🔄 Changing managerActive from', user.managerActive, 'to', newStatus);
     
     // Update the user's managerActive status
     const result = await query(
@@ -98,9 +260,14 @@ router.post("/toggleActive", verifyToken, async (req, res) => {
       [newStatus, userId]
     );
     
+    console.log('📝 Update result:', { affectedRows: result.affectedRows });
+    
     if (result.affectedRows === 0) {
+      console.log('❌ No rows affected in update');
       return res.status(404).json({ success: false, message: "User not found" });
     }
+    
+    console.log('✅ Successfully updated managerActive for user ID:', user.id, 'to', newStatus);
     
     res.json({ 
       success: true, 
@@ -108,8 +275,65 @@ router.post("/toggleActive", verifyToken, async (req, res) => {
       newStatus 
     });
   } catch (error) {
-    console.error("Error toggling manager active status:", error);
+    console.error('❌ Error in toggleActive:', error);
     res.status(500).json({ success: false, message: "Error updating active status" });
+  }
+});
+
+// Set user managerActive to inactive (n) - for context menu action
+router.post("/setManagerInactive", verifyToken, async (req, res) => {
+  try {
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+    
+    console.log('🔄 Setting managerActive to inactive for user ID:', userId);
+    
+    // Get user info first
+    const userQuery = await query(
+      'SELECT id, lagnname, managerActive FROM activeusers WHERE id = ?',
+      [userId]
+    );
+    
+    if (userQuery.length === 0) {
+      console.log('❌ User not found in activeusers table with ID:', userId);
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    
+    const user = userQuery[0];
+    console.log('👤 Found user:', { 
+      id: user.id, 
+      lagnname: user.lagnname, 
+      currentManagerActive: user.managerActive 
+    });
+    
+    // Set managerActive to 'n' (inactive)
+    const result = await query(
+      'UPDATE activeusers SET managerActive = ? WHERE id = ?',
+      ['n', userId]
+    );
+    
+    console.log('📝 Update result:', { affectedRows: result.affectedRows });
+    
+    if (result.affectedRows === 0) {
+      console.log('❌ No rows affected in update');
+      return res.status(404).json({ success: false, message: "User not found or no changes made" });
+    }
+    
+    console.log('✅ Successfully set managerActive to inactive for user:', user.lagnname);
+    
+    res.json({ 
+      success: true, 
+      message: `${user.lagnname} has been set to manager inactive`,
+      userId: user.id,
+      lagnname: user.lagnname,
+      newStatus: 'n'
+    });
+  } catch (error) {
+    console.error('❌ Error setting manager inactive:', error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 });
 
@@ -156,7 +380,7 @@ router.get("/profile", verifyToken, async (req, res) => {
       teamRole: user[0].teamRole || ''
     });
   } catch (error) {
-    console.error("Error fetching user profile:", error);
+    console.error('Error fetching profile data:', error);
     res.status(500).json({ success: false, message: "Error fetching profile data" });
   }
 });
@@ -164,11 +388,61 @@ router.get("/profile", verifyToken, async (req, res) => {
 /* ----------------------
    Login Route
 ------------------------- */
+/* ----------------------
+   Validate Token Route (for presentation system)
+------------------------- */
+router.post("/validate-token", async (req, res) => {
+  const { userToken } = req.body;
+
+  if (!userToken) {
+    return res.status(400).json({ success: false, message: 'Token is required.' });
+  }
+
+  try {
+    // Verify JWT token
+    const decoded = jwt.verify(userToken, process.env.JWT_SECRET);
+    const userId = decoded.userId || decoded.id; // Support both old and new token formats
+
+    // Check if token exists in database and is valid
+    const tokenCheck = await query(
+      'SELECT * FROM user_tokens WHERE userToken = ? AND valid = "y"',
+      [userToken]
+    );
+
+    if (tokenCheck.length === 0) {
+      return res.status(401).json({ success: false, message: 'Token not found or invalid.' });
+    }
+
+    // Token is valid
+    return res.json({ 
+      success: true, 
+      message: 'Token is valid',
+      userId: userId 
+    });
+
+  } catch (error) {
+    console.error('Token validation error:', error);
+    
+    // Check if it's a JWT error (expired, malformed, etc.)
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ success: false, message: 'Invalid token.' });
+    }
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ success: false, message: 'Token has expired.' });
+    }
+    
+    return res.status(401).json({ success: false, message: 'Token is no longer valid.' });
+  }
+});
+
+/* ----------------------
+   New Login Route
+------------------------- */
 router.post("/newlogin", async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    console.log('[Auth] Starting login process for username:', username);
+
 
     // Check both tables simultaneously
     const [regularUsers, adminUsers] = await Promise.all([
@@ -178,11 +452,7 @@ router.post("/newlogin", async (req, res) => {
       query('SELECT * FROM admin_logins WHERE Username = ?', [username])
     ]);
 
-    console.log('[Auth] Database query results:', {
-      regularUsersFound: regularUsers.length,
-      adminUsersFound: adminUsers.length,
-      username: username
-    });
+
 
     // Check regular users first
     const matchingRegularUsers = regularUsers.filter(user => {
@@ -193,14 +463,11 @@ router.post("/newlogin", async (req, res) => {
       return constructedUsername === username.toLowerCase();
     });
 
-    console.log('[Auth] Regular user matching results:', {
-      totalRegularUsers: regularUsers.length,
-      matchingRegularUsers: matchingRegularUsers.length
-    });
+
 
     // Try to authenticate as regular user first
     if (matchingRegularUsers.length > 0) {
-      console.log('[Auth] Found matching regular users, attempting authentication');
+
       
       const validRegularUser = await Promise.all(
         matchingRegularUsers.map(async (user) => {
@@ -214,12 +481,7 @@ router.post("/newlogin", async (req, res) => {
       ).then(users => users.find(user => user !== null));
 
       if (validRegularUser) {
-        console.log('[Auth] ✅ Regular user authentication successful:', {
-          userId: validRegularUser.id,
-          name: validRegularUser.lagnname,
-          role: validRegularUser.Role,
-          clname: validRegularUser.clname
-        });
+
 
         if (parseInt(validRegularUser.redeemed) === 1) {
           // Log successful login
@@ -232,9 +494,9 @@ router.post("/newlogin", async (req, res) => {
                VALUES (?, ?, UTC_TIMESTAMP(), ?, ?)`,
               [validRegularUser.id, validRegularUser.lagnname, clientIp, userAgent]
             );
-            console.log('[Auth] Login logged for user:', validRegularUser.lagnname);
+
           } catch (logError) {
-            console.error('[Auth] Failed to log login:', logError);
+
             // Don't fail the login if logging fails
           }
 
@@ -312,7 +574,7 @@ router.post("/newlogin", async (req, res) => {
           }
         } else {
           // Redirect to account setup if not redeemed
-          console.log('[Auth] ⚠️ Regular user needs account setup');
+
           return res.status(200).send({
             success: true,
             message: "Please complete account setup",
@@ -333,12 +595,12 @@ router.post("/newlogin", async (req, res) => {
 
     // If no valid regular user found, try admin authentication
     if (adminUsers.length > 0) {
-      console.log('[Auth] Found admin user, attempting admin authentication');
+
       
       const admin = adminUsers[0];
       
       if (!admin.Password) {
-        console.log('[Auth] ❌ Admin authentication failed: No password set');
+
         return res.status(401).send({ 
           success: false, 
           message: "Admin account is not properly configured. Please contact system administrator.",
@@ -348,22 +610,13 @@ router.post("/newlogin", async (req, res) => {
       }
 
       // Verify admin password - since passwords are stored as plain text
-      console.log('[Auth] Admin password verification:', {
-        providedPassword: password,
-        storedPassword: admin.Password,
-        passwordLength: admin.Password.length
-      });
+
       
       // Direct string comparison for plain text passwords
       const isAdminPasswordValid = (password === admin.Password);
       
       if (isAdminPasswordValid) {
-        console.log('[Auth] ✅ Admin user authentication successful:', {
-          userId: admin.id,
-          username: admin.Username,
-          adminLevel: admin.Admin_Level,
-          agency: admin.Agency
-        });
+
 
         // Log successful admin login
         try {
@@ -375,9 +628,9 @@ router.post("/newlogin", async (req, res) => {
              VALUES (?, ?, UTC_TIMESTAMP(), ?, ?)`,
             [admin.id, admin.Username, clientIp, userAgent]
           );
-          console.log('[Auth] Login logged for admin user:', admin.Username);
+
         } catch (logError) {
-          console.error('[Auth] Failed to log admin login:', logError);
+
           // Don't fail the login if logging fails
         }
 
@@ -421,7 +674,7 @@ router.post("/newlogin", async (req, res) => {
           username: admin.Username,
         });
       } else {
-        console.log('[Auth] ❌ Admin authentication failed: Invalid password');
+
         return res.status(401).send({ 
           success: false, 
           message: "Incorrect password. Please try again.",
@@ -432,7 +685,7 @@ router.post("/newlogin", async (req, res) => {
     }
 
     // If we get here, no valid user was found in either table
-    console.log('[Auth] ❌ Authentication failed: User not found in either table');
+
     return res.status(404).send({ 
       success: false, 
       message: "Username not found. Please check your credentials.",
@@ -441,7 +694,7 @@ router.post("/newlogin", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Login Error:", error);
+
     return res.status(500).send({ 
       success: false, 
       message: "An error occurred during login. Please try again.",
@@ -458,18 +711,15 @@ router.post("/adminlogin", async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    console.log('[AdminAuth] Starting admin login process for username:', username);
+
 
     // Check admin_logins table
     const adminUsers = await query('SELECT * FROM admin_logins WHERE Username = ?', [username]);
     
-    console.log('[AdminAuth] Database query results:', {
-      adminUsersFound: adminUsers.length,
-      username: username
-    });
+
 
     if (adminUsers.length === 0) {
-      console.log('[AdminAuth] ❌ Admin authentication failed: Username not found');
+
       return res.status(404).send({ 
         success: false, 
         message: "Username not found. Please check your credentials.",
@@ -480,7 +730,7 @@ router.post("/adminlogin", async (req, res) => {
     const admin = adminUsers[0];
     
     if (!admin.Password) {
-      console.log('[AdminAuth] ❌ Admin authentication failed: No password set');
+
       return res.status(401).send({ 
         success: false, 
         message: "Admin account is not properly configured. Please contact system administrator.",
@@ -489,13 +739,13 @@ router.post("/adminlogin", async (req, res) => {
     }
 
     // Verify admin password - since passwords are stored as plain text
-    console.log('[AdminAuth] Admin password verification for user:', username);
+
     
     // Direct string comparison for plain text passwords
     const isAdminPasswordValid = (password === admin.Password);
     
     if (!isAdminPasswordValid) {
-      console.log('[AdminAuth] ❌ Admin authentication failed: Invalid password');
+
       return res.status(401).send({ 
         success: false, 
         message: "Incorrect password. Please try again.",
@@ -503,13 +753,7 @@ router.post("/adminlogin", async (req, res) => {
       });
     }
 
-    console.log('[AdminAuth] ✅ Admin user authentication successful:', {
-      userId: admin.id,
-      username: admin.Username,
-      adminLevel: admin.Admin_Level,
-      agency: admin.Agency,
-      teamRole: admin.teamRole
-    });
+
 
     // Create token payload for admin user (excluding password)
     const adminTokenPayload = {
@@ -559,7 +803,7 @@ router.post("/adminlogin", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Admin Login Error:", error);
+
     return res.status(500).send({ 
       success: false, 
       message: "An error occurred during admin login. Please try again.",
@@ -609,7 +853,7 @@ router.post("/checkUserInfo", async (req, res) => {
       }
     }
   } catch (error) {
-    console.error("Database Query Error:", error);
+    console.error('Error checking user information:', error);
     return res.status(500).send({ success: false, message: "An error occurred while checking user information." });
   }
 });
@@ -628,7 +872,7 @@ router.post("/users/confirmIdentity", async (req, res) => {
       res.status(404).json({ success: false, message: "User not found." });
     }
   } catch (error) {
-    console.error("Error updating user information:", error);
+    console.error('Error updating user information:', error);
     res.status(500).json({ success: false, message: "An error occurred while updating user information." });
   }
 });
@@ -675,7 +919,7 @@ router.post("/handleUserInfo", async (req, res) => {
 
     res.json({ success: true, message: "User info updated successfully" });
   } catch (error) {
-    console.error("Error updating user info:", error);
+    console.error('Error updating user info:', error);
     res.status(500).json({ success: false, message: "An error occurred while updating user info" });
   }
 });
@@ -699,7 +943,7 @@ router.post("/confirmStartFresh", async (req, res) => {
       res.status(404).json({ success: false, message: "No matching user found for the provided lagnname and esid." });
     }
   } catch (error) {
-    console.error("Error confirming fresh start:", error);
+    console.error('Error confirming fresh start:', error);
     res.status(500).json({ success: false, message: "An error occurred while confirming fresh start." });
   }
 });
@@ -712,47 +956,237 @@ router.post("/validateToken", verifyToken, (req, res) => {
 });
 
 /* ----------------------
-   Search by User ID Route
+   User Hierarchy Route (Simplified for Activity View)
 ------------------------- */
-router.post("/searchByUserId", async (req, res) => {
+router.post("/userHierarchy", verifyToken, async (req, res) => {
   const { userId } = req.body;
-  console.log('\n[searchByUserId] Request received for userId:', userId);
+
   
   try {
-    console.log('[searchByUserId] Querying activeusers for user data');
+
     const userResult = await query(
-      `SELECT lagnname, clname, teamRole FROM activeusers WHERE id = ? AND Active = 'y' LIMIT 1`,
+      `SELECT lagnname, clname FROM activeusers WHERE id = ? AND Active = 'y' LIMIT 1`,
       [userId]
     );
-    console.log('[searchByUserId] User query result:', userResult);
+
 
     if (userResult.length === 0) {
-      console.log('[searchByUserId] User not found, returning error');
+
       return res.json({ success: false, message: "User not found" });
     }
 
     const agnName = userResult[0].lagnname;
     const clName = userResult[0].clname;
     let lagnnameList = [agnName];
-    console.log('[searchByUserId] User found:', { agnName, clName });
+
 
     if (clName === "RGA") {
-      console.log('[searchByUserId] User is RGA, searching for MGAs');
+
       const mgaResults = await query(
         `SELECT lagnname FROM MGAs WHERE (rga = ? OR legacy = ? OR tree = ?) AND (active = 'y' OR active IS NULL) AND (hide = 'n' OR hide IS NULL)`,
         [agnName, agnName, agnName]
       );
-      console.log('[searchByUserId] MGA search results:', mgaResults);
+
       
       if (mgaResults.length > 0) {
         const mgaNames = mgaResults.map(row => row.lagnname);
         lagnnameList = [...lagnnameList, ...mgaNames];
-        console.log('[searchByUserId] Extended lagnname list with MGAs:', lagnnameList);
+
       }
     }
 
     const placeholders = lagnnameList.map(() => "?").join(", ");
-    console.log('[searchByUserId] Preparing hierarchy query with placeholders:', placeholders);
+
+    
+    // Include PNP data similar to searchByUserId (with JSON_OBJECT; fallback below handles older MySQL)
+    let queryText = `
+      SELECT 
+          au.id,
+          au.lagnname, 
+          au.rept_name, 
+          au.clname,
+          au.Active,
+          au.managerActive,
+          au.redeemed,
+          au.released,
+          au.profpic,
+          au.phone,
+          au.esid,
+          COALESCE(main_ui.email, au.email, '') AS email, 
+          au.sa, 
+          au.ga, 
+          au.mga, 
+          au.rga,
+          (
+            SELECT JSON_OBJECT(
+              'curr_mo_4mo_rate_1', (
+                SELECT p1.curr_mo_4mo_rate FROM pnp p1 
+                WHERE (p1.name_line = au.lagnname OR au.lagnname LIKE CONCAT(p1.name_line, ' %'))
+                  AND ABS(DATEDIFF(STR_TO_DATE(p1.esid, '%m/%d/%y'), STR_TO_DATE(au.esid, '%Y-%m-%d'))) <= 7
+                  AND p1.agent_num LIKE '%-1%'
+                ORDER BY STR_TO_DATE(p1.date, '%m/%d/%y') DESC
+                LIMIT 1
+              ),
+              'curr_mo_4mo_rate_2', (
+                SELECT p2.curr_mo_4mo_rate FROM pnp p2 
+                WHERE (p2.name_line = au.lagnname OR au.lagnname LIKE CONCAT(p2.name_line, ' %'))
+                  AND ABS(DATEDIFF(STR_TO_DATE(p2.esid, '%m/%d/%y'), STR_TO_DATE(au.esid, '%Y-%m-%d'))) <= 7
+                  AND p2.agent_num LIKE '%-2%'
+                ORDER BY STR_TO_DATE(p2.date, '%m/%d/%y') DESC
+                LIMIT 1
+              ),
+              'curr_mo_4mo_rate_3', (
+                SELECT p3.curr_mo_4mo_rate FROM pnp p3 
+                WHERE (p3.name_line = au.lagnname OR au.lagnname LIKE CONCAT(p3.name_line, ' %'))
+                  AND ABS(DATEDIFF(STR_TO_DATE(p3.esid, '%m/%d/%y'), STR_TO_DATE(au.esid, '%Y-%m-%d'))) <= 7
+                  AND p3.agent_num LIKE '%-3%'
+                ORDER BY STR_TO_DATE(p3.date, '%m/%d/%y') DESC
+                LIMIT 1
+              )
+            )
+          ) AS pnp_data
+      FROM activeusers au
+      LEFT JOIN usersinfo main_ui ON au.lagnname = main_ui.lagnname AND au.esid = main_ui.esid
+      WHERE au.Active = 'y'
+          AND (
+              au.lagnname = ?
+              OR (au.clname = 'RGA' AND au.lagnname = ?)
+              OR au.sa IN (${placeholders})
+              OR au.ga IN (${placeholders})
+              OR au.mga IN (${placeholders})
+              OR au.rga IN (${placeholders})
+          )
+      ORDER BY au.lagnname;
+    `;
+    
+    const queryParams = [
+      agnName, // au.lagnname = ? (include self)
+      agnName, // (au.clname = 'RGA' AND au.lagnname = ?)
+      ...lagnnameList, // au.sa IN (...)
+      ...lagnnameList, // au.ga IN (...)
+      ...lagnnameList, // au.mga IN (...)
+      ...lagnnameList  // au.rga IN (...)
+    ];
+    
+
+    let results;
+    try {
+      results = await query(queryText, queryParams);
+    } catch (jsonErr) {
+      // Fallback without JSON_OBJECT; attach PNP in a second pass
+      const fallbackQuery = `
+        SELECT 
+            au.id,
+            au.lagnname, 
+            au.rept_name, 
+            au.clname,
+            au.Active,
+            au.managerActive,
+            au.redeemed,
+            au.released,
+            au.profpic,
+            au.phone,
+            au.esid,
+            COALESCE(main_ui.email, au.email, '') AS email, 
+            au.sa, 
+            au.ga, 
+            au.mga, 
+            au.rga
+        FROM activeusers au
+        LEFT JOIN usersinfo main_ui ON au.lagnname = main_ui.lagnname AND au.esid = main_ui.esid
+        WHERE au.Active = 'y'
+            AND (
+                au.lagnname = ?
+                OR (au.clname = 'RGA' AND au.lagnname = ?)
+                OR au.sa IN (${placeholders})
+                OR au.ga IN (${placeholders})
+                OR au.mga IN (${placeholders})
+                OR au.rga IN (${placeholders})
+            )
+        ORDER BY au.lagnname;
+      `;
+      results = await query(fallbackQuery, queryParams);
+      // Attach minimal PNP data best-effort
+      const names = results.map(r => r.lagnname).filter(Boolean);
+      if (names.length > 0) {
+        const namePlaceholders = names.map(() => '?').join(',');
+      const pnpRows = await query(`
+          SELECT name_line, curr_mo_4mo_rate, proj_plus_1, date AS pnp_date, agent_num
+          FROM pnp
+          WHERE name_line IN (${namePlaceholders})
+          ORDER BY STR_TO_DATE(date, '%m/%d/%y') DESC
+        `, names);
+        const byName = {};
+        for (const row of pnpRows) {
+          const nm = row.name_line;
+          if (!byName[nm]) byName[nm] = { '-1': null, '-2': null, '-3': null };
+          const suffix = (row.agent_num || '').includes('-1') ? '-1' : (row.agent_num || '').includes('-2') ? '-2' : (row.agent_num || '').includes('-3') ? '-3' : null;
+          if (!suffix) continue;
+          // Only set if not set yet (rows are date-desc already)
+          if (!byName[nm][suffix]) byName[nm][suffix] = row;
+        }
+        results = results.map(r => {
+          const entry = byName[r.lagnname];
+          return {
+            ...r,
+            pnp_data: entry ? {
+              curr_mo_4mo_rate_1: entry['-1'] ? entry['-1'].curr_mo_4mo_rate : null,
+              curr_mo_4mo_rate_2: entry['-2'] ? entry['-2'].curr_mo_4mo_rate : null,
+              curr_mo_4mo_rate_3: entry['-3'] ? entry['-3'].curr_mo_4mo_rate : null
+            } : null
+          };
+        });
+      }
+    }
+
+
+    if (results.length > 0) {
+
+      res.json({ success: true, data: results, agnName });
+    } else {
+
+      res.json({ success: false, message: "No data found" });
+    }
+  } catch (err) {
+
+    res.status(500).json({ success: false, message: "Error retrieving data" });
+  }
+});
+
+/* ----------------------
+   Search by User ID Route
+------------------------- */
+router.post("/searchByUserId", async (req, res) => {
+  const { userId } = req.body;
+
+  
+  try {
+    const userResult = await query(
+      `SELECT lagnname, clname, teamRole FROM activeusers WHERE id = ? AND Active = 'y' LIMIT 1`,
+      [userId]
+    );
+
+    if (userResult.length === 0) {
+      return res.json({ success: false, message: "User not found" });
+    }
+
+    const agnName = userResult[0].lagnname;
+    const clName = userResult[0].clname;
+    let lagnnameList = [agnName];
+
+    if (clName === "RGA") {
+      const mgaResults = await query(
+        `SELECT lagnname FROM MGAs WHERE (rga = ? OR legacy = ? OR tree = ?) AND (active = 'y' OR active IS NULL) AND (hide = 'n' OR hide IS NULL)`,
+        [agnName, agnName, agnName]
+      );
+      
+      if (mgaResults.length > 0) {
+        const mgaNames = mgaResults.map(row => row.lagnname);
+        lagnnameList = [...lagnnameList, ...mgaNames];
+      }
+    }
+
+    const placeholders = lagnnameList.map(() => "?").join(", ");
     
     // Try to use JSON_ARRAYAGG for efficiency, but be prepared for fallback
     let queryText;
@@ -770,9 +1204,10 @@ router.post("/searchByUserId", async (req, res) => {
             au.released,
             au.profpic,
             au.phone,
+            au.agtnum,
             au.esid,
             au.teamRole,
-            COALESCE(main_ui.email, '') AS email, 
+            COALESCE(main_ui.email, au.email, '') AS email, 
             au.sa, 
             COALESCE(sa_ui.email, '') AS sa_email, 
             au.ga, 
@@ -814,12 +1249,18 @@ router.post("/searchByUserId", async (req, res) => {
         LEFT JOIN usersinfo mga_ui ON au.mga = mga_ui.lagnname AND mga_ui.esid = (SELECT esid FROM activeusers WHERE lagnname = au.mga LIMIT 1)
         LEFT JOIN usersinfo rga_ui ON au.rga = rga_ui.lagnname AND rga_ui.esid = (SELECT esid FROM activeusers WHERE lagnname = au.rga LIMIT 1)
         WHERE au.Active = 'y'
-            AND ((au.clname = 'RGA' AND au.lagnname = ?) OR au.sa IN (${placeholders}) OR au.ga IN (${placeholders}) OR au.mga IN (${placeholders}) OR au.rga IN (${placeholders}))
+            AND (
+                au.lagnname = ?
+                OR (au.clname = 'RGA' AND au.lagnname = ?)
+                OR au.sa IN (${placeholders})
+                OR au.ga IN (${placeholders})
+                OR au.mga IN (${placeholders})
+                OR au.rga IN (${placeholders})
+            )
         ORDER BY au.lagnname;
       `;
       
       // Add a diagnostic query to check directly on the PNP table
-      console.log('[searchByUserId] Executing diagnostic PNP query to check what data exists');
       try {
         const pnpDiagnosticQuery = `
           SELECT name_line, esid, date, curr_mo_4mo_rate, proj_plus_1 
@@ -827,13 +1268,11 @@ router.post("/searchByUserId", async (req, res) => {
           LIMIT 5
         `;
         const pnpSample = await query(pnpDiagnosticQuery);
-        console.log('[searchByUserId] PNP sample data:', pnpSample);
       } catch (diagErr) {
-        console.log('[searchByUserId] Error executing PNP diagnostic query:', diagErr.message);
       }
     } catch (err) {
       // Fallback query without JSON functions (for MySQL < 5.7.22)
-      console.warn('[searchByUserId] JSON_ARRAYAGG not supported, using fallback query without license data');
+
       queryText = `
         SELECT 
             au.id,
@@ -848,7 +1287,7 @@ router.post("/searchByUserId", async (req, res) => {
             au.phone,
             au.esid,
             au.teamRole,
-            COALESCE(main_ui.email, '') AS email, 
+            COALESCE(main_ui.email, au.email, '') AS email, 
             au.sa, 
             COALESCE(sa_ui.email, '') AS sa_email, 
             au.ga, 
@@ -864,42 +1303,44 @@ router.post("/searchByUserId", async (req, res) => {
         LEFT JOIN usersinfo mga_ui ON au.mga = mga_ui.lagnname AND mga_ui.esid = (SELECT esid FROM activeusers WHERE lagnname = au.mga LIMIT 1)
         LEFT JOIN usersinfo rga_ui ON au.rga = rga_ui.lagnname AND rga_ui.esid = (SELECT esid FROM activeusers WHERE lagnname = au.rga LIMIT 1)
         WHERE au.Active = 'y'
-            AND ((au.clname = 'RGA' AND au.lagnname = ?) OR au.sa IN (${placeholders}) OR au.ga IN (${placeholders}) OR au.mga IN (${placeholders}) OR au.rga IN (${placeholders}))
+            AND (
+                au.lagnname = ?
+                OR (au.clname = 'RGA' AND au.lagnname = ?)
+                OR au.sa IN (${placeholders})
+                OR au.ga IN (${placeholders})
+                OR au.mga IN (${placeholders})
+                OR au.rga IN (${placeholders})
+            )
         ORDER BY au.lagnname;
       `;
     }
     
     const queryParams = [
-      agnName,
-      ...lagnnameList,
-      ...lagnnameList,
-      ...lagnnameList,
-      ...lagnnameList
+      agnName, // au.lagnname = ? (include self)
+      agnName, // (au.clname = 'RGA' AND au.lagnname = ?)
+      ...lagnnameList, // au.sa IN (...)
+      ...lagnnameList, // au.ga IN (...)
+      ...lagnnameList, // au.mga IN (...)
+      ...lagnnameList  // au.rga IN (...)
     ];
     
-    console.log('[searchByUserId] Executing main hierarchy query with params:', queryParams);
     const results = await query(queryText, queryParams);
-    console.log(`[searchByUserId] Query returned ${results.length} results`);
 
     // Add diagnostic query to check for each user's PNP data
-    console.log('[searchByUserId] Checking PNP matches for each user:');
     for (const user of results.slice(0, 5)) { // Limit to first 5 users to avoid too much logging
       if (!user.lagnname || !user.esid) continue;
       
-      console.log(`[searchByUserId] Checking PNP for user: ${user.lagnname}, ESID: ${user.esid}`);
       
       try {
         // Try to format the ESID to check conversions
         const userEsidDate = new Date(user.esid);
         if (!isNaN(userEsidDate.getTime())) {
-          console.log(`[searchByUserId] User ESID as Date: ${userEsidDate.toISOString().split('T')[0]}`);
           
           // Format as MM/DD/YY to match PNP format
           const month = (userEsidDate.getMonth() + 1).toString().padStart(2, '0');
           const day = userEsidDate.getDate().toString().padStart(2, '0');
           const year = userEsidDate.getFullYear().toString().slice(2);
           const formattedEsid = `${month}/${day}/${year}`;
-          console.log(`[searchByUserId] User ESID formatted as MM/DD/YY: ${formattedEsid}`);
           
           // Look for matches in PNP
           const pnpMatchQuery = `
@@ -910,9 +1351,7 @@ router.post("/searchByUserId", async (req, res) => {
             LIMIT 1
           `;
           const pnpMatches = await query(pnpMatchQuery, [user.lagnname, user.lagnname, formattedEsid]);
-          console.log(`[searchByUserId] PNP matches for ${user.lagnname}: ${pnpMatches.length}`);
           if (pnpMatches.length > 0) {
-            console.log(`[searchByUserId] Found PNP match:`, pnpMatches[0]);
           } else {
             // If no exact match, try a more lenient search to see what records exist
             const lenientSearchQuery = `
@@ -923,22 +1362,14 @@ router.post("/searchByUserId", async (req, res) => {
             `;
             const lenientResults = await query(lenientSearchQuery, [user.lagnname, user.lagnname]);
             if (lenientResults.length > 0) {
-              console.log(`[searchByUserId] Found similar PNP records for ${user.lagnname}:`, 
-                lenientResults.map(r => ({
-                  name_line: r.name_line,
-                  esid: r.esid,
-                  date: r.date
-                }))
-              );
+            
             } else {
-              console.log(`[searchByUserId] No PNP records found for name_line: ${user.lagnname}`);
             }
           }
         } else {
-          console.log(`[searchByUserId] Invalid ESID format for user ${user.lagnname}: ${user.esid}`);
         }
       } catch (pnpErr) {
-        console.error(`[searchByUserId] Error checking PNP data for user ${user.lagnname}:`, pnpErr);
+
       }
     }
 
@@ -957,7 +1388,7 @@ router.post("/searchByUserId", async (req, res) => {
               user.licenses = [];
             }
           } catch (e) {
-            console.error(`[searchByUserId] Error parsing licenses for user ${user.lagnname}:`, e);
+
             user.licenses = [];
           }
         });
@@ -968,7 +1399,6 @@ router.post("/searchByUserId", async (req, res) => {
       
       // Fetch licenses separately if needed (fallback method)
       if (needToFetchLicenses) {
-        console.log('[searchByUserId] Fetching licenses separately (fallback method)');
         
         // Get all user IDs from the results
         const userIds = results.map(user => user.id);
@@ -981,7 +1411,6 @@ router.post("/searchByUserId", async (req, res) => {
         `;
         
         const licensesResults = await query(licensesQuery, userIds);
-        console.log(`[searchByUserId] Retrieved ${licensesResults.length} licenses for ${userIds.length} users`);
         
         // Create a map of licenses by userId
         const licensesByUser = {};
@@ -999,36 +1428,28 @@ router.post("/searchByUserId", async (req, res) => {
       }
       
       // Fetch PNP data separately for fallback method
-      console.log('[searchByUserId] Fetching PNP data separately (fallback method)');
       
       try {
         // Create placeholders for user names
         const userNames = results.map(user => user.lagnname).filter(Boolean);
         if (userNames.length > 0) {
-          console.log(`[searchByUserId] Searching PNP data for ${userNames.length} users. First few names:`, userNames.slice(0, 3));
           
           // Log ESID conversions for better diagnosis - check first few users
           for (const user of results.slice(0, 3)) {
             if (user.esid) {
-              console.log(`[searchByUserId] ESID format debugging for ${user.lagnname}:`);
-              console.log(`[searchByUserId] Original ESID: ${user.esid}`);
               
               try {
                 // Convert to Date
                 const userEsidDate = new Date(user.esid);
                 if (!isNaN(userEsidDate.getTime())) {
-                  console.log(`[searchByUserId] ESID as Date: ${userEsidDate.toISOString()}`);
                   // Format MM/DD/YY for PNP comparison
                   const month = (userEsidDate.getMonth() + 1).toString().padStart(2, '0');
                   const day = userEsidDate.getDate().toString().padStart(2, '0');
                   const year = userEsidDate.getFullYear().toString().slice(2);
                   const mmddyyFormat = `${month}/${day}/${year}`;
-                  console.log(`[searchByUserId] ESID formatted as MM/DD/YY: ${mmddyyFormat}`);
                 } else {
-                  console.log(`[searchByUserId] Invalid date format: ${user.esid}`);
                 }
               } catch (dateError) {
-                console.log(`[searchByUserId] Error formatting date: ${dateError.message}`);
               }
             }
           }
@@ -1041,16 +1462,13 @@ router.post("/searchByUserId", async (req, res) => {
           `;
           const pnpTableCheck = await query(pnpTableCheckQuery);
           if (pnpTableCheck.length === 0) {
-            console.error('[searchByUserId] PNP table does not exist in the database');
           } else {
-            console.log('[searchByUserId] PNP table exists in the database');
             
             // Get a sample of PNP data to see what's available
             const pnpSampleQuery = `
               SELECT * FROM pnp LIMIT 5
             `;
             const pnpSample = await query(pnpSampleQuery);
-            console.log('[searchByUserId] Sample PNP data:', pnpSample);
           }
           
           // Fetch PNP data for each user by name and matching ESID
@@ -1069,13 +1487,10 @@ router.post("/searchByUserId", async (req, res) => {
           `;
           
           const pnpResults = await query(pnpQuery, userNames);
-          console.log(`[searchByUserId] Retrieved ${pnpResults.length} PNP records for ${userNames.length} users`);
           
           // Log a sample of the results
           if (pnpResults.length > 0) {
-            console.log('[searchByUserId] Sample PNP results:', pnpResults.slice(0, 3));
           } else {
-            console.log('[searchByUserId] No PNP records found for any user names');
           }
           
           // Create a map to find the latest PNP data by user name and matching ESID
@@ -1095,9 +1510,6 @@ router.post("/searchByUserId", async (req, res) => {
                   let pnpEsidParts = pnpEsid.split('/');
                   if (pnpEsidParts.length === 3) {
                     // Log each ESID comparison for debugging
-                    console.log(`[searchByUserId] Comparing ESIDs for ${user.lagnname}:`);
-                    console.log(`[searchByUserId] User ESID: ${user.esid} (${userEsidDate.toISOString()})`);
-                    console.log(`[searchByUserId] PNP ESID: ${pnpEsid}`);
                     
                     // Add '20' prefix to year if it's just 2 digits
                     if (pnpEsidParts[2].length === 2) {
@@ -1109,34 +1521,28 @@ router.post("/searchByUserId", async (req, res) => {
                       parseInt(pnpEsidParts[1])
                     );
                     
-                    console.log(`[searchByUserId] PNP ESID as Date: ${pnpEsidDate.toISOString()}`);
                     
                     // Check if dates match
                     const userDateString = userEsidDate.toISOString().split('T')[0];
                     const pnpDateString = pnpEsidDate.toISOString().split('T')[0];
                     
-                    console.log(`[searchByUserId] Comparing: ${userDateString} === ${pnpDateString} => ${userDateString === pnpDateString}`);
                     
                     // Calculate day difference instead of requiring exact match
                     const dayDiff = Math.abs((userEsidDate - pnpEsidDate) / (1000 * 60 * 60 * 24));
-                    console.log(`[searchByUserId] Date difference in days: ${dayDiff}`);
                     
                     // Allow matches within 7 days
                     if (dayDiff <= 7) {
-                      console.log(`[searchByUserId] ✅ MATCH FOUND (within 7 days) for ${user.lagnname}: ${pnpRecord.date}`);
                       // If we haven't stored this user's PNP data yet, or this record is newer
                       if (!latestPnpByUser[user.lagnname] || 
                           new Date(pnpRecord.date) > new Date(latestPnpByUser[user.lagnname].date) ||
                           (new Date(pnpRecord.date).getTime() === new Date(latestPnpByUser[user.lagnname].date).getTime() &&
                            pnpRecord.agent_num?.includes('-1') && !latestPnpByUser[user.lagnname].agent_num?.includes('-1'))) {
-                        console.log(`[searchByUserId] Selecting record with agent_num: ${pnpRecord.agent_num || 'N/A'}`);
                         latestPnpByUser[user.lagnname] = pnpRecord;
                       }
                     }
                   }
                 } catch (dateError) {
-                  console.error(`[searchByUserId] Error comparing dates for ${user.lagnname}:`, dateError);
-                  console.error(`[searchByUserId] User ESID: ${user.esid}, PNP ESID: ${pnpRecord.esid}`);
+
                 }
               }
             });
@@ -1156,24 +1562,189 @@ router.post("/searchByUserId", async (req, res) => {
             }
           });
           
-          console.log(`[searchByUserId] Attached PNP data to ${Object.keys(latestPnpByUser).length} users`);
         }
       } catch (pnpError) {
-        console.error('[searchByUserId] Error fetching PNP data:', pnpError);
+
       }
       
-      console.log('[searchByUserId] Returning success with data');
       // Log just the first result as a sample and the count
-      console.log('[searchByUserId] Sample result:', results[0]);
       res.json({ success: true, data: results, agnName });
     } else {
-      console.log('[searchByUserId] No data found, returning error');
       res.json({ success: false, message: "No data found" });
     }
   } catch (err) {
-    console.error("[searchByUserId] Error querying activeusers and usersinfo with userId", err);
-    console.error("[searchByUserId] Error stack:", err.stack);
+
     res.status(500).json({ success: false, message: "Error retrieving data" });
+  }
+});
+
+/* ----------------------
+   Search by User ID (Lite for MGA view)
+   - Minimal fields needed for hierarchy/teams
+   - Preserves original route above unchanged
+------------------------- */
+router.post("/searchByUserIdLite", async (req, res) => {
+  const { userId, includeInactive = false } = req.body;
+  try {
+    // Find requesting user's lagnname and role
+    const userResult = await query(
+      `SELECT lagnname, clname FROM activeusers WHERE id = ? AND Active = 'y' LIMIT 1`,
+      [userId]
+    );
+    if (userResult.length === 0) {
+      return res.json({ success: false, message: "User not found" });
+    }
+
+    const agnName = userResult[0].lagnname;
+    const clName = userResult[0].clname;
+    let lagnnameList = [agnName];
+
+    // If RGA, include their MGAs (filtered by MGAs table active/hide)
+    let allowedMgas = [];
+    if (clName === 'RGA') {
+      const mgaResults = await query(
+        `SELECT lagnname 
+         FROM MGAs 
+         WHERE (rga = ? OR legacy = ? OR tree = ?) 
+           AND (active = 'y' OR active IS NULL) 
+           AND (hide = 'n' OR hide IS NULL)`,
+        [agnName, agnName, agnName]
+      );
+      if (mgaResults.length > 0) {
+        allowedMgas = mgaResults.map(r => r.lagnname);
+        lagnnameList = [...lagnnameList, ...allowedMgas];
+      }
+    }
+
+    // Global allowlist of active (not hidden) MGAs for component-level filtering
+    let allowedMgasGlobal = [];
+    try {
+      const globalMgas = await query(
+        `SELECT lagnname 
+         FROM MGAs 
+         WHERE (active = 'y' OR active IS NULL) 
+           AND (hide = 'n' OR hide IS NULL)`
+      );
+      allowedMgasGlobal = globalMgas.map(r => r.lagnname);
+    } catch (e) {
+      // Non-fatal; proceed without global filtering list
+      allowedMgasGlobal = [];
+    }
+
+  
+    const placeholders = lagnnameList.map(() => "?").join(", ");
+
+    // Build the WHERE clause based on includeInactive parameter
+    const managerActiveFilter = includeInactive ? 
+      "(au.managerActive = 'y' OR au.managerActive = 'n')" : 
+      "au.managerActive = 'y'";
+
+    // Minimal hierarchy pull from activeusers only
+    const queryText = `
+      SELECT 
+        au.id,
+        au.lagnname,
+        au.clname,
+        au.Active,
+        au.managerActive,
+        au.esid,
+        au.sa,
+        au.ga,
+        au.mga,
+        au.rga
+      FROM activeusers au
+      WHERE au.Active = 'y' AND ${managerActiveFilter}
+        AND (
+          au.lagnname = ?
+          OR (au.clname = 'RGA' AND au.lagnname = ?)
+          OR au.sa IN (${placeholders})
+          OR au.ga IN (${placeholders})
+          OR au.mga IN (${placeholders})
+          OR au.rga IN (${placeholders})
+        )
+      ORDER BY au.managerActive DESC, au.lagnname
+    `;
+
+    const params = [
+      agnName,
+      agnName,
+      ...lagnnameList,
+      ...lagnnameList,
+      ...lagnnameList,
+      ...lagnnameList,
+    ];
+
+    let results = await query(queryText, params);
+
+    // Ensure uplines (SA/GA/MGA) are included even if not managerActive
+    try {
+      const uplineNames = new Set();
+      results.forEach(row => {
+        ['sa','ga','mga'].forEach(k => {
+          const v = row[k];
+          if (v && typeof v === 'string' && v.trim().length > 0) {
+            uplineNames.add(v.trim());
+          }
+        });
+      });
+      // Remove any already present
+      const present = new Set(results.map(r => r.lagnname));
+      const missing = Array.from(uplineNames).filter(name => !present.has(name));
+      if (missing.length > 0) {
+        const placeholders2 = missing.map(() => '?').join(',');
+      const uplinesRows = await query(
+          `SELECT id, lagnname, clname, Active, managerActive, agtnum, esid, sa, ga, mga, rga
+           FROM activeusers 
+           WHERE Active = 'y' AND lagnname IN (${placeholders2})`,
+          missing
+        );
+        if (uplinesRows && uplinesRows.length > 0) {
+          // Merge and de-dup
+          const mergedMap = new Map();
+          [...results, ...uplinesRows].forEach(r => {
+            if (!mergedMap.has(r.lagnname)) mergedMap.set(r.lagnname, r);
+          });
+          results = Array.from(mergedMap.values());
+        }
+      }
+    } catch (e) {
+
+    }
+
+    // For non-RGA users, include the full MGA team they belong to (all users whose mga = user's MGA)
+    try {
+      if (clName !== 'RGA') {
+        // Determine the user's MGA
+        let myMgaName = null;
+        const selfRow = results.find(r => r.lagnname === agnName);
+        if (selfRow && selfRow.mga) {
+          myMgaName = selfRow.mga;
+        } else {
+          const me = await query(`SELECT mga FROM activeusers WHERE id = ? LIMIT 1`, [userId]);
+          if (me && me.length > 0) myMgaName = me[0].mga;
+        }
+        if (myMgaName) {
+          const teamRows = await query(
+            `SELECT id, lagnname, clname, Active, managerActive, agtnum, esid, sa, ga, mga, rga
+             FROM activeusers
+             WHERE Active = 'y' AND managerActive = 'y' AND (mga = ? OR lagnname = ?)`,
+            [myMgaName, myMgaName]
+          );
+          if (teamRows && teamRows.length > 0) {
+            const byName = new Map(results.map(r => [r.lagnname, r]));
+            teamRows.forEach(r => { if (!byName.has(r.lagnname)) byName.set(r.lagnname, r); });
+            results = Array.from(byName.values());
+          }
+        }
+      }
+    } catch (e) {
+
+    }
+
+    return res.json({ success: true, data: results, agnName, allowedMgas, allowedMgasGlobal });
+  } catch (err) {
+
+    return res.status(500).json({ success: false, message: 'Error retrieving data' });
   }
 });
 
@@ -1192,21 +1763,19 @@ router.post("/upload-profile-picture", verifyToken, upload.single('image'), asyn
       return res.status(400).json({ success: false, message: "No image file uploaded" });
     }
     
-    console.log("Processing profile picture upload for user:", userId);
     
     // Convert buffer to base64
     const base64Image = req.file.buffer.toString('base64');
     
     // Determine image size
     const sizeInMB = req.file.size / (1024 * 1024);
-    console.log(`Image size: ${sizeInMB.toFixed(2)} MB`);
     
     // Create params for Imgur API
     const params = new URLSearchParams();
     params.append('image', base64Image);
     params.append('type', 'base64');
     
-    console.log("Uploading image to Imgur...");
+
     
     // Enhanced upload with retry logic and rate limit handling
     const uploadToImgur = async () => {
@@ -1228,48 +1797,7 @@ router.post("/upload-profile-picture", verifyToken, upload.single('image'), asyn
           retryCount++;
           
           // Log detailed error information
-          console.error(`\n----- IMGUR UPLOAD ERROR (Attempt ${retryCount}/${maxRetries}) -----`);
-          console.error(`Error Code: ${error.code || 'N/A'}`);
-          console.error(`Error Message: ${error.message}`);
-          
-          if (error.response) {
-            // The request was made and the server responded with a status code
-            // that falls out of the range of 2xx
-            console.error(`Status: ${error.response.status}`);
-            console.error(`Status Text: ${error.response.statusText}`);
-            console.error(`Response Data:`, error.response.data);
-            
-            // Log rate limit information if available
-            const rateHeaders = {};
-            ['x-ratelimit-clientlimit', 'x-ratelimit-clientremaining', 'x-ratelimit-clientreset', 
-             'x-ratelimit-userlimit', 'x-ratelimit-userremaining', 'x-ratelimit-userreset',
-             'x-post-rate-limit-limit', 'x-post-rate-limit-remaining', 'x-post-rate-limit-reset'].forEach(header => {
-              if (error.response.headers[header]) {
-                rateHeaders[header] = error.response.headers[header];
-              }
-            });
-            
-            if (Object.keys(rateHeaders).length > 0) {
-              console.error('Rate Limit Headers:', rateHeaders);
-            }
-          } else if (error.request) {
-            // The request was made but no response was received
-            console.error('No response received from server');
-            console.error('Request details:', error.request._currentUrl || error.request.path);
-          } else {
-            // Something happened in setting up the request that triggered an Error
-            console.error('Error during request setup');
-          }
-          
-          if (error.config) {
-            console.error(`Request URL: ${error.config.url}`);
-            console.error(`Request Method: ${error.config.method.toUpperCase()}`);
-            // Don't log headers with authentication info
-            console.error(`Request Timeout: ${error.config.timeout}ms`);
-          }
-          
-          console.error('Stack trace:', error.stack);
-          console.error(`----- END ERROR DETAILS -----\n`);
+          // Log detailed error information (removed for production)
           
           // Check if it's a rate limiting issue (429)
           if (error.response?.status === 429) {
@@ -1284,22 +1812,22 @@ router.post("/upload-profile-picture", verifyToken, upload.single('image'), asyn
               60000 // Max 60 seconds
             );
             
-            console.log(`Rate limited. Waiting ${Math.ceil(waitTime/1000)}s before retry ${retryCount}/${maxRetries}`);
+
             await new Promise(resolve => setTimeout(resolve, waitTime));
           } else if (error.response?.status === 503) {
             // Service unavailable, use exponential backoff
             const waitTime = Math.min(2000 * Math.pow(2, retryCount-1), 30000);
-            console.log(`Imgur service unavailable. Waiting ${waitTime/1000}s before retry ${retryCount}/${maxRetries}`);
+
             await new Promise(resolve => setTimeout(resolve, waitTime));
           } else if (error.code === 'ERR_SOCKET_CONNECTION_TIMEOUT' || error.code === 'ECONNABORTED') {
             // Connection timeout, retry with longer timeout
             const waitTime = 3000 * retryCount;
-            console.log(`Connection timeout. Waiting ${waitTime/1000}s before retry ${retryCount}/${maxRetries}`);
+
             await new Promise(resolve => setTimeout(resolve, waitTime));
           } else {
             // For other errors, use simple exponential backoff
             const waitTime = 1000 * Math.pow(2, retryCount-1) * (0.5 + Math.random());
-            console.log(`Imgur upload attempt ${retryCount} failed: ${error.message}. Retrying in ${Math.ceil(waitTime/1000)}s...`);
+
             await new Promise(resolve => setTimeout(resolve, waitTime));
           }
           
@@ -1318,7 +1846,7 @@ router.post("/upload-profile-picture", verifyToken, upload.single('image'), asyn
     
     // Get the URL from the Imgur response
     const imageUrl = imgurResponse.data.data.link;
-    console.log("Image successfully uploaded to Imgur:", imageUrl);
+
     
     // Update user's profile picture in database
     await query(
@@ -1361,7 +1889,7 @@ router.post("/upload-profile-picture", verifyToken, upload.single('image'), asyn
       token: token
     });
   } catch (error) {
-    console.error("Error uploading profile picture:", error);
+    console.error('Error uploading profile picture:', error);
     res.status(500).json({ 
       success: false, 
       message: "Error uploading profile picture", 
@@ -1419,7 +1947,7 @@ router.post("/remove-profile-picture", verifyToken, async (req, res) => {
       token: token
     });
   } catch (error) {
-    console.error("Error removing profile picture:", error);
+    console.error('Error removing profile picture:', error);
     res.status(500).json({ success: false, message: "Error removing profile picture" });
   }
 });
@@ -1431,37 +1959,31 @@ router.post("/upload-header-image", verifyToken, upload.single('image'), async (
   try {
     const { userId } = req.body;
     
-    console.log("================= HEADER IMAGE UPLOAD =================");
-    console.log(`Request received for header image upload. User ID: ${userId}`);
-    console.log(`Request headers:`, req.headers);
-    console.log(`Request body keys:`, Object.keys(req.body));
+
     
     if (!userId) {
-      console.error("Error: No userId provided in request");
+
       return res.status(400).json({ success: false, message: "User ID is required" });
     }
     
     if (!req.file) {
-      console.error("Error: No file uploaded in request");
+
       return res.status(400).json({ success: false, message: "No image file uploaded" });
     }
     
-    console.log(`Processing header image upload for user: ${userId}`);
-    console.log(`File details: ${req.file.originalname}, size: ${req.file.size} bytes, mime type: ${req.file.mimetype}`);
     
     // Convert buffer to base64
     const base64Image = req.file.buffer.toString('base64');
     
     // Determine image size
     const sizeInMB = req.file.size / (1024 * 1024);
-    console.log(`Image size: ${sizeInMB.toFixed(2)} MB`);
     
     // Create params for Imgur API
     const params = new URLSearchParams();
     params.append('image', base64Image);
     params.append('type', 'base64');
     
-    console.log("Initiating Imgur API upload request...");
+
     
     // Enhanced upload with retry logic and rate limit handling
     const uploadToImgur = async () => {
@@ -1483,48 +2005,7 @@ router.post("/upload-header-image", verifyToken, upload.single('image'), async (
           retryCount++;
           
           // Log detailed error information
-          console.error(`\n----- IMGUR UPLOAD ERROR (Attempt ${retryCount}/${maxRetries}) -----`);
-          console.error(`Error Code: ${error.code || 'N/A'}`);
-          console.error(`Error Message: ${error.message}`);
-          
-          if (error.response) {
-            // The request was made and the server responded with a status code
-            // that falls out of the range of 2xx
-            console.error(`Status: ${error.response.status}`);
-            console.error(`Status Text: ${error.response.statusText}`);
-            console.error(`Response Data:`, error.response.data);
-            
-            // Log rate limit information if available
-            const rateHeaders = {};
-            ['x-ratelimit-clientlimit', 'x-ratelimit-clientremaining', 'x-ratelimit-clientreset', 
-             'x-ratelimit-userlimit', 'x-ratelimit-userremaining', 'x-ratelimit-userreset',
-             'x-post-rate-limit-limit', 'x-post-rate-limit-remaining', 'x-post-rate-limit-reset'].forEach(header => {
-              if (error.response.headers[header]) {
-                rateHeaders[header] = error.response.headers[header];
-              }
-            });
-            
-            if (Object.keys(rateHeaders).length > 0) {
-              console.error('Rate Limit Headers:', rateHeaders);
-            }
-          } else if (error.request) {
-            // The request was made but no response was received
-            console.error('No response received from server');
-            console.error('Request details:', error.request._currentUrl || error.request.path);
-          } else {
-            // Something happened in setting up the request that triggered an Error
-            console.error('Error during request setup');
-          }
-          
-          if (error.config) {
-            console.error(`Request URL: ${error.config.url}`);
-            console.error(`Request Method: ${error.config.method.toUpperCase()}`);
-            // Don't log headers with authentication info
-            console.error(`Request Timeout: ${error.config.timeout}ms`);
-          }
-          
-          console.error('Stack trace:', error.stack);
-          console.error(`----- END ERROR DETAILS -----\n`);
+          // Log detailed error information (removed for production)
           
           // Check if it's a rate limiting issue (429)
           if (error.response?.status === 429) {
@@ -1539,22 +2020,22 @@ router.post("/upload-header-image", verifyToken, upload.single('image'), async (
               60000 // Max 60 seconds
             );
             
-            console.log(`Rate limited. Waiting ${Math.ceil(waitTime/1000)}s before retry ${retryCount}/${maxRetries}`);
+
             await new Promise(resolve => setTimeout(resolve, waitTime));
           } else if (error.response?.status === 503) {
             // Service unavailable, use exponential backoff
             const waitTime = Math.min(2000 * Math.pow(2, retryCount-1), 30000);
-            console.log(`Imgur service unavailable. Waiting ${waitTime/1000}s before retry ${retryCount}/${maxRetries}`);
+
             await new Promise(resolve => setTimeout(resolve, waitTime));
           } else if (error.code === 'ERR_SOCKET_CONNECTION_TIMEOUT' || error.code === 'ECONNABORTED') {
             // Connection timeout, retry with longer timeout
             const waitTime = 3000 * retryCount;
-            console.log(`Connection timeout. Waiting ${waitTime/1000}s before retry ${retryCount}/${maxRetries}`);
+
             await new Promise(resolve => setTimeout(resolve, waitTime));
           } else {
             // For other errors, use simple exponential backoff
             const waitTime = 1000 * Math.pow(2, retryCount-1) * (0.5 + Math.random());
-            console.log(`Imgur upload attempt ${retryCount} failed: ${error.message}. Retrying in ${Math.ceil(waitTime/1000)}s...`);
+
             await new Promise(resolve => setTimeout(resolve, waitTime));
           }
           
@@ -1573,7 +2054,7 @@ router.post("/upload-header-image", verifyToken, upload.single('image'), async (
     
     // Get the URL from the Imgur response
     const imageUrl = imgurResponse.data.data.link;
-    console.log("Header image successfully uploaded to Imgur:", imageUrl);
+
     
     // Update user's header image in database
     await query(
@@ -1598,7 +2079,7 @@ router.post("/upload-header-image", verifyToken, upload.single('image'), async (
       headerPic: imageUrl
     });
   } catch (error) {
-    console.error("Error uploading header image:", error);
+    console.error('Error uploading header image:', error);
     res.status(500).json({ 
       success: false, 
       message: "Error uploading header image", 
@@ -1638,7 +2119,7 @@ router.post("/remove-header-image", verifyToken, async (req, res) => {
       message: "Header image removed successfully"
     });
   } catch (error) {
-    console.error("Error removing header image:", error);
+    console.error('Error removing header image:', error);
     res.status(500).json({ success: false, message: "Error removing header image" });
   }
 });
@@ -1715,7 +2196,7 @@ router.post("/update-profile-info", verifyToken, async (req, res) => {
       user: user[0]
     });
   } catch (error) {
-    console.error("Error updating profile information:", error);
+
     res.status(500).json({ 
       success: false, 
       message: "Error updating profile information", 
@@ -1758,7 +2239,7 @@ router.get("/profile-info/:userId", verifyToken, async (req, res) => {
       user: transformedUser
     });
   } catch (error) {
-    console.error("Error fetching profile information:", error);
+    console.error('Error fetching profile information:', error);
     res.status(500).json({ 
       success: false, 
       message: "Error fetching profile information" 
@@ -1774,43 +2255,23 @@ router.put("/profile", verifyToken, upload.fields([
   { name: 'profileBanner', maxCount: 1 },  // Match frontend field name
   { name: 'headerPic', maxCount: 1 }  // Keep original name for backward compatibility
 ]), async (req, res) => {
-  console.log("================= PUT /profile REQUEST =================");
-  console.log(`Received profile update request. Body keys:`, Object.keys(req.body));
-  console.log(`Request has files:`, !!req.files);
-  if (req.files) {
-    console.log(`Files included:`, Object.keys(req.files));
-    // Log more detailed file info
-    for (const [fieldName, files] of Object.entries(req.files)) {
-      files.forEach((file, index) => {
-        console.log(`File [${fieldName}][${index}]: name=${file.originalname}, size=${file.size} bytes, mimetype=${file.mimetype}`);
-      });
-    }
-  }
-  
-  console.log("Raw body properties:");
-  for (const [key, value] of Object.entries(req.body)) {
-    if (key !== 'profilePic' && key !== 'profileBanner' && key !== 'headerPic') {
-      console.log(`  ${key}: ${typeof value === 'string' && value.length > 100 ? value.substring(0, 100) + '...' : value}`);
-    } else {
-      console.log(`  ${key}: [LARGE BINARY DATA]`);
-    }
-  }
+
 
   try {
     // Extract basic user data from request body
     const { userId, name, email, phone, screenName, bio } = req.body;
     
     if (!userId) {
-      console.error("Error: No userId provided in PUT /profile request");
+
       return res.status(400).json({ success: false, message: "User ID is required" });
     }
 
-    console.log(`Processing profile update for user: ${userId}`);
+
     
     // Check if user exists
     const userCheck = await query('SELECT id FROM activeusers WHERE id = ?', [userId]);
     if (userCheck.length === 0) {
-      console.error(`Error: User not found with ID ${userId}`);
+
       return res.status(404).json({ success: false, message: "User not found" });
     }
     
@@ -1826,8 +2287,7 @@ router.put("/profile", verifyToken, upload.fields([
                          : null;
     
     if (headerFile) {
-      console.log("Header image file detected, processing upload to Imgur...");
-      console.log(`Header file details: name=${headerFile.originalname}, size=${headerFile.size} bytes, type=${headerFile.mimetype}`);
+
       
       // Process image from buffer directly if it's in the files object
       const base64Header = headerFile.buffer.toString('base64');
@@ -1844,7 +2304,7 @@ router.put("/profile", verifyToken, upload.fields([
       
       while (retryCount < maxRetries && !headerUploadSuccess) {
         try {
-          console.log(`Attempting to upload header image to Imgur (attempt ${retryCount + 1}/${maxRetries})...`);
+
           const headerResponse = await axios.post('https://api.imgur.com/3/image', headerParams, {
             headers: {
               'Authorization': `Client-ID ${IMGUR_CLIENT_ID}`,
@@ -1854,50 +2314,50 @@ router.put("/profile", verifyToken, upload.fields([
           });
           
           headerPicUrl = headerResponse.data.data.link;
-          console.log(`Header image uploaded successfully to: ${headerPicUrl}`);
+
           headerUploadSuccess = true;
         } catch (uploadError) {
           retryCount++;
-          console.error(`Header image upload attempt ${retryCount} failed:`, uploadError.message);
+
           
           if (uploadError.response) {
-            console.error(`Status: ${uploadError.response.status}`);
-            console.error(`Response data:`, uploadError.response.data);
+
+
             
             // Check if it's a rate limiting issue (429)
             if (uploadError.response.status === 429) {
               const resetTime = uploadError.response.headers['x-ratelimit-clientreset'] || 
                               uploadError.response.headers['x-ratelimit-userreset'];
               const waitTime = resetTime ? parseInt(resetTime) * 1000 : 1000 * retryCount;
-              console.log(`Rate limited. Waiting ${Math.ceil(waitTime/1000)}s before retry...`);
+
               await new Promise(resolve => setTimeout(resolve, waitTime));
             } else if (uploadError.response.status === 503) {
               const waitTime = 2000 * retryCount;
-              console.log(`Service unavailable. Waiting ${waitTime/1000}s before retry...`);
+
               await new Promise(resolve => setTimeout(resolve, waitTime));
             }
           } else {
             // For connection timeouts or network errors
             const waitTime = 2000 * retryCount;
-            console.log(`Network error. Waiting ${waitTime/1000}s before retry...`);
+
             await new Promise(resolve => setTimeout(resolve, waitTime));
           }
           
           // If we've reached max retries
           if (retryCount >= maxRetries) {
-            console.error("Max retries reached for header image upload. Continuing without header image.");
+
           }
         }
       }
     } else {
       // Check if profileBanner is in the body as base64 and not in files
       if (req.body.profileBanner && typeof req.body.profileBanner === 'string' && req.body.profileBanner.startsWith('data:image')) {
-        console.log("Found profileBanner as base64 string in request body");
+
         
         // Extract base64 data from data URL
         const base64Data = req.body.profileBanner.split(',')[1];
         if (base64Data) {
-          console.log("Extracted base64 data from profileBanner");
+
           
           // Create params for Imgur API
           const headerParams = new URLSearchParams();
@@ -1911,7 +2371,7 @@ router.put("/profile", verifyToken, upload.fields([
           
           while (retryCount < maxRetries && !headerUploadSuccess) {
             try {
-              console.log(`Attempting to upload header image to Imgur (attempt ${retryCount + 1}/${maxRetries})...`);
+    
               const headerResponse = await axios.post('https://api.imgur.com/3/image', headerParams, {
                 headers: {
                   'Authorization': `Client-ID ${IMGUR_CLIENT_ID}`,
@@ -1921,38 +2381,38 @@ router.put("/profile", verifyToken, upload.fields([
               });
               
               headerPicUrl = headerResponse.data.data.link;
-              console.log(`Header image uploaded successfully to: ${headerPicUrl}`);
+    
               headerUploadSuccess = true;
             } catch (uploadError) {
               retryCount++;
-              console.error(`Header image upload attempt ${retryCount} failed:`, uploadError.message);
+    
               
               if (uploadError.response) {
-                console.error(`Status: ${uploadError.response.status}`);
-                console.error(`Response data:`, uploadError.response.data);
+    
+    
                 
                 // Check if it's a rate limiting issue (429)
                 if (uploadError.response.status === 429) {
                   const resetTime = uploadError.response.headers['x-ratelimit-clientreset'] || 
                                   uploadError.response.headers['x-ratelimit-userreset'];
                   const waitTime = resetTime ? parseInt(resetTime) * 1000 : 1000 * retryCount;
-                  console.log(`Rate limited. Waiting ${Math.ceil(waitTime/1000)}s before retry...`);
+    
                   await new Promise(resolve => setTimeout(resolve, waitTime));
                 } else if (uploadError.response.status === 503) {
                   const waitTime = 2000 * retryCount;
-                  console.log(`Service unavailable. Waiting ${waitTime/1000}s before retry...`);
+    
                   await new Promise(resolve => setTimeout(resolve, waitTime));
                 }
               } else {
                 // For connection timeouts or network errors
                 const waitTime = 2000 * retryCount;
-                console.log(`Network error. Waiting ${waitTime/1000}s before retry...`);
+    
                 await new Promise(resolve => setTimeout(resolve, waitTime));
               }
               
               // If we've reached max retries
               if (retryCount >= maxRetries) {
-                console.error("Max retries reached for header image upload. Continuing without header image.");
+    
               }
             }
           }
@@ -1962,10 +2422,10 @@ router.put("/profile", verifyToken, upload.fields([
     
     // Process profile pic if uploaded
     if (req.files && req.files.profilePic && req.files.profilePic.length > 0) {
-      console.log("Profile image file detected, processing upload to Imgur...");
+
       
       const profileFile = req.files.profilePic[0];
-      console.log(`Profile file details: name=${profileFile.originalname}, size=${profileFile.size} bytes, type=${profileFile.mimetype}`);
+
       const base64Profile = profileFile.buffer.toString('base64');
       
       // Create params for Imgur API
@@ -1980,7 +2440,7 @@ router.put("/profile", verifyToken, upload.fields([
       
       while (retryCount < maxRetries && !profileUploadSuccess) {
         try {
-          console.log(`Attempting to upload profile image to Imgur (attempt ${retryCount + 1}/${maxRetries})...`);
+
           const profileResponse = await axios.post('https://api.imgur.com/3/image', profileParams, {
             headers: {
               'Authorization': `Client-ID ${IMGUR_CLIENT_ID}`,
@@ -1990,38 +2450,38 @@ router.put("/profile", verifyToken, upload.fields([
           });
           
           profilePicUrl = profileResponse.data.data.link;
-          console.log(`Profile image uploaded successfully to: ${profilePicUrl}`);
+
           profileUploadSuccess = true;
         } catch (uploadError) {
           retryCount++;
-          console.error(`Profile image upload attempt ${retryCount} failed:`, uploadError.message);
+
           
           if (uploadError.response) {
-            console.error(`Status: ${uploadError.response.status}`);
-            console.error(`Response data:`, uploadError.response.data);
+
+
             
             // Check if it's a rate limiting issue (429)
             if (uploadError.response.status === 429) {
               const resetTime = uploadError.response.headers['x-ratelimit-clientreset'] || 
                               uploadError.response.headers['x-ratelimit-userreset'];
               const waitTime = resetTime ? parseInt(resetTime) * 1000 : 1000 * retryCount;
-              console.log(`Rate limited. Waiting ${Math.ceil(waitTime/1000)}s before retry...`);
+
               await new Promise(resolve => setTimeout(resolve, waitTime));
             } else if (uploadError.response.status === 503) {
               const waitTime = 2000 * retryCount;
-              console.log(`Service unavailable. Waiting ${waitTime/1000}s before retry...`);
+
               await new Promise(resolve => setTimeout(resolve, waitTime));
             }
           } else {
             // For connection timeouts or network errors
             const waitTime = 2000 * retryCount;
-            console.log(`Network error. Waiting ${waitTime/1000}s before retry...`);
+
             await new Promise(resolve => setTimeout(resolve, waitTime));
           }
           
           // If we've reached max retries
           if (retryCount >= maxRetries) {
-            console.error("Max retries reached for profile image upload. Continuing without profile image update.");
+
           }
         }
       }
@@ -2072,7 +2532,7 @@ router.put("/profile", verifyToken, upload.fields([
     
     // If no fields to update, return success but notify nothing changed
     if (updateFields.length === 0) {
-      console.log(`No fields to update for user ${userId}`);
+
       return res.json({ 
         success: true, 
         message: "Profile unchanged - no updateable fields provided" 
@@ -2084,13 +2544,13 @@ router.put("/profile", verifyToken, upload.fields([
     
     // Execute update query
     const updateQuery = `UPDATE activeusers SET ${updateFields.join(', ')} WHERE id = ?`;
-    console.log(`Executing update query: ${updateQuery.replace(/\?/g, '***')}`);
+
     
     const updateResult = await query(updateQuery, updateValues);
-    console.log(`Update result: ${JSON.stringify(updateResult)}`);
+
     
     if (updateResult.affectedRows === 0) {
-      console.error(`Update failed for user ${userId} - no rows affected`);
+
       return res.status(500).json({ success: false, message: "Failed to update profile information" });
     }
     
@@ -2101,7 +2561,7 @@ router.put("/profile", verifyToken, upload.fields([
     );
     
     if (user.length === 0) {
-      console.error(`Unexpected error: User ${userId} not found after update`);
+
       return res.status(404).json({ success: false, message: "User not found after update" });
     }
     
@@ -2127,7 +2587,7 @@ router.put("/profile", verifyToken, upload.fields([
     }
     
     // Return success response
-    console.log(`Profile update successful for user ${userId}`);
+
     res.json({
       success: true,
       message: "Profile updated successfully",
@@ -2135,7 +2595,7 @@ router.put("/profile", verifyToken, upload.fields([
       token: token // Only included if profile pic was updated
     });
   } catch (error) {
-    console.error("Error updating profile:", error);
+    console.error('Error updating profile information (route 2):', error);
     res.status(500).json({ 
       success: false, 
       message: "Error updating profile information", 
@@ -2148,6 +2608,45 @@ router.put("/profile", verifyToken, upload.fields([
    License Management Routes
 ------------------------- */
 // License management routes have been moved to routes/licensing.js
+
+/* ----------------------
+   Get Agent Details by User ID (for recruitment form)
+------------------------- */
+router.get("/getagent/:userId", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    // First, query to get the user's lagnname and esid based on userId
+    const userResult = await query(
+      'SELECT lagnname, esid, email FROM activeusers WHERE id = ? AND Active = "y" LIMIT 1',
+      [userId]
+    );
+
+    if (userResult.length > 0) {
+      const { lagnname, esid, email: activeusersEmail } = userResult[0];
+
+      // Query to get the user's email from usersinfo if not in activeusers
+      let email = activeusersEmail;
+      if (!email) {
+        const emailResult = await query(
+          'SELECT email FROM usersinfo WHERE lagnname = ? AND esid = ? LIMIT 1',
+          [lagnname, esid]
+        );
+        email = emailResult.length > 0 ? emailResult[0].email : '';
+      }
+
+      // Combine the original user data with the email
+      const agentData = { ...userResult[0], email };
+
+      res.status(200).json({ success: true, data: agentData });
+    } else {
+      res.status(404).json({ success: false, message: 'User not found or not active' });
+    }
+  } catch (error) {
+    console.error('Error retrieving agent information:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
 
 /* ----------------------
    Debug Routes
@@ -2183,7 +2682,7 @@ router.get("/debug/pnp", async (req, res) => {
       sampleData
     });
   } catch (error) {
-    console.error("[debug/pnp] Error:", error);
+
     return res.status(500).json({
       success: false,
       error: error.message
@@ -2231,7 +2730,7 @@ router.get("/debug/pnp/:name", async (req, res) => {
       records
     });
   } catch (error) {
-    console.error(`[debug/pnp/${req.params.name}] Error:`, error);
+    console.error('Error in final route:', error);
     return res.status(500).json({
       success: false,
       error: error.message

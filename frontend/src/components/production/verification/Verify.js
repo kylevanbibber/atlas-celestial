@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import VerificationForm from './VerificationForm';
 import VerifyTable from './VerifyTable';
 import RightDetails from '../../utils/RightDetails';
-import '../../../pages/settings/Settings.css';
+import '../../../pages/utilities/Utilities.css';
 
 const Verify = () => {
     const [view, setView] = useState('table');

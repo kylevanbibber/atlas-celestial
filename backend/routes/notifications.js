@@ -15,20 +15,12 @@ const vapidKeys = {
 // Only set VAPID details if keys are provided
 if (vapidKeys.publicKey && vapidKeys.privateKey) {
   try {
-    // Validate VAPID key formats
-    console.log('🔍 VAPID Key Validation:');
-    console.log('📧 Contact Email:', process.env.VAPID_CONTACT_EMAIL);
-    console.log('🔑 Public Key Length:', vapidKeys.publicKey.length);
-    console.log('🔑 Private Key Length:', vapidKeys.privateKey.length);
-    console.log('🔑 Public Key Format:', vapidKeys.publicKey.startsWith('B') ? 'Valid (Base64URL)' : 'Invalid format');
-    console.log('🔑 Private Key Format:', vapidKeys.privateKey.length === 43 ? 'Valid length' : 'Invalid length');
-    
+  
     webpush.setVapidDetails(
       process.env.VAPID_CONTACT_EMAIL || 'mailto:ariasorganization@gmail.com',
       vapidKeys.publicKey,
       vapidKeys.privateKey
     );
-    console.log('✅ Web Push VAPID details configured successfully');
   } catch (vapidError) {
     console.error('❌ Error configuring VAPID details:', vapidError);
     console.error('📋 VAPID Details that failed:');
@@ -37,11 +29,7 @@ if (vapidKeys.publicKey && vapidKeys.privateKey) {
     console.error('   Private Key (first 20 chars):', vapidKeys.privateKey?.substring(0, 20));
   }
 } else {
-  console.log('⚠️ Web Push VAPID keys not found - push notifications will be disabled');
-  console.log('📋 Missing VAPID environment variables:');
-  console.log('   VAPID_PUBLIC_KEY:', !!process.env.VAPID_PUBLIC_KEY);
-  console.log('   VAPID_PRIVATE_KEY:', !!process.env.VAPID_PRIVATE_KEY);
-  console.log('   VAPID_CONTACT_EMAIL:', !!process.env.VAPID_CONTACT_EMAIL);
+
 }
 
 // Helper function to check if web push is configured
@@ -73,7 +61,6 @@ router.get('/', verifyToken, async (req, res) => {
     const limitInt = parseInt(limit);
     const offsetInt = parseInt(offset);
     
-    console.log(`🚀 [FETCH] Enhanced notification fetch for user ${req.userId} (limit: ${limitInt}, offset: ${offsetInt}, includeRead: ${includeRead})`);
     
     // 1. Get user's traditional group memberships
     const userGroups = await db.query(
@@ -82,7 +69,6 @@ router.get('/', verifyToken, async (req, res) => {
     );
     const groupNames = userGroups.map(g => g.group_name);
     
-    console.log(`🔔 [FETCH] User belongs to ${groupNames.length} traditional groups:`, groupNames);
     
     // 2. Build simplified query that gets all notifications with read status from notification_reads
     let baseQuery = `
@@ -115,10 +101,8 @@ router.get('/', verifyToken, async (req, res) => {
     baseQuery += ` ORDER BY n.created_at DESC LIMIT ? OFFSET ?`;
     queryParams.push(limitInt * 2, offsetInt); // Get extra for dynamic filtering
     
-    console.log(`🔍 [FETCH] Executing query for direct and traditional group notifications...`);
     const directResults = await db.query(baseQuery, queryParams);
     
-    console.log(`📊 [FETCH] Retrieved ${directResults.length} direct/traditional notifications`);
     
     // 6. Now check for dynamic group notifications
     const dynamicNotifications = await db.query(`
@@ -137,7 +121,6 @@ router.get('/', verifyToken, async (req, res) => {
       ORDER BY n.created_at DESC
     `, [req.userId, ...(groupNames.length > 0 ? groupNames : [])]);
     
-    console.log(`🔄 [FETCH] Found ${dynamicNotifications.length} dynamic group notifications to check`);
     
     // 7. Process dynamic notifications to see if user matches the criteria
     const matchingDynamicNotifications = [];
@@ -147,7 +130,6 @@ router.get('/', verifyToken, async (req, res) => {
         const queryData = JSON.parse(notification.query_data);
         const tables = JSON.parse(notification.tables);
         
-        console.log(`🔍 [FETCH] Checking dynamic notification ${notification.id} with query:`, queryData);
         
         // Build and execute the query to check if user matches
         const { query, params } = buildQuery(queryData, tables);
@@ -165,12 +147,10 @@ router.get('/', verifyToken, async (req, res) => {
         // Use EXISTS for better performance
         const existsQuery = `SELECT EXISTS(${finalUserCheck}) as matches`;
         
-        console.log(`🔍 [FETCH] Running user match query: ${existsQuery.substring(0, 200)}...`);
         
         const userMatches = await db.query(existsQuery, params);
         
         if (userMatches.length > 0 && userMatches[0].matches > 0) {
-          console.log(`✅ [FETCH] User ${req.userId} matches dynamic notification ${notification.id}`);
           
           // Remove the query metadata and add to results
           const cleanNotification = {
@@ -183,7 +163,6 @@ router.get('/', verifyToken, async (req, res) => {
           
           matchingDynamicNotifications.push(cleanNotification);
         } else {
-          console.log(`❌ [FETCH] User ${req.userId} does not match dynamic notification ${notification.id}`);
         }
         
       } catch (err) {
@@ -192,7 +171,6 @@ router.get('/', verifyToken, async (req, res) => {
       }
     }
     
-    console.log(`🎯 [FETCH] Found ${matchingDynamicNotifications.length} matching dynamic notifications`);
     
     // 8. Combine all results and sort by created_at
     const allResults = [...directResults, ...matchingDynamicNotifications];
@@ -235,7 +213,6 @@ router.get('/', verifyToken, async (req, res) => {
     const dynamicUnreadCount = matchingDynamicNotifications.filter(n => !n.is_read).length;
     unreadCount += dynamicUnreadCount;
     
-    console.log(`🎉 [FETCH] Completed enhanced fetch: ${paginatedResults.length} notifications (${directResults.length} direct + ${matchingDynamicNotifications.length} dynamic), ${unreadCount} unread`);
     
     res.json({
       notifications: paginatedResults,
@@ -306,7 +283,6 @@ router.put('/:id/read', verifyToken, async (req, res) => {
 // Mark all notifications as read - ENHANCED STANDARDIZED VERSION  
 router.put('/read-all', verifyToken, async (req, res) => {
   try {
-    console.log(`📚 [READ-ALL] Marking all notifications as read for user ${req.userId}`);
     
     // Get all notifications that the user can see (both traditional and dynamic groups)
     const userGroups = await db.query(
@@ -337,7 +313,6 @@ router.put('/read-all', verifyToken, async (req, res) => {
     
     // Get traditional notification IDs
     const traditionalNotifications = await db.query(allNotificationsQuery, queryParams);
-    console.log(`📋 [READ-ALL] Found ${traditionalNotifications.length} traditional notifications`);
     
     // Get dynamic group notifications and check if user matches
     const dynamicNotifications = await db.query(`
@@ -349,7 +324,6 @@ router.put('/read-all', verifyToken, async (req, res) => {
       AND n.target_group NOT IN (${groupNames.length > 0 ? groupNames.map(() => '?').join(',') : "''"})
     `, groupNames.length > 0 ? groupNames : []);
     
-    console.log(`🔄 [READ-ALL] Checking ${dynamicNotifications.length} dynamic notifications`);
     
     // Check which dynamic notifications the user matches
     const matchingDynamicIds = [];
@@ -379,7 +353,6 @@ router.put('/read-all', verifyToken, async (req, res) => {
       }
     }
     
-    console.log(`🎯 [READ-ALL] Found ${matchingDynamicIds.length} matching dynamic notifications`);
     
     // Combine all notification IDs that the user can see
     const allNotificationIds = [
@@ -387,7 +360,6 @@ router.put('/read-all', verifyToken, async (req, res) => {
       ...matchingDynamicIds
     ];
     
-    console.log(`📋 [READ-ALL] Total ${allNotificationIds.length} notifications to mark as read`);
     
     // For each notification, create or update read record
     for (const notificationId of allNotificationIds) {
@@ -411,7 +383,6 @@ router.put('/read-all', verifyToken, async (req, res) => {
       }
     }
     
-    console.log(`✅ [READ-ALL] Successfully marked all notifications as read for user ${req.userId}`);
     
     // ✨ Send WebSocket update for real-time sync across tabs
     if (global.notificationManager) {
@@ -526,7 +497,6 @@ router.post('/subscribe', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'Subscription must have an endpoint' });
     }
     
-    console.log(`📱 Subscription attempt for user ${req.userId}, endpoint: ${subscriptionObj.endpoint.substring(0, 50)}...`);
     
     // Check if this specific endpoint already exists for this user
     const existingResults = await db.query(
@@ -540,14 +510,12 @@ router.post('/subscribe', verifyToken, async (req, res) => {
         'UPDATE push_subscriptions SET subscription = ?, updated_at = NOW() WHERE user_id = ? AND JSON_EXTRACT(subscription, "$.endpoint") = ?',
         [JSON.stringify(subscriptionObj), req.userId, subscriptionObj.endpoint]
       );
-      console.log(`✅ Updated existing push subscription for user ${req.userId}, endpoint: ${subscriptionObj.endpoint.substring(0, 50)}...`);
     } else {
       // Create new subscription for this device
       await db.query(
         'INSERT INTO push_subscriptions (user_id, subscription, created_at, updated_at) VALUES (?, ?, NOW(), NOW())',
         [req.userId, JSON.stringify(subscriptionObj)]
       );
-      console.log(`✅ Created new push subscription for user ${req.userId}, endpoint: ${subscriptionObj.endpoint.substring(0, 50)}...`);
       
       // Also update notification preferences to enable push for all types
       await updatePreferencesForPush(req.userId, true);
@@ -558,7 +526,6 @@ router.post('/subscribe', verifyToken, async (req, res) => {
       'SELECT COUNT(*) as count FROM push_subscriptions WHERE user_id = ?',
       [req.userId]
     );
-    console.log(`📱 User ${req.userId} now has ${userSubscriptions[0].count} device(s) subscribed to push notifications`);
     
     res.json({ 
       success: true,
@@ -570,7 +537,6 @@ router.post('/subscribe', verifyToken, async (req, res) => {
     
     // Handle the duplicate entry error gracefully (in case endpoint_hash constraint fails)
     if (error.code === 'ER_DUP_ENTRY') {
-      console.log(`🔄 Handling duplicate endpoint for user ${req.userId}, attempting update...`);
       try {
         // Try to update the existing subscription
         const subscriptionObj = typeof req.body.subscription === 'string' 
@@ -582,7 +548,6 @@ router.post('/subscribe', verifyToken, async (req, res) => {
           [JSON.stringify(subscriptionObj), req.userId, subscriptionObj.endpoint]
         );
         
-        console.log(`✅ Successfully updated subscription after duplicate endpoint error`);
         return res.json({ 
           success: true,
           message: 'Subscription updated successfully (duplicate endpoint resolved)',
@@ -618,19 +583,16 @@ router.post('/unsubscribe', verifyToken, async (req, res) => {
           'DELETE FROM push_subscriptions WHERE user_id = ? AND JSON_EXTRACT(subscription, "$.endpoint") = ?',
           [req.userId, subscriptionObj.endpoint]
         );
-        console.log(`✅ Unsubscribed specific device for user ${req.userId}, endpoint: ${subscriptionObj.endpoint.substring(0, 50)}...`);
         
         // Check remaining subscriptions
         const remainingSubscriptions = await db.query(
           'SELECT COUNT(*) as count FROM push_subscriptions WHERE user_id = ?',
           [req.userId]
         );
-        console.log(`📱 User ${req.userId} now has ${remainingSubscriptions[0].count} device(s) remaining`);
         
         // If no subscriptions remain, update preferences
         if (remainingSubscriptions[0].count === 0) {
           await updatePreferencesForPush(req.userId, false);
-          console.log(`🔕 Disabled push notifications for user ${req.userId} (no devices remaining)`);
         }
       } else {
         return res.status(400).json({ error: 'Subscription must have an endpoint' });
@@ -641,7 +603,6 @@ router.post('/unsubscribe', verifyToken, async (req, res) => {
         'DELETE FROM push_subscriptions WHERE user_id = ?',
         [req.userId]
       );
-      console.log(`✅ Unsubscribed all devices for user ${req.userId} (${result.affectedRows || 0} devices)`);
       
       // Update preferences to disable push
       await updatePreferencesForPush(req.userId, false);
@@ -666,12 +627,10 @@ async function sendPushNotification(userId, notification) {
   try {
     // Input validation
     if (!userId) {
-      console.log('Cannot send push notification: Missing user ID');
       return false;
     }
     
     if (!notification || typeof notification !== 'object') {
-      console.log(`Cannot send push notification to user ${userId}: Invalid notification object`);
       return false;
     }
     
@@ -682,11 +641,9 @@ async function sendPushNotification(userId, notification) {
     );
     
     if (!results || results.length === 0) {
-      console.log(`No push subscriptions found for user ${userId}`);
       return false;
     }
     
-    console.log(`Found ${results.length} push subscription(s) for user ${userId}`);
     
     let successCount = 0;
     let failureCount = 0;
@@ -697,7 +654,6 @@ async function sendPushNotification(userId, notification) {
       
       // Ensure subscription is valid
       if (!result.subscription) {
-        console.log(`Empty subscription found for user ${userId}, device ${i + 1}`);
         failureCount++;
         continue;
       }
@@ -711,7 +667,6 @@ async function sendPushNotification(userId, notification) {
           
         // Validate the subscription format
         if (!subscription || !subscription.endpoint) {
-          console.log(`Invalid subscription format for user ${userId}, device ${i + 1}`);
           failureCount++;
           continue;
         }
@@ -741,7 +696,6 @@ async function sendPushNotification(userId, notification) {
       
       try {
         await webpush.sendNotification(subscription, payload);
-        console.log(`✅ Push notification sent successfully to user ${userId}, device ${i + 1}`);
         successCount++;
       } catch (error) {
         console.error(`❌ Error sending push notification to user ${userId}, device ${i + 1}:`, error);
@@ -749,13 +703,11 @@ async function sendPushNotification(userId, notification) {
         
         // If subscription is invalid (410 Gone), remove it from database
         if (error.statusCode === 410) {
-          console.log(`🧹 Removing invalid subscription for user ${userId}, device ${i + 1}`);
           try {
             await db.query(
               'DELETE FROM push_subscriptions WHERE user_id = ? AND subscription = ?',
               [userId, result.subscription]
             );
-            console.log(`✅ Invalid subscription removed for user ${userId}`);
           } catch (deleteError) {
             console.error(`❌ Error removing invalid subscription:`, deleteError);
           }
@@ -763,7 +715,6 @@ async function sendPushNotification(userId, notification) {
       }
     }
     
-    console.log(`📊 Push notification summary for user ${userId}: ${successCount} successful, ${failureCount} failed out of ${results.length} devices`);
     
     // Return true if at least one notification was sent successfully
     return successCount > 0;
@@ -808,6 +759,29 @@ router.get('/admin/all', verifyToken, isAdmin, async (req, res) => {
   } catch (error) {
     console.error('Error fetching all notifications:', error);
     res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+});
+
+// Get active users for targeting (admin only)
+router.get('/admin/active-users', verifyToken, isAdmin, async (req, res) => {
+  try {
+    const { q } = req.query;
+    let sql = `
+      SELECT id, lagnname, clname, email
+      FROM activeusers
+      WHERE Active = 'y'
+    `;
+    const params = [];
+    if (q && q.trim()) {
+      sql += ` AND (lagnname LIKE ? OR email LIKE ?)`;
+      params.push(`%${q}%`, `%${q}%`);
+    }
+    sql += ` ORDER BY lagnname`;
+    const users = await db.query(sql, params);
+    res.json({ success: true, data: users });
+  } catch (error) {
+    console.error('Error fetching active users for notifications:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch users' });
   }
 });
 
@@ -994,7 +968,6 @@ router.post('/test', verifyToken, async (req, res) => {
 // Get VAPID public key
 router.get('/vapid-key', verifyToken, async (req, res) => {
   try {
-    console.log('VAPID Public Key from env:', process.env.VAPID_PUBLIC_KEY);
     if (!process.env.VAPID_PUBLIC_KEY) {
       console.error('VAPID_PUBLIC_KEY is not set in environment variables');
       return res.status(500).json({ error: 'Push notifications are not configured' });
@@ -1080,11 +1053,9 @@ router.get('/debug-vapid', verifyToken, (req, res) => {
 // Clear all push subscriptions for VAPID key changes
 router.post('/admin/clear-subscriptions', verifyToken, isAdmin, async (req, res) => {
   try {
-    console.log(`🧹 Admin clearing all push subscriptions due to VAPID key changes`);
     
     const result = await db.query('DELETE FROM push_subscriptions');
     
-    console.log(`✅ Cleared ${result.affectedRows || 0} push subscriptions`);
     
     res.json({ 
       success: true, 
@@ -1101,26 +1072,43 @@ router.post('/admin/clear-subscriptions', verifyToken, isAdmin, async (req, res)
 // Send notification to specific user (admin only)
 router.post('/send', verifyToken, isAdmin, async (req, res) => {
   try {
-    const { userId, title, message, link_url } = req.body;
+    const { userId, title, message, link_url = '/notifications', type = 'info' } = req.body;
     
     if (!userId || !title || !message) {
       return res.status(400).json({ error: 'User ID, title, and message are required' });
     }
-    
-    const notification = {
+
+    // 1) Insert notification into DB (consistent with app behavior)
+    const insert = await db.query(
+      `INSERT INTO notifications (title, message, type, user_id, link_url) VALUES (?, ?, ?, ?, ?)` ,
+      [title, message, type, userId, link_url]
+    );
+    const notificationId = insert.insertId;
+
+    // 2) Send push notification
+    await sendPushNotification(userId, {
+      id: notificationId,
       title,
       message,
-      id: Date.now(),
-      link_url: link_url || '/notifications'
-    };
+      link_url
+    });
 
-    const success = await sendPushNotification(userId, notification);
-    
-    if (success) {
-      res.json({ success: true, message: 'Notification sent successfully' });
-    } else {
-      res.status(400).json({ error: 'Failed to send notification. User may not have push notifications enabled.' });
+    // 3) Emit via websocket if available
+    if (global.notificationManager) {
+      global.notificationManager.notifyUser(userId, {
+        type: 'notification',
+        notification: {
+          id: notificationId,
+          title,
+          message,
+          type,
+          link_url,
+          created_at: new Date().toISOString()
+        }
+      });
     }
+
+    res.json({ success: true, message: 'Notification sent successfully', id: notificationId });
   } catch (error) {
     console.error('Error sending notification:', error);
     res.status(500).json({ error: 'Failed to send notification' });
@@ -1443,9 +1431,6 @@ router.post('/admin/query-preview', verifyToken, isAdmin, async (req, res) => {
     const { query, params } = buildQuery({ conditions, logicOperator, joins }, tables);
     const countQuery = `SELECT COUNT(*) as count FROM (${query}) as query_result`;
 
-    // Log the generated query and params
-    console.log('[QUERY PREVIEW] SQL:', countQuery);
-    console.log('[QUERY PREVIEW] Params:', params);
 
     const result = await db.query(countQuery, params);
 
@@ -1459,7 +1444,6 @@ router.post('/admin/query-preview', verifyToken, isAdmin, async (req, res) => {
     }));
 
     // Log the preview user results
-    console.log('[QUERY PREVIEW] Preview Users:', previewUsers);
 
     res.json({
       success: true,
@@ -1825,7 +1809,6 @@ router.post('/admin/send', verifyToken, isAdmin, async (req, res) => {
     
     // Send push notifications in batches to avoid overwhelming the server
     try {
-      console.log('Starting push notification process');
       
       // Get all users with push subscriptions that match our query
       const pushQuery = `
@@ -1835,21 +1818,16 @@ router.post('/admin/send', verifyToken, isAdmin, async (req, res) => {
         ON ps.user_id = matched_users.id
       `;
       
-      console.log('Push query constructed:', pushQuery.substring(0, 100) + '...');
-      console.log('Query params:', JSON.stringify(params));
+     
       
       // Wrap in try-catch to handle potential SQL errors
       let pushSubscriptions = [];
       try {
-        console.log('Executing push subscriptions query...');
         pushSubscriptions = await db.query(pushQuery, params);
-        console.log(`Query returned ${pushSubscriptions ? pushSubscriptions.length : 0} results`);
-        console.log('pushSubscriptions type:', typeof pushSubscriptions);
-        console.log('Is array?', Array.isArray(pushSubscriptions));
+        
         
         // Log the first result to see structure
         if (pushSubscriptions && pushSubscriptions.length > 0) {
-          console.log('First subscription sample:', JSON.stringify(pushSubscriptions[0]).substring(0, 200) + '...');
         }
       } catch (sqlError) {
         console.error('Error executing push subscriptions query:', sqlError);
@@ -1864,10 +1842,8 @@ router.post('/admin/send', verifyToken, isAdmin, async (req, res) => {
       
       // Make sure pushSubscriptions is an array before processing
       if (!pushSubscriptions) {
-        console.log('Push subscriptions is null or undefined');
         pushSubscriptions = [];
       } else if (!Array.isArray(pushSubscriptions)) {
-        console.log('Push subscriptions is not an array, converting:', typeof pushSubscriptions);
         // Try to convert to array if possible
         try {
           pushSubscriptions = Array.from(pushSubscriptions);
@@ -1879,22 +1855,18 @@ router.post('/admin/send', verifyToken, isAdmin, async (req, res) => {
       
       // Final check
       if (Array.isArray(pushSubscriptions) && pushSubscriptions.length > 0) {
-        console.log(`Processing ${pushSubscriptions.length} push subscriptions`);
         
         // Send push notifications in batches of 50
         const batchSize = 50;
         
         // Process in batches
         for (let i = 0; i < pushSubscriptions.length; i += batchSize) {
-          console.log(`Processing batch starting at index ${i}`);
           
           // Safely slice the array
           const endIndex = Math.min(i + batchSize, pushSubscriptions.length);
-          console.log(`Batch range: ${i} to ${endIndex}`);
           
           try {
             const batch = pushSubscriptions.slice(i, endIndex);
-            console.log(`Batch size: ${batch.length}`);
             
             const validPromises = [];
             
@@ -1903,7 +1875,6 @@ router.post('/admin/send', verifyToken, isAdmin, async (req, res) => {
               const sub = batch[j];
               
               // Log detailed info about the subscription
-              console.log(`Subscription ${j}:`, sub ? `user_id: ${sub.user_id}, has subscription: ${!!sub.subscription}` : 'undefined');
               
               if (sub && sub.user_id && sub.subscription) {
                 // Directly add promise without nesting - this avoids potential iteration issues
@@ -1922,10 +1893,8 @@ router.post('/admin/send', verifyToken, isAdmin, async (req, res) => {
             }
             
             // Only await if we have valid promises
-            console.log(`Created ${validPromises.length} valid push notification promises`);
             if (validPromises.length > 0) {
               await Promise.all(validPromises);
-              console.log(`Processed batch of ${validPromises.length} push notifications`);
             }
           } catch (batchError) {
             console.error(`Error processing batch starting at index ${i}:`, batchError);
@@ -1933,9 +1902,7 @@ router.post('/admin/send', verifyToken, isAdmin, async (req, res) => {
           }
         }
         
-        console.log(`Completed sending push notifications to ${pushSubscriptions.length} users`);
       } else {
-        console.log('No users with push subscriptions matched the query');
       }
     } catch (pushError) {
       console.error('Error in push notification process:', pushError);
@@ -2094,7 +2061,6 @@ router.patch('/scheduled/:id/status', async (req, res) => {
 // Test endpoint to manually trigger scheduled notification processing
 router.post('/debug/process-scheduled', async (req, res) => {
   try {
-    console.log('🔔 [DEBUG] Manually triggering scheduled notification processing...');
     const stats = await scheduledNotificationService.processDueNotifications();
     
     res.json({
@@ -2114,14 +2080,11 @@ router.post('/debug/process-scheduled', async (req, res) => {
 // Test endpoint to create a scheduled notification due in 1 minute
 router.post('/debug/create-test-scheduled', verifyToken, isAdmin, async (req, res) => {
   try {
-    console.log('🔔 [DEBUG] Creating test scheduled notification...');
     
     // Create a notification scheduled for 1 minute from now
     const now = new Date();
     const scheduledFor = new Date(now.getTime() + 60 * 1000); // 1 minute from now
     
-    console.log('🔔 [DEBUG] Current time:', now.toISOString());
-    console.log('🔔 [DEBUG] Scheduling for:', scheduledFor.toISOString());
     
     const testNotification = {
       title: 'Test Scheduled Notification',
@@ -2136,7 +2099,6 @@ router.post('/debug/create-test-scheduled', verifyToken, isAdmin, async (req, re
     
     const notification = await scheduledNotificationService.createScheduledNotification(testNotification);
     
-    console.log('🔔 [DEBUG] Test scheduled notification created:', notification.id);
     
     res.json({
       success: true,
@@ -2190,7 +2152,6 @@ async function createNotificationInternal(notificationData) {
   
   // If this is a direct notification to a user, send push notification
   if (user_id) {
-    console.log(`🔔 [INTERNAL] Processing individual user notification for user_id: ${user_id}`);
     
     // Send push notification
     sendPushNotification(user_id, {
@@ -2202,7 +2163,6 @@ async function createNotificationInternal(notificationData) {
 
     // Send WebSocket notification for real-time updates
     if (global.notificationManager) {
-      console.log(`🔔 [INTERNAL] Sending WebSocket notification to user ${user_id}`);
       global.notificationManager.notifyUser(user_id, {
         id: insertedId,
         title,
@@ -2212,12 +2172,10 @@ async function createNotificationInternal(notificationData) {
         created_at: effectiveCreatedAt.toISOString ? effectiveCreatedAt.toISOString() : new Date(effectiveCreatedAt).toISOString()
       });
     } else {
-      console.log(`❌ [INTERNAL] No notificationManager available for WebSocket`);
     }
   } 
   // If this is a group notification, send to all users in the group
   else if (target_group) {
-    console.log(`🔔 [INTERNAL] Processing group notification for target_group: ${target_group} (type: ${typeof target_group})`);
     
     let groupUsers = [];
     
@@ -2229,14 +2187,12 @@ async function createNotificationInternal(notificationData) {
       );
       
       if (groupResult.length > 0) {
-        console.log(`🔔 [INTERNAL] Found notification group definition for ID ${target_group}`);
         
         // Use the same logic as immediate notifications
         const group = groupResult[0];
         const queryData = JSON.parse(group.query_data);
         const tables = JSON.parse(group.tables);
         
-        console.log(`🔔 [INTERNAL] Using dynamic query for group ${target_group}:`, queryData);
         
         // Build and execute the query (same as immediate notifications)
         const { query, params } = buildQuery(queryData, tables);
@@ -2244,26 +2200,21 @@ async function createNotificationInternal(notificationData) {
         
         // Convert to the expected format
         groupUsers = userResults.map(user => ({ user_id: user.id }));
-        console.log(`🔔 [INTERNAL] Dynamic query found ${groupUsers.length} users for group ${target_group}`);
         
       } else {
-        console.log(`🔔 [INTERNAL] No notification group found with ID ${target_group}, falling back to user_groups table`);
         
         // Fallback to the old user_groups logic (in case it's still used somewhere)
         const allGroups = await db.query('SELECT DISTINCT group_name FROM user_groups');
-        console.log(`🔔 [INTERNAL] Available groups in user_groups table:`, allGroups.map(g => g.group_name));
         
         // Try to handle target_group as both ID and name
         if (typeof target_group === 'string' || isNaN(target_group)) {
           // Query by group_name
-          console.log(`🔔 [INTERNAL] Querying users by group_name: ${target_group}`);
           groupUsers = await db.query(
             'SELECT user_id FROM user_groups WHERE group_name = ?',
             [target_group]
           );
         } else {
           // For integer target_group, try common group mappings
-          console.log(`🔔 [INTERNAL] target_group is integer: ${target_group}`);
           
           const groupIdToName = {
             1: 'Admin',
@@ -2273,7 +2224,6 @@ async function createNotificationInternal(notificationData) {
           };
           
           const groupName = groupIdToName[target_group] || target_group.toString();
-          console.log(`🔔 [INTERNAL] Mapping group ID ${target_group} to name: ${groupName}`);
           
           groupUsers = await db.query(
             'SELECT user_id FROM user_groups WHERE group_name = ?',
@@ -2286,16 +2236,12 @@ async function createNotificationInternal(notificationData) {
       groupUsers = [];
     }
     
-    console.log(`🔔 [INTERNAL] Found ${groupUsers.length} users in group ${target_group}`);
     
     if (groupUsers.length === 0) {
-      console.log(`❌ [INTERNAL] No users found for target_group: ${target_group}`);
       // Log some debugging info
       const allNotificationGroups = await db.query('SELECT id, name FROM notification_groups');
-      console.log(`🔔 [INTERNAL] Available notification groups:`, allNotificationGroups.map(g => `${g.id}: ${g.name}`));
     } else {
       // ✅ OPTIMIZED GROUP NOTIFICATION PROCESSING
-      console.log(`🚀 [INTERNAL] Starting optimized batch processing for ${groupUsers.length} users`);
       
       try {
         // 1. Batch get all push subscriptions in one query (eliminates N+1 problem)
@@ -2305,7 +2251,6 @@ async function createNotificationInternal(notificationData) {
           userIds
         ) : [];
         
-        console.log(`🔔 [INTERNAL] Found ${subscriptions.length} push subscriptions for ${userIds.length} users`);
         
         // 2. Create subscription lookup map for fast access
         const subscriptionMap = new Map();
@@ -2322,7 +2267,6 @@ async function createNotificationInternal(notificationData) {
           }
         });
         
-        console.log(`🔔 [INTERNAL] Processed ${subscriptionMap.size} valid push subscriptions`);
         
         // 3. Send push notifications with controlled concurrency
         const PUSH_CONCURRENCY_LIMIT = 15; // Max concurrent push requests
@@ -2337,7 +2281,6 @@ async function createNotificationInternal(notificationData) {
         const sendPushWithRetry = async (userId) => {
           const subscription = subscriptionMap.get(userId);
           if (!subscription) {
-            console.log(`ℹ️ [INTERNAL] No push subscription for user ${userId}`);
             return { success: false, reason: 'no_subscription' };
           }
           
@@ -2356,7 +2299,6 @@ async function createNotificationInternal(notificationData) {
           const batch = userIds.slice(i, i + PUSH_CONCURRENCY_LIMIT);
           const batchPromises = batch.map(userId => sendPushWithRetry(userId));
           
-          console.log(`🔔 [INTERNAL] Processing push batch ${Math.floor(i/PUSH_CONCURRENCY_LIMIT) + 1}/${Math.ceil(userIds.length/PUSH_CONCURRENCY_LIMIT)} (${batch.length} users)`);
           
           // Wait for this batch to complete before starting the next
           const batchResults = await Promise.allSettled(batchPromises);
@@ -2375,11 +2317,9 @@ async function createNotificationInternal(notificationData) {
           failed: pushPromises.filter(p => p.status === 'rejected' || (p.status === 'fulfilled' && !p.value.success)).length
         };
         
-        console.log(`📊 [INTERNAL] Push notification results: ${pushStats.successful}/${pushStats.total} successful, ${pushStats.failed} failed`);
         
         // 4. Send WebSocket notifications in parallel (these are fast)
         if (global.notificationManager) {
-          console.log(`🔔 [INTERNAL] Sending WebSocket notifications to ${userIds.length} users`);
           
           const webSocketData = {
             id: insertedId,
@@ -2401,18 +2341,14 @@ async function createNotificationInternal(notificationData) {
           });
           
           await Promise.allSettled(wsPromises);
-          console.log(`✅ [INTERNAL] WebSocket notifications sent to ${userIds.length} users`);
         } else {
-          console.log(`❌ [INTERNAL] No notificationManager available for WebSocket notifications`);
         }
         
-        console.log(`🎉 [INTERNAL] Batch processing complete for ${groupUsers.length} users`);
         
       } catch (batchError) {
         console.error(`❌ [INTERNAL] Error in batch processing:`, batchError);
         
         // Fallback to sequential processing if batch fails
-        console.log(`🔄 [INTERNAL] Falling back to sequential processing...`);
         for (const user of groupUsers.slice(0, 10)) { // Limit fallback to 10 users
           try {
             await sendPushNotification(user.user_id, {
@@ -2458,15 +2394,11 @@ async function createNotificationInternal(notificationData) {
 // Test endpoint to create a scheduled notification for a specific user (debugging)
 router.post('/debug/create-user-scheduled', verifyToken, isAdmin, async (req, res) => {
   try {
-    console.log('🔔 [DEBUG] Creating test scheduled notification for current user...');
     
     // Create a notification scheduled for 1 minute from now for the current user
     const now = new Date();
     const scheduledFor = new Date(now.getTime() + 60 * 1000); // 1 minute from now
-    
-    console.log('🔔 [DEBUG] Current time:', now.toISOString());
-    console.log('🔔 [DEBUG] Scheduling for:', scheduledFor.toISOString());
-    console.log('🔔 [DEBUG] User ID:', req.userId);
+
     
     const testNotification = {
       title: 'Test User Scheduled Notification',
@@ -2482,7 +2414,6 @@ router.post('/debug/create-user-scheduled', verifyToken, isAdmin, async (req, re
     
     const notification = await scheduledNotificationService.createScheduledNotification(testNotification);
     
-    console.log('🔔 [DEBUG] Test user scheduled notification created:', notification.id);
     
     res.json({
       success: true,
@@ -2554,7 +2485,6 @@ router.get('/debug/:id/status', verifyToken, async (req, res) => {
 // Debug endpoint to apply notification standardization (admin only)
 router.post('/debug/standardize', verifyToken, isAdmin, async (req, res) => {
   try {
-    console.log('🔧 [DEBUG] Admin triggered notification standardization...');
     
     const { standardizeNotifications } = require('../scripts/apply_notification_standardization');
     await standardizeNotifications();
@@ -2576,7 +2506,6 @@ router.post('/debug/standardize', verifyToken, isAdmin, async (req, res) => {
 router.post('/debug/test-dynamic-match/:userId', verifyToken, isAdmin, async (req, res) => {
   try {
     const userId = req.params.userId;
-    console.log(`🔧 [DEBUG] Testing dynamic notification matching for user ${userId}`);
     
     // Get user details
     const userDetails = await db.query('SELECT * FROM activeusers WHERE id = ?', [userId]);
@@ -2585,12 +2514,7 @@ router.post('/debug/test-dynamic-match/:userId', verifyToken, isAdmin, async (re
     }
     
     const user = userDetails[0];
-    console.log(`👤 [DEBUG] User details:`, {
-      id: user.id,
-      lagnname: user.lagnname,
-      Active: user.Active,
-      managerActive: user.managerActive
-    });
+
     
     // Get all dynamic group notifications
     const dynamicNotifications = await db.query(`
@@ -2601,7 +2525,6 @@ router.post('/debug/test-dynamic-match/:userId', verifyToken, isAdmin, async (re
       AND n.user_id IS NULL
     `);
     
-    console.log(`🔄 [DEBUG] Found ${dynamicNotifications.length} dynamic notifications`);
     
     const testResults = [];
     
@@ -2610,8 +2533,7 @@ router.post('/debug/test-dynamic-match/:userId', verifyToken, isAdmin, async (re
         const queryData = JSON.parse(notification.query_data);
         const tables = JSON.parse(notification.tables);
         
-        console.log(`🔍 [DEBUG] Testing notification ${notification.id} (${notification.group_name})`);
-        console.log(`🔍 [DEBUG] Query conditions:`, queryData);
+    
         
         // Build and execute the query
         const { query, params } = buildQuery(queryData, tables);
@@ -2628,8 +2550,7 @@ router.post('/debug/test-dynamic-match/:userId', verifyToken, isAdmin, async (re
         
         const existsQuery = `SELECT EXISTS(${finalUserCheck}) as matches`;
         
-        console.log(`🔍 [DEBUG] Generated query: ${existsQuery}`);
-        console.log(`🔍 [DEBUG] Query params:`, params);
+     
         
         const userMatches = await db.query(existsQuery, params);
         const matches = userMatches.length > 0 && userMatches[0].matches > 0;
@@ -2644,7 +2565,6 @@ router.post('/debug/test-dynamic-match/:userId', verifyToken, isAdmin, async (re
           params: params
         });
         
-        console.log(`${matches ? '✅' : '❌'} [DEBUG] Notification ${notification.id}: ${matches ? 'MATCHES' : 'NO MATCH'}`);
         
       } catch (err) {
         console.error(`❌ [DEBUG] Error testing notification ${notification.id}:`, err);
@@ -2657,7 +2577,6 @@ router.post('/debug/test-dynamic-match/:userId', verifyToken, isAdmin, async (re
     }
     
     const matchingCount = testResults.filter(r => r.matches).length;
-    console.log(`🎯 [DEBUG] Summary: ${matchingCount}/${testResults.length} notifications match user ${userId}`);
     
     res.json({
       success: true,

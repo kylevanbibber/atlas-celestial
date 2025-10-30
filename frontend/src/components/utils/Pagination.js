@@ -4,6 +4,7 @@ import './DataTable.css';
 const Pagination = ({
   pageIndex,
   pageCount,
+  pageOptions,
   gotoPage,
   nextPage,
   previousPage,
@@ -37,6 +38,22 @@ const Pagination = ({
         <span className="pagination-info">
           Page {pageIndex + 1} of {pageCount}
         </span>
+
+        {/* Page selector dropdown */}
+        <label className="pagination-label" style={{ marginLeft: 8 }}>
+          Go to:
+        </label>
+        <select
+          className="pagination-select"
+          value={pageIndex}
+          onChange={(e) => gotoPage(Number(e.target.value))}
+          style={{ marginLeft: 6 }}
+        >
+          {(pageOptions && pageOptions.length ? pageOptions : Array.from({ length: pageCount }, (_, i) => i)).map((_, i) => (
+            <option key={`page-opt-${i}`} value={i}>{i + 1}</option>
+          ))}
+        </select>
+
         <button 
           className="pagination-btn" 
           onClick={nextPage} 

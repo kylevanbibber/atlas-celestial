@@ -53,11 +53,10 @@ const useLicenseStatus = () => {
         const response = await api.get(`/licenses/${user.userId}`);
         const licenses = response.data.licenses || [];
         
-        // Check if there's a resident license
-        const hasResidentLicense = licenses.some(license => license.resident_state === 1);
-        console.log(`[useLicenseStatus] Has resident license: ${hasResidentLicense}`);
-        
-        // Check for expired or soon-to-expire licenses
+        // Determine if user has at least one license
+        const hasAtLeastOneLicense = Array.isArray(licenses) && licenses.length > 0;
+
+        // Check for expired or soon-to-expire licenses (keep behavior if desired)
         const currentDate = new Date();
         const oneMonthLater = new Date(currentDate);
         oneMonthLater.setMonth(currentDate.getMonth() + 1);
@@ -70,14 +69,13 @@ const useLicenseStatus = () => {
           
           const isExpiring = expiryDate <= oneMonthLater;
           if (isExpiring) {
-            console.log(`[useLicenseStatus] Found expiring license: ${license.state}, expires: ${license.expiry_date}`);
           }
           return isExpiring;
         });
         
-        // Set warning if no resident license or there's an expiring license
-        const shouldWarn = !hasResidentLicense || hasExpiringLicense;
-        console.log(`[useLicenseStatus] Setting warning status to: ${shouldWarn}`);
+        // Show warning only if no licenses at all (aligns with onboarding requirement)
+        // If you still want expiring warnings, use: const shouldWarn = !hasAtLeastOneLicense || hasExpiringLicense;
+        const shouldWarn = !hasAtLeastOneLicense;
         setHasWarning(shouldWarn);
       } catch (error) {
         console.error('[useLicenseStatus] Error checking license status:', error);

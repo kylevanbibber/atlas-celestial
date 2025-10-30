@@ -25,6 +25,7 @@ async function createScheduledNotification(notificationData) {
       is_paused = false
     } = notificationData;
 
+  
     // Convert metadata to JSON string if needed
     // This handles complex nested objects like queryData examples
     let metadataStr;
@@ -203,7 +204,6 @@ async function updateScheduledNotification(id, updateData) {
       if (notification && notification.is_sent) {
         // Only add is_sent=FALSE if it was previously sent
         setParts.push('is_sent = FALSE');
-        logger.info(`Resetting is_sent flag to FALSE for updated notification ${id}`);
       }
     }
 
@@ -318,13 +318,10 @@ async function getScheduledNotifications(filters = {}) {
  */
 async function processDueNotifications() {
   try {
-    logger.info('Processing due notifications...');
-    console.log('🔔 [PROCESSOR] Starting processDueNotifications...');
     
     // Get current time
     const now = new Date();
-    console.log('🔔 [PROCESSOR] Current time (UTC):', now.toISOString());
-    console.log('🔔 [PROCESSOR] Current time (Local):', now.toLocaleString());
+
     
     // Find notifications that are due and not paused
     // Note: We need to handle timezone properly here
@@ -336,20 +333,12 @@ async function processDueNotifications() {
       [now]
     );
     
-    logger.info(`Found ${dueNotifications.length} notifications to process`);
-    console.log(`🔔 [PROCESSOR] Found ${dueNotifications.length} due notifications`);
     
     // Debug: Show all scheduled notifications for context with timezone info
     const allScheduled = await db.query('SELECT id, title, scheduled_for, is_sent, is_paused FROM scheduled_notifications ORDER BY scheduled_for DESC LIMIT 5');
-    console.log('🔔 [PROCESSOR] Recent scheduled notifications:');
     allScheduled.forEach(n => {
       const scheduledDate = new Date(n.scheduled_for);
-      console.log(`  ID ${n.id}: "${n.title}"`);
-      console.log(`    DB value: ${n.scheduled_for}`);
-      console.log(`    Parsed as: ${scheduledDate.toISOString()} (UTC)`);
-      console.log(`    Local time: ${scheduledDate.toLocaleString()}`);
-      console.log(`    Is due? ${scheduledDate <= now} (is_sent: ${n.is_sent}, is_paused: ${n.is_paused})`);
-      console.log('');
+
     });
     
     // Track statistics
@@ -373,8 +362,6 @@ async function processDueNotifications() {
         }
         
         // Log details about this notification (for debugging)
-        logger.info(`Processing notification ${notification.id}: "${notification.title}" (type: ${notification.type})`);
-        logger.info(`Target: user_id=${notification.user_id}, target_group=${notification.target_group}`);
         logger.debug(`Metadata: ${JSON.stringify(metadata, null, 2)}`);
         
         // Store original scheduled_for time for reference
@@ -388,7 +375,6 @@ async function processDueNotifications() {
         
         // Send notification using the same logic as immediate notifications
         // Instead of duplicating push notification logic, use the same internal function
-        console.log(`🔔 [PROCESSOR] Creating notification for ID ${notification.id}...`);
         
         try {
           // Import the internal notification creation function
@@ -407,19 +393,16 @@ async function processDueNotifications() {
             created_at: originalScheduledFor
           };
           
-          console.log(`🔔 [PROCESSOR] Sending notification via internal route for scheduled ID ${notification.id}`);
           
           // Call the same internal function that immediate notifications use
           // This will handle database creation, push notifications, and WebSocket notifications
           const createdNotification = await createNotificationInternal(notificationData);
           
-          console.log(`✅ [PROCESSOR] Successfully sent notification from scheduled ID ${notification.id} via internal route`);
           
         } catch (internalError) {
           console.error(`❌ [PROCESSOR] Error sending notification via internal route for scheduled ID ${notification.id}:`, internalError);
           
           // Fallback to the old method if internal route fails
-          console.log(`🔔 [PROCESSOR] Falling back to direct creation for scheduled ID ${notification.id}`);
           
           const createdNotification = await notificationService.createNotification({
             title: notification.title,
@@ -433,18 +416,13 @@ async function processDueNotifications() {
             created_at: originalScheduledFor
           });
           
-          console.log(`🔔 [PROCESSOR] Fallback creation completed for scheduled ID ${notification.id}`);
         }
         
         // Handle recurrence if applicable
         if (metadata.recurrence) {
-          logger.info(`Notification ${notification.id} has recurrence pattern: ${metadata.recurrence.pattern}`);
-          console.log(`🔔 [PROCESSOR] Handling recurrence for ID ${notification.id}: ${metadata.recurrence.pattern}`);
           await handleRecurrence(notification, metadata.recurrence);
         } else {
           // Mark as sent for one-time notifications without changing the scheduled_for time
-          logger.info(`Marking one-time notification ${notification.id} as sent (preserving original scheduled_for time)`);
-          console.log(`🔔 [PROCESSOR] Marking one-time notification ${notification.id} as sent`);
           await db.query(
             'UPDATE scheduled_notifications SET is_sent = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
             [notification.id]
@@ -458,7 +436,6 @@ async function processDueNotifications() {
       }
     }
     
-    logger.info(`Processed due notifications. Sent: ${stats.sent}, Errors: ${stats.errors}`);
     return stats;
   } catch (error) {
     logger.error('Error processing due notifications:', error);
@@ -543,7 +520,6 @@ async function handleRecurrence(notification, recurrence) {
     // Check if we've reached the end date for non-indefinite recurrences
     if (!indefinite && endDate && nextDate > endDate) {
       // End of recurrence reached, mark as sent and done
-      logger.info(`Recurring notification ${notification.id} has reached its end date. Marking as sent.`);
       await db.query(
         'UPDATE scheduled_notifications SET is_sent = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
         [notification.id]
@@ -552,7 +528,6 @@ async function handleRecurrence(notification, recurrence) {
     }
     
     // Update the notification with the next date
-    logger.info(`Updating recurring notification ${notification.id} with next scheduled date: ${nextDate.toISOString()}`);
     await db.query(
       'UPDATE scheduled_notifications SET scheduled_for = ?, is_sent = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [nextDate, notification.id]

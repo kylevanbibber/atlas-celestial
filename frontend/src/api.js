@@ -6,7 +6,6 @@ const API_URL =
     ? "https://atlas-celest-backend-3bb2fea96236.herokuapp.com/api"  // Production URL  
     : "http://localhost:5001/api"; // Local development URL
 
-console.log(`[API] Initializing with baseURL: ${API_URL}`);
 
 // Simple cache for frequently accessed data
 const cache = new Map();
@@ -53,6 +52,11 @@ const api = axios.create({
 // Add auth token to all requests
 api.interceptors.request.use(
   (config) => {
+    // Debug logging for release management endpoints
+    if (config.url?.includes('fail-user') || config.url?.includes('pass-user')) {
+
+    }
+    
     // Get token from localStorage
     const token = localStorage.getItem('auth_token');
     
@@ -74,12 +78,20 @@ api.interceptors.request.use(
     // Add delay to respect rate limits
     config.metadata = { startTime: Date.now() };
     
-    console.log(`[API] 🚀 Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, {
-      params: config.params,
-      hasToken: !!config.headers.Authorization,
-      hasImpersonation: !!config.headers['X-Impersonated-User-Id'],
-      withCredentials: config.withCredentials
-    });
+
+    
+
+    // Track timing and goals-specific logging
+    config.metadata = { startTime: Date.now(), url: config.url };
+    if (config.url?.startsWith('/goals')) {
+      console.log('[API] 🚀 Request →', {
+        url: config.url,
+        method: config.method?.toUpperCase(),
+        hasAuth: !!config.headers.Authorization,
+      });
+    }
+    
+    
     return config;
   },
   (error) => {
@@ -99,15 +111,79 @@ api.interceptors.response.use(
       rateLimitState.reset = parseInt(response.headers['x-ratelimit-reset']) * 1000;
     }
     
-    console.log(`[API] ✅ Response: ${response.config.method?.toUpperCase()} ${response.config.url}`, {
-      status: response.status,
-      statusText: response.statusText,
-      dataSize: JSON.stringify(response.data).length,
-      rateLimitRemaining: rateLimitState.remaining,
-    });
+ 
+    // Per-request timing log for goals
+    if (response.config?.metadata?.startTime && response.config?.url?.startsWith('/goals')) {
+      const ms = Date.now() - response.config.metadata.startTime;
+      console.log('[API] ✅ Response ←', { url: response.config.url, status: response.status, ms });
+    }
     return response;
   },
   async (error) => {
+    // Per-request timing log for goals on error
+    if (error.config?.metadata?.startTime && error.config?.url?.startsWith('/goals')) {
+      const ms = Date.now() - error.config.metadata.startTime;
+      console.warn('[API] ❌ Error ←', { url: error.config.url, status: error.response?.status, ms });
+    }
+    // Handle authentication errors (401 Unauthorized)
+    if (error.response?.status === 401) {
+      const originalRequest = error.config;
+      
+      // Skip auto-logout for login/register endpoints to avoid infinite loops
+      const isAuthEndpoint = originalRequest?.url?.includes('/auth/login') || 
+                            originalRequest?.url?.includes('/auth/newlogin') ||
+                            originalRequest?.url?.includes('/auth/register');
+      
+      // Skip auto-logout for Discord-specific token expiration
+      const isDiscordEndpoint = originalRequest?.url?.includes('/discord/');
+      const isDiscordTokenError = error.response?.data?.error?.includes?.('Discord token') || 
+                                  error.response?.data?.message?.includes?.('Discord token') ||
+                                  error.response?.data?.error === 'Discord token expired';
+      
+      if (isDiscordEndpoint && isDiscordTokenError) {
+        console.warn('[API] 🔒 Discord token expired - NOT triggering main auth logout');
+        
+        // Return the error without triggering logout - let Discord components handle it
+        const discordError = new Error('Discord authentication failed');
+        discordError.type = 'DISCORD_AUTH_FAILED';
+        discordError.originalError = error;
+        return Promise.reject(discordError);
+      }
+      
+      if (!isAuthEndpoint && !originalRequest._authRetried) {
+        originalRequest._authRetried = true;
+        
+        console.warn('[API] 🔒 Authentication failed - token likely expired, triggering auto-logout');
+        
+        // Save current page before logout for restoration after re-login
+        const currentPath = window.location.pathname + window.location.search + window.location.hash;
+        
+        // Only save path if it's not already an auth page
+        const isCurrentlyOnAuthPage = ['/login', '/register', '/adminlogin'].includes(window.location.pathname);
+        if (!isCurrentlyOnAuthPage && currentPath !== '/') {
+          localStorage.setItem('intendedPath', currentPath);
+        }
+        
+        // Trigger logout by dispatching a custom event that AuthContext can listen to
+        window.dispatchEvent(new CustomEvent('auth:token-expired', {
+          detail: { 
+            error: error.response?.data,
+            url: originalRequest?.url,
+            currentPath 
+          }
+        }));
+        
+        // Clear the auth token immediately
+        localStorage.removeItem('auth_token');
+        
+        // Return a rejected promise with a specific error type
+        const authError = new Error('Authentication token expired');
+        authError.type = 'AUTH_EXPIRED';
+        authError.originalError = error;
+        return Promise.reject(authError);
+      }
+    }
+    
     // Handle rate limiting
     if (error.response?.status === 429) {
       const retryAfter = error.response.headers['retry-after'];
@@ -146,7 +222,6 @@ const enhancedApi = {
     const cached = cache.get(cacheKey);
     
     if (cached && isCacheValid(cached.timestamp) && !options.forceRefresh) {
-      console.log(`[API] 📦 Cache hit for ${url}`);
       return cached.data;
     }
     
@@ -197,7 +272,15 @@ const enhancedApi = {
     } else {
       cache.clear();
     }
-    console.log(`[API] 🗑️ Cache cleared${urlPattern ? ` for pattern: ${urlPattern}` : ''}`);
+  },
+  
+  // Convenience to clear activity-related caches after impersonation switch
+  clearActivityCaches() {
+    this.clearCache('/dailyActivity');
+    this.clearCache('/alp/weekly');
+    this.clearCache('/discord/sales');
+    this.clearCache('/auth/userHierarchy');
+    this.clearCache('/auth/searchByUserId');
   },
   
   // Get rate limit status

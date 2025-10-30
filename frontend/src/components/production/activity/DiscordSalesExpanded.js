@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import api from '../../../api';
 
 const DiscordSalesExpanded = ({ 
@@ -30,6 +30,7 @@ const DiscordSalesExpanded = ({
 
   const handleEditSave = async (saleId) => {
     try {
+      console.log('[DiscordSalesExpanded] Saving sale edit', { saleId, editFormData });
       const response = await api.put(`/discord/sales/${saleId}`, editFormData);
       
       if (response.data.success) {
@@ -52,6 +53,7 @@ const DiscordSalesExpanded = ({
     }
 
     try {
+      console.log('[DiscordSalesExpanded] Deleting sale', { saleId });
       const response = await api.delete(`/discord/sales/${saleId}`);
       
       if (response.data.success) {
@@ -70,6 +72,10 @@ const DiscordSalesExpanded = ({
     setManualFormData({
       alp: breakdownData?.manual_alp || 0,
       refs: breakdownData?.manual_refs || 0
+    });
+    console.log('[DiscordSalesExpanded] Starting manual edit with defaults', {
+      manual_alp: breakdownData?.manual_alp || 0,
+      manual_refs: breakdownData?.manual_refs || 0
     });
   };
 
@@ -110,8 +116,47 @@ const DiscordSalesExpanded = ({
     return leadType?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown';
   };
 
-  // Calculate totals
-  const totals = salesData.reduce((acc, sale) => {
+  // Deduplicate sales by id to prevent double-counting on refresh
+  const uniqueSales = useMemo(() => {
+    const seen = new Set();
+    return (salesData || []).filter((sale) => {
+      if (!sale || sale.id == null) return false;
+      if (seen.has(sale.id)) return false;
+      seen.add(sale.id);
+      return true;
+    });
+  }, [salesData]);
+
+  // Debug: incoming props and deduplication summary
+  useEffect(() => {
+    try {
+      console.groupCollapsed('[DiscordSalesExpanded] Props snapshot');
+      console.log('dateString:', dateString);
+      console.log('salesData count:', Array.isArray(salesData) ? salesData.length : 0);
+      console.log('salesData ids:', Array.isArray(salesData) ? salesData.map(s => s?.id) : []);
+      console.log('breakdownData:', breakdownData);
+      console.groupEnd();
+
+      // Duplicate id detection
+      const idCounts = new Map();
+      (salesData || []).forEach(s => {
+        const id = s?.id;
+        if (id == null) return;
+        idCounts.set(id, (idCounts.get(id) || 0) + 1);
+      });
+      const duplicates = Array.from(idCounts.entries()).filter(([_, c]) => c > 1).map(([id, c]) => ({ id, count: c }));
+      console.groupCollapsed('[DiscordSalesExpanded] Dedup summary');
+      console.log('input count:', (salesData || []).length);
+      console.log('unique count:', uniqueSales.length);
+      if (duplicates.length) {
+        console.log('duplicate ids:', duplicates);
+      }
+      console.groupEnd();
+    } catch (e) {}
+  }, [salesData, breakdownData, dateString, uniqueSales]);
+
+  // Calculate totals from unique sales only
+  const totals = uniqueSales.reduce((acc, sale) => {
     acc.alp += parseFloat(sale.alp) || 0;
     acc.refs += parseInt(sale.refs) || 0;
     acc.sales += 1;
@@ -121,55 +166,50 @@ const DiscordSalesExpanded = ({
   // Get manual amounts from breakdown data
   const manualAlp = breakdownData?.manual_alp || 0;
   const manualRefs = breakdownData?.manual_refs || 0;
-  const totalAlp = breakdownData?.total_alp || (totals.alp + manualAlp);
-  const totalRefs = breakdownData?.total_refs || (totals.refs + manualRefs);
+  const totalAlp = (breakdownData?.total_alp ?? null) !== null && breakdownData?.total_alp !== undefined
+    ? Number(breakdownData.total_alp) || 0
+    : (totals.alp + manualAlp);
+  const totalRefs = (breakdownData?.total_refs ?? null) !== null && breakdownData?.total_refs !== undefined
+    ? Number(breakdownData.total_refs) || 0
+    : (totals.refs + manualRefs);
 
-  if (!salesData || salesData.length === 0) {
-    // No Discord sales, but might have manual entries
-    if (manualAlp > 0 || manualRefs > 0) {
-      return (
-        <div className="expanded-content">
-          <div className="discord-sales-container">
-            <div className="discord-sales-header">
-              <h4 className="discord-sales-title">Activity for {dateString}</h4>
-              <span className="discord-sales-count">Manual entries only</span>
-            </div>
+  // Debug: totals overview
+  useEffect(() => {
+    try {
+      console.groupCollapsed('[DiscordSalesExpanded] Totals overview');
+      console.table({
+        discord_alp: Number(totals.alp || 0).toFixed(2),
+        discord_refs: totals.refs || 0,
+        discord_sales: totals.sales || 0,
+        manual_alp: Number(manualAlp || 0).toFixed(2),
+        manual_refs: manualRefs || 0,
+        total_alp: Number(totalAlp || 0).toFixed(2),
+        total_refs: totalRefs || 0
+      });
+      console.groupEnd();
+    } catch (e) {}
+  }, [totals, manualAlp, manualRefs, totalAlp, totalRefs]);
 
-            <div className="discord-sale-item manual-addition-item">
-              <div className="discord-sale-info">
-                <div className="discord-sale-field">
-                  <span className="discord-sale-label">Manual ALP</span>
-                  <span className="discord-sale-value">${manualAlp.toFixed(2)}</span>
-                </div>
-                <div className="discord-sale-field">
-                  <span className="discord-sale-label">Manual Refs</span>
-                  <span className="discord-sale-value">{manualRefs}</span>
-                </div>
-              </div>
-              <div className="discord-sale-actions">
-                <button
-                  className="discord-sale-edit-btn"
-                  onClick={handleManualEditStart}
-                >
-                  Edit Manual
-                </button>
-              </div>
-            </div>
-
-            <div className="discord-sales-total">
-              <span>Total ALP: ${manualAlp.toFixed(2)}</span>
-              <span>Total Refs: {manualRefs}</span>
-              <span>Manual Entries Only</span>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
+  if (!uniqueSales || uniqueSales.length === 0) {
+    // No Discord sales — render empty Discord section and then Arias Life section if any
     return (
       <div className="expanded-content">
-        <div className="no-discord-sales">
-          No Discord sales or manual entries recorded for {dateString}
+        <div className="discord-sales-container">
+          {/* Reported on Discord */}
+          <div className="discord-sales-header">
+            <h4 className="discord-sales-title">Reported on Discord</h4>
+            <span className="discord-sales-count">0 sales</span>
+          </div>
+          <div className="no-discord-sales" style={{ padding: '8px 0', color: 'var(--text-secondary)' }}>
+            No Discord sales recorded for {dateString}
+          </div>
+          <div className="discord-sales-total" style={{ marginTop: '6px' }}>
+            <span>Discord Totals — ALP: ${totals.alp.toFixed(2)}</span>
+            <span>Refs: {totals.refs}</span>
+            <span>Closes: {totals.sales}</span>
+          </div>
+
+          {/* Removed Arias Life section */}
         </div>
       </div>
     );
@@ -178,12 +218,13 @@ const DiscordSalesExpanded = ({
   return (
     <div className="expanded-content">
       <div className="discord-sales-container">
+        {/* Reported on Discord */}
         <div className="discord-sales-header">
-          <h4 className="discord-sales-title">Discord Sales for {dateString}</h4>
-          <span className="discord-sales-count">{salesData.length} sale{salesData.length !== 1 ? 's' : ''}</span>
+          <h4 className="discord-sales-title">Reported on Discord</h4>
+          <span className="discord-sales-count">{uniqueSales.length} sale{uniqueSales.length !== 1 ? 's' : ''}</span>
         </div>
 
-        {salesData.map((sale) => (
+        {uniqueSales.map((sale) => (
           <div key={sale.id} className="discord-sale-item">
             {editingSale === sale.id ? (
               // Edit mode
@@ -311,95 +352,16 @@ const DiscordSalesExpanded = ({
           </div>
         ))}
 
-        {/* Manual Addition Row */}
-        <div className="discord-sale-item manual-addition-item">
-          <div className="manual-addition-header">
-          </div>
-          
-          {editingManual ? (
-            // Edit mode for manual amounts
-            <div className="discord-sale-info">
-              <div className="discord-sale-field">
-                <label className="discord-sale-label">Manual ALP</label>
-                <input
-                  type="number"
-                  value={manualFormData.alp}
-                  onChange={(e) => setManualFormData(prev => ({ ...prev, alp: e.target.value }))}
-                  style={{ width: '80px', padding: '2px 4px', fontSize: '12px' }}
-                  step="0.01"
-                />
-              </div>
-              <div className="discord-sale-field">
-                <label className="discord-sale-label">Manual Refs</label>
-                <input
-                  type="number"
-                  value={manualFormData.refs}
-                  onChange={(e) => setManualFormData(prev => ({ ...prev, refs: e.target.value }))}
-                  style={{ width: '60px', padding: '2px 4px', fontSize: '12px' }}
-                />
-              </div>
-              <div className="discord-sale-field">
-                <div className="discord-sale-timestamp">
-                  Additional amounts not tracked via Discord
-                </div>
-              </div>
-            </div>
-          ) : (
-            // View mode for manual amounts
-            <div className="discord-sale-info">
-              <div className="discord-sale-field">
-                <span className="discord-sale-label">Manual ALP</span>
-                <span className="discord-sale-value">${manualAlp.toFixed(2)}</span>
-              </div>
-              <div className="discord-sale-field">
-                <span className="discord-sale-label">Manual Refs</span>
-                <span className="discord-sale-value">{manualRefs}</span>
-              </div>
-              <div className="discord-sale-field">
-                <div className="discord-sale-timestamp">
-                  Additional amounts not tracked via Discord
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="discord-sale-actions">
-            {editingManual ? (
-              <>
-                <button
-                  className="discord-sale-edit-btn"
-                  onClick={handleManualEditSave}
-                >
-                  Save
-                </button>
-                <button
-                  className="discord-sale-delete-btn"
-                  onClick={handleManualEditCancel}
-                >
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <button
-                className="discord-sale-edit-btn"
-                onClick={handleManualEditStart}
-              >
-                Edit Manual
-              </button>
-            )}
-          </div>
+        {/* Discord subtotal under list */}
+        <div className="discord-sales-total" style={{ marginTop: '6px' }}>
+          <span>Discord Totals — ALP: ${totals.alp.toFixed(2)}</span>
+          <span>Refs: {totals.refs}</span>
+          <span>Closes: {totals.sales}</span>
         </div>
 
-        <div className="discord-sales-total">
-          <span>Discord ALP: ${totals.alp.toFixed(2)}</span>
-          <span>Manual ALP: ${manualAlp.toFixed(2)}</span>
-          <span>Total ALP: ${totalAlp.toFixed(2)}</span>
-          <br />
-          <span>Discord Refs: {totals.refs}</span>
-          <span>Manual Refs: {manualRefs}</span>
-          <span>Total Refs: {totalRefs}</span>
-          <br />
-        </div>
+        {/* Removed Arias Life manual section */}
+
+        {/* Bottom totals removed per simplification */}
       </div>
     </div>
   );

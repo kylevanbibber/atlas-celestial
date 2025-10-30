@@ -45,13 +45,13 @@ const ClientInfo = ({ setClientInfo, setAgentInfo, setSelectedAgentId }) => {
 
   const fetchAgentInfo = async (userId) => {
     try {
-      // Note: userId is automatically added by AuthContext interceptor, but we can still include it explicitly
-      const response = await api.post('/verify/searchByUserId', { userId });
+      // Use AUTH endpoint (broader hierarchy) instead of VERIFY endpoint
+      const response = await api.post('/auth/searchByUserId', { userId });
       const data = response.data;
   
       if (data.success && data.data && data.data.length > 0) {
         const agentData = data.data;
-        const defaultAgent = data.agnName;
+        const defaultAgent = data.agnName || agentData[0]?.lagnname || '';
         
         setAgentName(defaultAgent);
         const defaultAgentInfo = agentData.find(agent => agent.lagnname === defaultAgent) || {};
@@ -62,10 +62,14 @@ const ClientInfo = ({ setClientInfo, setAgentInfo, setSelectedAgentId }) => {
         setSelectedAgent(defaultAgent);
       } else {
         console.error('Agent info not found or invalid data format');
+        setAllAgents([]);
+        setSelectedAgent('');
       }
       setAgentInfoLoaded(true);
     } catch (error) {
       console.error('Error fetching agent info:', error);
+      setAllAgents([]);
+      setSelectedAgent('');
       setAgentInfoLoaded(true);
     }
   };

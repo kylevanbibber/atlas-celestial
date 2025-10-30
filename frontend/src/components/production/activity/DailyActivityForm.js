@@ -2,6 +2,8 @@ import React, { useState, useEffect, useContext } from "react";
 import DataTable from "../../utils/DataTable";
 import ActionBar from "../../utils/ActionBar";
 import DiscordSalesExpanded from "./DiscordSalesExpanded";
+import HierarchyActivity from "./HierarchyActivity";
+import MGADataTable from "./MGADataTable";
 import api from "../../../api";
 import { AuthContext } from "../../../context/AuthContext";
 import "./DailyActivityForm.css";
@@ -24,17 +26,33 @@ const DailyActivityForm = () => {
     return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   };
 
-  // Helper function to get Monday of the week for any date
-  const getMondayOfWeek = (dateInput) => {
+  // Helper function to get the start of the week for any date (respects schedule_type)
+  const getWeekStart = (dateInput, weekScheduleType = scheduleType) => {
     // Handle both string dates and Date objects
     const date = typeof dateInput === 'string' 
       ? new Date(dateInput + 'T00:00:00') 
       : new Date(dateInput);
     
     const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const monday = new Date(date);
-    monday.setDate(date.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-    return monday.toISOString().split('T')[0];
+    const weekStart = new Date(date);
+    
+    if (weekScheduleType === 'wed-tue') {
+      // For Wed-Tue weeks, find the Wednesday that starts the week
+      let daysToSubtract;
+      if (dayOfWeek >= 3) {
+        // Wed (3), Thu (4), Fri (5), Sat (6) -> go back to this Wed
+        daysToSubtract = dayOfWeek - 3;
+      } else {
+        // Sun (0), Mon (1), Tue (2) -> go back to previous Wed
+        daysToSubtract = dayOfWeek + 4; // 0+4=4, 1+4=5, 2+4=6
+      }
+      weekStart.setDate(date.getDate() - daysToSubtract);
+    } else {
+      // Default Mon-Sun week
+      weekStart.setDate(date.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+    }
+    
+    return weekStart.toISOString().split('T')[0];
   };
   
   const [selectedRange, setSelectedRange] = useState("week"); // week, month, ytd
@@ -49,16 +67,38 @@ const DailyActivityForm = () => {
   const [editedRows, setEditedRows] = useState({});
   const [rowClassNames, setRowClassNames] = useState({});
   const [showWeeklyTotals, setShowWeeklyTotals] = useState(false);
-  const [showMissingDataWarnings, setShowMissingDataWarnings] = useState(true);
+  const [showMissingDataWarnings, setShowMissingDataWarnings] = useState(false);
   const [hoveredWeekKey, setHoveredWeekKey] = useState(null);
   const [expandableRows, setExpandableRows] = useState({});
   const [expandedRows, setExpandedRows] = useState({});
+  const [showHierarchy, setShowHierarchy] = useState(false);
+  const [showMgaTable, setShowMgaTable] = useState(false);
+  
+  // Initialize schedule type from localStorage or default to 'mon-sun'
+  const [scheduleType, setScheduleType] = useState(() => {
+    try {
+      const savedScheduleType = localStorage.getItem('dailyActivityScheduleType');
+      return savedScheduleType === 'wed-tue' ? 'wed-tue' : 'mon-sun';
+    } catch (error) {
+      console.error('Error reading schedule type from localStorage:', error);
+      return 'mon-sun';
+    }
+  });
 
 
-  // Define columns for DataTable
-  const columns = [
+  // Define columns for DataTable - memoized to update when showMissingDataWarnings changes
+  const columns = React.useMemo(() => [
+    // Dedicated expander column (first)
     {
       Header: "",
+      accessor: "_expander",
+      width: 26,
+      disableSortBy: true,
+      Cell: () => null
+    },
+    // Day of week column (second)
+    {
+      Header: "Day",
       accessor: "dayOfWeek",
       width: 30,
       Cell: ({ value }) => <strong>{value}</strong>
@@ -125,7 +165,7 @@ const DailyActivityForm = () => {
       }
     },
     {
-      Header: "ALP",
+      Header: "Total ALP",
       accessor: "alp",
       type: "number",
       width: 80,
@@ -269,12 +309,84 @@ const DailyActivityForm = () => {
         inputMode: "decimal"
       },
       // No custom Cell renderer needed for Ref ALP since we only show actual data for main ALP
+    },
+    {
+      Header: "Show Ratio",
+      accessor: "showRatio",
+      width: 80,
+      Cell: ({ value }) => <span>{value || ''}</span>
+    },
+    {
+      Header: "Close Ratio", 
+      accessor: "closeRatio",
+      width: 80,
+      Cell: ({ value }) => <span>{value || ''}</span>
+    },
+    {
+      Header: "ALP/Sale",
+      accessor: "alpPerSale", 
+      width: 80,
+      Cell: ({ value }) => <span>{value ? `$${value}` : ''}</span>
+    },
+    {
+      Header: "ALP/Ref Sale",
+      accessor: "alpPerRefSale",
+      width: 100,
+      Cell: ({ value }) => <span>{value ? `$${value}` : ''}</span>
+    },
+    {
+      Header: "ALP/Ref Coll",
+      accessor: "alpPerRefCollected", 
+      width: 100,
+      Cell: ({ value }) => <span>{value ? `$${value}` : ''}</span>
+    },
+    {
+      Header: "Ref Close Ratio",
+      accessor: "refCloseRatio",
+      width: 100,
+      Cell: ({ value }) => <span>{value || ''}</span>
+    },
+    {
+      Header: "Ref Coll/Sit",
+      accessor: "refCollectedPerSit",
+      width: 100,
+      Cell: ({ value }) => <span>{value || ''}</span>
+    },
+    {
+      Header: "Calls to Sit",
+      accessor: "callsToSitRatio",
+      width: 100,
+      Cell: ({ value }) => <span>{value || ''}</span>
     }
-  ];
+  ], [showMissingDataWarnings, discordSalesData, actualAlpData, discordVsManualBreakdown]);
+
+  // Save schedule type to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('dailyActivityScheduleType', scheduleType);
+    } catch (error) {
+      console.error('Error saving schedule type to localStorage:', error);
+    }
+  }, [scheduleType]);
 
   useEffect(() => {
     generateDateRows();
-  }, [selectedRange, currentDate]);
+  }, [selectedRange, currentDate, scheduleType]);
+
+  // Refetch on user change (including admin impersonation)
+  useEffect(() => {
+    // When user changes, reset local state and regenerate rows to trigger refetches
+    setActivityData({});
+    setActualAlpData({});
+    setDiscordSalesData({});
+    setDiscordVsManualBreakdown({});
+    setEditedRows({});
+    setExpandableRows({});
+    setExpandedRows({});
+    setTableData([]);
+    // Keep the same period and date; generate rows to trigger downstream fetches
+    generateDateRows();
+  }, [user?.userId, user?.lagnname]);
 
   useEffect(() => {
     if (dateRows.length > 0) {
@@ -304,51 +416,67 @@ const DailyActivityForm = () => {
     return <div>Loading user data...</div>;
   }
 
-  // Log component render state
-  console.log(`[DAILY-ACTIVITY-RENDER] 🎬 DailyActivityForm rendering:`, {
-    selectedRange,
-    dateRowsLength: dateRows.length,
-    activityDataKeys: Object.keys(activityData).length,
-    discordSalesDataKeys: Object.keys(discordSalesData).length,
-    discordVsManualBreakdownKeys: Object.keys(discordVsManualBreakdown).length,
-    expandableRowsKeys: Object.keys(expandableRows).length,
-    tableDataLength: tableData.length,
-    loading,
-    authLoading,
-    userLoaded: !!user,
-    userId: user?.id,
-    userName: user?.lagnname
-  });
+  // (console logs removed)
 
   const transformDataForTable = () => {
-    console.log(`[TRANSFORM-DATA] 🔄 Starting transformDataForTable`);
-    console.log(`[TRANSFORM-DATA] Input state:`, {
-      dateRowsLength: dateRows.length,
-      activityDataKeys: Object.keys(activityData).length,
-      discordSalesDataKeys: Object.keys(discordSalesData).length,
-      expandableRowsKeys: Object.keys(expandableRows).length,
-      editedRowsKeys: Object.keys(editedRows).length,
-      showWeeklyTotals,
-      selectedRange
-    });
-
     // Pre-calculate today's date to avoid repeated calculations
     const today = getTodayEastern();
 
     // Helper function to check if a row exists in the database or has edited data
-    const hasAnyData = (row, editedRow) => {
-      // Check if we have a database record (row from activityData)
-      const hasDbRecord = row && Object.keys(row).length > 0;
+    const hasAnyData = (row, editedRow, date) => {
+      // Check if there's a row with actual activity data (not just reportDate)
+      const hasDbRecord = row && typeof row === 'object' && (
+        row.calls !== undefined || 
+        row.appts !== undefined || 
+        row.sits !== undefined || 
+        row.sales !== undefined || 
+        row.alp !== undefined || 
+        row.refs !== undefined ||
+        row.refAppt !== undefined ||
+        row.refSit !== undefined ||
+        row.refSale !== undefined ||
+        row.refAlp !== undefined
+      );
       
-      // Check if we have any edited values for this date
+      // If there are any edited values for this date, then data exists
       const hasEditedData = editedRow && Object.keys(editedRow).length > 0;
       
-      // Return true if either database record exists OR we have edited data
+      // Return true if there's either a database record OR edited data
       return hasDbRecord || hasEditedData;
     };
 
+    // Helper function to calculate stats ratios
+    const calculateStats = (calls, appts, sits, sales, alp, refs, refAppt, refSit, refSale, refAlp) => {
+      const stats = {};
+      
+      // Only calculate stats if there's any activity
+      const hasActivity = calls > 0 || appts > 0 || sits > 0 || sales > 0 || alp > 0 || refs > 0 || refAppt > 0 || refSit > 0 || refSale > 0 || refAlp > 0;
+      
+      if (hasActivity) {
+        stats.showRatio = appts > 0 ? ((sits / appts) * 100).toFixed(1) + '%' : '0.0%';
+        stats.closeRatio = sits > 0 ? ((sales / sits) * 100).toFixed(1) + '%' : '0.0%';
+        stats.alpPerSale = sales > 0 ? (alp / sales).toFixed(0) : '0';
+        stats.alpPerRefSale = refSale > 0 ? (refAlp / refSale).toFixed(0) : '0';
+        stats.alpPerRefCollected = refs > 0 ? (refAlp / refs).toFixed(0) : '0';
+        stats.refCloseRatio = refSit > 0 ? ((refSale / refSit) * 100).toFixed(1) + '%' : '0.0%';
+        stats.refCollectedPerSit = sits > 0 ? (refs / sits).toFixed(2) : '0.00';
+        stats.callsToSitRatio = sits > 0 ? (calls / sits).toFixed(2) : '0.00';
+      } else {
+        stats.showRatio = '';
+        stats.closeRatio = '';
+        stats.alpPerSale = '';
+        stats.alpPerRefSale = '';
+        stats.alpPerRefCollected = '';
+        stats.refCloseRatio = '';
+        stats.refCollectedPerSit = '';
+        stats.callsToSitRatio = '';
+      }
+      
+      return stats;
+    };
+
     // First, create all daily rows with optimized data checking
-    console.log(`[TRANSFORM-DATA] 📅 Creating daily rows for ${dateRows.length} dates`);
+    // (console logs removed)
     
     const dailyRows = dateRows.map((date, index) => {
       const row = activityData[date] || {};
@@ -358,7 +486,7 @@ const DailyActivityForm = () => {
       const isPastDate = date < today;
 
       // Optimized missing data detection
-      const hasData = hasAnyData(row, editedRow);
+      const hasData = hasAnyData(row, editedRow, date);
       const hasNoData = isPastDate && !hasData;
 
       // Create date object once and reuse
@@ -368,9 +496,8 @@ const DailyActivityForm = () => {
       const dayAbbreviations = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
       const dayOfWeek = dayAbbreviations[dateObj.getDay()];
 
-      // Create display date
+      // Create display date (m/d format)
       const displayDate = dateObj.toLocaleDateString("en-US", { 
-          year: "2-digit", 
           month: "numeric", 
           day: "numeric" 
         });
@@ -382,18 +509,22 @@ const DailyActivityForm = () => {
       const hasDiscordSales = discordSalesData[date] && discordSalesData[date].length > 0;
       const discordSalesCount = hasDiscordSales ? discordSalesData[date].length : 0;
 
-      if (index < 5) { // Log first 5 rows for debugging
-        console.log(`[TRANSFORM-DATA] Row ${index + 1} (${date}):`, {
-          hasData,
-          hasNoData,
-          hasDiscordSales,
-          discordSalesCount,
-          expandable: expandableRows[date] || false,
-          alp: getFieldValue('alp'),
-          sales: getFieldValue('sales'),
-          refs: getFieldValue('refs')
-        });
-      }
+      // Get numeric values for stats calculation
+      const calls = parseFloat(getFieldValue('calls')) || 0;
+      const appts = parseFloat(getFieldValue('appts')) || 0;
+      const sits = parseFloat(getFieldValue('sits')) || 0;
+      const sales = parseFloat(getFieldValue('sales')) || 0;
+      const alp = parseFloat(getFieldValue('alp')) || 0;
+      const refs = parseFloat(getFieldValue('refs')) || 0;
+      const refAppt = parseFloat(getFieldValue('refAppt')) || 0;
+      const refSit = parseFloat(getFieldValue('refSit')) || 0;
+      const refSale = parseFloat(getFieldValue('refSale')) || 0;
+      const refAlp = parseFloat(getFieldValue('refAlp')) || 0;
+
+      // Calculate stats for this row
+      const stats = calculateStats(calls, appts, sits, sales, alp, refs, refAppt, refSit, refSale, refAlp);
+
+      // (console logs removed)
 
       return {
         id: date,
@@ -409,24 +540,21 @@ const DailyActivityForm = () => {
         refSit: getFieldValue('refSit'),
         refSale: getFieldValue('refSale'),
         refAlp: getFieldValue('refAlp'),
+        ...stats, // Add the calculated stats
         reportDate: date,
         hasNoData,
         isWeeklyTotal: false,
-        weekKey: getMondayOfWeek(date) // Add week identifier for hover highlighting
+        weekKey: getWeekStart(date) // Add week identifier for hover highlighting
       };
     });
 
     let transformedData = [...dailyRows];
 
-    console.log(`[TRANSFORM-DATA] 📊 Created ${dailyRows.length} daily rows`);
-    console.log(`[TRANSFORM-DATA] Discord sales summary:`, 
-      Object.keys(discordSalesData).map(date => `${date}: ${discordSalesData[date].length} sales`)
-    );
-    console.log(`[TRANSFORM-DATA] Expandable rows:`, Object.keys(expandableRows));
+    // (console logs removed)
 
     // If weekly totals are enabled, group by weeks and insert total rows
     if (showWeeklyTotals && (selectedRange === "month" || selectedRange === "ytd")) {
-      console.log(`[TRANSFORM-DATA] 📈 Processing weekly totals for ${selectedRange} view`);
+      // (console logs removed)
       
       const finalData = [];
       const weekGroups = {};
@@ -443,7 +571,7 @@ const DailyActivityForm = () => {
       // Process weeks in order (newest first to match our data order)
       const weekKeys = Object.keys(weekGroups).sort((a, b) => new Date(b) - new Date(a));
       
-      console.log(`[TRANSFORM-DATA] 🗓️ Processing ${weekKeys.length} weeks`);
+      // (console logs removed)
       
       weekKeys.forEach((weekKey, weekIndex) => {
         const weekRows = weekGroups[weekKey];
@@ -480,6 +608,12 @@ const DailyActivityForm = () => {
           totals.alp = actualAlpTotal;
         }
 
+        // Calculate stats for weekly total
+        const weeklyStats = calculateStats(
+          totals.calls, totals.appts, totals.sits, totals.sales, totals.alp, 
+          totals.refs, totals.refAppt, totals.refSit, totals.refSale, totals.refAlp
+        );
+
                  // Get Monday and Sunday of this week for display
          const mondayDate = new Date(weekKey + 'T00:00:00');
          const sundayDate = new Date(mondayDate);
@@ -494,6 +628,7 @@ const DailyActivityForm = () => {
            dayOfWeek: "",
            displayDate: `Week ${mondayDisplay}-${sundayDisplay}`,
            ...totals,
+           ...weeklyStats, // Add the calculated stats
            reportDate: `week-total-${weekKey}`,
            hasNoData: false,
            isWeeklyTotal: true,
@@ -509,18 +644,12 @@ const DailyActivityForm = () => {
       });
 
       transformedData = finalData;
-      console.log(`[TRANSFORM-DATA] ✅ Weekly totals processed - final data length: ${finalData.length}`);
     }
 
-    console.log(`[TRANSFORM-DATA] 🎯 Final transformed data summary:`, {
-      totalRows: transformedData.length,
-      weeklyTotalRows: transformedData.filter(row => row.isWeeklyTotal).length,
-      dailyRows: transformedData.filter(row => !row.isWeeklyTotal).length,
-      expandableRowCount: Object.keys(expandableRows).length
-    });
+    // (console logs removed)
 
     setTableData(transformedData);
-    console.log(`[TRANSFORM-DATA] ✅ Table data updated`);
+    // (console logs removed)
   };
 
   const updateRowClassNames = () => {
@@ -544,8 +673,15 @@ const DailyActivityForm = () => {
           const dateObj = new Date(row.reportDate + 'T00:00:00');
           const dayOfWeek = dateObj.getDay(); // 0 = Sunday, 1 = Monday, etc.
           
-          if (dayOfWeek === 1) { // Monday - add border after Monday to visually separate from previous week
-            classes.push("week-end-row");
+          // Add border at start of week based on schedule type
+          if (scheduleType === 'wed-tue') {
+            if (dayOfWeek === 3) { // Wednesday - start of Wed-Tue week
+              classes.push("week-end-row");
+            }
+          } else {
+            if (dayOfWeek === 1) { // Monday - start of Mon-Sun week
+              classes.push("week-end-row");
+            }
           }
         }
         
@@ -570,27 +706,21 @@ const DailyActivityForm = () => {
     const viewingDate = new Date(currentDate);
 
     if (selectedRange === "week") {
-        // Determine the Monday of the current week
-        const dayOfWeek = viewingDate.getDay(); // 0 = Sunday, 6 = Saturday
-        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Move backward to Monday
-        start = new Date(viewingDate);
-        start.setDate(viewingDate.getDate() + mondayOffset);
+        // Get the week start using the appropriate schedule type
+        const weekStartStr = getWeekStart(viewingDate, scheduleType);
+        start = new Date(weekStartStr + 'T00:00:00');
         start.setHours(0, 0, 0, 0); // Normalize time
 
-        // Set end date to the following Sunday
+        // Set end date - always 7 days (full week)
         end = new Date(start);
-        end.setDate(start.getDate() + 6); // Always go to Sunday
+        end.setDate(start.getDate() + 6);
 
-       
-        // Populate the week range from Monday to Sunday
-        for (let i = 0; i <= 6; i++) {
+        // Populate the week range in reverse order (newest to oldest)
+        for (let i = 6; i >= 0; i--) {
             const date = new Date(start);
             date.setDate(start.getDate() + i);
             dates.push(date.toISOString().split("T")[0]);
         }
-        
-        // Reverse for newest to oldest (Sunday to Monday)
-        dates.reverse();
     } else if (selectedRange === "month") {
         // Ensure month start and end use correct date formatting (no timezone shift)
         start = new Date(viewingDate.getFullYear(), viewingDate.getMonth(), 1);
@@ -629,7 +759,7 @@ const DailyActivityForm = () => {
     const todayDate = new Date(todayEastern + 'T00:00:00'); // Use Eastern date for calculations
 
     if (selectedRange === "week") {
-        const currentWeekStartStr = getMondayOfWeek(todayEastern); // Pass Eastern date string
+        const currentWeekStartStr = getWeekStart(todayEastern, scheduleType); // Pass Eastern date string and schedule type
         const currentWeekStart = new Date(currentWeekStartStr + 'T00:00:00'); // Convert string to Date object
         
         for (let i = 0; i < 52; i++) { // Show 52 weeks
@@ -638,9 +768,16 @@ const DailyActivityForm = () => {
             const weekEnd = new Date(weekStart);
             weekEnd.setDate(weekStart.getDate() + 6);
 
+            // Format label based on schedule type
+            const startLabel = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const endLabel = weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const weekLabel = scheduleType === 'wed-tue' 
+                ? `Week ${startLabel} - ${endLabel} (Wed-Tue)`
+                : `Week ${startLabel} - ${endLabel}`;
+
             options.push({
                 value: weekStart.toISOString(),
-                label: `Week of ${weekStart.toLocaleDateString()} - ${weekEnd.toLocaleDateString()}`
+                label: weekLabel
             });
         }
     } else if (selectedRange === "month") {
@@ -828,116 +965,79 @@ const DailyActivityForm = () => {
   };
 
   const fetchDiscordSalesData = async () => {
-    console.log(`[DISCORD-SALES-FRONTEND] 🚀 Starting fetchDiscordSalesData`);
+    // (console logs removed)
     
     if (dateRows.length === 0) {
-      console.log(`[DISCORD-SALES-FRONTEND] ⏭️ Skipping fetch - no dateRows available`);
+      // (console logs removed)
       return;
     }
 
     const startDate = dateRows[dateRows.length - 1]; // Oldest date
     const endDate = dateRows[0]; // Newest date
 
-    console.log(`[DISCORD-SALES-FRONTEND] 📅 Date range: ${startDate} to ${endDate}`);
-    console.log(`[DISCORD-SALES-FRONTEND] 📋 Total dateRows: ${dateRows.length}`);
-    console.log(`[DISCORD-SALES-FRONTEND] 👤 Current user:`, { 
-      userId: user?.userId, 
-      lagnname: user?.lagnname,
-      id: user?.id 
-    });
+    // (console logs removed)
 
     const requestUrl = `/discord/sales/user-sales?startDate=${startDate}&endDate=${endDate}`;
-    console.log(`[DISCORD-SALES-FRONTEND] 📡 Making API request to: ${requestUrl}`);
+    // (console logs removed)
 
     try {
       // For testing, pass userId as query param (using fallback user ID 21)
       const testUserId = user?.userId || user?.id || 21;
       const requestUrlWithUserId = `${requestUrl}&userId=${testUserId}`;
       const response = await api.get(requestUrlWithUserId);
-      console.log(`[DISCORD-SALES-FRONTEND] 📥 Raw API response:`, {
-        status: response.status,
-        success: response.data?.success,
-        dataLength: response.data?.data?.length,
-        dataType: Array.isArray(response.data?.data) ? 'array' : typeof response.data?.data,
-        testUserId,
-        finalUrl: requestUrlWithUserId
-      });
+      // (console logs removed)
 
       const result = response.data;
 
       if (!result.success) {
-        console.log(`[DISCORD-SALES-FRONTEND] ❌ API returned success: false`);
-        console.log(`[DISCORD-SALES-FRONTEND] Message: ${result.message}`);
         setDiscordSalesData({});
         setExpandableRows({});
         return;
       }
 
       if (!Array.isArray(result.data)) {
-        console.log(`[DISCORD-SALES-FRONTEND] ❌ API data is not an array:`, typeof result.data);
-        console.log(`[DISCORD-SALES-FRONTEND] Actual data:`, result.data);
         setDiscordSalesData({});
         setExpandableRows({});
         return;
       }
 
-      console.log(`[DISCORD-SALES-FRONTEND] ✅ Valid data received - ${result.data.length} records`);
+      // (console logs removed)
 
-      if (result.data.length > 0) {
-        console.log(`[DISCORD-SALES-FRONTEND] 🔍 Sample record:`, {
-          id: result.data[0].id,
-          sale_date: result.data[0].sale_date,
-          alp: result.data[0].alp,
-          refs: result.data[0].refs,
-          lead_type: result.data[0].lead_type,
-          ts: result.data[0].ts,
-          lagnname: result.data[0].lagnname
-        });
-      }
+      // (console logs removed)
 
       // Group Discord sales data by sale_date
       const mappedDiscordSalesData = {};
       const newExpandableRows = {};
       
-      console.log(`[DISCORD-SALES-FRONTEND] 🔄 Processing ${result.data.length} sales records...`);
+      // (console logs removed)
       
       result.data.forEach((sale, index) => {
-        console.log(`[DISCORD-SALES-FRONTEND] Processing record ${index + 1}:`, {
-          id: sale.id,
-          sale_date: sale.sale_date,
-          alp: sale.alp,
-          refs: sale.refs,
-          lead_type: sale.lead_type
-        });
+        // (console logs removed)
 
         if (sale.sale_date) {
           const formattedDate = sale.sale_date; // Already in YYYY-MM-DD format from DB
           
           if (!mappedDiscordSalesData[formattedDate]) {
             mappedDiscordSalesData[formattedDate] = [];
-            console.log(`[DISCORD-SALES-FRONTEND] 📅 Created new date group for: ${formattedDate}`);
           }
           
           mappedDiscordSalesData[formattedDate].push(sale);
           newExpandableRows[formattedDate] = true; // Mark this date as expandable
           
-          console.log(`[DISCORD-SALES-FRONTEND] ➕ Added sale to date ${formattedDate} (now has ${mappedDiscordSalesData[formattedDate].length} sales)`);
+          // (console logs removed)
         } else {
-          console.log(`[DISCORD-SALES-FRONTEND] ⚠️ Sale record missing sale_date:`, sale);
+          // (console logs removed)
         }
       });
 
-      console.log(`[DISCORD-SALES-FRONTEND] 📊 Final mapping summary:`);
-      Object.keys(mappedDiscordSalesData).forEach(date => {
-        console.log(`[DISCORD-SALES-FRONTEND]   ${date}: ${mappedDiscordSalesData[date].length} sales`);
-      });
+      // (console logs removed)
 
-      console.log(`[DISCORD-SALES-FRONTEND] 🎯 Expandable rows:`, Object.keys(newExpandableRows));
+      // (console logs removed)
 
       setDiscordSalesData(mappedDiscordSalesData);
       setExpandableRows(newExpandableRows);
       
-      console.log(`[DISCORD-SALES-FRONTEND] ✅ State updated successfully`);
+      // (console logs removed)
       
     } catch (error) {
       console.error(`[DISCORD-SALES-FRONTEND] ❌ Error fetching Discord sales data:`, error);
@@ -957,57 +1057,49 @@ const DailyActivityForm = () => {
   };
 
   const fetchDiscordVsManualBreakdown = async () => {
-    console.log(`[DISCORD-BREAKDOWN-FRONTEND] 🚀 Starting fetchDiscordVsManualBreakdown`);
+    // (console logs removed)
     
     if (dateRows.length === 0) {
-      console.log(`[DISCORD-BREAKDOWN-FRONTEND] ⏭️ Skipping fetch - no dateRows available`);
+      // (console logs removed)
       return;
     }
 
     const startDate = dateRows[dateRows.length - 1]; // Oldest date
     const endDate = dateRows[0]; // Newest date
 
-    console.log(`[DISCORD-BREAKDOWN-FRONTEND] 📅 Date range: ${startDate} to ${endDate}`);
+    // (console logs removed)
 
     try {
       const testUserId = user?.userId || user?.id || 21;
       const requestUrl = `/discord/sales/breakdown?startDate=${startDate}&endDate=${endDate}&userId=${testUserId}`;
       const response = await api.get(requestUrl);
       
-      console.log(`[DISCORD-BREAKDOWN-FRONTEND] 📥 Raw breakdown response:`, {
-        status: response.status,
-        success: response.data?.success,
-        dataLength: response.data?.data?.length,
-        testUserId
-      });
+      // (console logs removed)
 
       const result = response.data;
 
       if (!result.success) {
-        console.log(`[DISCORD-BREAKDOWN-FRONTEND] ❌ API returned success: false`);
         setDiscordVsManualBreakdown({});
         return;
       }
 
       if (!Array.isArray(result.data)) {
-        console.log(`[DISCORD-BREAKDOWN-FRONTEND] ❌ API data is not an array:`, typeof result.data);
         setDiscordVsManualBreakdown({});
         return;
       }
 
-      console.log(`[DISCORD-BREAKDOWN-FRONTEND] ✅ Valid breakdown data received - ${result.data.length} records`);
+      // (console logs removed)
 
       // Map the breakdown data by date
       const mappedBreakdownData = {};
       result.data.forEach(breakdown => {
         if (breakdown.date) {
           mappedBreakdownData[breakdown.date] = breakdown;
-          console.log(`[DISCORD-BREAKDOWN-FRONTEND] 📊 ${breakdown.date}: Discord=${breakdown.discord_alp}, Manual=${breakdown.manual_alp}, Unaccounted=${breakdown.unaccounted_alp}`);
         }
       });
 
       setDiscordVsManualBreakdown(mappedBreakdownData);
-      console.log(`[DISCORD-BREAKDOWN-FRONTEND] ✅ Breakdown state updated successfully`);
+      // (console logs removed)
       
     } catch (error) {
       console.error(`[DISCORD-BREAKDOWN-FRONTEND] ❌ Error fetching breakdown data:`, error);
@@ -1015,56 +1107,10 @@ const DailyActivityForm = () => {
     }
   };
 
-  const handleCellUpdate = async (id, field, value) => {
+  const handleCellUpdate = (id, field, value) => {
     const reportDate = id; // id is the reportDate for daily rows
-    const numericValue = value === '' ? null : parseFloat(value) || 0;
     
-    console.log(`[DAILY-ACTIVITY] 📝 Cell update: ${reportDate} ${field} = ${value} (numeric: ${numericValue})`);
-
-    // Check if this date has Discord sales - if so, redirect user to expanded view
-    if (['sales', 'alp', 'refs'].includes(field)) {
-      const hasDiscordSales = discordSalesData[reportDate] && discordSalesData[reportDate].length > 0;
-      
-      if (hasDiscordSales) {
-        alert(`This date has Discord sales tracked. Please use the expandable row (▶) to view Discord sales and edit manual additions.`);
-        return;
-      }
-    }
-
-    // Handle checkbox fields
-    if (typeof value === 'boolean') {
-      setActivityData(prev => ({
-        ...prev,
-        [reportDate]: {
-          ...prev[reportDate],
-          [field]: value
-        }
-      }));
-
-      try {
-        const response = await api.put('/dailyActivity', {
-          reportDate,
-          [field]: value
-        });
-        
-        if (response.data.success) {
-          console.log(`[DAILY-ACTIVITY] ✅ Updated checkbox ${field}: ${value}`);
-        }
-      } catch (error) {
-        console.error(`[DAILY-ACTIVITY] ❌ Error updating checkbox ${field}:`, error);
-      }
-      return;
-    }
-
-    // Handle regular numeric fields (only for dates without Discord sales)
-    setActivityData(prev => ({
-      ...prev,
-      [reportDate]: {
-        ...prev[reportDate],
-        [field]: numericValue
-      }
-    }));
-
+    // Stage all changes locally without saving to backend
     setEditedRows(prev => ({
       ...prev,
       [id]: {
@@ -1072,25 +1118,32 @@ const DailyActivityForm = () => {
         [field]: value
       }
     }));
+  };
 
-    try {
-      const response = await api.put('/dailyActivity', {
-        reportDate,
-        [field]: numericValue
-      });
+  const handleCellBlur = (id, field, value) => {
+    const reportDate = id;
+    const numericValue = value === '' ? null : parseFloat(value) || 0;
+    
+    // For alp/refs fields, enforce Discord floor constraint on blur
+    if (['alp', 'refs'].includes(field)) {
+      const sales = discordSalesData[reportDate] || [];
+      const discordFloor = sales.reduce((acc, s) => {
+        if (field === 'alp') acc += Number(s.alp) || 0;
+        if (field === 'refs') acc += Number(s.refs) || 0;
+        return acc;
+      }, 0);
+      const clampedValue = Math.max(discordFloor, numericValue ?? 0);
       
-      if (response.data.success) {
-        console.log(`[DAILY-ACTIVITY] ✅ Updated ${field}: ${numericValue}`);
-        
-        // If this was a sales/alp/refs update, refresh breakdown data
-        if (['sales', 'alp', 'refs'].includes(field)) {
-          setTimeout(() => {
-            fetchDiscordVsManualBreakdown();
-          }, 500);
-        }
+      if (clampedValue !== numericValue) {
+        // Update the edited rows with clamped value
+        setEditedRows(prev => ({
+          ...prev,
+          [id]: {
+            ...prev[id],
+            [field]: clampedValue
+          }
+        }));
       }
-    } catch (error) {
-      console.error(`[DAILY-ACTIVITY] ❌ Error updating ${field}:`, error);
     }
   };
 
@@ -1100,10 +1153,45 @@ const DailyActivityForm = () => {
         return;
     }
 
+    // Validate and correct ALP/Refs values against Discord floors before saving
+    const correctedEditedRows = { ...editedRows };
+    
+    Object.keys(correctedEditedRows).forEach(reportDate => {
+      const rowEdits = correctedEditedRows[reportDate];
+      
+      // Check if this row has ALP or Refs edits
+      if (rowEdits.alp !== undefined || rowEdits.refs !== undefined) {
+        const sales = discordSalesData[reportDate] || [];
+        const discordTotals = sales.reduce((acc, s) => {
+          acc.alp += Number(s.alp) || 0;
+          acc.refs += Number(s.refs) || 0;
+          return acc;
+        }, { alp: 0, refs: 0 });
+        
+        // Correct ALP if it's below Discord floor
+        if (rowEdits.alp !== undefined) {
+          const alpValue = parseFloat(rowEdits.alp) || 0;
+          if (alpValue < discordTotals.alp) {
+            console.log(`[SUBMIT] Correcting ALP for ${reportDate}: ${alpValue} → ${discordTotals.alp} (Discord floor)`);
+            correctedEditedRows[reportDate].alp = discordTotals.alp;
+          }
+        }
+        
+        // Correct Refs if it's below Discord floor
+        if (rowEdits.refs !== undefined) {
+          const refsValue = parseFloat(rowEdits.refs) || 0;
+          if (refsValue < discordTotals.refs) {
+            console.log(`[SUBMIT] Correcting Refs for ${reportDate}: ${refsValue} → ${discordTotals.refs} (Discord floor)`);
+            correctedEditedRows[reportDate].refs = discordTotals.refs;
+          }
+        }
+      }
+    });
+
     // Ensure each row update contains the correctly formatted reportDate
-    const updatesWithDates = Object.keys(editedRows).reduce((acc, reportDate) => {
+    const updatesWithDates = Object.keys(correctedEditedRows).reduce((acc, reportDate) => {
         const formattedDate = new Date(reportDate).toISOString().split("T")[0]; // Ensure it's YYYY-MM-DD
-        acc[formattedDate] = { reportDate: formattedDate, ...editedRows[reportDate] };
+        acc[formattedDate] = { reportDate: formattedDate, ...correctedEditedRows[reportDate] };
         return acc;
     }, {});
 
@@ -1117,13 +1205,13 @@ const DailyActivityForm = () => {
         const result = response.data;
 
         if (result.success) {
-            // Merge edited fields with existing data for each date, preserving unedited fields
+            // Merge corrected edited fields with existing data for each date, preserving unedited fields
             setActivityData((prev) => {
                 const updated = { ...prev };
-                Object.keys(editedRows).forEach(reportDate => {
+                Object.keys(correctedEditedRows).forEach(reportDate => {
                     updated[reportDate] = {
                         ...updated[reportDate], // Keep existing fields
-                        ...editedRows[reportDate] // Overwrite only edited fields
+                        ...correctedEditedRows[reportDate] // Overwrite only edited fields (with corrections)
                     };
                 });
                 return updated;
@@ -1212,22 +1300,32 @@ const DailyActivityForm = () => {
   // Handle manual addition updates
   const handleManualAdditionUpdate = async (date, manualData) => {
     try {
-      console.log(`[DAILY-ACTIVITY] 📝 Manual addition update for ${date}:`, manualData);
-      
-      // Get current breakdown for this date
+      // Fallback-friendly source of discord totals
       const breakdown = discordVsManualBreakdown[date];
-      if (!breakdown) {
-        console.error(`[DAILY-ACTIVITY] ❌ No breakdown data found for ${date}`);
-        return;
+      let discordAlp = 0;
+      let discordRefs = 0;
+      
+      if (breakdown) {
+        discordAlp = Number(breakdown.discord_alp) || 0;
+        discordRefs = Number(breakdown.discord_refs) || 0;
+      } else if (discordSalesData && discordSalesData[date]) {
+        // If breakdown is missing, derive from raw discord sales loaded in memory
+        const derived = (discordSalesData[date] || []).reduce((acc, sale) => {
+          acc.alp += Number(sale.alp) || 0;
+          acc.refs += Number(sale.refs) || 0;
+          return acc;
+        }, { alp: 0, refs: 0 });
+        discordAlp = derived.alp;
+        discordRefs = derived.refs;
       }
       
       // Calculate new totals: Discord + Manual
-      const discordAlp = breakdown.discord_alp || 0;
-      const discordRefs = breakdown.discord_refs || 0;
-      const newTotalAlp = discordAlp + (parseFloat(manualData.alp) || 0);
-      const newTotalRefs = discordRefs + (parseInt(manualData.refs) || 0);
+      const manualAlp = Number(manualData.alp) || 0;
+      const manualRefs = Number(manualData.refs) || 0;
+      const newTotalAlp = discordAlp + manualAlp;
+      const newTotalRefs = discordRefs + manualRefs;
       
-      console.log(`[DAILY-ACTIVITY] 🔄 Updating totals: Discord ALP=${discordAlp} + Manual ALP=${manualData.alp} = Total=${newTotalAlp}`);
+      // (console logs removed)
       
       // Update the Daily_Activity record
       const response = await api.put('/dailyActivity', {
@@ -1237,7 +1335,7 @@ const DailyActivityForm = () => {
       });
       
       if (response.data.success) {
-        console.log(`[DAILY-ACTIVITY] ✅ Updated manual amounts successfully`);
+        // (console logs removed)
         
         // Refresh both main data and breakdown data
         setTimeout(() => {
@@ -1659,6 +1757,51 @@ const DailyActivityForm = () => {
               </svg>
             </div>
 
+            {/* Week Schedule Toggle - Calendar icon */}
+            <button 
+              className={`schedule-toggle-button icon-only ${scheduleType === 'wed-tue' ? 'active' : ''}`}
+              onClick={() => setScheduleType(scheduleType === 'mon-sun' ? 'wed-tue' : 'mon-sun')}
+              title={scheduleType === 'mon-sun' ? 'Switch to Wed-Tue Week' : 'Switch to Mon-Sun Week'}
+            >
+              <svg 
+                width="18" 
+                height="18" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2" fill="none"/>
+                <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="2"/>
+                <line x1="9" y1="4" x2="9" y2="22" stroke="currentColor" strokeWidth="2"/>
+                {scheduleType === 'wed-tue' && (
+                  <text x="12" y="18" fontSize="8" fill="currentColor" fontWeight="bold">W</text>
+                )}
+                {scheduleType === 'mon-sun' && (
+                  <text x="12" y="18" fontSize="8" fill="currentColor" fontWeight="bold">M</text>
+                )}
+              </svg>
+            </button>
+
+            {/* MGA Teams (DataTable) Toggle - People icon */}
+            <button 
+              className={`hierarchy-toggle-button icon-only ${showMgaTable ? 'active' : ''}`}
+              onClick={() => setShowMgaTable(!showMgaTable)}
+              title={showMgaTable ? 'Hide MGA Teams' : 'Show MGA Teams'}
+            >
+              <svg 
+                width="18" 
+                height="18" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path d="M16 11c1.657 0 3-1.79 3-4s-1.343-4-3-4-3 1.79-3 4 1.343 4 3 4z" stroke="currentColor" strokeWidth="2" fill="none"/>
+                <path d="M8 11c1.657 0 3-1.79 3-4S9.657 3 8 3 5 4.79 5 7s1.343 4 3 4z" stroke="currentColor" strokeWidth="2" fill="none"/>
+                <path d="M2 21v-2c0-2.761 3.582-4 6-4s6 1.239 6 4v2" stroke="currentColor" strokeWidth="2" fill="none"/>
+                <path d="M22 21v-2c0-2.2-2.686-3.6-5-3.95" stroke="currentColor" strokeWidth="2" fill="none"/>
+              </svg>
+            </button>
+
             {/* Export Button - Icon only */}
             <button 
               className="export-button icon-only" 
@@ -1685,51 +1828,61 @@ const DailyActivityForm = () => {
           </div>
         </ActionBar>
 
-        {/* Table Content - Conditional */}
-        {loading ? (
-          <div style={{ padding: "20px", textAlign: "center" }}>
-            <p>Loading data...</p>
+        {/* Table Content - Conditional; replace with MGA view when enabled */}
+        {showMgaTable ? (
+          <div className="hierarchy-section" >
+            <MGADataTable 
+              startDate={dateRows[dateRows.length - 1]}
+              endDate={dateRows[0]}
+            />
           </div>
         ) : (
-          (() => {
-            // Log DataTable props before rendering
-            console.log(`[DATATABLE-RENDER] 🎯 Rendering DataTable with props:`, {
-              enableRowExpansion: true,
-              expandableRowsCount: Object.keys(expandableRows).length,
-              expandableRowKeys: Object.keys(expandableRows),
-              tableDataLength: tableData.length,
-              hasRenderExpandedRow: typeof renderExpandedRow === 'function',
-              discordSalesDataKeys: Object.keys(discordSalesData)
-            });
-
-            return (
-              <DataTable
-                key={`datatable-${showMissingDataWarnings}`} // Force re-render when toggle changes
-                columns={columns}
-                data={tableData}
-                onCellUpdate={handleCellUpdate}
-                disablePagination={true}
-                highlightRowOnEdit={true}
-                showActionBar={false}
-                disableCellEditing={false}
-                showTotals={true}
-                totalsPosition="top"
-                totalsColumns={['calls', 'appts', 'sits', 'sales', 'alp', 'refs', 'refAppt', 'refSit', 'refSale', 'refAlp']}
-                totalsLabel="Totals"
-                totalsLabelColumn="displayDate"
-                rowClassNames={rowClassNames}
-                stickyHeader={true}
-                stickyTop={0}
-                pageScrollSticky={true}
-                onRowHover={handleWeeklyTotalHover}
-                enableRowExpansion={true}
-                expandableRows={expandableRows}
-                renderExpandedRow={renderExpandedRow}
-                expandedRowsInitial={{}}
-              />
-            );
-          })()
+          loading ? (
+            <div style={{ padding: "20px", textAlign: "center" }}>
+              <p>Loading data...</p>
+            </div>
+          ) : (
+            (() => {
+              return (
+                <DataTable
+                  key={`datatable-${showMissingDataWarnings}`}
+                  columns={columns}
+                  data={tableData}
+                  onCellUpdate={handleCellUpdate}
+                  onCellBlur={handleCellBlur}
+                  autoSave={false}
+                  disablePagination={true}
+                  highlightRowOnEdit={true}
+                  showActionBar={false}
+                  disableCellEditing={false}
+                  showTotals={true}
+                  totalsPosition="top"
+                  totalsColumns={['calls', 'appts', 'sits', 'sales', 'alp', 'refs', 'refAppt', 'refSit', 'refSale', 'refAlp', 'showRatio', 'closeRatio', 'alpPerSale', 'alpPerRefSale', 'alpPerRefCollected', 'refCloseRatio', 'refCollectedPerSit', 'callsToSitRatio']}
+                  totalsLabel="Totals"
+                  totalsLabelColumn="displayDate"
+                  rowClassNames={rowClassNames}
+                  stickyHeader={true}
+                  stickyTop={0}
+                  pageScrollSticky={true}
+                  onRowHover={handleWeeklyTotalHover}
+                  enableRowExpansion={true}
+                  expandableRows={{}} // Allow all rows to be expandable
+                  renderExpandedRow={renderExpandedRow}
+                  expandedRowsInitial={{}}
+                />
+              );
+            })()
+          )
         )}
+
+        {/* Hierarchy View - Show below table when toggled */}
+        {showHierarchy && (
+          <div className="hierarchy-section">
+            <HierarchyActivity currentUserOnly={true} />
+          </div>
+        )}
+
+        {/* MGA Teams View now replaces main table; no separate below-table rendering */}
       </div>
     </div>
   );

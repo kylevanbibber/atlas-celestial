@@ -17,21 +17,29 @@ export const NOTIFICATION_TYPES = {
 
 // Format relative time
 const formatRelativeTime = (timestamp) => {
+  if (!timestamp || typeof timestamp !== 'string') {
+    return 'Just now';
+  }
   // Parse the timestamp with explicit timezone handling
   // If the timestamp is in MySQL format (YYYY-MM-DD HH:MM:SS) convert it to ISO
   let dateTime;
-  if (timestamp.includes('T')) {
+  if (timestamp && typeof timestamp === 'string' && timestamp.includes('T')) {
     // Already in ISO format
     dateTime = DateTime.fromISO(timestamp, { zone: 'America/New_York' });
   } else {
     // Convert from MySQL format to ISO
-    const isoTime = timestamp.replace(' ', 'T') + '-04:00'; // Eastern Time offset
+    const safeStr = String(timestamp || '').trim();
+    const isoTime = safeStr ? safeStr.replace(' ', 'T') + '-04:00' : '';
     dateTime = DateTime.fromISO(isoTime);
   }
   
   const now = DateTime.now().setZone('America/New_York');
   const diff = now.diff(dateTime, ['days', 'hours', 'minutes', 'seconds']);
   
+  if (!dateTime || !dateTime.isValid) {
+    return 'Just now';
+  }
+
   if (diff.days > 0) {
     return diff.days === 1 ? 'Yesterday' : `${diff.days} days ago`;
   } else if (diff.hours > 0) {
@@ -79,6 +87,7 @@ const NotificationItem = ({ notification, onRead, onDismiss }) => {
         className="notification-dismiss"
         onClick={(e) => {
           e.stopPropagation();
+          console.log('🗑️ [UI] Dismiss clicked for', notification?.id, notification);
           onDismiss(notification.id);
         }}
       >
@@ -239,7 +248,7 @@ const NotificationCenter = () => {
               </button>
               <button
                 className="notification-action-btn settings"
-                onClick={() => { navigate('/settings?section=notifications'); setIsOpen(false); }}
+                onClick={() => { navigate('/utilities?section=notifications'); setIsOpen(false); }}
                 title="Notification settings"
               >
                 <BsGear size={16} />

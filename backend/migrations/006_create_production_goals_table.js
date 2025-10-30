@@ -4,7 +4,7 @@ async function up(connection) {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS production_goals (
       id INT PRIMARY KEY AUTO_INCREMENT,
-      userId INT NOT NULL,
+      activeUserId INT NOT NULL,
       year INT NOT NULL,
       month INT NOT NULL,
       monthlyAlpGoal DECIMAL(10,2) NOT NULL,
@@ -13,8 +13,8 @@ async function up(connection) {
       customRates JSON DEFAULT NULL,
       createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      UNIQUE KEY unique_user_month_year (userId, year, month),
-      INDEX idx_user_date (userId, year, month)
+      UNIQUE KEY unique_user_month_year (activeUserId, year, month),
+      INDEX idx_user_date (activeUserId, year, month)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   `;
   

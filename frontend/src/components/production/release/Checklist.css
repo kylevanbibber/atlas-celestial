@@ -129,7 +129,7 @@
 }
 
 /* Progress Bar - matching app's style */
-.progress-bar-container {
+.release-progress-bar-container {
   margin-bottom: 20px;
   padding: 20px;
   background-color: var(--card-bg);

@@ -11,7 +11,7 @@ import ContextMenuPortal from "./ContextMenuPortal";
 import "./Sidebar.css";
 import Logo from "../Layout/Logo";
 
-const Sidebar = ({ isExpanded, setIsExpanded }) => {
+const Sidebar = ({ isExpanded, setIsExpanded, onboardingMode = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { teamName } = useTeamStyles();
@@ -29,7 +29,13 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
   const shouldShowLicenseWarning = teamRole !== "app" ? licenseWarning : false;
   
   // Get sidebar items with warning indicators based on license status
-  const navItems = getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole, user?.userId);
+  let navItems = getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole, user?.userId) || [];
+  if (onboardingMode) {
+    // Limit to Onboarding Home only
+    navItems = [
+      { name: 'Onboarding Home', path: '/onboarding/home', icon: navItems[0]?.icon || null }
+    ];
+  }
   
   // Track which item (if any) currently shows its submenu
   const [submenuVisible, setSubmenuVisible] = useState(null);
@@ -49,7 +55,7 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
 
   // Handle the logo click to navigate to dashboard
   const handleLogoClick = () => {
-    navigate("/dashboard");
+    navigate(onboardingMode ? "/onboarding/home" : "/dashboard");
   };
 
   // Check if a nav item is active
@@ -99,11 +105,11 @@ const Sidebar = ({ isExpanded, setIsExpanded }) => {
         <ContextMenuPortal
           options={navItems
             .find((item) => item.name === submenuVisible)
-            .submenu.map((sub) => ({
+            ?.submenu?.map((sub) => ({
               label: sub.name,
               onClick: () => navigate(sub.path),
               icon: sub.icon
-            }))}
+            })) || []}
           onClose={() => setSubmenuVisible(null)}
           onMouseEnter={() => {}}
           onMouseLeave={() => setSubmenuVisible(null)}

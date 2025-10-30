@@ -1,0 +1,216 @@
+/* WidgetCard Component Styles */
+
+.widget-card {
+  background: var(--card-bg, #fff);
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.widget-card.clickable {
+  cursor: pointer;
+}
+
+.widget-card.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+/* Header Section */
+.widget-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.widget-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.widget-card-title-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.widget-card-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary, #666);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1.4;
+}
+
+.widget-card-progress-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary, #666);
+  padding: 2px 8px;
+  background: var(--bg-secondary, #f5f5f5);
+  border-radius: 12px;
+}
+
+/* Body Section */
+.widget-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.widget-card-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60px;
+}
+
+.widget-card-value-section {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.widget-card-main-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary, #000);
+  line-height: 1;
+}
+
+.widget-card-goal {
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: var(--text-secondary, #999);
+}
+
+/* Progress Bar */
+.widget-card-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-secondary, #e0e0e0);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.widget-card-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* Sub text in header */
+.widget-card-subtext-header {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #999);
+  margin: 0;
+  line-height: 1.2;
+}
+
+/* Sub text (legacy - if needed elsewhere) */
+.widget-card-subtext {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #666);
+  margin: 0;
+}
+
+/* Comparison styling (matching Card.js) */
+.widget-card-comparison {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.widget-card-comparison.positive {
+  color: #4caf50;
+}
+
+.widget-card-comparison.negative {
+  color: #f44336;
+}
+
+.widget-card-comparison.neutral {
+  color: var(--text-secondary, #666);
+}
+
+/* Action button area */
+.widget-card-action {
+  margin-top: 0;
+}
+
+.widget-card-action-inline {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Dark Mode */
+.dark-mode .widget-card {
+  background: var(--card-bg-dark, #1e1e1e);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.dark-mode .widget-card.clickable:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.dark-mode .widget-card-title {
+  color: var(--text-secondary-dark, #aaa);
+}
+
+.dark-mode .widget-card-progress-text {
+  background: var(--bg-secondary-dark, #2a2a2a);
+  color: var(--text-secondary-dark, #aaa);
+}
+
+.dark-mode .widget-card-main-value {
+  color: var(--text-primary-dark, #fff);
+}
+
+.dark-mode .widget-card-goal {
+  color: var(--text-secondary-dark, #888);
+}
+
+.dark-mode .widget-card-progress-bar {
+  background: var(--bg-secondary-dark, #2a2a2a);
+}
+
+.dark-mode .widget-card-subtext-header {
+  color: var(--text-secondary-dark, #888);
+}
+
+.dark-mode .widget-card-subtext {
+  color: var(--text-secondary-dark, #aaa);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .widget-card {
+    padding: 0.875rem;
+  }
+
+  .widget-card-main-value {
+    font-size: 1.75rem;
+  }
+
+  .widget-card-goal {
+    font-size: 1.125rem;
+  }
+}
+

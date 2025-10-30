@@ -4,12 +4,38 @@ const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v9');
 const { SlashCommandBuilder } = require('@discordjs/builders');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus } = require('@discordjs/voice');
 const cron = require('node-cron');
 const axios = require('axios');
+const play = require('play-dl');
+const ytdl = require('ytdl-core');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const db = require('../db');
+
+// Initialize play-dl for YouTube streaming
+(async () => {
+  try {
+    await play.setToken({
+      soundcloud: {
+        client_id: null  // We're only using YouTube
+      },
+      spotify: {
+        client_id: null,
+        client_secret: null,
+        refresh_token: null,
+        market: 'US'
+      },
+      useragent: [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
+      ]
+    });
+    console.log('[Discord] play-dl initialized for YouTube streaming');
+  } catch (error) {
+    console.error('[Discord] Failed to initialize play-dl:', error);
+  }
+})();
 
 // Imgur API client ID (same as in upload.js)
 const IMGUR_CLIENT_ID = 'd08c81e700c9978';
@@ -18,14 +44,16 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildVoiceStates
   ]
 });
 
 // Keep track of all scheduled jobs so we can stop them later
 const scheduledJobs = {
   reminders: {},
-  leaderboards: {}
+  leaderboards: {},
+  motivationCalls: {}
 };
 
 const commands = [
@@ -117,9 +145,11 @@ async function loadScheduledJobs() {
     // Clear existing scheduled jobs
     Object.values(scheduledJobs.reminders).forEach(job => job.stop());
     Object.values(scheduledJobs.leaderboards).forEach(job => job.stop());
+    Object.values(scheduledJobs.motivationCalls).forEach(job => job.stop());
     
     scheduledJobs.reminders = {};
     scheduledJobs.leaderboards = {};
+    scheduledJobs.motivationCalls = {};
 
     // Load reminders
     const reminders = await db.query('SELECT * FROM discord_reminders WHERE is_active = TRUE');
@@ -149,6 +179,11 @@ async function loadScheduledJobs() {
       });
       console.log(`Scheduled leaderboard: ${leaderboard.cron_expr} -> ${leaderboard.channel_id}`);
     });
+
+    // Load motivation calls (disabled)
+    // const motivationCalls = await db.query('SELECT * FROM discord_motivation_calls WHERE is_active = TRUE');
+    // motivationCalls.forEach(motivationCall => { /* disabled */ });
+    // console.log('Motivation call scheduling disabled');
   } catch (error) {
     console.error('Error loading scheduled jobs:', error);
   }
@@ -212,6 +247,12 @@ async function sendLeaderboard(leaderboard) {
     console.error(`[BOT] Error sending leaderboard to channel ${leaderboard.channel_id}:`, error);
     throw error;
   }
+}
+
+// Function to execute motivation calls (disabled)
+async function executeMotivationCall(motivationCall) {
+  console.log(`[BOT] Motivation feature removed. Skipping execution for: ${motivationCall?.title || 'unknown'}`);
+  return;
 }
 
 async function crossPostSale(saleData, originalChannelId) {
@@ -974,7 +1015,7 @@ async function handleCloseCommand(interaction) {
       }
     }
 
-    console.log(`[BOT] 🎯 Inserting into discord_sales table...`);
+    console.log(`[BOT] 🎯 Preparing to insert into discord_sales table...`);
     
     // Calculate Eastern Time timestamp for insertion
     const currentTime = new Date();
@@ -984,9 +1025,37 @@ async function handleCloseCommand(interaction) {
     console.log(`[BOT] 🎯 Current UTC time: ${currentTime.toISOString()}`);
     console.log(`[BOT] 🎯 Eastern timestamp for DB: ${easternTimestamp}`);
     
-    // Use a more robust approach: try to insert with a unique constraint check
-    // Include a temporary unique identifier to prevent exact duplicates
-    const submissionId = `${discordUserId}-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    // Idempotency guard: prevent duplicate inserts for the same user/value within a short window
+    try {
+      const dupCheck = await db.query(
+        `SELECT id FROM discord_sales
+         WHERE user_id = ?
+           AND alp = ?
+           AND refs = ?
+           AND lead_type = ?
+           AND ABS(TIMESTAMPDIFF(SECOND, ts, ?)) <= 5
+         LIMIT 1`,
+        [user.id, alp, refs, leadType, easternTimestamp]
+      );
+
+      if (dupCheck.length > 0) {
+        console.log(`[BOT] 🎯 ⚠️ Duplicate close detected (time/value match) — skipping insert. Existing id=${dupCheck[0].id}`);
+        if (canReply) {
+          await interaction.editReply({
+            content: `⚠️ **Close Already Recorded**\n\nA similar close was recorded moments ago. If this wasn't you, please contact support.`
+          });
+        }
+        return;
+      }
+    } catch (dupErr) {
+      console.warn('[BOT] 🎯 Duplicate check failed (continuing):', dupErr.message);
+    }
+
+    // Use a more robust approach: try to insert with a unique constraint check (via submission_id)
+    // Prefer Discord interaction id for idempotency when available
+    const submissionId = (interaction && interaction.id) 
+      ? `ixn_${interaction.id}` 
+      : `${discordUserId}-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
     
     const insertQuery = `
       INSERT INTO discord_sales (discord_user, guild_id, alp, refs, lead_type, image_url, user_id, submission_id, ts)
@@ -1422,5 +1491,6 @@ module.exports = {
   initDiscordBot,
   syncBotPresenceWithDatabase,
   reloadScheduledJobs,
-  getClient
+  getClient,
+  executeMotivationCallTest: executeMotivationCall
 };

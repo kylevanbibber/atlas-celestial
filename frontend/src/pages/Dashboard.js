@@ -1,13 +1,15 @@
 /**
  * Refactored Dashboard Page
  * 
- * This replaces the 2658-line Dashboard.js with a clean, maintainable implementation
- * that uses configuration-driven components to handle all user roles.
+ * Routes users to the appropriate dashboard based on their role:
+ * - SGA: Uses UnifiedDashboard (original dashboard with all cards)
+ * - AGT, SA, GA, MGA, RGA: Uses TeamDashboard (simplified dashboard with competitions and widgets)
  */
 
 import React from "react";
 import { useAuth } from "../context/AuthContext";
 import UnifiedDashboard from "../components/dashboard/UnifiedDashboard";
+import TeamDashboard from "../components/dashboard/TeamDashboard";
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -17,7 +19,7 @@ const Dashboard = () => {
 
   console.log(`🔍 [Dashboard] Rendering dashboard for user role: ${userRole}`);
 
-  // If no user or role, show error state (not loading since UnifiedDashboard handles loading)
+  // If no user or role, show error state
   if (!user) {
     return (
       <div className="dashboard-container padded-content-sm">
@@ -57,8 +59,14 @@ const Dashboard = () => {
     );
   }
 
-  // Let UnifiedDashboard handle all loading states
-  return <UnifiedDashboard userRole={userRole} user={user} />;
+  // Route to appropriate dashboard based on user role
+  if (userRole === 'SGA') {
+    // SGA users get the UnifiedDashboard
+    return <UnifiedDashboard userRole={userRole} user={user} />;
+  } else {
+    // AGT, SA, GA, MGA, RGA users get the simplified TeamDashboard
+    return <TeamDashboard userRole={userRole} user={user} />;
+  }
 };
 
 export default Dashboard;

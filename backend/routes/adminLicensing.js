@@ -6,9 +6,18 @@ const { query } = require("../db");
 router.get("/all", async (req, res) => {
   try {
     const result = await query(`
-      SELECT id, userId, lagnname, state, expiry_date, resident_state, license_number
-      FROM licensed_states
-      ORDER BY id DESC
+      SELECT 
+        ls.id,
+        ls.userId,
+        ls.lagnname,
+        ls.state,
+        ls.expiry_date,
+        ls.resident_state,
+        ls.license_number,
+        au.mga
+      FROM licensed_states ls
+      LEFT JOIN activeusers au ON au.id = ls.userId
+      ORDER BY ls.id DESC
     `);
 
     res.json({

@@ -284,4 +284,57 @@
 .menu-item.menu-separator:hover {
     background: var(--bg-secondary);
 }
-  
+
+/* Mobile responsive styles for header menus */
+@media (max-width: 768px) {
+    /* Make dropdown menus smaller on mobile */
+    .context-menu.dropdown {
+        min-width: 180px; /* Reduced from 250px */
+        max-height: 50vh; /* Reduce height for smaller screens */
+    }
+    
+    /* Smaller font size for menu items on mobile */
+    .menu-item {
+        padding: 8px 12px; /* Reduced padding from 10px 15px */
+        font-size: 12px; /* Reduced from 14px */
+    }
+    
+    /* Smaller icons on mobile */
+    .menu-icon {
+        margin-right: 8px; /* Reduced from 10px */
+        font-size: 14px; /* Reduced from 16px */
+    }
+    
+    /* Smaller submenus on mobile */
+    .context-submenu {
+        min-width: 150px; /* Reduced from 180px */
+    }
+    
+    /* Smaller nested submenu on mobile */
+    .context-nested-submenu .context-menu-items {
+        max-height: 150px; /* Reduced from 200px */
+    }
+    
+    /* Smaller search input on mobile */
+    .context-menu-search-input {
+        font-size: 12px; /* Reduced from 14px */
+        padding: 6px 10px; /* Reduced from 8px 12px */
+    }
+    
+    /* Smaller role filter buttons on mobile */
+    .role-filter-btn {
+        font-size: 10px; /* Reduced from 11px */
+        padding: 3px 6px; /* Reduced from 4px 8px */
+    }
+    
+    /* Smaller submenu arrow on mobile */
+    .submenu-arrow {
+        font-size: 12px; /* Reduced from 14px */
+    }
+    
+    /* Smaller hint text on mobile */
+    .menu-item.menu-item-hint {
+        font-size: 11px; /* Reduced from 12px */
+        padding: 6px 12px; /* Reduced from 8px 15px */
+    }
+}

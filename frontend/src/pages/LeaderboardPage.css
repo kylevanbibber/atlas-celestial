@@ -350,6 +350,14 @@
     min-height: 400px;
 }
 
+/* MORE leaderboard responsive container */
+.more-leaderboard-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    min-height: 400px;
+}
+
 /* Mobile Responsive */
 @media (max-width: 1200px) {
     .leaderboards-container {
@@ -357,6 +365,11 @@
     }
     
     .leaderboard-row {
+        gap: 15px;
+        min-height: 350px;
+    }
+    
+    .more-leaderboard-container {
         gap: 15px;
         min-height: 350px;
     }
@@ -509,6 +522,11 @@
         min-height: 300px;
     }
     
+    .more-leaderboard-container {
+        grid-template-columns: 1fr;
+        min-height: 300px;
+    }
+    
     .main-leaderboard {
         min-height: 400px;
     }
@@ -545,6 +563,24 @@
         content: "Y";
         font-size: 14px;
         color: inherit;
+    }
+    
+    /* Fix for VIP leaderboard where Week tab is hidden - MTD becomes first, YTD becomes second */
+    .tabs-filter-container.vips-mode span:nth-child(1)::before {
+        content: "M";
+        font-size: 14px;
+        color: inherit;
+    }
+    
+    .tabs-filter-container.vips-mode span:nth-child(3)::before {
+        content: "Y";
+        font-size: 14px;
+        color: inherit;
+    }
+    
+    /* Remove the 5th child content for VIP mode since there are only 3 elements */
+    .tabs-filter-container.vips-mode span:nth-child(5)::before {
+        content: "";
     }
     
     .tabs-filter-container span:nth-child(1),

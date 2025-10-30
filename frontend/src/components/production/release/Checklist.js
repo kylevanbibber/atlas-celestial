@@ -6,6 +6,7 @@ import { useProgress } from "./ProgressContext";
 import api from "../../../api";
 import DataTable from "../../utils/DataTable";
 import LoadingSpinner, { InlineSpinner, ButtonSpinner, PageSpinner } from "../../utils/LoadingSpinner";
+import { formatUTCForDisplay } from "../../../utils/dateUtils";
 import "./Checklist.css";
 
 const Checklist = () => {
@@ -26,6 +27,7 @@ const Checklist = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [tableData, setTableData] = useState([]);
+  const [firstPackSent, setFirstPackSent] = useState(false);
 
   // Get user data from auth context
   const { user } = useAuth();
@@ -633,7 +635,7 @@ const Checklist = () => {
   ];
   
   // Exclude optional fields from progress calculation
-  const excludeKeys = ["reviewed_by"];
+  const excludeKeys = ["reviewed_by", "know_more"];
   const filteredProgressKeys = progressKeys.filter((key) => !excludeKeys.includes(key));
   
   // Total items in Preparation section with increments for practice_pres and refs_25
@@ -712,12 +714,13 @@ const Checklist = () => {
         }
 
         if (response.data.success) {
-          setAgents(response.data.data);
+          const fetchedAgents = response.data.data;
+          setAgents(fetchedAgents);
         } else {
-          console.error("Failed to fetch agents:", response.data.message);
+          
         }
       } catch (err) {
-        console.error("Error fetching agents list:", err);
+        
       } finally {
         setIsLoading(false);
       }
@@ -730,7 +733,7 @@ const handleAgentSelection = async (event) => {
   const selectedId = event.target.value;
 
   if (!selectedId) {
-    console.warn("No agent selected.");
+    
     // Clear data when no agent is selected
     setSelectedAgent("");
     setResponses({});
@@ -755,15 +758,19 @@ const handleAgentSelection = async (event) => {
   const selectedAgentData = agents.find(agent => agent.id === parseInt(selectedId, 10));
 
   if (!selectedAgentData) {
-    console.error("Selected agent data not found.");
+    
     setIsLoading(false);
     return;
   }
 
+  
+
   setSelectedAgent(selectedAgentData);
   setReviewerOptions(
     [selectedAgentData.sa, selectedAgentData.ga, selectedAgentData.mga, selectedAgentData.rga].filter(Boolean)
-  ); // Filter out null or empty values
+  );
+  
+  
   
   // Fetch checklist data for the selected agent
   await fetchChecklistData(selectedAgentData.id);
@@ -774,11 +781,16 @@ const handleAgentSelection = async (event) => {
   setIsLoading(false);
 };
 
-  const checkReleaseScheduled = async (agentId) => {
-    const userIdToUse = agentId || userId;
+  const checkReleaseScheduled = async (targetUserId) => {
+    if (!targetUserId) {
+      
+      return;
+    }
+
+    
 
     try {
-      const response = await api.get('/release/check-release-scheduled', { params: { userId: userIdToUse } });
+      const response = await api.get('/release/check-release-scheduled', { params: { userId: targetUserId } });
       const result = response.data;
 
       const { weekStart, weekEnd } = getCurrentWeekRange();
@@ -790,10 +802,13 @@ const handleAgentSelection = async (event) => {
       setOnReleaseList(result.success);
 
       if (result.allRowsResult) {
-        // Filter to get all rows submitted this week (regardless of release_scheduled status)
+        // Spots taken: release_scheduled is null AND passed is null AND time_submitted within current week (Saturday–Saturday)
         const rowsThisWeek = result.allRowsResult.filter((row) => {
           const submissionDate = new Date(row.time_submitted);
-          return submissionDate >= weekStart && submissionDate <= weekEnd;
+          const withinWeek = submissionDate >= weekStart && submissionDate <= weekEnd;
+          const notScheduled = row.release_scheduled == null;
+          const notPassed = row.passed == null;
+          return withinWeek && notScheduled && notPassed;
         });
 
         setTotalRowsThisWeek(rowsThisWeek.length);
@@ -803,55 +818,76 @@ const handleAgentSelection = async (event) => {
 
       return result;
     } catch (error) {
-      console.error("Error checking release schedule status:", error);
+      
       setTotalRowsThisWeek(0);
       setOnReleaseList(false);
       return { success: false };
     }
   };
 
-  // Auto-load data for AGT users
+  // Check if the agent has 1st Pack sent in leads_released
+  const checkFirstPackStatus = async (targetUserId) => {
+    try {
+      const resp = await api.get('/release/leads-released');
+      const rows = resp?.data?.data || [];
+      const hasFirstPack = rows.some(r =>
+        String(r.userId) === String(targetUserId) &&
+        (r.type === '1st Pack' || r.type === 'First Pack') &&
+        (r.sent == 1 || r.sent === '1')
+      );
+      setFirstPackSent(hasFirstPack);
+    } catch (e) {
+      setFirstPackSent(false);
+    }
+  };
+
+  // Auto-load data for AGT users only
   useEffect(() => {
     if (!userRole || !userId) return;
     if (userRole === "AGT") {
+      
       setIsLoading(true);
       fetchChecklistData(userId);
+      checkReleaseScheduled(userId);
+      checkFirstPackStatus(userId);
     }
   }, [userRole, userId]);
 
-  // Fetch release status for all users to show spots remaining
+  // Only auto-load manager's own data if no agent is selected
   useEffect(() => {
     if (!userRole || !userId) return;
+    if (userRole === "AGT") return; // AGT users handled above
     
-    const fetchReleaseStatus = async () => {
-      const agentId = selectedAgent?.id || userId;
-      await checkReleaseScheduled(agentId);
-    };
+    // Only run this for managers when no specific agent is selected
+    if (!selectedAgent) {
+      
+      fetchChecklistData(userId);
+      checkReleaseScheduled(userId);
+      checkFirstPackStatus(userId);
+    }
+  }, [userRole, userId, selectedAgent]); // Include selectedAgent to re-run when cleared
 
-    fetchReleaseStatus();
-  }, [userId, selectedAgent, userRole]);
-
-  // Removed duplicate useEffect that was causing race condition
-  // fetchChecklistData is already called in handleAgentSelection
-
+  // Check if the current user (either selected agent or manager) is released
   useEffect(() => {
-    if (!userId) return;
+    const targetUserId = selectedAgent?.id || userId;
+    if (!targetUserId) return;
     
     const checkReleased = async () => {
-          try {
-      const response = await api.get('/release/check-released', { params: { userId } });
-      const result = response.data;
+      
+      try {
+        const response = await api.get('/release/check-released', { params: { userId: targetUserId } });
+        const result = response.data;
 
         if (result.success) {
           setIsReleased(result.isReleased);
         }
       } catch (error) {
-        console.error("Error fetching release status:", error);
+        
       }
     };
 
     checkReleased();
-  }, [userId]);
+  }, [selectedAgent?.id, userId]); // Re-run when agent selection changes
 
   // Initialize countdown timer
   useEffect(() => {
@@ -906,17 +942,26 @@ const handleAgentSelection = async (event) => {
   
     // Calculate remaining items
     const remaining = totalProgressItems - completedItems;
+    const progressPercentage = (completedItems / totalProgressItems) * 100;
+    
+    const targetUser = selectedAgent ? 
+      (selectedAgent.lagnname || `${selectedAgent.first_name} ${selectedAgent.last_name}`) : 
+      'Current User';
+    
+    
     setRemainingItems(remaining);
-  
-    // Set the progress percentage
-    setProgress((completedItems / totalProgressItems) * 100);
+    setProgress(progressPercentage);
   };
 
-  const fetchChecklistData = async (agentId) => {
-    const userIdToUse = agentId || userId;
+  const fetchChecklistData = async (targetUserId) => {
+    if (!targetUserId) {
+      return;
+    }
+    
+    
     
     try {
-      const response = await api.get('/release/get-checklist', { params: { userId: userIdToUse } });
+      const response = await api.get('/release/get-checklist', { params: { userId: targetUserId } });
       const data = response.data;
 
       if (data.success && data.checklist) {
@@ -928,7 +973,6 @@ const handleAgentSelection = async (event) => {
         setIsReleased(false);
       }
     } catch (error) {
-      console.error("Error fetching checklist data:", error);
       // Clear responses on error
       setResponses({});
       setIsReleased(false);
@@ -938,29 +982,28 @@ const handleAgentSelection = async (event) => {
   };
 
   const updateProgress = async (updates) => {
-    const userIdToUse = selectedAgent?.id || userId;
+    const targetUserId = selectedAgent?.id || userId;
     
     try {
       setIsSaving(true);
       await api.post('/release/update-progress', {
-        userId: userIdToUse,
+        userId: targetUserId,
         updates,
       });
     } catch (error) {
-      console.error("Error updating progress:", error);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleScheduleReleaseCall = async () => {
-    const userIdToUse = selectedAgent?.id || userId;
+    const targetUserId = selectedAgent?.id || userId;
     const agentName = selectedAgent ? (selectedAgent.lagnname || `${selectedAgent.first_name} ${selectedAgent.last_name}`) : 'your';
     
     try {
       setIsSaving(true);
       const response = await api.post('/release/schedule-release', {
-        userId: userIdToUse,
+        userId: targetUserId,
       });
 
       if (response.data.success) {
@@ -970,17 +1013,13 @@ const handleAgentSelection = async (event) => {
         alert('Error scheduling release call: ' + response.data.message);
       }
     } catch (error) {
-      console.error('Error scheduling release call:', error);
       alert('Error scheduling release call');
     } finally {
       setIsSaving(false);
     }
   };
 
-  useEffect(() => {
-    if (!userId) return;
-    fetchChecklistData();
-  }, [userId]);
+  // Removed legacy useEffect that was causing conflicts
 
   useEffect(() => {
     calculateProgress();
@@ -1031,12 +1070,12 @@ const handleAgentSelection = async (event) => {
       {/* Release Schedule Information - Full Details for AGT */}
       {userRole === "AGT" && isReleaseScheduled && (
         <div className="release-schedule-info">
-          <div className="scheduled-info">
+          <div className="scheduled-info" style={{ textAlign: 'center' }}>
             <p><strong>🎯 Your Release Call is Scheduled!</strong></p>
-            <p>
-              <strong>Release Date:</strong> {new Date(releaseScheduledDate).toLocaleDateString()} at {new Date(releaseScheduledDate).toLocaleTimeString()}
+            <p style={{ fontSize: '1rem', marginTop: '8px', marginBottom: '15px' }}>
+              <strong>Release Date:</strong> {formatUTCForDisplay(releaseScheduledDate)}
             </p>
-            <div style={{ marginTop: '15px', padding: '10px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
+            <div style={{ marginTop: '15px', padding: '10px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', textAlign: 'center' }}>
               <p><strong>📞 Zoom Meeting Info:</strong></p>
               <p>
                 <a href="https://zoom.us/j/6233180376" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--link-color)', textDecoration: 'underline' }}>
@@ -1055,88 +1094,99 @@ const handleAgentSelection = async (event) => {
         </div>
       )}
 
-      {/* Progress Bar */}
-      <div className="progress-bar-container">
-        <div className="progress-percentage">
-          {Math.round(progress)}% Complete
+      {/* Minimal request UI (no % complete, no checklist), only if not already scheduled */}
+      {!isReleaseScheduled && (
+        <div className="release-progress-bar-container">
+          <div style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '16px',
+            marginBottom: '15px'
+          }}>
+            {/* Left: spots remaining */}
+            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'left', flex: '0 0 auto' }}>
+              📅  {Math.max(0, 24 - totalRowsThisWeek)}/24 spots remaining
+            </div>
+
+            {/* Center: button */}
+            <button
+              onClick={handleScheduleReleaseCall}
+              disabled={!((userRole === "AGT") || (["SA", "GA", "MGA", "RGA"].includes(userRole) && selectedAgent) || (isAppAdmin && selectedAgent)) || !firstPackSent || onReleaseList || isSaving}
+              className="unlocked-link"
+              style={{ 
+                fontSize: '1rem', 
+                padding: '8px 16px', 
+                minHeight: '40px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                flex: '0 0 auto'
+              }}
+            >
+              {isSaving ? <ButtonSpinner /> : 'Request to be Scheduled'}
+            </button>
+
+            {/* Right: countdown timer */}
+            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'right', flex: '0 0 auto' }}>
+              {countdown ? `⏰ Time remaining: ${countdown}` : ''}
+            </div>
+          </div>
         </div>
-        
-        {/* Show items remaining or schedule button */}
-        {remainingItems > 0 ? (
-          <div style={{ marginBottom: '10px', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-            {remainingItems} item{remainingItems !== 1 ? 's' : ''} remaining
+      )}
+
+      {/* Release Call Information Section for AGT users */}
+      {userRole === "AGT" && (
+        <div style={{ 
+          marginTop: '20px',
+          padding: '20px',
+          backgroundColor: 'var(--bg-secondary)',
+          borderRadius: '8px',
+          border: '1px solid var(--border-color)'
+        }}>
+          <h3 style={{ 
+            marginTop: 0,
+            marginBottom: '12px',
+            color: 'var(--text-primary)',
+            fontSize: '1.1rem'
+          }}>
+            📞 About Your Release Call
+          </h3>
+          <p style={{ 
+            marginBottom: '15px',
+            lineHeight: '1.6',
+            color: 'var(--text-primary)',
+            fontSize: '0.95rem'
+          }}>
+            Your release call is a pivotal milestone in your journey with us. This is when you transition from training 
+            to operating independently as a licensed agent. During this call, you'll demonstrate your knowledge of our 
+            systems, products, and processes. Successfully completing your release call means you're ready to build your 
+            own business and start making an impact in the field. Review the release questions below to prepare for your call.
+          </p>
+          <div style={{ 
+            textAlign: 'center',
+            padding: '12px',
+            backgroundColor: 'var(--bg-primary)',
+            borderRadius: '6px'
+          }}>
+            <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+              📋 <a 
+                href="https://aagencies-my.sharepoint.com/:b:/g/personal/kvanbibber_ariasagencies_com/Edr14iXcerVHoroIJvQd5gMB-BCqDoRpg-tzI2vVElfbDg" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                style={{ 
+                  color: 'var(--link-color)', 
+                  textDecoration: 'underline',
+                  fontWeight: '500'
+                }}
+              >
+                Review Release Questions <FaDownload style={{ marginLeft: '4px' }} />
+              </a>
+            </p>
           </div>
-        ) : (userRole === "AGT" || (["SA", "GA", "MGA", "RGA"].includes(userRole) && selectedAgent) || (isAppAdmin && selectedAgent)) ? (
-          <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'center' }}>
-            {totalRowsThisWeek < 24 ? (
-              onReleaseList ? (
-                isReleaseScheduled ? (
-                  <div className="scheduled-info" style={{ textAlign: 'center' }}>
-                    <p style={{ color: 'var(--success-color)', fontWeight: 'bold', margin: '0 0 5px 0' }}>
-                      🎯 Release Call Scheduled{selectedAgent ? ` for ${selectedAgent.lagnname || selectedAgent.first_name}` : ''}!
-                    </p>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0' }}>
-                      {new Date(releaseScheduledDate).toLocaleDateString()} at {new Date(releaseScheduledDate).toLocaleTimeString()}
-                    </p>
-                  </div>
-                              ) : (
-                <div style={{ textAlign: 'center' }}>
-                  <p style={{ color: 'var(--success-color)', fontWeight: 'bold', margin: '0 0 5px 0' }}>
-                    ✅ Release Call Request Submitted{selectedAgent ? ` for ${selectedAgent.lagnname || selectedAgent.first_name}` : ''}!
-                  </p>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0' }}>
-                    Check back over the weekend to see the scheduled time for the upcoming week.
-                  </p>
-                </div>
-              )
-              ) : (
-                <button
-                  onClick={handleScheduleReleaseCall}
-                  disabled={progress < 100 || onReleaseList || isSaving}
-                  className={progress === 100 && !onReleaseList ? "unlocked-link" : "locked-link"}
-                  aria-label={progress === 100 ? (selectedAgent ? `Schedule release call for ${selectedAgent.lagnname || selectedAgent.first_name}` : "Schedule your release call") : "Complete all sections to unlock scheduling"}
-                  style={{ 
-                    fontSize: '1rem', 
-                    padding: '8px 16px', 
-                    minHeight: '40px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px'
-                  }}
-                >
-                  <span className="link-icon">
-                    {isSaving ? <ButtonSpinner /> : (progress === 100 ? <FaLockOpen /> : <FaLock />)}
-                  </span>
-                  {isSaving ? "Scheduling..." : (progress === 100 ? (selectedAgent ? `Schedule Release Call for ${selectedAgent.lagnname || selectedAgent.first_name}` : "Schedule Release Call") : "Complete All Sections to Unlock")}
-                </button>
-              )
-            ) : (
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ color: 'var(--warning-color)', fontWeight: 'bold', margin: '0' }}>
-                  ⚠️ Release calls are full for this week{selectedAgent ? ` for ${selectedAgent.lagnname || selectedAgent.first_name}` : ''}
-                </p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div style={{ marginBottom: '10px', fontSize: '0.875rem', color: 'var(--success-color)', textAlign: 'center' }}>
-            🎉 All items complete!
-          </div>
-        )}
-        
-        <div style={{ marginBottom: '10px', fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
-          📅  {Math.max(0, 24 - totalRowsThisWeek)}/24 spots remaining
         </div>
-        <div className="checklist-progress-bar" role="progressbar" aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100">
-          <div className="checklist-progress-bar-fill" style={{ width: `${progress}%` }}></div>
-        </div>
-        {countdown && (
-          <div style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-            ⏰ Time remaining: {countdown}
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Roleplay Modal */}
       <RoleplayModal
@@ -1145,18 +1195,7 @@ const handleAgentSelection = async (event) => {
         content={activeModalContent}
       />
 
-      {/* DataTable for Checklist */}
-      <DataTable
-        columns={columns}
-        data={tableData}
-        onCellUpdate={handleCellUpdate}
-        disablePagination={true}
-        disableSorting={true}
-        disableCellEditing={false}
-        showActionBar={false}
-        stickyHeader={true}
-        entityName="checklist item"
-      />
+      {/* Checklist table removed for the stripped-down version */}
       
       {/* Saving indicator */}
       {isSaving && (

@@ -47,6 +47,7 @@ export const Cell = memo(function Cell({
   handleEditStart,
   handleEditChange,
   onCellUpdate,
+  onCellBlur,
   handleKeyDown,
   inputRef,
   onOpenAddressMenu,
@@ -60,8 +61,16 @@ export const Cell = memo(function Cell({
 
   // If column is not found, return the cell value as-is
   if (!column) {
-    return cell.value || "";
+    return cell.value ?? "";
   }
+
+  // Helper function to handle blur events
+  const handleBlur = (value) => {
+    if (onCellBlur) {
+      onCellBlur(row.original.id, cell.column.id, value);
+    }
+    // Do not forcibly clear editing state here; navigation manages editing target.
+  };
 
 // in Cell.js, under massSelection:
 if (column?.massSelection) {
@@ -158,7 +167,7 @@ if (column?.massSelection) {
           <CustomAutocomplete
             value={val}
             onChange={(v) => handleEditChange(row.original.id, "company", v)}
-            onBlur={() => handleEditStart(null)}
+            onBlur={(e) => handleBlur(e.target.value)}
             suggestions={suggestions}
             chipStyle
           />
@@ -226,11 +235,43 @@ if (column?.massSelection) {
           boxSizing: "border-box",
         }}
         value={val}
+        tabIndex={0}
         onChange={(e) =>
           handleEditChange(row.original.id, cell.column.id, e.target.value)
         }
-        onBlur={() => handleEditStart(null)}
-        onKeyDown={(e) => handleKeyDown(e, rowIndex, columnIndex)}
+        onBlur={(e) => {
+          console.log('[Cell] select onBlur', {
+            rowId: row.original.id,
+            field: cell.column.id,
+            value: e.target.value
+          });
+          handleBlur(e.target.value);
+        }}
+        onKeyDown={(e) => {
+          // Keep arrows and Enter/Space within the select
+          if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", " "].includes(e.key)) {
+            e.stopPropagation();
+            return;
+          }
+          // For Tab/Shift+Tab, move between cells
+          if (e.key === "Tab") {
+            console.log('[Cell] Tab on select', {
+              rowIndex,
+              columnIndex,
+              rowId: row.original.id,
+              field: cell.column.id,
+              shiftKey: !!e.shiftKey
+            });
+            e.preventDefault();
+            e.stopPropagation();
+            // Blur current select to avoid trapped focus in some browsers
+            if (e.currentTarget && typeof e.currentTarget.blur === 'function') {
+              e.currentTarget.blur();
+            }
+            handleKeyDown(e, rowIndex, columnIndex);
+            return;
+          }
+        }}
       >
         {column.DropdownOptions.map((opt) => (
           <option key={opt} value={opt}>
@@ -265,7 +306,7 @@ if (column?.massSelection) {
       <CustomAutocomplete
         value={val}
         onChange={(v) => handleEditChange(row.original.id, column.accessor, v)}
-        onBlur={() => handleEditStart(null)}
+        onBlur={(e) => handleBlur(val)}
         suggestions={suggestions}
       />
     ) : (
@@ -370,7 +411,7 @@ if (column?.massSelection) {
             );
             handleEditChange(row.original.id, column.accessor, picked.toISO());
           }}
-          onBlur={() => handleEditStart(null)}
+          onBlur={(e) => handleBlur(localStr)}
           onKeyDown={(e) => handleKeyDown(e, rowIndex, columnIndex)}
         />
       );
@@ -437,7 +478,7 @@ if (column?.massSelection) {
         }}
         value={val}
         onChange={(e) => handleEditChange(row.original.id, column.accessor, e.target.value)}
-        onBlur={() => handleEditStart(null)}
+        onBlur={(e) => handleBlur(e.target.value)}
         onKeyDown={(e) => handleKeyDown(e, rowIndex, columnIndex)}
       >
         {column.chipDropdownOptions.map((opt) => (
@@ -504,7 +545,7 @@ if (column?.massSelection) {
           handleKeyPress(e);
           handleKeyDown(e, rowIndex, columnIndex);
         }}
-        onBlur={() => handleEditStart(null)}
+        onBlur={(e) => handleBlur(e.target.value)}
         {...(column.inputProps || {})}
       />
     );
