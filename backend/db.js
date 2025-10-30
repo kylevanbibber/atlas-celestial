@@ -3,24 +3,50 @@ const dotenv = require("dotenv");
 
 dotenv.config();
 
-// IMPORTANT: Avoid defaulting to production credentials in local/dev.
-// Use environment variables; fall back to safe localhost defaults.
-const dbConfig = {
-  host: process.env.DB_HOST || '216.69.162.18',
-  user: process.env.DB_USER || 'kvanbibber',
-  password: process.env.DB_PASS || 'Atlas2024!',
-  database: process.env.DB_NAME || 'AriasLifeUsers',
-  multipleStatements: true,
-  connectionLimit: 15,
-  queueLimit: 0,
-  waitForConnections: true,
-  connectTimeout: 60000,
-  acquireTimeout: 60000,
-  timeout: 60000,
-  reconnect: true,
-  idleTimeout: 300000,
-  timezone: 'America/New_York',
-};
+// Parse JAWSDB_URL if it exists (for Heroku)
+let dbConfig;
+
+if (process.env.JAWSDB_URL) {
+  // Parse the JAWSDB_URL (format: mysql://user:pass@host:port/database)
+  const url = new URL(process.env.JAWSDB_URL);
+  dbConfig = {
+    host: url.hostname,
+    user: url.username,
+    password: url.password,
+    database: url.pathname.substring(1), // Remove leading slash
+    port: url.port || 3306,
+    multipleStatements: true,
+    connectionLimit: 15,
+    queueLimit: 0,
+    waitForConnections: true,
+    connectTimeout: 60000,
+    acquireTimeout: 60000,
+    timeout: 60000,
+    reconnect: true,
+    idleTimeout: 300000,
+    timezone: 'America/New_York',
+  };
+  console.log('[DB] 🚀 Using JawsDB MySQL (Heroku)');
+} else {
+  // Use individual environment variables or local defaults
+  dbConfig = {
+    host: process.env.DB_HOST || '216.69.162.18',
+    user: process.env.DB_USER || 'kvanbibber',
+    password: process.env.DB_PASS || 'Atlas2024!',
+    database: process.env.DB_NAME || 'AriasLifeUsers',
+    multipleStatements: true,
+    connectionLimit: 15,
+    queueLimit: 0,
+    waitForConnections: true,
+    connectTimeout: 60000,
+    acquireTimeout: 60000,
+    timeout: 60000,
+    reconnect: true,
+    idleTimeout: 300000,
+    timezone: 'America/New_York',
+  };
+  console.log('[DB] 🔧 Using custom database configuration');
+}
 
 const pool = mysql.createPool(dbConfig);
 
