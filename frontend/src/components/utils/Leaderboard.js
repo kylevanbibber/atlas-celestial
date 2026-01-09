@@ -957,8 +957,8 @@ const Leaderboard = ({
     : data;
 
   // If an allowedNames Set/array is provided, filter items whose name is not in the allowed list
-  // Normalize to lowercase for comparison safety
-  const normalizeName = (val) => (val ? String(val).toLowerCase().trim() : "");
+  // Normalize to lowercase for comparison safety and normalize multiple spaces
+  const normalizeName = (val) => (val ? String(val).replace(/\s+/g, ' ').toLowerCase().trim() : "");
   const toSet = (input, mapper = (v) => v) => {
     if (!input) return null;
     if (input instanceof Set) return input;

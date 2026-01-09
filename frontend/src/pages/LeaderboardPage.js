@@ -2231,7 +2231,7 @@ const LeaderboardPage = () => {
                 .filter(r => (r.Active === 'y' || r.active === 'y') && (r.managerActive === 'y' || r.manageractive === 'y'))
                 .map(r => r.lagnname)
                 .filter(Boolean);
-            setAllowedNames(new Set(names.map(n => String(n).toLowerCase().trim())));
+            setAllowedNames(new Set(names.map(n => String(n).replace(/\s+/g, ' ').toLowerCase().trim())));
             const ids = rows
                 .map(r => r.id)
                 .filter((v) => v !== null && v !== undefined)
@@ -2246,7 +2246,7 @@ const LeaderboardPage = () => {
                     .filter(r => (r.managerActive === 'y' || r.manageractive === 'y'))
                     .map(r => r.lagnname)
                     .filter(Boolean);
-                setAllowedNames(new Set(names2.map(n => String(n).toLowerCase().trim())));
+                setAllowedNames(new Set(names2.map(n => String(n).replace(/\s+/g, ' ').toLowerCase().trim())));
                 const ids2 = rows2
                     .map(r => r.id)
                     .filter((v) => v !== null && v !== undefined)
