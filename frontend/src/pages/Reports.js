@@ -6,11 +6,14 @@ import LeadsUtilities from '../components/utilities/LeadsUtilities';
 import LicenseUtilities from '../components/utilities/LicenseUtilities';
 import AdminLicensing from '../components/admin/AdminLicensing';
 import RefsPage from './refs/page';
-import { FiFileText, FiMail, FiClipboard, FiList } from 'react-icons/fi';
+import Feedback from '../components/feedback/Feedback';
+import MedicationSearch from '../components/medication/MedicationSearch';
+import { FiFileText, FiMail, FiClipboard, FiList, FiActivity } from 'react-icons/fi';
 import '../pages/utilities/Utilities.css';
-import SecondarySidebar from '../components/utils/SecondarySidebar';
+// import SecondarySidebar from '../components/utils/SecondarySidebar';
 import { useAuth } from '../context/AuthContext';
 import { useLicenseWarning } from '../context/LicenseWarningContext';
+import ResourcesOverview from './ResourcesOverview';
 
 const Reports = () => {
   const navigate = useNavigate();
@@ -27,6 +30,9 @@ const Reports = () => {
   // Check if user can view refs
   const canViewRefs = hasPermission('view_refs');
   
+  // Check if user should see Trial Toolkit (exclude AGT, SA, GA, MGA, RGA)
+  const canSeeTrialToolkit = !['AGT', 'SA', 'GA', 'MGA', 'RGA'].includes(user?.clname);
+  
   // Default section - for non-app users show reports first
   const [active, setActive] = useState('reports');
   
@@ -36,16 +42,11 @@ const Reports = () => {
     const activeParam = params.get('active');
     
     // Define valid sections based on user type
-    let validSections = ['reports', 'release'];
+    let validSections = ['reports', 'release', 'feedback', 'trial-toolkit', 'leads', 'licensing'];
     
     // Add refs if user has permission
     if (canViewRefs) {
       validSections.push('refs');
-    }
-    
-    // Add leads and licensing for non-app users
-    if (!isAppAdmin) {
-      validSections.push('leads', 'licensing');
     }
     
     if (activeParam && validSections.includes(activeParam)) {
@@ -74,39 +75,57 @@ const Reports = () => {
     { id: 'release', label: 'Release', icon: <FiList /> }
   ];
   
-  // Add leads and licensing for non-app users
-  const additionalItems = !isAppAdmin ? [
-    { id: 'leads', label: 'Leads', icon: <FiMail /> },
-    { id: 'licensing', label: 'Licensing', icon: <FiFileText /> }
+  // Add trial toolkit (only if user is allowed to see it)
+  const trialToolkitItem = canSeeTrialToolkit ? [
+    { id: 'trial-toolkit', label: 'Trial Toolkit', icon: <FiActivity /> }
   ] : [];
   
-  const items = [...baseItems, ...refsItems, ...releaseItem, ...additionalItems];
+  // Add leads and licensing (available to all users)
+  const additionalItems = [
+    { id: 'leads', label: 'Leads', icon: <FiMail /> },
+    { id: 'licensing', label: 'Licensing', icon: <FiFileText /> }
+  ];
+  
+  const items = [...baseItems, ...refsItems, ...releaseItem, ...trialToolkitItem, ...additionalItems];
   
   // Items that need warning indicators
-  const warningItems = licenseWarning && !isAppAdmin ? ['licensing'] : [];
+  const warningItems = licenseWarning ? ['licensing'] : [];
+
+  // Check if there's an active parameter
+  const params = new URLSearchParams(location.search);
+  const hasActive = params.has('active');
+
+  // If no active parameter, show the overview page
+  if (!hasActive) {
+    return <ResourcesOverview />;
+  }
 
   return (
     <div className="settings-container">
-      <SecondarySidebar
+      {/* Breadcrumb Navigation now in Header */}
+      
+      {/* <SecondarySidebar
         items={items}
         activeItem={active}
         onItemClick={handleSectionChange}
         warningItems={warningItems}
-      />
+      /> */}
       <div className="settings-content">
         <div className="padded-content">
           {active === 'reports' && <ProductionReports />}
           {active === 'release' && <Release />}
+          {active === 'feedback' && <Feedback />}
+          {active === 'trial-toolkit' && <MedicationSearch />}
           {active === 'refs' && canViewRefs && <RefsPage />}
-          {active === 'leads' && !isAppAdmin && <LeadsUtilities />}
-          {active === 'licensing' && !isAppAdmin && (
+          {active === 'leads' && <LeadsUtilities />}
+          {active === 'licensing' && (
             <>
-              {/* All non-app users get their personal license utilities */}
-              <LicenseUtilities />
+              {/* Non-app users get their personal license utilities */}
+              {!isAppAdmin && <LicenseUtilities />}
               
-              {/* SA/GA/MGA/RGA users also get admin licensing for their hierarchy */}
+              {/* App admins and hierarchy managers get admin licensing */}
               {canSeeAdminLicensing && (
-                <div style={{ marginTop: '2rem' }}>
+                <div style={{ marginTop: isAppAdmin ? '0' : '2rem' }}>
                   <AdminLicensing />
                 </div>
               )}

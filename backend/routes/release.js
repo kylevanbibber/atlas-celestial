@@ -536,7 +536,8 @@ router.get('/get-unreleased-users-checklist', async (req, res) => {
         // Query to get all users from activeusers where released is 0,
         // and left join with checklist_progress and JA_Release tables.
         const unreleasedUsersQuery = `
-            SELECT a.*, c.*, j.*, a.lagnname, a.esid, a.sa, a.ga, a.mga, a.rga, a.id,
+            SELECT a.*, c.*, j.*, a.lagnname, a.esid, a.sa, a.ga, a.mga, a.rga, a.rept_name, a.id,
+                   mga_table.rept_name AS mga_rept_name,
                    p.PendingDate,
                    CASE 
                        WHEN p.PendingDate IS NOT NULL AND a.esid IS NOT NULL 
@@ -547,6 +548,7 @@ router.get('/get-unreleased-users-checklist', async (req, res) => {
             LEFT JOIN checklist_progress AS c ON a.id = c.user_id
             LEFT JOIN JA_Release AS j ON a.id = j.user_id
             LEFT JOIN pending p ON a.lagnname = p.LagnName
+            LEFT JOIN MGAs mga_table ON a.mga = mga_table.lagnname
             WHERE a.Active = 'y' AND a.managerActive = 'y'
         `;
         const unreleasedUsers = await query(unreleasedUsersQuery);
@@ -584,7 +586,25 @@ router.post('/get-hierarchy-users-checklist', async (req, res) => {
             AND Active = 'y'
         `;
         
-        const hierarchyUsers = await query(hierarchyQuery, [userId, userId, userId, userId]);
+        let hierarchyUsers = await query(hierarchyQuery, [userId, userId, userId, userId]);
+        
+        // Get the user's lagnname to check for special case
+        const userResult = await query(`SELECT lagnname FROM activeusers WHERE id = ?`, [userId]);
+        const userLagnname = userResult.length > 0 ? userResult[0].lagnname : null;
+        
+        // Special case: For MAUGHANEVANSON BRODY W, also include all LOCKER-ROTOLO users
+        if (userLagnname === 'MAUGHANEVANSON BRODY W') {
+            const lockerRotoloUsers = await query(`
+                SELECT * FROM activeusers 
+                WHERE rept_name = 'LOCKER-ROTOLO'
+                AND Active = 'y'
+            `);
+            
+            // Merge LOCKER-ROTOLO users with existing hierarchy, avoiding duplicates
+            const existingIds = new Set(hierarchyUsers.map(u => u.id));
+            const newUsers = lockerRotoloUsers.filter(u => !existingIds.has(u.id));
+            hierarchyUsers = [...hierarchyUsers, ...newUsers];
+        }
         
         if (hierarchyUsers.length === 0) {
             // Try without managerActive filter in case that's the issue
@@ -897,7 +917,10 @@ router.get('/first-pack/eligible', async (req, res) => {
                 au.ga,
                 au.mga,
                 au.rga,
+                au.rept_name,
                 au.pending,
+                au.managerActive,
+                mga_table.rept_name AS mga_rept_name,
                 lr.id AS lead_id,
                 lr.created_at AS created_at,
                 lr.sent AS lr_sent,
@@ -929,6 +952,7 @@ router.get('/first-pack/eligible', async (req, res) => {
                 GROUP BY userId
             ) ls ON ls.userId = au.id
             LEFT JOIN pending p ON au.lagnname = p.LagnName
+            LEFT JOIN MGAs mga_table ON au.mga = mga_table.lagnname
             WHERE au.pending IN (0,1)
               AND au.released = 0
               AND au.Active = 'y'
@@ -1028,11 +1052,6 @@ router.get('/leads-released', async (req, res) => {
             ORDER BY lr.last_updated DESC
         `);
         // Debug specific user 26816
-        try {
-            const debugUserId = 26816;
-            const debugRows = result.filter(r => String(r.userId) === String(debugUserId));
-            console.log('[DEBUG /release/leads-released] Rows for 26816:', debugRows);
-        } catch (e) {}
         res.status(200).json({ success: true, data: result });
     } catch (error) {
         console.error('Error fetching leads released data:', error);
@@ -1095,12 +1114,11 @@ router.post('/leads-released', async (req, res) => {
 // Get licensed states data
 router.get('/licensed-states', async (req, res) => {
     try {
-        // Assuming there's a licensed_states table with userId, state, expiry_date columns
-        // If the table doesn't exist, you might need to create it or adjust the query
+        // Return ALL licenses including those with NULL expiry_date
+        // Frontend will handle display logic (color-coding for expired/no expiry)
         const result = await query(`
             SELECT userId, state, expiry_date 
             FROM licensed_states 
-            WHERE expiry_date IS NOT NULL 
             ORDER BY userId, state
         `);
         
@@ -1146,20 +1164,20 @@ router.post('/second-pack', async (req, res) => {
         const { lagnname } = user[0];
         const now = new Date();
 
-        // Check if there's already a leads_released record for this user
-        const existingRecord = await query(
-            'SELECT * FROM leads_released WHERE userId = ? LIMIT 1',
-            [userId]
+        // Check if there's already a 2nd Pack record for this user (NOT 1st Pack!)
+        const existingSecondPack = await query(
+            'SELECT * FROM leads_released WHERE userId = ? AND type IN (?, ?) LIMIT 1',
+            [userId, '2nd Pack', 'Second Pack']
         );
 
-        if (existingRecord.length > 0) {
-            // Update existing record to mark second pack as sent
+        if (existingSecondPack.length > 0) {
+            // Update existing 2nd Pack record to mark as sent
             await query(
-                'UPDATE leads_released SET sent = 1, sent_date = ?, last_updated = ?, type = ? WHERE userId = ?',
-                [now, now, 'Second Pack', userId]
+                'UPDATE leads_released SET sent = 1, sent_date = ?, last_updated = ? WHERE id = ?',
+                [now, now, existingSecondPack[0].id]
             );
         } else {
-            // Create new record for second pack
+            // Create new record for second pack (keeps 1st Pack record intact)
             await query(
                 'INSERT INTO leads_released (userId, lagnname, type, sent, sent_date, last_updated) VALUES (?, ?, ?, ?, ?, ?)',
                 [userId, lagnname, 'Second Pack', 1, now, now]

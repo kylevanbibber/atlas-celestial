@@ -69,7 +69,7 @@ const ProductionTracker = () => {
   // Define columns for DataTable based on selected range
   const columns = React.useMemo(() => {
     if (selectedRange === "day") {
-      // Day view: Day, Date, Send, Gross, Net (daily breakdown for a week)
+      // Day view: Day, Date, Arias, NY (daily breakdown for a week)
       return [
         {
           Header: "Day",
@@ -84,36 +84,88 @@ const ProductionTracker = () => {
           Cell: ({ value }) => <strong>{value}</strong>
         },
         {
-          Header: "Send",
-          accessor: "send",
+          Header: "Arias",
+          accessor: "arias",
           type: "number",
-          width: 80,
+          width: 120,
           inputProps: {
             pattern: "[0-9]*\\.?[0-9]*",
-            inputMode: "decimal"
+            inputMode: "decimal",
+            step: "0.01"
+          },
+          Cell: ({ value, row, isEditing, updateCell }) => {
+            if (isEditing) {
+              return (
+                <input
+                  type="number"
+                  value={value || ''}
+                  onChange={(e) => updateCell(row.id, 'arias', e.target.value)}
+                  style={{
+                    width: '100%',
+                    border: 'none',
+                    outline: 'none',
+                    background: 'transparent',
+                    padding: '4px',
+                    fontFamily: 'inherit'
+                  }}
+                  autoFocus
+                  step="any"
+                  min="0"
+                  placeholder="0.00"
+                />
+              );
+            }
+            if (value !== undefined && value !== '') {
+              return (
+                <span style={{ fontFamily: 'monospace' }}>
+                  ${parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              );
+            }
+            return <span></span>;
           }
         },
         {
-          Header: "Gross",
-          accessor: "gross",
+          Header: "NY",
+          accessor: "ny",
           type: "number",
-          width: 100,
+          width: 120,
           inputProps: {
             pattern: "[0-9]*\\.?[0-9]*",
-            inputMode: "decimal"
+            inputMode: "decimal",
+            step: "0.01"
           },
-          Cell: ({ value }) => <span>{value ? `$${parseFloat(value).toLocaleString()}` : ''}</span>
-        },
-        {
-          Header: "Net",
-          accessor: "net",
-          type: "number",
-          width: 100,
-          inputProps: {
-            pattern: "[0-9]*\\.?[0-9]*",
-            inputMode: "decimal"
-          },
-          Cell: ({ value }) => <span>{value ? `$${parseFloat(value).toLocaleString()}` : ''}</span>
+          Cell: ({ value, row, isEditing, updateCell }) => {
+            if (isEditing) {
+              return (
+                <input
+                  type="number"
+                  value={value || ''}
+                  onChange={(e) => updateCell(row.id, 'ny', e.target.value)}
+                  style={{
+                    width: '100%',
+                    border: 'none',
+                    outline: 'none',
+                    background: 'transparent',
+                    padding: '4px',
+                    fontFamily: 'inherit'
+                  }}
+                  autoFocus
+                  step="any"
+                  min="0"
+                  placeholder="0.00"
+                />
+              );
+            }
+            if (value !== undefined && value !== '') {
+              return (
+                <span style={{ fontFamily: 'monospace' }}>
+                  ${parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              );
+            }
+            return <span></span>;
+          }
         }
       ];
     } else if (selectedRange === "week") {
@@ -134,7 +186,7 @@ const ProductionTracker = () => {
             pattern: "[0-9]*\\.?[0-9]*",
             inputMode: "decimal"
           },
-          Cell: ({ value }) => <span>{value ? `$${parseFloat(value).toLocaleString()}` : ''}</span>
+          Cell: ({ value }) => <span>{value !== undefined && value !== '' ? `$${parseFloat(value).toLocaleString()}` : ''}</span>
         },
         {
           Header: "Net",
@@ -145,7 +197,36 @@ const ProductionTracker = () => {
             pattern: "[0-9]*\\.?[0-9]*",
             inputMode: "decimal"
           },
-          Cell: ({ value }) => <span>{value ? `$${parseFloat(value).toLocaleString()}` : ''}</span>
+          Cell: ({ value }) => <span>{value !== undefined && value !== '' ? `$${parseFloat(value).toLocaleString()}` : ''}</span>
+        }
+      ];
+    } else if (selectedRange === "year") {
+      // Year view: Year, Net (yearly aggregated rows - calculated from monthly data)
+      return [
+        {
+          Header: "Year",
+          accessor: "displayYear",
+          width: 120,
+          disableSortBy: false,
+          disableCellEditing: true,
+          Cell: ({ value }) => <strong>{value}</strong>
+        },
+        {
+          Header: "Net",
+          accessor: "net",
+          type: "number",
+          width: 180,
+          disableCellEditing: true,
+          Cell: ({ value }) => {
+            if (value !== undefined && value !== '') {
+              return (
+                <span style={{ fontFamily: 'monospace' }}>
+                  ${parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              );
+            }
+            return <span></span>;
+          }
         }
       ];
     } else {
@@ -293,6 +374,16 @@ const ProductionTracker = () => {
 
   const transformDataForTable = () => {
     const today = getTodayEastern();
+    
+    if (selectedRange === "week") {
+      console.log('[Production Tracker] transformDataForTable - ALL dateRows:', dateRows);
+      console.log('[Production Tracker] transformDataForTable - ALL productionData keys:', Object.keys(productionData));
+      console.log('[Production Tracker] transformDataForTable - Checking if keys match...');
+      dateRows.forEach(weekStart => {
+        const hasData = productionData[weekStart] !== undefined;
+        console.log(`  ${weekStart}: ${hasData ? 'HAS DATA' : 'NO DATA'}`);
+      });
+    }
 
     if (selectedRange === "day") {
       // Day view: Daily rows for the selected week
@@ -309,15 +400,18 @@ const ProductionTracker = () => {
           day: "numeric" 
         });
 
-        const getFieldValue = (field) => editedRow[field] !== undefined ? editedRow[field] : (row[field] || '');
+        const getFieldValue = (field) => {
+          if (editedRow[field] !== undefined) return editedRow[field];
+          if (row[field] !== undefined) return row[field];
+          return '';
+        };
 
         return {
           id: date,
           dayOfWeek,
           displayDate,
-          send: getFieldValue('send'),
-          gross: getFieldValue('gross'),
-          net: getFieldValue('net'),
+          arias: getFieldValue('arias'),
+          ny: getFieldValue('ny'),
           reportDate: date,
           weekKey: getWeekStart(date)
         };
@@ -338,18 +432,61 @@ const ProductionTracker = () => {
         const endDisplay = weekEndDate.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "numeric" });
         const displayPeriod = `${startDisplay} - ${endDisplay}`;
 
-        const getFieldValue = (field) => editedRow[field] !== undefined ? editedRow[field] : (row[field] || '');
+        const getFieldValue = (field) => {
+          if (editedRow[field] !== undefined) return editedRow[field];
+          if (row[field] !== undefined) return row[field];
+          return '';
+        };
 
-        return {
+        const grossValue = getFieldValue('gross');
+        const netValue = getFieldValue('net');
+        
+        const weekRow = {
           id: weekStart,
           displayPeriod,
-          gross: getFieldValue('gross'),
-          net: getFieldValue('net'),
+          gross: grossValue,
+          net: netValue,
           reportDate: weekStart
+        };
+        
+        // Log every week's data
+        console.log(`[Production Tracker] Week ${displayPeriod}:`, {
+          weekStart,
+          hasRowData: Object.keys(row).length > 0,
+          rawRow: row,
+          grossValue: grossValue,
+          netValue: netValue,
+          grossType: typeof grossValue,
+          netType: typeof netValue
+        });
+        
+        return weekRow;
+      });
+
+      console.log('[Production Tracker] Setting tableData with', weeklyRows.length, 'weekly rows');
+      console.log('[Production Tracker] First 3 rows going to table:', weeklyRows.slice(0, 3));
+      setTableData(weeklyRows);
+    } else if (selectedRange === "year") {
+      // Year view: Yearly aggregated rows
+      const yearlyRows = dateRows.map((year) => {
+        const row = productionData[year] || {};
+        const editedRow = editedRows[year] || {};
+        
+        const getFieldValue = (field) => {
+          if (editedRow[field] !== undefined) return editedRow[field];
+          if (row[field] !== undefined) return row[field];
+          return '';
+        };
+
+        return {
+          id: year,
+          displayYear: year,
+          net: getFieldValue('net'),
+          reportDate: year
         };
       });
 
-      setTableData(weeklyRows);
+      setTableData(yearlyRows);
     } else {
       // Month view: Monthly aggregated rows
       // dateRows contains keys in YYYY-MM format, but we need to use MM/YYYY for sga_alp
@@ -417,16 +554,29 @@ const ProductionTracker = () => {
       }
     } else if (selectedRange === "week") {
       // Week view: Generate week start dates for the current year only
+      // IMPORTANT: Weekly_ALP data always uses Wed-Tue weeks, so we force 'wed-tue'
       const currentYear = todayDate.getFullYear();
-      const currentWeekStartStr = getWeekStart(todayEastern, scheduleType);
+      const currentWeekStartStr = getWeekStart(todayEastern, 'wed-tue'); // Force Wed-Tue weeks
       const currentWeekStart = new Date(currentWeekStartStr + 'T00:00:00');
+      
+      console.log('[Production Tracker] Generating weeks starting from:', currentWeekStartStr);
       
       // Start from current week and go back to the first week of the year
       let weekStart = new Date(currentWeekStart);
       
       while (weekStart.getFullYear() === currentYear) {
-        dates.push(weekStart.toISOString().split("T")[0]);
+        const weekStartStr = weekStart.toISOString().split("T")[0];
+        dates.push(weekStartStr);
         weekStart.setDate(weekStart.getDate() - 7);
+      }
+      
+      console.log('[Production Tracker] Generated', dates.length, 'weeks. First:', dates[0], 'Last:', dates[dates.length - 1]);
+    } else if (selectedRange === "year") {
+      // Year view: Generate years from current year back to 2008
+      const currentYear = todayDate.getFullYear();
+      
+      for (let year = currentYear; year >= 2008; year--) {
+        dates.push(year.toString());
       }
     } else {
       // Month view: Generate month keys (YYYY-MM) going back (e.g., last 24 months)
@@ -476,11 +626,17 @@ const ProductionTracker = () => {
         });
       }
     } else {
-      // Week and Month views: Show current view (no navigation needed as all data shown)
+      // Week, Month, and Year views: Show current view (no navigation needed as all data shown)
       const currentYear = new Date().getFullYear();
+      let label = "Last 24 Months";
+      if (selectedRange === "week") {
+        label = `${currentYear} Weeks`;
+      } else if (selectedRange === "year") {
+        label = "2008 - Present";
+      }
       options.push({
         value: todayDate.toISOString(),
-        label: selectedRange === "week" ? `${currentYear} Weeks` : "Last 24 Months"
+        label: label
       });
     }
 
@@ -545,6 +701,8 @@ const ProductionTracker = () => {
         const response = await api.get(`/alp/weekly-tracker?startDate=${oldestWeekStart}&endDate=${endDate}`);
         const result = response.data;
 
+        console.log('[Production Tracker] RAW API response:', result);
+
         if (!result.success || !Array.isArray(result.data)) {
           console.error("Invalid API response format:", result);
           setProductionData({});
@@ -554,25 +712,30 @@ const ProductionTracker = () => {
 
         // Map by reportDate (week start date)
         const mappedData = {};
-        result.data.forEach((entry) => {
+        result.data.forEach((entry, index) => {
           if (entry.reportDate) {
             const key = entry.reportDate.split("T")[0];
             mappedData[key] = {
               gross: entry.gross,
               net: entry.net
             };
+            if (index < 5) {
+              console.log(`[Production Tracker] API entry ${index}:`, entry);
+            }
           }
         });
 
         console.log('[Production Tracker] Mapped weekly data:', Object.keys(mappedData).length, 'weeks');
+        console.log('[Production Tracker] All week keys from API:', Object.keys(mappedData).sort());
+        console.log('[Production Tracker] Sample data values from API (first 5):');
+        Object.entries(mappedData).slice(0, 5).forEach(([key, value]) => {
+          console.log(`  ${key}: gross=${value.gross}, net=${value.net}`);
+        });
         setProductionData(mappedData);
-      } else {
-        // Day view: TODO - implement endpoint
-        const startDate = dateRows[dateRows.length - 1];
-        const endDate = dateRows[0];
-        
-        console.log('[Production Tracker] Day view not yet implemented');
-        const response = await api.get(`/production-tracker/data?view=${selectedRange}&startDate=${startDate}&endDate=${endDate}`);
+      } else if (selectedRange === "year") {
+        // Year view: Fetch from yearly_sga_alp table
+        console.log('[Production Tracker] Fetching yearly data from yearly_sga_alp');
+        const response = await api.get('/alp/yearly-tracker');
         const result = response.data;
 
         if (!result.success || !Array.isArray(result.data)) {
@@ -582,14 +745,47 @@ const ProductionTracker = () => {
           return;
         }
 
+        // Map by year
         const mappedData = {};
         result.data.forEach((entry) => {
-          if (entry.reportDate) {
-            const key = entry.reportDate.split("T")[0];
-            mappedData[key] = entry;
+          if (entry.year) {
+            mappedData[entry.year.toString()] = {
+              net: entry.net
+            };
           }
         });
 
+        console.log('[Production Tracker] Mapped yearly data:', Object.keys(mappedData).length, 'years');
+        setProductionData(mappedData);
+      } else {
+        // Day view: Fetch from daily_sga_alp table
+        const startDate = dateRows[dateRows.length - 1];
+        const endDate = dateRows[0];
+        
+        console.log('[Production Tracker] Fetching daily data from daily_sga_alp');
+        const response = await api.get(`/alp/daily-tracker?startDate=${startDate}&endDate=${endDate}`);
+        const result = response.data;
+
+        if (!result.success || !Array.isArray(result.data)) {
+          console.error("Invalid API response format:", result);
+          setProductionData({});
+          setLoading(false);
+          return;
+        }
+
+        // Map by date
+        const mappedData = {};
+        result.data.forEach((entry) => {
+          if (entry.date) {
+            const key = entry.date.split("T")[0];
+            mappedData[key] = {
+              arias: entry.arias,
+              ny: entry.ny
+            };
+          }
+        });
+
+        console.log('[Production Tracker] Mapped daily data:', Object.keys(mappedData).length, 'days');
         setProductionData(mappedData);
       }
     } catch (error) {
@@ -649,35 +845,39 @@ const ProductionTracker = () => {
           console.error("❌ Update failed:", result.message);
           alert(`Error: ${result.message}`);
         }
-      } else {
-        // Day and Week views: TODO - implement endpoints
-        const updatesWithDates = Object.keys(editedRows).reduce((acc, reportDate) => {
-          acc[reportDate] = { reportDate, ...editedRows[reportDate] };
-          return acc;
-        }, {});
-
-        const response = await api.post("/production-tracker/update", {
-          view: selectedRange,
-          updates: updatesWithDates
+      } else if (selectedRange === "day") {
+        // Day view: Update daily_sga_alp table
+        console.log('[Production Tracker] Submitting daily updates to daily_sga_alp');
+        console.log('[Production Tracker] Edited rows:', editedRows);
+        
+        const response = await api.post("/alp/daily-tracker", {
+          updates: editedRows
         });
 
         const result = response.data;
 
         if (result.success) {
+          console.log(`✅ Successfully updated ${result.successCount} day(s)`);
           setProductionData((prev) => {
             const updated = { ...prev };
-            Object.keys(editedRows).forEach(reportDate => {
-              updated[reportDate] = {
-                ...updated[reportDate],
-                ...editedRows[reportDate]
+            Object.keys(editedRows).forEach(date => {
+              updated[date] = {
+                ...updated[date],
+                ...editedRows[date]
               };
             });
             return updated;
           });
           setEditedRows({});
+          alert(`Successfully updated ${result.successCount} day(s)`);
         } else {
           console.error("❌ Update failed:", result.message);
+          alert(`Error: ${result.message}`);
         }
+      } else {
+        // Week and Year views: Read-only, no updates
+        console.log('[Production Tracker] Week and Year views are read-only');
+        alert('This view is read-only and cannot be edited.');
       }
     } catch (error) {
       console.error("🚨 Error updating data:", error);
@@ -745,15 +945,14 @@ const ProductionTracker = () => {
     let headers, csvContent;
     
     if (selectedRange === "day") {
-      headers = ['Date', 'Day', 'Send', 'Gross', 'Net'];
+      headers = ['Date', 'Day', 'Arias', 'NY'];
       csvContent = [
         headers.join(','),
         ...tableData.map(row => [
           row.displayDate,
           row.dayOfWeek,
-          row.send || 0,
-          row.gross || 0,
-          row.net || 0
+          row.arias || 0,
+          row.ny || 0
         ].join(','))
       ].join('\n');
     } else if (selectedRange === "week") {
@@ -764,6 +963,15 @@ const ProductionTracker = () => {
           row.displayPeriod,
           row.net || 0,
           row.gross || 0
+        ].join(','))
+      ].join('\n');
+    } else if (selectedRange === "year") {
+      headers = ['Year', 'Net'];
+      csvContent = [
+        headers.join(','),
+        ...tableData.map(row => [
+          row.displayYear,
+          row.net || 0
         ].join(','))
       ].join('\n');
     } else {
@@ -840,7 +1048,8 @@ const ProductionTracker = () => {
           ) : (
             <div className="navigation-container">
               <div style={{ padding: '8px 16px', color: '#666', fontSize: '14px' }}>
-                {selectedRange === "week" ? `${new Date().getFullYear()} Weeks` : "Last 24 Months"}
+                {selectedRange === "week" ? `${new Date().getFullYear()} Weeks` : 
+                 selectedRange === "year" ? "2008 - Present" : "Last 24 Months"}
               </div>
             </div>
           )}
@@ -874,6 +1083,16 @@ const ProductionTracker = () => {
               }}
             >
               Month
+            </span>
+            <span className="separator">|</span>
+            <span 
+              className={selectedRange === "year" ? "selected" : "unselected"} 
+              onClick={() => {
+                setSelectedRange("year");
+                setCurrentDate(new Date());
+              }}
+            >
+              Year
             </span>
           </div>
         </div>
@@ -1005,12 +1224,20 @@ const ProductionTracker = () => {
             disablePagination={true}
             highlightRowOnEdit={true}
             showActionBar={false}
-            disableCellEditing={selectedRange === "week"}
-            showTotals={true}
+            disableCellEditing={selectedRange === "week" || selectedRange === "year"}  // Week and Year are read-only
+            showTotals={selectedRange !== "week" && selectedRange !== "year"}
             totalsPosition="top"
-            totalsColumns={selectedRange === "day" ? ['send', 'gross', 'net'] : ['net', 'gross']}
+            totalsColumns={
+              selectedRange === "day" ? ['arias', 'ny'] : 
+              selectedRange === "year" ? ['net'] : 
+              ['net', 'gross']
+            }
             totalsLabel="Totals"
-            totalsLabelColumn={selectedRange === "day" ? "displayDate" : "displayPeriod"}
+            totalsLabelColumn={
+              selectedRange === "day" ? "displayDate" : 
+              selectedRange === "year" ? "displayYear" : 
+              "displayPeriod"
+            }
             rowClassNames={rowClassNames}
             stickyHeader={true}
             stickyTop={0}

@@ -25,12 +25,16 @@ export const CARD_TYPES = {
   // YTD Performance Cards
   YTD_ALP: 'ytd_alp',
   YTD_CODES_VIPS: 'ytd_codes_vips',
+  YTD_CODES: 'ytd_codes',
+  YTD_VIPS: 'ytd_vips',
   YTD_HIRES: 'ytd_hires',
   YTD_REF_SALES: 'ytd_ref_sales',
   
   // Last Month Performance Cards
   MONTHLY_ALP: 'monthly_alp',
   MONTHLY_CODES_VIPS: 'monthly_codes_vips',
+  MONTHLY_CODES: 'monthly_codes',
+  MONTHLY_VIPS: 'monthly_vips',
   MONTHLY_HIRES: 'monthly_hires',
   MONTHLY_REF_SALES: 'monthly_ref_sales',
   
@@ -187,11 +191,22 @@ export const DASHBOARD_CONFIG = {
           navigateTo: '/production?section=scorecard'
         },
         {
-          type: CARD_TYPES.YTD_CODES_VIPS,
-          title: 'YTD Codes + VIPs',
+          type: CARD_TYPES.YTD_CODES,
+          title: 'YTD Codes',
           dataKey: 'ytdCodes',
           icon: FiActivity,
           iconColor: 'rgba(63, 81, 181, 0.1)',
+          format: 'number',
+          showComparison: true,
+          comparisonType: 'year',
+          navigateTo: '/production?section=scorecard'
+        },
+        {
+          type: CARD_TYPES.YTD_VIPS,
+          title: 'YTD VIPs',
+          dataKey: 'ytdVips',
+          icon: FiActivity,
+          iconColor: 'rgba(103, 58, 183, 0.1)',
           format: 'number',
           showComparison: true,
           comparisonType: 'year',
@@ -233,11 +248,22 @@ export const DASHBOARD_CONFIG = {
           navigateTo: '/production?section=scorecard'
         },
         {
-          type: CARD_TYPES.MONTHLY_CODES_VIPS,
-          title: (monthName) => `${monthName} Codes + VIPs`,
+          type: CARD_TYPES.MONTHLY_CODES,
+          title: (monthName) => `${monthName} Codes`,
           dataKey: 'currentMonthCodes',
           icon: FiActivity,
           iconColor: 'rgba(63, 81, 181, 0.1)',
+          format: 'number',
+          showComparison: true,
+          comparisonType: 'month',
+          navigateTo: '/production?section=scorecard'
+        },
+        {
+          type: CARD_TYPES.MONTHLY_VIPS,
+          title: (monthName) => `${monthName} VIPs`,
+          dataKey: 'currentMonthVips',
+          icon: FiActivity,
+          iconColor: 'rgba(103, 58, 183, 0.1)',
           format: 'number',
           showComparison: true,
           comparisonType: 'month',

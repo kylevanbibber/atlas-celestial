@@ -1142,5 +1142,166 @@ router.get("/calendly/events", verifyToken, async (req, res) => {
   }
 });
 
+// ============================================================
+// SMS CREDITS & USAGE
+// ============================================================
+
+// Get current SMS credit balance and simple usage summary for the logged-in user
+// Uses sms_balances table so we don't store balances on activeusers
+router.get("/sms/credits", verifyToken, async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    const balanceRows = await query(
+      `SELECT balance, last_updated 
+       FROM sms_balances 
+       WHERE user_id = ? 
+       LIMIT 1`,
+      [userId]
+    );
+
+    const balanceRow = balanceRows && balanceRows.length > 0 ? balanceRows[0] : null;
+
+    // Aggregate basic transaction info (optional, used for simple UI summary)
+    const txRows = await query(
+      `SELECT 
+         SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS total_purchased,
+         SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END) AS total_debited
+       FROM sms_credit_transactions
+       WHERE user_id = ?`,
+      [userId]
+    );
+
+    const summary = txRows && txRows.length > 0 ? txRows[0] : {};
+
+    res.json({
+      success: true,
+      balance: balanceRow ? (balanceRow.balance || 0) : 0,
+      lastUpdated: balanceRow ? balanceRow.last_updated : null,
+      summary: {
+        totalPurchased: summary.total_purchased || 0,
+        totalDebited: summary.total_debited || 0,
+      },
+    });
+  } catch (error) {
+    console.error("[Account Route] Error fetching SMS credits:", error);
+    res.status(500).json({ success: false, message: "Error fetching SMS credits." });
+  }
+});
+
+// Add/purchase SMS credits for the logged-in user
+// NOTE: This endpoint only adjusts balances; hook it into your payment processor
+// (Stripe, etc.) where appropriate.
+router.post("/sms/credits/purchase", verifyToken, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { amount, description } = req.body || {};
+
+    const parsedAmount = parseInt(amount, 10);
+    if (!parsedAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "A positive integer amount is required to purchase credits.",
+      });
+    }
+
+    // Reasonable guardrail
+    if (parsedAmount > 100000) {
+      return res.status(400).json({
+        success: false,
+        message: "Requested credit amount is too large.",
+      });
+    }
+
+    // Increment balance in sms_balances (insert or update)
+    await query(
+      `INSERT INTO sms_balances (user_id, balance, last_updated)
+       VALUES (?, ?, NOW())
+       ON DUPLICATE KEY UPDATE
+         balance = balance + VALUES(balance),
+         last_updated = NOW()`,
+      [userId, parsedAmount]
+    );
+
+    // Record transaction in ledger
+    await query(
+      `INSERT INTO sms_credit_transactions (user_id, amount, type, description, related_id)
+       VALUES (?, ?, 'purchase', ?, NULL)`,
+      [userId, parsedAmount, description || null]
+    );
+
+    // Fetch updated balance
+    const updatedRows = await query(
+      `SELECT balance, last_updated 
+       FROM sms_balances 
+       WHERE user_id = ? 
+       LIMIT 1`,
+      [userId]
+    );
+
+    const updated = updatedRows && updatedRows.length > 0 ? updatedRows[0] : null;
+
+    res.json({
+      success: true,
+      message: "SMS credits added successfully.",
+      balance: updated ? updated.balance : parsedAmount,
+      lastUpdated: updated ? updated.last_updated : null,
+    });
+  } catch (error) {
+    console.error("[Account Route] Error purchasing SMS credits:", error);
+    res.status(500).json({ success: false, message: "Error purchasing SMS credits." });
+  }
+});
+
+// Get a paginated view of this user's outbound SMS messages
+router.get("/sms/messages", verifyToken, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 25, 100);
+    const offset = parseInt(req.query.offset, 10) || 0;
+
+    const messages = await query(
+      `SELECT 
+         id,
+         to_number,
+         message,
+         status,
+         cost_credits,
+         provider,
+         provider_message_id,
+         pipeline_id,
+         created_at
+       FROM sms_messages
+       WHERE user_id = ?
+       ORDER BY created_at DESC
+       LIMIT ? OFFSET ?`,
+      [userId, limit, offset]
+    );
+
+    // Get total count for simple pagination
+    const countRows = await query(
+      `SELECT COUNT(*) AS total 
+       FROM sms_messages 
+       WHERE user_id = ?`,
+      [userId]
+    );
+
+    const total = countRows && countRows.length > 0 ? countRows[0].total : 0;
+
+    res.json({
+      success: true,
+      data: messages,
+      pagination: {
+        total,
+        limit,
+        offset,
+      },
+    });
+  } catch (error) {
+    console.error("[Account Route] Error fetching SMS messages:", error);
+    res.status(500).json({ success: false, message: "Error fetching SMS messages." });
+  }
+});
+
 module.exports = router;
 

@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FiChevronRight, FiLoader, FiUser, FiSearch, FiFilter, FiX, FiCheck, FiDownload, FiChevronDown, FiChevronUp, FiUsers, FiGrid } from 'react-icons/fi';
+import { FiChevronRight, FiLoader, FiUser, FiSearch, FiFilter, FiX, FiCheck, FiDownload, FiChevronDown, FiChevronUp, FiUsers, FiGrid, FiList } from 'react-icons/fi';
+import { HiViewGrid } from 'react-icons/hi';
+import { RiOrganizationChart } from 'react-icons/ri';
 import { useAuth } from '../../context/AuthContext';
+import { useUserHierarchy } from '../../hooks/useUserHierarchy';
 import api from '../../api';
 import '../../pages/utilities/Utilities.css';
 import './AdminHierarchySettings.css';
@@ -21,6 +24,7 @@ const US_STATES_LIST = [
 // Admin Hierarchy settings component
 const AdminHierarchySettings = () => {
   const { hasPermission, user } = useAuth();
+  const { hierarchyData, hierarchyLoading, loadingStages } = useUserHierarchy();
   const [initialLoading, setInitialLoading] = useState(true); // Show UI skeleton immediately
   const [dataLoading, setDataLoading] = useState(false); // Track data loading separately
   const [rgaHierarchies, setRgaHierarchies] = useState([]);
@@ -61,39 +65,55 @@ const AdminHierarchySettings = () => {
   // Add search mode state - 'full' or 'isolated'
   const [searchMode, setSearchMode] = useState('full');
 
-  // Show UI immediately, then load data
+  // Show UI immediately
   useEffect(() => {
-    // Show UI skeleton immediately
     setInitialLoading(false);
-    
-    // Start data loading after a brief delay to allow UI to render
-    const loadData = async () => {
-      setDataLoading(true);
-      try {
-        // Determine if the current user should see org-wide data
-        // Strict org-wide viewer check: Admin role, app teamRole, or SGA clname only
-        const isOrgWideViewer = (
-          String(user?.Role || '').toUpperCase() === 'ADMIN' ||
-          String(user?.teamRole || '').toLowerCase() === 'app' ||
-          String(user?.clname || '').toUpperCase() === 'SGA'
-        );
+  }, []);
 
-        if (!isOrgWideViewer) {
-          await fetchUserHierarchyData();
-        } else {
+  // Load data when component mounts or user changes
+  useEffect(() => {
+    const loadData = async () => {
+      // Determine if the current user should see org-wide data
+      const isOrgWideViewer = (
+        String(user?.Role || '').toUpperCase() === 'ADMIN' ||
+        String(user?.teamRole || '').toLowerCase() === 'app' ||
+        String(user?.clname || '').toUpperCase() === 'SGA'
+      );
+
+      if (isOrgWideViewer) {
+        // Admin users: fetch all RGAs directly (not using hook)
+        setDataLoading(true);
+        try {
           await fetchAllRGAsHierarchy();
+        } finally {
+          setDataLoading(false);
         }
-      } finally {
-        setDataLoading(false);
       }
+      // For non-admin users, we'll use hierarchyData from the hook (handled in next useEffect)
     };
     
-    // Small delay to let the UI render first
     setTimeout(loadData, 100);
-  }, [hasPermission, user?.userId, user?.teamRole, user?.clname]);
+  }, [hasPermission, user?.userId, user?.teamRole, user?.clname, user?.Role]);
 
-  // New function to fetch data using searchByUserId for non-admin users
-  const fetchUserHierarchyData = async () => {
+  // 🚀 Watch for hierarchyData changes from the hook and process it (for non-admin users)
+  useEffect(() => {
+    const isOrgWideViewer = (
+      String(user?.Role || '').toUpperCase() === 'ADMIN' ||
+      String(user?.teamRole || '').toLowerCase() === 'app' ||
+      String(user?.clname || '').toUpperCase() === 'SGA'
+    );
+    
+    // Only process hierarchyData for non-org-wide viewers
+    if (!isOrgWideViewer && hierarchyData && hierarchyData.raw && hierarchyData.raw.length > 0) {
+      console.log('🚀 [AdminHierarchySettings] hierarchyData updated, processing...', hierarchyData);
+      setDataLoading(true);
+      fetchUserHierarchyData();
+      setDataLoading(false);
+    }
+  }, [hierarchyData, user?.Role, user?.teamRole, user?.clname]);
+
+  // New function to use hierarchyData from useUserHierarchy hook (with progressive loading!)
+  const fetchUserHierarchyData = () => {
     try {
       setError('');
       
@@ -102,52 +122,67 @@ const AdminHierarchySettings = () => {
         return;
       }
 
-      const response = await api.post('/auth/searchByUserId', {
-        userId: user.userId
-      });
+      // 🚀 Use data from the hook instead of making our own API call
+      // The hook handles progressive loading of structure, licenses, and PNP data
+      console.log('📊 [AdminHierarchySettings] Using hierarchyData from hook:', hierarchyData);
+      console.log('📊 [AdminHierarchySettings] Loading stages:', loadingStages);
       
-      if (response.data.success) {
-        // Create a single "RGA hierarchy" object from the user data
-        const incomingData = response.data.data || [];
-        const activeOnly = Array.isArray(incomingData)
-          ? incomingData.filter(u => (u.Active || '').toLowerCase() === 'y')
-          : [];
-        const userHierarchyData = {
-          rgaId: response.data.agnName || user.userId,
-          rgaName: response.data.agnName || user.userId,
-          hierarchyData: activeOnly
-        };
-        
-        // Process the hierarchy data
-        const hierarchicalData = buildRgaHierarchy(userHierarchyData.hierarchyData);
-        const processedHierarchy = {
-          ...userHierarchyData,
-          hierarchicalData
-        };
-        
-        // Initialize expanded state
-        const initialExpandedState = {};
-        initialExpandedState[processedHierarchy.rgaId] = true; // Expand by default for single user
-        setExpandedRGAs(initialExpandedState);
-        
-        // Set the hierarchy data
-        setRgaHierarchies([processedHierarchy]);
-        
-        // Collect all states for filtering
-        const allStates = collectAllStatesFromHierarchies([userHierarchyData]);
-        setAllAvailableStates(allStates);
-        
-        // Initialize state filters
-        initializeStateFilters(allStates);
-      } else {
-        setError(response.data.message || 'Failed to load hierarchy data');
+      if (!hierarchyData || !hierarchyData.raw || hierarchyData.raw.length === 0) {
+        console.log('⚠️ [AdminHierarchySettings] No hierarchyData available yet');
+        return; // Wait for the hook to fetch data
       }
+      
+      // Create a single "RGA hierarchy" object from the user data
+      const incomingData = hierarchyData.raw || [];
+      const activeOnly = Array.isArray(incomingData)
+        ? incomingData.filter(u => (u.Active || '').toLowerCase() === 'y')
+        : [];
+      
+      console.log('📊 [AdminHierarchySettings] Active users:', activeOnly.length);
+      console.log('📊 [AdminHierarchySettings] Sample user with licenses:', activeOnly[0]);
+      
+      const userHierarchyData = {
+        rgaId: user.lagnname || user.userId,
+        rgaName: user.lagnname || user.userId,
+        hierarchyData: activeOnly
+      };
+      
+      // Process the hierarchy data
+      const hierarchicalData = buildRgaHierarchy(userHierarchyData.hierarchyData);
+      const processedHierarchy = {
+        ...userHierarchyData,
+        hierarchicalData
+      };
+      
+      console.log('🔍 [AdminHierarchySettings] Processed hierarchy:', processedHierarchy);
+      console.log('🔍 [AdminHierarchySettings] First user in hierarchyData:', processedHierarchy.hierarchyData[0]);
+      console.log('🔍 [AdminHierarchySettings] First user licenses:', processedHierarchy.hierarchyData[0]?.licenses);
+      console.log('🔍 [AdminHierarchySettings] First user pnp_data:', processedHierarchy.hierarchyData[0]?.pnp_data);
+      console.log('🔍 [AdminHierarchySettings] First node in hierarchicalData:', hierarchicalData[0]);
+      console.log('🔍 [AdminHierarchySettings] First node licenses:', hierarchicalData[0]?.licenses);
+      console.log('🔍 [AdminHierarchySettings] First node pnp_data:', hierarchicalData[0]?.pnp_data);
+      
+      // Initialize expanded state
+      const initialExpandedState = {};
+      initialExpandedState[processedHierarchy.rgaId] = true; // Expand by default for single user
+      setExpandedRGAs(initialExpandedState);
+      
+      // Set the hierarchy data
+      setRgaHierarchies([processedHierarchy]);
+      console.log('✅ [AdminHierarchySettings] Set rgaHierarchies with', processedHierarchy.hierarchyData.length, 'users');
+      
+      // Collect all states for filtering
+      const allStates = collectAllStatesFromHierarchies([userHierarchyData]);
+      setAllAvailableStates(allStates);
+      
+      // Initialize state filters
+      initializeStateFilters(allStates);
     } catch (err) {
       setError('Error loading hierarchy data: ' + (err.response?.data?.message || err.message));
     }
   };
 
-  // Fetch hierarchy data for all RGAs
+  // Fetch hierarchy data for all RGAs (with progressive loading!)
   const fetchAllRGAsHierarchy = async () => {
     try {
       setError('');
@@ -157,51 +192,118 @@ const AdminHierarchySettings = () => {
         inProgress: true
       });
 
-      const response = await api.get('/admin/getAllRGAsHierarchy');
+      console.log('🚀 [Admin] Stage 1/3: Fetching ALL RGAs structure...');
+      const stage1Start = Date.now();
       
-      if (response.data.success) {
-        // Process received hierarchies
-        const hierarchies = (response.data.data || []).map(h => ({
-          ...h,
-          hierarchyData: Array.isArray(h.hierarchyData)
-            ? h.hierarchyData.filter(u => (u.Active || '').toLowerCase() === 'y')
-            : []
-        }));
-        
-        // Process the hierarchies to build the tree structure
-        const processedHierarchies = processHierarchyData(hierarchies);
-        
-        // Initialize expanded state for each RGA (collapsed by default)
-        const initialExpandedState = {};
-        processedHierarchies.forEach(rga => {
-          initialExpandedState[rga.rgaId] = false;
-        });
-        setExpandedRGAs(initialExpandedState);
-        
-        // Set the hierarchies data
-        setRgaHierarchies(processedHierarchies);
-        
-        // Collect all states for filtering
-        const allStates = collectAllStatesFromHierarchies(hierarchies);
-        setAllAvailableStates(allStates);
-        
-        // Initialize state filters
-        initializeStateFilters(allStates);
-        
-        setProcessingStats({
-          total: response.data.totalRgaCount,
-          loaded: response.data.rgaCount,
-          inProgress: false
-        });
-      } else {
+      // Stage 1: Get structure (fast, no licenses/PNP)
+      const response = await api.get('/admin/getAllRGAsHierarchy');
+      console.log(`✅ [Admin] Stage 1/3: Structure loaded in ${Date.now() - stage1Start}ms`);
+      
+      if (!response.data.success) {
         setError(response.data.message || 'Failed to load hierarchy data');
-        setProcessingStats({
-          total: 0,
-          loaded: 0,
-          inProgress: false
-        });
+        setProcessingStats({ total: 0, loaded: 0, inProgress: false });
+        return;
       }
+
+      // Backend returns array of { rgaId, rgaName, hierarchyData: [...] }
+      const hierarchies = (response.data.data || []).map(rga => ({
+        ...rga,
+        hierarchyData: Array.isArray(rga.hierarchyData)
+          ? rga.hierarchyData.filter(u => (u.Active || '').toLowerCase() === 'y')
+          : []
+      }));
+      
+      // Flatten all users for batch license/PNP fetching
+      const allUsersFlat = [];
+      hierarchies.forEach(rga => {
+        allUsersFlat.push(...rga.hierarchyData);
+      });
+      
+      console.log(`📊 [Admin] Total RGAs: ${hierarchies.length}, Total active users: ${allUsersFlat.length}`);
+      
+      // Process and display structure immediately
+      const processedHierarchies = processHierarchyData(hierarchies);
+      const initialExpandedState = {};
+      processedHierarchies.forEach(rga => {
+        initialExpandedState[rga.rgaId] = false;
+      });
+      setExpandedRGAs(initialExpandedState);
+      setRgaHierarchies(processedHierarchies);
+      
+      // Stage 2: Fetch licenses for all users
+      const allUserIds = allUsersFlat.map(u => u.id).filter(Boolean);
+      console.log(`🚀 [Admin] Stage 2/3: Fetching licenses for ${allUserIds.length} users...`);
+      const stage2Start = Date.now();
+      
+      api.post('/auth/hierarchy/licenses', { userIds: allUserIds })
+        .then(licenseResp => {
+          console.log(`✅ [Admin] Stage 2/3: Licenses loaded in ${Date.now() - stage2Start}ms`);
+          
+          if (licenseResp.data?.success) {
+            const licensesMap = licenseResp.data.data || {};
+            console.log(`📜 [Admin] ${Object.keys(licensesMap).length} users have license data`);
+            
+            // Merge licenses directly into the existing hierarchies
+            hierarchies.forEach(rga => {
+              rga.hierarchyData = rga.hierarchyData.map(user => ({
+                ...user,
+                licenses: licensesMap[user.id] || []
+              }));
+            });
+            
+            // Update UI with licenses
+            const processedWithLicenses = processHierarchyData(hierarchies);
+            setRgaHierarchies(processedWithLicenses);
+            
+            // Update available states
+            const allStates = collectAllStatesFromHierarchies(hierarchies);
+            setAllAvailableStates(allStates);
+            initializeStateFilters(allStates);
+            
+            // Stage 3: Fetch PNP data
+            console.log(`🚀 [Admin] Stage 3/3: Fetching PNP data for ${allUserIds.length} users...`);
+            const stage3Start = Date.now();
+            const pnpPayload = allUsersFlat.map(u => ({ id: u.id, lagnname: u.lagnname, esid: u.esid }));
+            
+            api.post('/auth/hierarchy/pnp', { users: pnpPayload })
+              .then(pnpResp => {
+                console.log(`✅ [Admin] Stage 3/3: PNP loaded in ${Date.now() - stage3Start}ms`);
+                
+                if (pnpResp.data?.success) {
+                  const pnpMap = pnpResp.data.data || {};
+                  console.log(`📊 [Admin] ${Object.keys(pnpMap).length} users have PNP data`);
+                  
+                  // Merge PNP directly into the existing hierarchies (which already have licenses)
+                  hierarchies.forEach(rga => {
+                    rga.hierarchyData = rga.hierarchyData.map(user => ({
+                      ...user,
+                      pnp_data: pnpMap[user.id] || null
+                    }));
+                  });
+                  
+                  // Final update with all data
+                  const processedComplete = processHierarchyData(hierarchies);
+                  setRgaHierarchies(processedComplete);
+                  console.log('🎉 [Admin] All stages complete! Full hierarchy data loaded.');
+                } else {
+                  console.warn('[Admin] PNP fetch unsuccessful');
+                }
+              })
+              .catch(err => console.error('[Admin] PNP fetch error:', err));
+          } else {
+            console.warn('[Admin] License fetch unsuccessful');
+          }
+        })
+        .catch(err => console.error('[Admin] License fetch error:', err));
+      
+      setProcessingStats({
+        total: response.data.totalRgaCount,
+        loaded: response.data.rgaCount,
+        inProgress: false
+      });
+      
     } catch (err) {
+      console.error('[Admin] Error loading hierarchy:', err);
       setError('Error loading hierarchy data: ' + (err.response?.data?.message || err.message));
       setProcessingStats({
         total: 0,
@@ -1075,8 +1177,66 @@ const AdminHierarchySettings = () => {
     }
   };
 
-  // Update the buildRgaHierarchy function to handle the correct ordering
+  // Build RGA hierarchy based on MGA-first structure:
+  // RGA (header - not in tree)
+  // ├─ MGA (mga=RGA) - level 0
+  // │  ├─ AGT (mga=MGA, sa=null, ga=null) - level 1 (indent 2x)
+  // │  └─ GA (mga=MGA) - level 1
+  // │     ├─ AGT (ga=GA, sa=null) - level 2 (indent 2x more)
+  // │     └─ SA (ga=GA) - level 2 (indent 1x, collapsible)
+  // │        └─ AGT (sa=SA) - level 3
+  // └─ MGA (next MGA coded to RGA)
   const buildRgaHierarchy = (rgaData) => {
+    // Filter logging to only MAUGHANEVANSON BRODY
+    const shouldLog = rgaData.some(u => u.lagnname && u.lagnname.includes('MAUGHANEVANSON BRODY'));
+    
+    if (shouldLog) {
+      console.log(`\n🏗️ [buildRgaHierarchy] Building hierarchy for ${rgaData.length} users (includes MAUGHANEVANSON BRODY)`);
+      
+      // Log specific managers' full data
+      const managersToInspect = [
+        'MAUGHANEVANSON BRODY W',
+        'CRIVELLI JOSEPH O',
+        'CAMERON BRAYDON J',
+        'BENNETT BRANDON',
+        'PINKERTON EVAN A',
+        'KONSTANZER CHRISTINA M',
+        'BORCHERT ALLIYAH M'
+      ];
+      
+      managersToInspect.forEach(name => {
+        const user = rgaData.find(u => u.lagnname && u.lagnname.includes(name));
+        if (user) {
+          console.log(`\n🔍 [${user.clname}] ${user.lagnname}:`);
+          console.log(`   sa: "${user.sa || 'null'}"`);
+          console.log(`   ga: "${user.ga || 'null'}"`);
+          console.log(`   mga: "${user.mga || 'null'}"`);
+          console.log(`   rga: "${user.rga || 'null'}"`);
+          console.log(`   🔑 mga_rga_link: "${user.mga_rga_link || 'null'}"`);
+          console.log(`   🔑 legacy_link: "${user.legacy_link || 'null'}"`);
+          console.log(`   🔑 tree_link: "${user.tree_link || 'null'}"`);
+          
+          // Check if their upline is in the dataset
+          if (user.mga) {
+            const mgaExists = rgaData.find(u => u.lagnname === user.mga);
+            console.log(`   mga "${user.mga}" in dataset? ${mgaExists ? '✅ YES' : '❌ NO - MISSING!'}`);
+          }
+          if (user.rga) {
+            const rgaExists = rgaData.find(u => u.lagnname === user.rga);
+            console.log(`   rga "${user.rga}" in dataset? ${rgaExists ? '✅ YES' : '❌ NO - MISSING!'}`);
+          }
+          if (user.mga_rga_link) {
+            const mgaRgaExists = rgaData.find(u => u.lagnname === user.mga_rga_link);
+            console.log(`   mga_rga_link "${user.mga_rga_link}" in dataset? ${mgaRgaExists ? '✅ YES' : '❌ NO - MISSING!'}`);
+          }
+        }
+      });
+      
+      // Also check which RGA this dataset is actually for
+      const allRgaNames = [...new Set(rgaData.filter(u => u.clname === 'RGA').map(u => u.lagnname))];
+      console.log(`\n📊 RGAs in this dataset:`, allRgaNames);
+    }
+    
     const hierarchy = [];
     const map = {};
     
@@ -1088,86 +1248,125 @@ const AdminHierarchySettings = () => {
       };
     });
 
-    // Process nodes in a single pass with clear hierarchy rules
-    rgaData.forEach(item => {
-      // Add to the hierarchy based on relationships
-      let added = false;
+    if (shouldLog) {
+      console.log(`📋 [buildRgaHierarchy] Map initialized with ${Object.keys(map).length} entries`);
+    }
 
-      // First level: RGA or MGA
-      if (item.clname === 'RGA' || item.clname === 'MGA') {
-        // Check if this RGA/MGA should be under another RGA
-        if (item.rga && map[item.rga]) {
-          map[item.rga].children.push(map[item.lagnname]);
-          added = true;
-        } 
-        // Check for MGA-RGA link
-        else if (item.mga_rga_link && map[item.mga_rga_link]) {
+    // Process nodes based on the MGA-first hierarchy
+    // IMPORTANT: Process in order of hierarchy depth to ensure proper nesting
+    rgaData.forEach(item => {
+      let added = false;
+      let reason = '';
+
+      // 1. Top-level RGAs (RGAs with no mga_rga_link AND no rga, or neither exist in our dataset)
+      if (item.clname === 'RGA' && (!item.mga_rga_link || !map[item.mga_rga_link]) && (!item.rga || !map[item.rga])) {
+        hierarchy.push(map[item.lagnname]);
+        added = true;
+        reason = 'Top-level RGA (no mga_rga_link or rga in dataset)';
+        const keyRGAs = ['MAUGHANEVANSON', 'CRIVELLI', 'CAMERON', 'BENNETT', 'PINKERTON'];
+        const logThisRGA = shouldLog && keyRGAs.some(rga => item.lagnname && item.lagnname.includes(rga));
+        if (logThisRGA) console.log(`  ✅ [RGA] ${item.lagnname} → TOP LEVEL (${reason})`);
+      }
+      // 2. Nested RGAs - check BOTH MGAs table (mga_rga_link) AND activeusers.rga
+      else if (item.clname === 'RGA') {
+        const keyRGAs = ['MAUGHANEVANSON', 'CRIVELLI', 'CAMERON', 'BENNETT', 'PINKERTON'];
+        const logThisRGA = shouldLog && keyRGAs.some(rga => item.lagnname && item.lagnname.includes(rga));
+        
+        if (logThisRGA) {
+          console.log(`  🔍 [RGA] ${item.lagnname} - checking nesting:`);
+          console.log(`     mga_rga_link: "${item.mga_rga_link || 'null'}", exists in map? ${item.mga_rga_link && map[item.mga_rga_link] ? 'YES' : 'NO'}`);
+          console.log(`     rga: "${item.rga || 'null'}", exists in map? ${item.rga && map[item.rga] ? 'YES' : 'NO'}`);
+        }
+        
+        // First priority: Use MGAs table relationship (mga_rga_link)
+        if (item.mga_rga_link && map[item.mga_rga_link]) {
           map[item.mga_rga_link].children.push(map[item.lagnname]);
           added = true;
+          reason = `Nested under ${item.mga_rga_link} (from MGAs table)`;
+          if (logThisRGA) console.log(`  ✅ [RGA] ${item.lagnname} → under ${item.mga_rga_link} (${reason})`);
         }
-        // Otherwise add to top level
-        else {
-          hierarchy.push(map[item.lagnname]);
-          added = true;
-        }
-      }
-      // Second level: AGT with no sa or ga
-      else if (item.clname === 'AGT' && !item.sa && !item.ga) {
-        if (item.mga && map[item.mga]) {
-          map[item.mga].children.push(map[item.lagnname]);
-          added = true;
-        } else if (item.rga && map[item.rga]) {
+        // Second priority: Use activeusers.rga
+        else if (item.rga && map[item.rga]) {
           map[item.rga].children.push(map[item.lagnname]);
           added = true;
+          reason = `Nested under ${item.rga} (from activeusers)`;
+          if (logThisRGA) console.log(`  ✅ [RGA] ${item.lagnname} → under ${item.rga} (${reason})`);
         }
       }
-      // Third level: SA with no ga
-      else if (item.clname === 'SA' && !item.ga) {
-        if (item.mga && map[item.mga]) {
-          map[item.mga].children.push(map[item.lagnname]);
+      // 3. MGA - check BOTH MGAs table (mga_rga_link) AND activeusers.rga
+      else if (item.clname === 'MGA') {
+        const keyMGAs = ['KONSTANZER'];
+        const logThisMGA = shouldLog && keyMGAs.some(mga => item.lagnname && item.lagnname.includes(mga));
+        
+        if (logThisMGA) {
+          console.log(`  🔍 [MGA] ${item.lagnname} - checking nesting:`);
+          console.log(`     mga_rga_link: "${item.mga_rga_link || 'null'}", exists in map? ${item.mga_rga_link && map[item.mga_rga_link] ? 'YES' : 'NO'}`);
+          console.log(`     rga: "${item.rga || 'null'}", exists in map? ${item.rga && map[item.rga] ? 'YES' : 'NO'}`);
+        }
+        
+        // First priority: Use MGAs table relationship (mga_rga_link)
+        if (item.mga_rga_link && map[item.mga_rga_link]) {
+          map[item.mga_rga_link].children.push(map[item.lagnname]);
           added = true;
-        } else if (item.rga && map[item.rga]) {
+          reason = `Under ${item.mga_rga_link} (from MGAs table)`;
+          if (logThisMGA) console.log(`  ✅ [MGA] ${item.lagnname} → under ${item.mga_rga_link} (${reason})`);
+        }
+        // Second priority: Use activeusers.rga
+        else if (item.rga && map[item.rga]) {
           map[item.rga].children.push(map[item.lagnname]);
           added = true;
+          reason = `Under ${item.rga} (from activeusers)`;
+          if (logThisMGA) console.log(`  ✅ [MGA] ${item.lagnname} → under ${item.rga} (${reason})`);
         }
       }
-      // Fourth level: AGT with SA value but no ga
-      else if (item.clname === 'AGT' && item.sa && !item.ga) {
-        if (map[item.sa]) {
-          map[item.sa].children.push(map[item.lagnname]);
-          added = true;
-        }
-      }
-      // Fifth level: GA
-      else if (item.clname === 'GA') {
-        if (item.mga && map[item.mga]) {
+      // 4. AGT where mga = MGA/RGA AND sa = null AND ga = null (direct under MGA/RGA)
+      else if (item.clname === 'AGT' && item.mga && !item.sa && !item.ga) {
+        if (map[item.mga]) {
           map[item.mga].children.push(map[item.lagnname]);
           added = true;
-        } else if (item.rga && map[item.rga]) {
-          map[item.rga].children.push(map[item.lagnname]);
-          added = true;
+          reason = `Direct AGT under ${item.mga}`;
+          if (shouldLog) console.log(`  ✅ [AGT] ${item.lagnname} → under ${item.mga} (${reason}, no SA/GA)`);
         }
       }
-      // Sixth level: AGT with no sa but with GA
-      else if (item.clname === 'AGT' && !item.sa && item.ga) {
+      // 5. GA where mga = MGA (under that MGA)
+      else if (item.clname === 'GA' && item.mga) {
+        if (map[item.mga]) {
+          map[item.mga].children.push(map[item.lagnname]);
+          added = true;
+          reason = `Under MGA ${item.mga}`;
+          if (shouldLog) console.log(`  ✅ [GA] ${item.lagnname} → under ${item.mga} (${reason})`);
+        }
+      }
+      // 6. AGT where ga = GA AND sa = null (under that GA)
+      else if (item.clname === 'AGT' && item.ga && !item.sa) {
         if (map[item.ga]) {
           map[item.ga].children.push(map[item.lagnname]);
           added = true;
+          reason = `Under GA ${item.ga}, no SA`;
+          if (shouldLog) console.log(`  ✅ [AGT] ${item.lagnname} → under ${item.ga} (${reason})`);
         }
       }
-      // Seventh level: SA with ga
+      // 7. SA where ga = GA (under that GA)
       else if (item.clname === 'SA' && item.ga) {
         if (map[item.ga]) {
           map[item.ga].children.push(map[item.lagnname]);
           added = true;
+          reason = `Under GA ${item.ga}`;
+          if (shouldLog) console.log(`  ✅ [SA] ${item.lagnname} → under ${item.ga} (${reason})`);
         }
       }
-      // Eighth level: AGT with both sa and ga
-      else if (item.clname === 'AGT' && item.sa && item.ga) {
+      // 8. AGT where sa = SA (under that SA)
+      else if (item.clname === 'AGT' && item.sa) {
         if (map[item.sa]) {
           map[item.sa].children.push(map[item.lagnname]);
           added = true;
+          reason = `Under SA ${item.sa}`;
+          if (shouldLog) console.log(`  ✅ [AGT] ${item.lagnname} → under ${item.sa} (${reason})`);
         }
+      }
+      
+      if (!added && shouldLog) {
+        console.warn(`  ⚠️ [${item.clname}] ${item.lagnname} NOT ADDED - mga: ${item.mga}, ga: ${item.ga}, sa: ${item.sa}, rga: ${item.rga}`);
       }
 
       // Default fallback if not handled by above rules
@@ -1186,21 +1385,35 @@ const AdminHierarchySettings = () => {
       }
     });
 
-    // Sort node children alphabetically within each type group
+    // Sort node children by role priority, then alphabetically
     const sortChildren = (nodes) => {
       if (!nodes || !nodes.length) return [];
       
       return nodes.map(node => {
         if (node.children && node.children.length) {
-          // We're only sorting alphabetically within the same role type
-          // but preserving the hierarchy order (not sorting by role)
+          // Define role priority for ordering
+          // Under RGA/MGA: AGT (no SA/GA) first, then nested RGAs, then MGAs, then GAs, then SAs
+          const getRolePriority = (child) => {
+            if (child.clname === 'AGT' && !child.sa && !child.ga) return 1; // Direct AGTs first
+            if (child.clname === 'RGA') return 2; // Nested RGAs
+            if (child.clname === 'MGA') return 3; // MGAs
+            if (child.clname === 'GA') return 4; // GAs
+            if (child.clname === 'SA') return 5; // SAs
+            if (child.clname === 'AGT') return 6; // AGTs under GA/SA come later
+            return 7;
+          };
+          
           node.children.sort((a, b) => {
-            if (a.clname === b.clname) {
-              // If same role, sort alphabetically
-              return a.lagnname.localeCompare(b.lagnname);
+            const priorityA = getRolePriority(a);
+            const priorityB = getRolePriority(b);
+            
+            // First, sort by role priority
+            if (priorityA !== priorityB) {
+              return priorityA - priorityB;
             }
-            // If different roles, preserve the order they were added in
-            return 0;
+            
+            // If same priority, sort alphabetically
+            return a.lagnname.localeCompare(b.lagnname);
           });
           
           // Apply sort recursively
@@ -1212,6 +1425,26 @@ const AdminHierarchySettings = () => {
     
     // Apply sorting to the hierarchy
     const sortedHierarchy = sortChildren(hierarchy);
+    
+    if (shouldLog) {
+      console.log(`\n📊 [buildRgaHierarchy] Final hierarchy structure (KEY RGAs ONLY):`);
+      const keyRGAs = ['MAUGHANEVANSON', 'CRIVELLI', 'CAMERON', 'BENNETT', 'PINKERTON', 'KONSTANZER'];
+      const logHierarchy = (nodes, indent = 0) => {
+        nodes.forEach(node => {
+          const isKeyRGA = keyRGAs.some(rga => node.lagnname && node.lagnname.includes(rga));
+          if (isKeyRGA || indent > 0) { // Show key RGAs and their children
+            console.log(`${'  '.repeat(indent)}├─ [${node.clname}] ${node.lagnname} (${node.children.length} children)`);
+          }
+          if (node.children.length > 0) {
+            // Only recurse if this is a key RGA or we're already in a key RGA's subtree
+            if (isKeyRGA || indent > 0) {
+              logHierarchy(node.children, indent + 1);
+            }
+          }
+        });
+      };
+      logHierarchy(sortedHierarchy);
+    }
     
     return sortedHierarchy;
   };
@@ -1449,19 +1682,9 @@ const AdminHierarchySettings = () => {
           // For search results, check if this node or any of its children are in the matching set
           const isMatch = matchingSet ? matchingSet.has(node.lagnname) : false;
           
-          // Check if node should be collapsible:
-          // Instead of checking if it's level 0, we need to properly handle RGA children
-          const isReallyTopLevelRga = level === 0 && node.clname === 'RGA';
-          const isChildRga = level > 0 && node.clname === 'RGA';
-          const isMga = node.clname === 'MGA';
-          
-          const hasNonRgaMgaChildren = node.children && node.children.some(
-            child => child.clname !== 'RGA' && child.clname !== 'MGA'
-          );
-          
-          // Make node collapsible if it has any children
+          // Make managers (RGA, MGA, GA, SA) collapsible if they have children
           const isCollapsible = (
-            ((node.clname === 'RGA' || node.clname === 'MGA')) && 
+            (node.clname === 'RGA' || node.clname === 'MGA' || node.clname === 'GA' || node.clname === 'SA') && 
             node.children && 
             node.children.length > 0
           );
@@ -1478,8 +1701,8 @@ const AdminHierarchySettings = () => {
           return (
             <React.Fragment key={node.lagnname}>
               <div 
-                className={`hierarchy-node-container ${isCollapsible ? 'collapsible' : ''}`}
-                style={{ marginLeft: `${level * 20}px` }} // Add indentation based on level
+                className={`hierarchy-node-container ${isCollapsible ? 'collapsible' : ''} level-${level}`}
+                style={{ marginLeft: `${level * 30}px` }}
               >
                 {isCollapsible && visibleChildrenCount > 0 ? (
                   <div 
@@ -1511,25 +1734,10 @@ const AdminHierarchySettings = () => {
                 )}
               </div>
               
-              {/* Rendering children based on node type */}
-              {node.children && node.children.length > 0 && (
+              {/* Rendering children - only if node is expanded (or not collapsible) */}
+              {node.children && node.children.length > 0 && (isNodeExpanded || !isCollapsible) && (
                 <div className="hierarchy-children-container">
-                  {/* Always render immediate RGA/MGA children, regardless of parent's expanded state */}
-                  {node.children
-                    .filter(child => child.clname === 'RGA' || child.clname === 'MGA')
-                    .map(child => renderHierarchyTree([child], level + 1, matchingSet))}
-                  
-                  {/* Only render non-RGA/MGA children if this node is explicitly expanded */}
-                  {isNodeExpanded && 
-                   expandedNodes[node.lagnname] === true && // Must be explicitly expanded
-                   node.children.filter(child => child.clname !== 'RGA' && child.clname !== 'MGA').length > 0 && (
-                    <>
-                      {/* Render all non-RGA/MGA children while preserving their order */}
-                      {node.children
-                        .filter(child => child.clname !== 'RGA' && child.clname !== 'MGA')
-                        .map(child => renderHierarchyTree([child], level + 1, matchingSet))}
-                    </>
-                  )}
+                  {node.children.map(child => renderHierarchyTree([child], level + 1, matchingSet))}
                 </div>
               )}
             </React.Fragment>
@@ -2032,6 +2240,33 @@ const AdminHierarchySettings = () => {
     return name;
   };
 
+  // Calculate role counts for a specific RGA hierarchy
+  const calculateRoleCountsForRGA = (rgaHierarchy) => {
+    const counts = {
+      RGA: 0,
+      MGA: 0,
+      GA: 0,
+      SA: 0,
+      AGT: 0
+    };
+
+    if (!rgaHierarchy || !rgaHierarchy.hierarchyData) {
+      return counts;
+    }
+
+    rgaHierarchy.hierarchyData.forEach(user => {
+      // Apply filters to determine if user should be counted
+      if (passesAllFilters(user)) {
+        const role = user.clname;
+        if (counts.hasOwnProperty(role)) {
+          counts[role]++;
+        }
+      }
+    });
+
+    return counts;
+  };
+
   // Helper function to format PNP date for display
   const formatDateForDisplay = (dateString) => {
     if (!dateString) return '';
@@ -2399,7 +2634,6 @@ const AdminHierarchySettings = () => {
 
   return (
     <div className="settings-section-large">
-      
       {error && <div className="settings-alert settings-alert-error">{error}</div>}
       
       {/* Current User Card at Top - Only shown for non-admin users */}
@@ -2573,19 +2807,14 @@ const AdminHierarchySettings = () => {
                 onClick={() => setViewMode('tree')}
                 title="Tree View"
               >
-                <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="18" width="18" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="18" cy="18" r="3"></circle>
-                  <circle cx="6" cy="6" r="3"></circle>
-                  <path d="M13 6h3a2 2 0 0 1 2 2v7"></path>
-                  <line x1="6" y1="9" x2="6" y2="21"></line>
-                </svg>
+                <RiOrganizationChart size={18} />
               </button>
               <button 
                 className={`view-toggle-button ${viewMode === 'mga' ? 'active' : ''}`}
                 onClick={() => setViewMode('mga')}
-                title="MGA Teams View"
+                title="Table View"
               >
-                <FiUsers />
+                <FiList size={18} />
               </button>
               
               <button className="admin-toggle-button" onClick={toggleAllRGAs} title={Object.values(expandedRGAs).some(isExpanded => isExpanded) ? "Collapse All" : "Expand All"}>
@@ -2744,9 +2973,6 @@ const AdminHierarchySettings = () => {
                     >
                       <div className="admin-rga-title">
                         {isExpanded ? <FiChevronDown /> : <FiChevronRight />}
-                        <span>{rgaHierarchy.rgaName}</span>
-                      </div>
-                      <div className="admin-rga-role">
                         <span 
                           className="role-badge role-RGA"
                           style={{
@@ -2756,9 +2982,34 @@ const AdminHierarchySettings = () => {
                         >
                           RGA
                         </span>
-                        <div className="user-count-badge">
-                          {displayedUsersCount}
-                        </div>
+                        <span>{rgaHierarchy.rgaName}</span>
+                      </div>
+                      <div className="admin-rga-role-counts">
+                        {(() => {
+                          const counts = calculateRoleCountsForRGA(rgaHierarchy);
+                          const totalCount = Object.values(counts).reduce((sum, count) => sum + count, 0);
+                          return (
+                            <>
+                              {Object.entries(counts).map(([role, count]) => (
+                                count > 0 && (
+                                  <div key={role} className="role-count-item-compact">
+                                    <span className="role-count-label" style={{ 
+                                      backgroundColor: getRoleColor(role).bg,
+                                      borderColor: getRoleColor(role).border
+                                    }}>
+                                      {role}
+                                    </span>
+                                    <span className="role-count-value">{count}</span>
+                                  </div>
+                                )
+                              ))}
+                              <div className="role-count-item-compact total">
+                                <span className="role-count-label-total">Total</span>
+                                <span className="role-count-value">{totalCount}</span>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                     
@@ -2768,8 +3019,8 @@ const AdminHierarchySettings = () => {
                         {searchQuery && searchResults && searchResults.matchingRgaGroups ? (
                           renderSearchResults(rgaHierarchy, searchResults)
                         ) : (
-                          // Show the hierarchical tree for this RGA
-                          renderHierarchyTree(rgaHierarchy.hierarchicalData)
+                          // Show the hierarchical tree including the RGA card itself, then MGAs nest under it
+                          renderHierarchyTree(rgaHierarchy.hierarchicalData, 0)
                         )}
                       </div>
                     )}

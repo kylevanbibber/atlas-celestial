@@ -3,7 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { FiUsers, FiTrello } from 'react-icons/fi';
 import { Applicants } from '../components/recruiting';
 import Pipeline from '../components/recruiting/Pipeline/Pipeline';
-import SecondarySidebar from '../components/utils/SecondarySidebar';
+// import SecondarySidebar from '../components/utils/SecondarySidebar';
+import RecruitingOverview from './RecruitingOverview';
 import '../pages/utilities/Utilities.css'; // Reuse utilities styling
 
 const Recruiting = () => {
@@ -50,14 +51,25 @@ const Recruiting = () => {
     }
   };
   
+  // Check if there's a section parameter
+  const params = new URLSearchParams(location.search);
+  const hasSection = params.has('section');
+
+  // If no section parameter, show the overview page
+  if (!hasSection) {
+    return <RecruitingOverview />;
+  }
+  
   return (
     <div className="settings-container">
-      <SecondarySidebar
+      {/* Breadcrumb Navigation now in Header */}
+      
+      {/* <SecondarySidebar
         items={recruitingItems}
         activeItem={activeSection}
         onItemClick={handleSectionChange}
         warningItems={[]}
-      />
+      /> */}
       <div className="settings-content">
         <div className="padded-content">
           {renderRecruitingSection()}

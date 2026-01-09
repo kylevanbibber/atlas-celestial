@@ -1,18 +1,24 @@
 // src/components/utils/Header.jsx
 import React, { useContext, useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import ThemeContext from "../../context/ThemeContext";
 import { useTeamStyles } from "../../context/TeamStyleContext";
-import { FiMenu, FiUser, FiLogOut, FiMoon, FiSun, FiUsers, FiChevronRight, FiPhone, FiMonitor, FiExternalLink, FiChevronDown } from "react-icons/fi";
-import { sidebarNavItems } from "../../context/sidebarNavItems";
+import { FiMenu, FiUser, FiLogOut, FiMoon, FiSun, FiUsers, FiChevronRight, FiPhone, FiMonitor, FiExternalLink, FiChevronDown, FiMessageSquare, FiHome, FiClipboard, FiUserPlus, FiSettings, FiTrendingUp } from "react-icons/fi";
+import getSidebarNavItems from "../../context/sidebarNavItems";
+import { useLicenseWarning } from "../../context/LicenseWarningContext";
+import { useNotificationContext } from "../../context/NotificationContext";
 import ContextMenu from "./ContextMenu";
 import Logo from "../Layout/Logo";
 import NotificationCenter from "../common/NotificationCenter";
+import GlobalSearch from "./GlobalSearch";
+import RightDetails from "./RightDetails";
+import Breadcrumb from "./Breadcrumb";
 import api from "../../api";
+import { usePresentationWindow } from "../../hooks/usePresentationWindow";
 import "./Header.css";
 
-const Header = ({ pageTitle, isExpanded, onboardingMode = false }) => {
+const Header = ({ pageTitle, onboardingMode = false }) => {
   const { 
     user, 
     isImpersonating, 
@@ -23,12 +29,27 @@ const Header = ({ pageTitle, isExpanded, onboardingMode = false }) => {
   } = useAuth();
   const { theme, toggleTheme } = useContext(ThemeContext);
   const { teamName } = useTeamStyles();
+  const { hasWarning: licenseWarning } = useLicenseWarning();
+  const { unreadCount } = useNotificationContext();
+  const location = useLocation();
   const defaultProfilePic = "http://www.gravatar.com/avatar/?d=mp";
   const profilePic = user?.profpic || defaultProfilePic;
   const navigate = useNavigate();
   
+  // Check if user is admin
+  const isAdmin = hasPermission('admin');
+  const teamRole = user?.teamRole || null;
+  const shouldShowLicenseWarning = teamRole !== "app" ? licenseWarning : false;
+  
+  // Get navigation items (previously from sidebar)
+  const navItems = onboardingMode 
+    ? [{ name: 'Onboarding Home', path: '/onboarding/home', icon: <FiMenu /> }]
+    : getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole, user?.userId, user?.lagnname, user?.clname) || [];
+  
   // State to detect if on mobile
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  
+  // State removed - now using horizontal tabs instead of dropdown
   
   // Admin user switching state
   const [users, setUsers] = useState([]);
@@ -43,9 +64,22 @@ const Header = ({ pageTitle, isExpanded, onboardingMode = false }) => {
   const phoneWindowRef = useRef(null);
   const presWindowRef = useRef(null);
 
+  // Agent profile state
+  const [agentProfileData, setAgentProfileData] = useState(null);
+
+  // Presentation Setup window (new for VANBIBBER KYLE A)
+  const { openWindow: openPresentationSetup, isOpen: isPresentationSetupOpen } = usePresentationWindow();
+
+  // Check if user is VANBIBBER KYLE A
+  const isPresentationUser = user?.lagnname === 'VANBIBBER KYLE A';
+  
+  // Presentation menu state
+  const [showPresentationMenu, setShowPresentationMenu] = useState(false);
+
   // Use custom team name or fall back to the page title
   const displayTitle = pageTitle || teamName || "Atlas";
   const [hasRecentUpdate, setHasRecentUpdate] = useState(false);
+
 
   // Detect recent page-specific updates (last 7 days) by matching current path
   useEffect(() => {
@@ -88,6 +122,7 @@ const Header = ({ pageTitle, isExpanded, onboardingMode = false }) => {
     return () => clearInterval(interval);
   }, []);
 
+
   // Check if device is mobile on mount and on resize
   React.useEffect(() => {
     const handleResize = () => {
@@ -103,10 +138,18 @@ const Header = ({ pageTitle, isExpanded, onboardingMode = false }) => {
   // State for the profile dropdown menu
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   
-  // State for the sidebar menu (hamburger menu)
-  const [showHamburgerMenu, setShowHamburgerMenu] = useState(false);
-  const hamburgerRef = useRef(null);
-  const [hamburgerMenuPosition, setHamburgerMenuPosition] = useState({ top: 0, left: 0 });
+  // State for nav tab dropdowns
+  const [activeNavDropdown, setActiveNavDropdown] = useState(null);
+  const navDropdownTimeoutRef = useRef(null);
+
+  // Cleanup nav dropdown timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (navDropdownTimeoutRef.current) {
+        clearTimeout(navDropdownTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Phone Scripts window function
   const openPhone = (phoneFile) => {
@@ -253,15 +296,6 @@ const Header = ({ pageTitle, isExpanded, onboardingMode = false }) => {
     setShowProfileMenu(!showProfileMenu);
   };
 
-  const handleHamburgerClick = () => {
-    const rect = hamburgerRef.current.getBoundingClientRect();
-    // Position the menu down and to the right
-    const top = rect.bottom + 5;
-    const left = rect.left;
-    setHamburgerMenuPosition({ top, left });
-    setShowHamburgerMenu(!showHamburgerMenu);
-  };
-
   // Load users for admin switching
   const loadUsers = async () => {
     if (users.length > 0) return; // Already loaded
@@ -317,12 +351,35 @@ const Header = ({ pageTitle, isExpanded, onboardingMode = false }) => {
     window.location.reload();
   };
 
+  // Get main navigation items (excluding Utilities) - declare before profileOptions
+  const mainNavItems = navItems.filter(item => item.name !== 'Utilities');
+  const utilitiesItem = navItems.find(item => item.name === 'Utilities');
+
   // Profile menu options
   const baseProfileOptions = [
     {
       label: "Account",
       onClick: () => navigate("/utilities?section=account"),
       icon: <FiUser />
+    },
+    // Utilities with submenu
+    {
+      label: "Utilities",
+      onClick: () => navigate("/utilities"),
+      icon: <FiSettings />,
+      submenu: utilitiesItem?.submenu?.map(subItem => ({
+        label: subItem.name,
+        onClick: () => {
+          navigate(subItem.path);
+          setShowProfileMenu(false);
+        },
+        icon: subItem.icon
+      }))
+    },
+    {
+      label: "Feedback",
+      onClick: () => navigate("/resources?active=feedback"),
+      icon: <FiMessageSquare />
     },
     // Admin user switching option
     ...(hasPermission('admin') ? [{
@@ -379,12 +436,12 @@ const Header = ({ pageTitle, isExpanded, onboardingMode = false }) => {
         },
         {
           label: "Option Builder",
-          onClick: () => window.open("https://thekeefersuccess.com/WinnersCircle/agent_tools/presentation/option_builder_solo.html", "_blank"),
+          onClick: () => window.open("http://salebase.ai/option_builder/option_builder_solo_arias.php", "_blank"),
           icon: <FiExternalLink />
         },
         {
           label: "Career Track",
-          onClick: () => window.open("https://ariaslife.com/uploads/defaultFolder/CareerTrackwAgent.pdf", "_blank"),
+          onClick: () => window.open("/pdfs/careertrack.pdf", "_blank"),
           icon: <FiExternalLink />
         },
         {
@@ -412,6 +469,11 @@ const Header = ({ pageTitle, isExpanded, onboardingMode = false }) => {
         {
           label: "PR Directory",
           onClick: () => window.open("https://aagencies-my.sharepoint.com/:w:/g/personal/kvanbibber_ariasagencies_com/EaPhjMWWMNtEmxutLriHI2kBRPryI_Y0ot6BFb0PWxc8dQ?e=cRFzCI", "_blank"),
+          icon: <FiExternalLink />
+        },
+        {
+          label: "2026 Awards Guide",
+          onClick: () => window.open("/pdfs/Arias_Awards_2026.jpg", "_blank"),
           icon: <FiExternalLink />
         },
       ]
@@ -486,87 +548,93 @@ const Header = ({ pageTitle, isExpanded, onboardingMode = false }) => {
     }
   }
 
-
-
-  // Hamburger menu options based on sidebar nav items
-  const hamburgerOptions = onboardingMode
-    ? [{ label: 'Onboarding Home', onClick: () => navigate('/onboarding/home'), icon: sidebarNavItems[0]?.icon }]
-    : sidebarNavItems.map((item) => ({
-        label: item.name,
-        onClick: () => navigate(item.submenu ? item.submenu[0].path : item.path),
-        icon: item.icon
-      }));
+  // Helper function to check if nav item is active
+  const isNavItemActive = (path) => {
+    if (!path) return false;
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  };
 
   return (
-    <div className={`header ${isExpanded ? "expanded" : ""}`}>
-      {/* Left section */}
-      <div className="header-left-section">
-        {/* Hamburger Menu (desktop only) */}
-        <div
-          className="hamburger-container"
-          ref={hamburgerRef}
-          onClick={handleHamburgerClick}
-        >
-          <FiMenu className="hamburger-icon" />
-          {showHamburgerMenu && (
-            <ContextMenu
-              options={hamburgerOptions}
-              onClose={() => setShowHamburgerMenu(false)}
-              style={{ 
-                top: hamburgerMenuPosition.top,
-                left: hamburgerMenuPosition.left
-              }}
-              className="hamburger-menu"
-            />
+    <>
+      <div className="modern-header">
+        {/* Left section - Logo */}
+        <div className="header-left">
+          {!isMobile && (
+            <div className="header-logo-container" onClick={() => navigate('/dashboard')} style={{ cursor: 'pointer' }}>
+              <Logo size="small" className="header-logo" />
+            </div>
+          )}
+          
+          {/* Mobile - Just show logo */}
+          {isMobile && (
+            <div className="mobile-logo-container" onClick={() => navigate('/dashboard')} style={{ cursor: 'pointer' }}>
+              <Logo size="xs" className="header-logo" />
+            </div>
           )}
         </div>
         
-        {/* Logo (for mobile) */}
-        <div className="header-logo-container">
-          <Logo size={isMobile ? "xs" : "small"} className="header-logo" />
-        </div>
-      </div>
-      
-      {/* Header Title */}
-      {displayTitle && (
-        <h4 className={`header-title ${isExpanded ? "expanded" : ""}`}>
-          {displayTitle}
-          {hasRecentUpdate && (
-            <span style={{
-              display: 'inline-block',
-              fontSize: '10px',
-              lineHeight: 1,
-              padding: '3px 6px',
-              background: '#ff9800',
-              color: '#fff',
-              borderRadius: '8px',
-              marginLeft: 8
-            }}>New</span>
-          )}
-        </h4>
-      )}
-      
-      {/* Right section - Header actions container */}
-      <div className="header-actions">
-        {/* Agent Tools - Only show on desktop */}
+        {/* Center section - Main Navigation Tabs */}
         {!isMobile && !onboardingMode && (
-          <div className="agent-tools">
-            <button
-              className={`tool-button phone-button ${isPhoneOpen ? 'active' : ''}`}
-              onClick={() => openPhone('https://ariaslife.com/temp/agent_tools/phone_scripts/phone_scripts.html')}
-              title="Phone Scripts"
-            >
-              <FiPhone size={18} />
-            </button>
-
-            <button
-              className={`tool-button presentation-button ${isPresOpen ? 'active' : ''}`}
-              onClick={handleLaunchPresentation}
-              title="Launch Presentation"
-            >
-              <FiMonitor size={18} />
-            </button>
+          <div className="header-center-nav">
+            {mainNavItems.map((item, index) => (
+              <React.Fragment key={item.name}>
+                <div
+                  className="nav-tab-container"
+                  onMouseEnter={() => {
+                    if (navDropdownTimeoutRef.current) {
+                      clearTimeout(navDropdownTimeoutRef.current);
+                    }
+                    if (item.submenu && item.submenu.length > 0) {
+                      setActiveNavDropdown(item.name);
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    navDropdownTimeoutRef.current = setTimeout(() => {
+                      setActiveNavDropdown(null);
+                    }, 200);
+                  }}
+                >
+                  <div
+                    className={`nav-tab ${isNavItemActive(item.path) ? 'active' : ''}`}
+                    onClick={() => navigate(item.path)}
+                  >
+                    <span>{item.name}</span>
+                    {item.hasWarning && <span className="nav-tab-warning-dot"></span>}
+                  </div>
+                  
+                  {/* Submenu Dropdown */}
+                  {activeNavDropdown === item.name && item.submenu && (
+                    <div className="nav-tab-dropdown">
+                      {item.submenu.map((subItem) => (
+                        <div
+                          key={subItem.name}
+                          className={`nav-dropdown-item ${isNavItemActive(subItem.path) ? 'active' : ''}`}
+                      onClick={() => {
+                            navigate(subItem.path);
+                            setActiveNavDropdown(null);
+                      }}
+                    >
+                          {subItem.icon}
+                          <span>{subItem.name}</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+                {/* Add separator between items, but not after the last one */}
+                {index < mainNavItems.length - 1 && (
+                  <span className="nav-separator">|</span>
+            )}
+              </React.Fragment>
+            ))}
           </div>
+        )}
+        
+        {/* Right section - Actions */}
+        <div className="header-right">
+          {/* Global Search */}
+          {!isMobile && !onboardingMode && (
+            <GlobalSearch theme={theme} toggleTheme={toggleTheme} onOpenAgentProfile={setAgentProfileData} />
         )}
         
         {/* Notification Center */}
@@ -603,7 +671,24 @@ const Header = ({ pageTitle, isExpanded, onboardingMode = false }) => {
           )}
         </div>
       </div>
-    </div>
+      </div>
+      
+      {/* Breadcrumb Navigation - Show below header */}
+      {!onboardingMode && location.pathname !== '/dashboard' && (
+        <Breadcrumb />
+      )}
+      
+      {/* Mobile navigation handled by BottomNav component in App.js */}
+
+      {/* Agent Profile Panel */}
+      {agentProfileData && (
+        <RightDetails
+          data={agentProfileData}
+          fromPage="Agent"
+          onClose={() => setAgentProfileData(null)}
+        />
+      )}
+    </>
   );
 };
 

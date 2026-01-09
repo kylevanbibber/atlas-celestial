@@ -154,18 +154,10 @@ const Login = () => {
                   <div style={{ textAlign: 'center', marginTop: '20px' }}>
                     <button
                       className="secondary-button"
-                      onClick={() => window.open('https://ariaslife.mykajabi.com/', '_blank')}
+                      onClick={() => navigate('/onboarding/login')}
                     >
-                      New Agent Training Course
+                      Onboarding Login
                     </button>
-                    <div style={{ marginTop: '10px' }}>
-                      <button
-                        className="secondary-button"
-                        onClick={() => navigate('/onboarding/login')}
-                      >
-                        Onboarding
-                      </button>
-                    </div>
                   </div>
                 </div>
               </div>

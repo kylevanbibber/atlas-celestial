@@ -518,9 +518,14 @@ const Applicants = () => {
       return;
     }
     
+    // Sanitize and validate URL
+    let url = String(videoForm.video_url).trim();
+    if (url && !/^https?:\/\//i.test(url)) {
+      url = `https://${url}`; // ensure protocol
+    }
     // Validate URL is YouTube or Vimeo
-    const isYouTube = videoForm.video_url.includes('youtube.com') || videoForm.video_url.includes('youtu.be');
-    const isVimeo = videoForm.video_url.includes('vimeo.com');
+    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+    const isVimeo = url.includes('vimeo.com');
     
     if (!isYouTube && !isVimeo) {
       toast.error('Please enter a valid YouTube or Vimeo URL');
@@ -529,11 +534,12 @@ const Applicants = () => {
     
     try {
       setVideoLoading(true);
-      const response = await api.post('/careers-videos', {
+      const payload = {
         target_mga: videoForm.target_mga || null,
-        video_url: videoForm.video_url,
+        video_url: url,
         video_type: isYouTube ? 'youtube' : 'vimeo'
-      });
+      };
+      const response = await api.post('/careers-videos', payload);
       
       if (response.data.success) {
         toast.success(response.data.action === 'created' ? 'Video added successfully!' : 'Video updated successfully!');
@@ -541,8 +547,8 @@ const Applicants = () => {
         loadCustomVideos();
       }
     } catch (error) {
-      console.error('Error saving video:', error);
-      toast.error(error.response?.data?.error || 'Failed to save video');
+      console.error('Error saving video:', error?.response?.data || error?.message || error);
+      toast.error(error?.response?.data?.error || error?.response?.data?.message || 'Failed to save video');
     } finally {
       setVideoLoading(false);
     }
@@ -706,7 +712,7 @@ const Applicants = () => {
                       onChange={(e) => setVideoForm({ ...videoForm, target_mga: e.target.value })}
                       className="settings-row select"
                       style={{ width: '100%' }}
-                      required
+                      
                     >
                       <option value="">Select Targeting Level...</option>
                       {availableTeams.map((team, index) => (

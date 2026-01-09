@@ -2027,4 +2027,41 @@
     border-color: var(--primary-color-hover, #3a5bc7);
   }
   
+  /* Commits Toggle Button */
+  .atlas-scorecard-commits-toggle {
+    display: flex;
+    align-items: center;
+  }
+
+  .commits-toggle-btn {
+    background: none;
+    border: 1px solid var(--border-color, #d1d5db);
+    color: var(--text-secondary, #666);
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .commits-toggle-btn:hover {
+    background-color: var(--sidebar-hover, #f5f5f5);
+    color: var(--hover-color, #4a6cf7);
+    border-color: var(--hover-color, #4a6cf7);
+  }
+
+  .commits-toggle-btn.active {
+    background-color: var(--hover-color, #4a6cf7);
+    color: white;
+    border-color: var(--hover-color, #4a6cf7);
+  }
+
+  .commits-toggle-btn.active:hover {
+    background-color: var(--primary-color-hover, #3a5bc7);
+    border-color: var(--primary-color-hover, #3a5bc7);
+  }
+  
       

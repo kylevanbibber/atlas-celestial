@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../../context/AuthContext';
-import { FiCheck, FiX, FiChevronDown, FiChevronRight, FiUpload, FiPaperclip, FiDownload, FiTrash2, FiUser, FiExternalLink } from 'react-icons/fi';
+import { FiCheck, FiX, FiChevronDown, FiChevronRight, FiUpload, FiPaperclip, FiDownload, FiTrash2, FiUser, FiExternalLink, FiMessageSquare, FiSend } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import api from '../../../api';
 import '../../utils/RightDetails.css';
@@ -9,6 +9,7 @@ import './PipelineChecklist.css';
 const PipelineChecklistDetails = ({ data, onClose, onSave }) => {
   const { recruit, stages } = data;
   const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('checklist');
   const [checklistItems, setChecklistItems] = useState([]);
   const [progress, setProgress] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,16 +18,71 @@ const PipelineChecklistDetails = ({ data, onClose, onSave }) => {
   const [attachments, setAttachments] = useState([]);
   const [uploadingItems, setUploadingItems] = useState({});
   const [currentStep, setCurrentStep] = useState(recruit.step); // Track current step for re-rendering
+  const [smsHistory, setSmsHistory] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState('');
   const fileInputRefs = useRef({});
   const [videoPanels, setVideoPanels] = useState({}); // { [itemId]: { expanded, platform, videoId, durationSec, maxWatchedSec } }
   const youTubePlayersRef = useRef({}); // { [itemId]: YT.Player }
   const vimeoPlayersRef = useRef({}); // { [itemId]: Vimeo.Player }
   const videoIntervalsRef = useRef({}); // { [itemId]: intervalId }
   const [scriptsLoaded, setScriptsLoaded] = useState({ youtube: false, vimeo: false });
+  const [aobData, setAobData] = useState(null);
+  const [aobLoading, setAobLoading] = useState(false);
 
   useEffect(() => {
     fetchChecklistData();
   }, [recruit.id]);
+
+  // Fetch AOB data when recruit has an aob value
+  useEffect(() => {
+    if (recruit.aob) {
+      fetchAobData();
+    }
+  }, [recruit.id, recruit.aob]);
+
+  const fetchAobData = async () => {
+    try {
+      setAobLoading(true);
+      const response = await api.get(`/recruitment/recruits/${recruit.id}/aob`);
+      if (response.data.success && response.data.data) {
+        setAobData(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching AOB data:', error);
+    } finally {
+      setAobLoading(false);
+    }
+  };
+
+  // Fetch SMS history when switching to Texts tab
+  useEffect(() => {
+    if (activeTab === 'texts') {
+      fetchSmsHistory();
+    }
+  }, [activeTab, recruit.id]);
+
+  const fetchSmsHistory = async () => {
+    try {
+      console.log('[PipelineChecklistDetails] Fetching SMS history for recruit:', recruit.id);
+      const smsResponse = await api.get(`/recruitment/recruits/${recruit.id}/sms-history`);
+      console.log('[PipelineChecklistDetails] SMS history response:', smsResponse.data);
+      
+      if (smsResponse.data.success) {
+        const messages = smsResponse.data.data || [];
+        console.log('[PipelineChecklistDetails] Setting SMS history:', messages.length, 'messages');
+        setSmsHistory(messages);
+      } else {
+        console.error('[PipelineChecklistDetails] Failed to fetch SMS history:', smsResponse.data.message);
+        setSmsHistory([]);
+      }
+    } catch (error) {
+      console.error('[PipelineChecklistDetails] Error fetching SMS history:', error);
+      setSmsHistory([]);
+    }
+  };
 
   const fetchChecklistData = async () => {
     try {
@@ -716,6 +772,72 @@ const PipelineChecklistDetails = ({ data, onClose, onSave }) => {
   }).length;
   const overallPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
+  // Fetch SMS templates
+  const fetchTemplates = async () => {
+    try {
+      const response = await api.get('/recruitment/sms/templates');
+      if (response.data.success) {
+        setTemplates(response.data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching SMS templates:', error);
+    }
+  };
+
+  // Fetch templates when switching to texts tab
+  useEffect(() => {
+    if (activeTab === 'texts') {
+      fetchTemplates();
+    }
+  }, [activeTab]);
+
+  // Handle template selection
+  const handleTemplateSelect = (e) => {
+    const templateId = e.target.value;
+    setSelectedTemplate(templateId);
+    
+    if (templateId) {
+      const template = templates.find(t => t.id === parseInt(templateId));
+      if (template) {
+        setNewMessage(template.message);
+      }
+    }
+  };
+
+  // Handle sending a new text message
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !recruit.phone) return;
+
+    setSendingMessage(true);
+    const toastId = toast.loading('Sending text message...');
+
+    try {
+      const response = await api.post(`/recruitment/recruits/${recruit.id}/send-onboarding-text`, {
+        phone: recruit.phone,
+        message: newMessage
+      });
+
+      if (response.data.success) {
+        toast.success('Text message sent successfully!', { id: toastId });
+        setNewMessage('');
+        setSelectedTemplate('');
+        
+        // Refresh SMS history
+        const smsResponse = await api.get(`/recruitment/recruits/${recruit.id}/sms-history`);
+        if (smsResponse.data.success) {
+          setSmsHistory(smsResponse.data.data || []);
+        }
+      } else {
+        toast.error(response.data.message || 'Failed to send text message', { id: toastId });
+      }
+    } catch (error) {
+      console.error('Error sending text:', error);
+      toast.error(error.response?.data?.message || 'Failed to send text message', { id: toastId });
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ 
@@ -845,6 +967,36 @@ const PipelineChecklistDetails = ({ data, onClose, onSave }) => {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="pipeline-detail-tabs">
+        <button
+          className={`pipeline-detail-tab ${activeTab === 'checklist' ? 'active' : ''}`}
+          onClick={() => setActiveTab('checklist')}
+        >
+          <FiCheck />
+          Checklist
+        </button>
+        <button
+          className={`pipeline-detail-tab ${activeTab === 'texts' ? 'active' : ''}`}
+          onClick={() => setActiveTab('texts')}
+        >
+          <FiMessageSquare />
+          Texts
+          {smsHistory.length > 0 && (
+            <span className="tab-badge">{smsHistory.length}</span>
+          )}
+        </button>
+        {recruit.aob && (
+          <button
+            className={`pipeline-detail-tab ${activeTab === 'aob' ? 'active' : ''}`}
+            onClick={() => setActiveTab('aob')}
+          >
+            <FiExternalLink />
+            AOB Status
+          </button>
+        )}
+      </div>
+
       {/* Scrollable Content Area */}
       <div style={{ 
         flex: 1, 
@@ -854,17 +1006,20 @@ const PipelineChecklistDetails = ({ data, onClose, onSave }) => {
         minHeight: 0,
         WebkitOverflowScrolling: 'touch'
       }}>
-        {checklistItems.length === 0 && !loading && (
-          <div style={{ 
-            padding: '20px', 
-            textAlign: 'center', 
-            color: 'var(--text-secondary)' 
-          }}>
-            No checklist items found. Please contact your administrator.
-          </div>
-        )}
-        
-        <div className="checklist-stages" style={{ paddingBottom: '40px' }}>
+        {/* Checklist Tab Content */}
+        {activeTab === 'checklist' && (
+          <>
+            {checklistItems.length === 0 && !loading && (
+              <div style={{ 
+                padding: '20px', 
+                textAlign: 'center', 
+                color: 'var(--text-secondary)' 
+              }}>
+                No checklist items found. Please contact your administrator.
+              </div>
+            )}
+            
+            <div className="checklist-stages" style={{ paddingBottom: '40px' }}>
         {stages.map(stage => {
           // Filter by stage_name instead of stage_id
           const stageItems = checklistItems.filter(item => item.stage_name === stage.stage_name);
@@ -1156,6 +1311,316 @@ const PipelineChecklistDetails = ({ data, onClose, onSave }) => {
           );
         })}
         </div>
+          </>
+        )}
+
+        {/* Texts Tab Content */}
+        {activeTab === 'texts' && (
+          <div className="texts-tab-content">
+            {/* SMS History Section */}
+            {smsHistory.length > 0 ? (
+              <div className="sms-history-section">
+                <div className="sms-history-header">
+                  <FiMessageSquare />
+                  <h3>Text Message History</h3>
+                  <span className="sms-count">{smsHistory.length}</span>
+                </div>
+                <div className="sms-history-list">
+                  {smsHistory.map((msg) => {
+                    const isInbound = msg.direction === 'inbound';
+                    const senderName = isInbound 
+                      ? `${recruit.recruit_first || ''} ${recruit.recruit_last || ''}`.trim() || 'Recruit'
+                      : (msg.sender_name 
+                          ? msg.sender_name.split(' ').slice(1).join(' ') + ' ' + msg.sender_name.split(' ')[0]
+                          : 'System');
+                    
+                    return (
+                      <div key={msg.id} className={`sms-message ${isInbound ? 'inbound' : 'outbound'}`}>
+                        <div className="sms-message-header">
+                          <div className="sms-sender">
+                            {isInbound ? (
+                              <div className="sms-sender-avatar-placeholder recruit">
+                                <FiUser />
+                              </div>
+                            ) : (
+                              msg.sender_profpic ? (
+                                <img 
+                                  src={msg.sender_profpic} 
+                                  alt={senderName}
+                                  className="sms-sender-avatar"
+                                />
+                              ) : (
+                                <div className="sms-sender-avatar-placeholder">
+                                  <FiUser />
+                                </div>
+                              )
+                            )}
+                            <span className="sms-sender-name">{senderName}</span>
+                            {isInbound && <span className="sms-direction-badge">Reply</span>}
+                          </div>
+                          <div className="sms-meta">
+                            <span className="sms-timestamp">
+                              {new Date(msg.sent_at).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                                hour12: true
+                              })}
+                            </span>
+                            {!isInbound && (
+                              <span className={`sms-status ${msg.status}`}>
+                                {msg.status === 'sent' ? '✓' : msg.status === 'delivered' ? '✓✓' : '✗'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="sms-message-body">
+                          {msg.message_body}
+                        </div>
+                        <div className="sms-message-footer">
+                          <span className="sms-phone">
+                            {isInbound ? `From: ${msg.from_phone}` : `To: ${msg.to_phone}`}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="no-sms-history">
+                <FiMessageSquare size={48} />
+                <p>No text messages sent yet</p>
+              </div>
+            )}
+
+            {/* Send New Message */}
+            {recruit.phone && (
+              <div className="send-sms-section">
+                <div className="send-sms-header">
+                  <h4>Send New Text Message</h4>
+                  <span className="recipient-phone">To: {recruit.phone}</span>
+                </div>
+                <div className="send-sms-form">
+                  {templates.length > 0 && (
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#374151' }}>
+                        Use Template (Optional)
+                      </label>
+                      <select
+                        value={selectedTemplate}
+                        onChange={handleTemplateSelect}
+                        disabled={sendingMessage}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          fontSize: '14px',
+                          backgroundColor: 'white',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="">-- Select a template --</option>
+                        {templates.map(template => (
+                          <option key={template.id} value={template.id}>
+                            {template.name} {template.category && `(${template.category})`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <textarea
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type your message here or select a template above..."
+                    rows={4}
+                    maxLength={5000}
+                    disabled={sendingMessage}
+                  />
+                  <div className="send-sms-footer">
+                    <span className="char-count">
+                      {newMessage.length} / 5000 characters
+                      {newMessage.length > 160 && <span style={{ color: '#f59e0b', marginLeft: '8px' }}>(multiple segments)</span>}
+                    </span>
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={sendingMessage || !newMessage.trim()}
+                      className="send-sms-btn"
+                    >
+                      {sendingMessage ? (
+                        <>Sending...</>
+                      ) : (
+                        <>
+                          <FiSend />
+                          Send Text
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* AOB Tab Content */}
+        {activeTab === 'aob' && (
+          <div className="aob-tab-content">
+            {aobLoading ? (
+              <div style={{ padding: '40px', textAlign: 'center' }}>
+                <div className="pipeline-loading-spinner"></div>
+                <p style={{ marginTop: '12px', color: 'var(--text-secondary)' }}>Loading AOB data...</p>
+              </div>
+            ) : aobData ? (
+              <div style={{ padding: '8px' }}>
+                <div style={{
+                  backgroundColor: 'var(--card-bg)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '12px',
+                  overflow: 'hidden'
+                }}>
+                  {/* Header */}
+                  <div style={{
+                    padding: '16px 20px',
+                    backgroundColor: 'var(--primary-color)',
+                    color: 'white'
+                  }}>
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>
+                      Application Processing Status
+                    </h3>
+                    <p style={{ margin: '4px 0 0', fontSize: '13px', opacity: 0.9 }}>
+                      Last updated: {aobData.LastUpdated ? new Date(aobData.LastUpdated).toLocaleString() : 'N/A'}
+                    </p>
+                  </div>
+
+                  {/* Status Summary */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '1px',
+                    backgroundColor: 'var(--border-color)',
+                    margin: '16px',
+                    borderRadius: '8px',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      padding: '16px',
+                      backgroundColor: 'var(--card-bg)',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>WF Status</div>
+                      <div style={{
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: aobData.WFStatus === 'COMPLETED' ? '#10b981' : 
+                               aobData.WFStatus === 'INPROGRESS' ? '#f59e0b' : 
+                               aobData.WFStatus === 'FAILED' ? '#ef4444' : 'var(--text-primary)'
+                      }}>
+                        {aobData.WFStatus || 'N/A'}
+                      </div>
+                    </div>
+                    <div style={{
+                      padding: '16px',
+                      backgroundColor: 'var(--card-bg)',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>WF Step</div>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {aobData.WFStep || 'N/A'}
+                      </div>
+                    </div>
+                    <div style={{
+                      padding: '16px',
+                      backgroundColor: 'var(--card-bg)',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Step Status</div>
+                      <div style={{
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: aobData.StepStatus === 'COMPLETED' ? '#10b981' : 
+                               aobData.StepStatus === 'INPROGRESS' ? '#f59e0b' : 
+                               aobData.StepStatus === 'FAILED' ? '#ef4444' :
+                               aobData.StepStatus === 'ASSIGNED' ? '#3b82f6' : 'var(--text-primary)'
+                      }}>
+                        {aobData.StepStatus || 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Details */}
+                  <div style={{ padding: '0 20px 20px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                      <tbody>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '12px 0', color: 'var(--text-secondary)', width: '140px' }}>Agent</td>
+                          <td style={{ padding: '12px 0', fontWeight: 500 }}>{aobData.Agent || 'N/A'}</td>
+                        </tr>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '12px 0', color: 'var(--text-secondary)' }}>Agent Number</td>
+                          <td style={{ padding: '12px 0', fontWeight: 500 }}>{aobData.AgentNumber || 'N/A'}</td>
+                        </tr>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '12px 0', color: 'var(--text-secondary)' }}>State</td>
+                          <td style={{ padding: '12px 0', fontWeight: 500 }}>{aobData.STPROV || 'N/A'}</td>
+                        </tr>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '12px 0', color: 'var(--text-secondary)' }}>Email</td>
+                          <td style={{ padding: '12px 0', fontWeight: 500 }}>{aobData.EmailAddress || 'N/A'}</td>
+                        </tr>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '12px 0', color: 'var(--text-secondary)' }}>Phone</td>
+                          <td style={{ padding: '12px 0', fontWeight: 500 }}>{aobData.ApplicantPhoneNumber || 'N/A'}</td>
+                        </tr>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '12px 0', color: 'var(--text-secondary)' }}>SGA Name</td>
+                          <td style={{ padding: '12px 0', fontWeight: 500 }}>{aobData.SGAName || 'N/A'}</td>
+                        </tr>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '12px 0', color: 'var(--text-secondary)' }}>MGA</td>
+                          <td style={{ padding: '12px 0', fontWeight: 500 }}>{aobData.MGA || 'N/A'}</td>
+                        </tr>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '12px 0', color: 'var(--text-secondary)' }}>Company</td>
+                          <td style={{ padding: '12px 0', fontWeight: 500 }}>{aobData.Company || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                          <td style={{ padding: '12px 0', color: 'var(--text-secondary)' }}>Import Date</td>
+                          <td style={{ padding: '12px 0', fontWeight: 500 }}>
+                            {(() => {
+                              if (!aobData.ImportDate) return 'N/A';
+                              // Check if it's an Excel serial date (number)
+                              const serial = parseFloat(aobData.ImportDate);
+                              if (!isNaN(serial) && serial > 10000 && serial < 100000) {
+                                // Excel serial date: days since Jan 1, 1900 (with leap year bug)
+                                const excelEpoch = new Date(1899, 11, 30); // Dec 30, 1899
+                                const date = new Date(excelEpoch.getTime() + serial * 86400000);
+                                if (!isNaN(date.getTime())) {
+                                  return `${date.getMonth() + 1}/${date.getDate()}/${String(date.getFullYear()).slice(-2)}`;
+                                }
+                              }
+                              // Try parsing as regular date string
+                              const date = new Date(aobData.ImportDate);
+                              return isNaN(date.getTime()) ? aobData.ImportDate : date.toLocaleDateString();
+                            })()}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <FiExternalLink size={48} style={{ marginBottom: '12px', opacity: 0.5 }} />
+                <p>No AOB data linked to this recruit</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

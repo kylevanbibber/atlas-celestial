@@ -1,0 +1,878 @@
+.presentation-builder {
+  padding: 20px;
+  background: var(--background-color);
+  min-height: 100vh;
+}
+
+.builder-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.builder-header h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 2rem;
+}
+
+.builder-content {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 20px;
+  height: calc(100vh - 180px);
+}
+
+/* Presentations Sidebar */
+.presentations-sidebar {
+  background: var(--card-bg);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow-y: auto;
+}
+
+.presentations-sidebar h3 {
+  margin: 0 0 15px 0;
+  color: var(--text-primary);
+}
+
+.presentations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.presentation-item {
+  padding: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 2px solid transparent;
+}
+
+.presentation-item:hover {
+  background: var(--hover-background);
+}
+
+.presentation-item.active {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color-dark);
+}
+
+.presentation-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.presentation-meta {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+/* Main Editor Area */
+.editor-main {
+  background: var(--card-bg);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow-y: auto;
+}
+
+.pb-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+}
+
+.presentation-header {
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.presentation-header h3 {
+  margin: 0 0 8px 0;
+  color: var(--text-primary);
+}
+
+.presentation-header p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+/* Slides Section */
+.slides-section {
+  margin-bottom: 30px;
+}
+
+.slides-section h4 {
+  margin: 0 0 15px 0;
+  color: var(--text-primary);
+}
+
+.slides-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.slide-card {
+  background: var(--background-color);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.slide-card:hover {
+  border-color: var(--primary-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.slide-card.slide-hidden {
+  opacity: 0.6;
+  border-style: dashed;
+  border-color: #f59e0b;
+}
+
+/* Add Slide Card */
+.add-slide-card {
+  background: var(--card-bg);
+  border: 2px dashed var(--primary-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.add-slide-card:hover {
+  background: var(--primary-color);
+  color: white;
+  border-style: solid;
+}
+
+.add-slide-icon {
+  font-size: 3rem;
+  margin-bottom: 10px;
+  color: var(--primary-color);
+  font-weight: 300;
+}
+
+.add-slide-card:hover .add-slide-icon {
+  color: white;
+}
+
+.add-slide-card h5 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.add-slide-card:hover h5 {
+  color: white;
+}
+
+/* Add Slide Card Form */
+.add-slide-card-form {
+  cursor: default;
+  min-height: 250px;
+}
+
+.add-slide-card-form:hover {
+  transform: none;
+  border-color: var(--border-color);
+}
+
+.add-slide-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.add-slide-form h5 {
+  margin: 0 0 10px 0;
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.add-slide-input,
+.add-slide-file,
+.add-slide-textarea {
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 13px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.add-slide-input:focus,
+.add-slide-textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.add-slide-file {
+  font-size: 12px;
+}
+
+.add-slide-textarea {
+  resize: none;
+  font-family: inherit;
+}
+
+.add-slide-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 5px;
+}
+
+.pb-btn-add-confirm {
+  flex: 1;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pb-btn-add-confirm:hover {
+  background: var(--primary-color-dark);
+}
+
+.pb-btn-add-cancel {
+  flex: 1;
+  background: var(--text-secondary);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pb-btn-add-cancel:hover {
+  background: #555;
+}
+
+.slide-number {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: var(--primary-color);
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.slide-thumbnail {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  background: #f0f0f0;
+}
+
+/* Slide Card Header with Status Icons */
+.slide-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-color);
+}
+
+.slide-card-header h5 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slide-status-icons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.status-icon {
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.active-icon {
+  color: #10b981;
+}
+
+.hidden-icon {
+  color: #f59e0b;
+  opacity: 0.7;
+}
+
+.script-icon {
+  color: var(--primary-color);
+}
+
+.no-script-icon {
+  color: #ef4444;
+}
+
+.slide-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  justify-content: flex-end;
+}
+
+.pb-delete-btn {
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 16px;
+  opacity: 0.6;
+}
+
+.pb-delete-btn:hover {
+  background: #fee2e2;
+  opacity: 1;
+}
+
+/* Slide Form */
+.slide-form-section {
+  background: var(--background-color);
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.slide-form-section h4 {
+  margin: 0 0 20px 0;
+  color: var(--text-primary);
+}
+
+/* Presentation Builder Forms - Keep as-is since form-group is common pattern */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-group label {
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group input[type="file"],
+.form-group select,
+.form-group textarea {
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 14px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(0, 85, 140, 0.1);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* Presentation Builder Buttons - Unique naming to avoid conflicts */
+.pb-btn-primary {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pb-btn-primary:hover {
+  background: var(--primary-color-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 85, 140, 0.3);
+}
+
+.pb-btn-secondary {
+  background: var(--text-secondary);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pb-btn-secondary:hover {
+  background: #555;
+}
+
+/* Presentation Builder Modal - Unique naming to avoid conflicts */
+.pb-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.pb-modal-content {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 30px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.pb-modal-content h3 {
+  margin: 0 0 20px 0;
+  color: var(--text-primary);
+}
+
+.pb-modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* Presentation Builder Loading - Unique naming */
+.pb-loading {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-secondary);
+}
+
+/* Presentation Mockup View */
+.presentation-mockup {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.mockup-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.pb-btn-back {
+  background: var(--text-secondary);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pb-btn-back:hover {
+  background: #555;
+}
+
+.mockup-title {
+  flex: 1;
+}
+
+.mockup-title h3 {
+  margin: 0 0 4px 0;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+}
+
+.slide-indicator {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.mockup-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.pb-btn-save {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pb-btn-save:hover {
+  background: var(--primary-color-dark);
+  transform: translateY(-1px);
+}
+
+.pb-btn-delete-slide {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pb-btn-delete-slide:hover {
+  background: #dc2626;
+}
+
+
+.mockup-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Slide Preview Section */
+.mockup-slide-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.wireframe-label {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 8px 12px;
+  background: var(--background-color);
+  border-radius: 4px;
+  border-left: 3px solid var(--primary-color);
+}
+
+.wireframe-slide {
+  background: #f9fafb;
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  aspect-ratio: 16/9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.slide-preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: white;
+}
+
+.slide-placeholder {
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.placeholder-icon {
+  font-size: 4rem;
+  margin-bottom: 10px;
+  opacity: 0.3;
+}
+
+.placeholder-icon-small {
+  font-size: 3rem;
+  opacity: 0.3;
+}
+
+.slide-thumbnail-placeholder {
+  width: 100%;
+  height: 140px;
+  border-radius: 6px;
+  background: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.slide-title-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  padding: 20px 15px 15px;
+}
+
+.title-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid transparent;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.title-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  background: white;
+  box-shadow: 0 0 0 3px rgba(0, 85, 140, 0.1);
+}
+
+.slide-meta-form {
+  background: var(--background-color);
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.meta-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.meta-item label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.meta-item input,
+.meta-item select {
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 14px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.meta-item input:focus,
+.meta-item select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.checkbox-label-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  padding-top: 4px;
+}
+
+.file-input {
+  font-size: 13px;
+}
+
+/* Script Editor Section */
+.mockup-script-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  overflow-y: auto;
+}
+
+.script-editor-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.script-textarea {
+  flex: 1;
+  min-height: 500px;
+  padding: 15px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 15px;
+  line-height: 1.6;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  resize: vertical;
+  transition: all 0.2s;
+}
+
+.script-textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(0, 85, 140, 0.1);
+}
+
+.presentation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .builder-content {
+    grid-template-columns: 1fr;
+  }
+
+  .presentations-sidebar {
+    max-height: 200px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .slides-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+
+  .mockup-container {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .mockup-header {
+    flex-wrap: wrap;
+  }
+
+  .meta-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .builder-header {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .slides-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mockup-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .mockup-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .script-textarea {
+    min-height: 300px;
+  }
+}
+

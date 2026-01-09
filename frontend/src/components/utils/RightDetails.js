@@ -6,6 +6,9 @@ import VerificationDetails from "../production/verification/VerificationDetails"
 import ApplicationDetails from "../production/verification/ApplicationDetails";
 import ApplicantDetails from "../recruiting/ApplicantDetails";
 import PipelineChecklistDetails from "../recruiting/Pipeline/PipelineChecklistDetails";
+import OnboardingItemDetails from "../onboarding/OnboardingItemDetails";
+import FeedbackDetails from "../feedback/FeedbackDetails";
+import AgentProfile from "./AgentProfile";
 import "./RightDetails.css";
 
 // Default columns for company details if none are provided
@@ -165,6 +168,32 @@ const RightDetails = (props) => {
     DetailComponent = PipelineChecklistDetails;
     detailData = cleanData;
     detailFromPage = "Pipeline";
+  }
+  // Check for our special onboarding item flag
+  else if (data && data.__isOnboardingItem === true) {
+    console.log("Detected onboarding item data via flag, rendering OnboardingItemDetails component");
+    const { __isOnboardingItem, ...cleanData } = data;
+    DetailComponent = OnboardingItemDetails;
+    detailData = cleanData;
+    detailFromPage = "Onboarding";
+    // Pass recruitSummary to OnboardingItemDetails
+    detailProps.recruitSummary = props.recruitSummary;
+  }
+  // Check for our special feedback details flag
+  else if (data && data.__isFeedbackDetails === true) {
+    console.log("Detected feedback data via flag, rendering FeedbackDetails component");
+    const { __isFeedbackDetails, ...cleanData } = data;
+    DetailComponent = FeedbackDetails;
+    detailData = cleanData;
+    detailFromPage = "Feedback";
+  }
+  // Check for our special agent profile flag
+  else if (data && data.__isAgentProfile === true) {
+    console.log("Detected agent profile data via flag, rendering AgentProfile component");
+    const { __isAgentProfile, ...cleanData } = data;
+    DetailComponent = AgentProfile;
+    detailData = cleanData;
+    detailFromPage = "Agent";
   }
   // Force the use of SalesDetails if the data appears to be a sale record
   // else if (data && (data.fromPage === "Sales" || (data.transaction_date && data.total_amount !== undefined))) {

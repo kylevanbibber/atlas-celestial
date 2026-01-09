@@ -29,7 +29,7 @@ const Sidebar = ({ isExpanded, setIsExpanded, onboardingMode = false }) => {
   const shouldShowLicenseWarning = teamRole !== "app" ? licenseWarning : false;
   
   // Get sidebar items with warning indicators based on license status
-  let navItems = getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole, user?.userId) || [];
+  let navItems = getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole, user?.userId, user?.lagnname, user?.clname) || [];
   if (onboardingMode) {
     // Limit to Onboarding Home only
     navItems = [

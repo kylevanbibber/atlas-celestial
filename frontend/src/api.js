@@ -43,25 +43,68 @@ const delayIfNeeded = async () => {
 
 const api = axios.create({
   baseURL: API_URL,
-  headers: { 
-    "Content-Type": "application/json",
-  },
   withCredentials: true, // This ensures cookies are sent with cross-origin requests
 });
 
 // Add auth token to all requests
 api.interceptors.request.use(
   (config) => {
+    // If we're sending FormData, do NOT force JSON content-type.
+    // The browser/Axios must set the multipart boundary automatically, otherwise multer won't see req.file.
+    const isFormData =
+      typeof FormData !== 'undefined' &&
+      config.data instanceof FormData;
+
+    if (isFormData && config.headers) {
+      // Axios v1 may use an AxiosHeaders instance which supports .delete()
+      if (typeof config.headers.delete === 'function') {
+        config.headers.delete('Content-Type');
+        config.headers.delete('content-type');
+        // Ensure it stays unset (lets the browser set boundary)
+        if (typeof config.headers.set === 'function') {
+          config.headers.set('Content-Type', undefined);
+          config.headers.set('content-type', undefined);
+        }
+      } else {
+        delete config.headers['Content-Type'];
+        delete config.headers['content-type'];
+        // Some axios setups nest headers by method
+        if (config.headers.common) {
+          delete config.headers.common['Content-Type'];
+          delete config.headers.common['content-type'];
+        }
+        if (config.headers.post) {
+          delete config.headers.post['Content-Type'];
+          delete config.headers.post['content-type'];
+        }
+      }
+    }
+
     // Debug logging for release management endpoints
     if (config.url?.includes('fail-user') || config.url?.includes('pass-user')) {
 
     }
     
-    // Get token from localStorage
-    const token = localStorage.getItem('auth_token');
+    // Public endpoints that don't require authentication
+    const publicEndpoints = [
+      '/auth/send-reset-code-by-email',
+      '/auth/verify-reset-code',
+      '/auth/update-password',
+      '/onboarding/auth/start',
+      '/onboarding/auth/register',
+      '/onboarding/auth/login',
+      '/onboarding/auth/forgot',
+      '/onboarding/auth/reset',
+      '/onboarding/hiring-managers'
+    ];
     
-    // If token exists, add it to the Authorization header
-    if (token) {
+    const isPublicEndpoint = publicEndpoints.some(endpoint => config.url?.includes(endpoint));
+    
+    // Get token from localStorage (support both main app and onboarding keys)
+    const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+    
+    // If token exists and not a public endpoint, add it to the Authorization header
+    if (token && !isPublicEndpoint) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     
@@ -150,6 +193,19 @@ api.interceptors.response.use(
         return Promise.reject(discordError);
       }
       
+      // If in onboarding context and hitting onboarding-allowed endpoints, don't auto-logout
+      const onboardingId = localStorage.getItem('onboardingPipelineId');
+      const isOnboardingContext = Boolean(onboardingId);
+      const isOnboardingAllowed = originalRequest?.url?.startsWith('/pipeline-attachments/') ||
+                                  originalRequest?.url?.startsWith('/recruitment/recruits/') ||
+                                  originalRequest?.url?.startsWith('/recruitment/stages') ||
+                                  originalRequest?.url?.startsWith('/onboarding/');
+
+      if (isOnboardingContext && isOnboardingAllowed) {
+        // Let onboarding UI handle auth (header-based), don't nuke token/session
+        return Promise.reject(error);
+      }
+
       if (!isAuthEndpoint && !originalRequest._authRetried) {
         originalRequest._authRetried = true;
         
@@ -173,8 +229,9 @@ api.interceptors.response.use(
           }
         }));
         
-        // Clear the auth token immediately
+        // Clear the auth token immediately (both keys)
         localStorage.removeItem('auth_token');
+        localStorage.removeItem('token');
         
         // Return a rejected promise with a specific error type
         const authError = new Error('Authentication token expired');

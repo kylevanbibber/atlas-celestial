@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { FiChevronLeft, FiChevronRight, FiCalendar, FiDownload, FiSearch, FiList, FiGrid, FiFilter, FiUpload } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiCalendar, FiDownload, FiSearch, FiList, FiGrid, FiFilter, FiUpload, FiChevronDown, FiCheck } from 'react-icons/fi';
 import DataTable from './DataTable';
 import ActionBar from './ActionBar';
 import { useAuth } from '../../context/AuthContext';
@@ -161,6 +161,18 @@ const buildHierarchy = (agents) => {
 
 const PNP_UPLOAD_URL = 'https://peaceful-badlands-42414-7b2e5f9acb76.herokuapp.com/upload/pnp';
 
+// Tab definitions - defined outside component to prevent recreation
+const TABS_CONFIG = [
+  { id: 'all', label: 'All', description: 'All records' },
+  { id: 'over', label: 'Over', description: 'All 4mo rates ≥ 85%' },
+  { id: 'under', label: 'Under', description: 'Any 4mo rate < 85%' }
+];
+
+// Stable Cell renderer functions - defined outside component
+const CurrencyCell = ({ value }) => formatCurrency(value);
+const PercentageCell = ({ value }) => formatPercentage(value);
+const NumberCell = ({ value }) => formatNumber(value);
+
 const Pnp = () => {
   const { user } = useAuth();
   const { hierarchyData, hierarchyLoading, getHierarchyForComponent } = useUserHierarchy();
@@ -191,7 +203,8 @@ const Pnp = () => {
   
   const allowedNamesSet = useMemo(() => new Set(allowedNames.map(name => String(name).toLowerCase())), [allowedNames]);
   const [availableDates, setAvailableDates] = useState([]);
-  const [currentDateIndex, setCurrentDateIndex] = useState(0);
+  const [selectedDates, setSelectedDates] = useState([]); // Array of selected date strings
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [pnpData, setPnpData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -210,6 +223,10 @@ const Pnp = () => {
   // No options: always process all pages and all levels
   const [selectedFileName, setSelectedFileName] = useState('');
   const fileInputRef = useRef(null);
+  const datePickerRef = useRef(null);
+  
+  // Check if multiple months are selected
+  const isMultiMonth = selectedDates.length > 1;
   
   // Filter state
   const [activeFilters, setActiveFilters] = useState({
@@ -225,13 +242,6 @@ const Pnp = () => {
 
   // Determine if user should see tabs (Admin or teamRole = 'app')
   const shouldShowTabs = isAdmin || user?.teamRole === 'app';
-
-  // Tab definitions with filtering logic (only used if shouldShowTabs is true)
-  const tabs = [
-    { id: 'all', label: 'All', description: 'All records' },
-    { id: 'over', label: 'Over', description: 'All 4mo rates ≥ 85%' },
-    { id: 'under', label: 'Under', description: 'Any 4mo rate < 85%' }
-  ];
 
   // Filter functions
   const updateRangeFilter = (filterName, field, value) => {
@@ -578,12 +588,23 @@ const Pnp = () => {
     }
   }, [viewMode, user?.userId]);
 
-  // Fetch data when date changes or hierarchy data is ready
+  // Fetch data when selected dates change or hierarchy data is ready
   useEffect(() => {
-    if (availableDates.length > 0 && (isAdmin || (hierarchyData && allowedNames.length > 0))) {
-      fetchPnpData(availableDates[currentDateIndex]);
+    if (selectedDates.length > 0 && (isAdmin || (hierarchyData && allowedNames.length > 0))) {
+      fetchPnpDataForDates(selectedDates);
     }
-  }, [currentDateIndex, availableDates, isAdmin, hierarchyData, allowedNames]);
+  }, [selectedDates, isAdmin, hierarchyData, allowedNames]);
+
+  // Close date picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target)) {
+        setShowDatePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchAvailableDates = async () => {
     try {
@@ -592,7 +613,8 @@ const Pnp = () => {
       
       if (result.success && result.dates.length > 0) {
         setAvailableDates(result.dates);
-        setCurrentDateIndex(0);
+        // Select the most recent date by default
+        setSelectedDates([result.dates[0]]);
       } else {
         setError('No P&P data available');
       }
@@ -601,6 +623,54 @@ const Pnp = () => {
       setError('Failed to fetch P&P dates');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Toggle date selection
+  const toggleDateSelection = (date) => {
+    setSelectedDates(prev => {
+      if (prev.includes(date)) {
+        // Don't allow deselecting if it's the only one selected
+        if (prev.length === 1) return prev;
+        return prev.filter(d => d !== date);
+      } else {
+        return [...prev, date].sort((a, b) => {
+          // Sort by date descending (most recent first)
+          return new Date(b) - new Date(a);
+        });
+      }
+    });
+  };
+
+  // Select all dates
+  const selectAllDates = () => {
+    setSelectedDates([...availableDates]);
+  };
+
+  // Clear to single date (most recent)
+  const selectSingleDate = () => {
+    if (availableDates.length > 0) {
+      setSelectedDates([availableDates[0]]);
+    }
+  };
+
+  // Navigate to previous date (older)
+  const goToPreviousDate = () => {
+    if (selectedDates.length === 1) {
+      const currentIndex = availableDates.indexOf(selectedDates[0]);
+      if (currentIndex < availableDates.length - 1) {
+        setSelectedDates([availableDates[currentIndex + 1]]);
+      }
+    }
+  };
+
+  // Navigate to next date (more recent)
+  const goToNextDate = () => {
+    if (selectedDates.length === 1) {
+      const currentIndex = availableDates.indexOf(selectedDates[0]);
+      if (currentIndex > 0) {
+        setSelectedDates([availableDates[currentIndex - 1]]);
+      }
     }
   };
 
@@ -677,8 +747,8 @@ const Pnp = () => {
               
               // Refresh available dates (new data added)
               await fetchAvailableDates();
-              const date = availableDates[currentDateIndex];
-              if (date) await fetchPnpData(date);
+              // The fetchAvailableDates will set selectedDates to the most recent date
+              // which will trigger fetchPnpDataForDates via useEffect
               
               // Clear form
               setSelectedFileName('');
@@ -716,54 +786,58 @@ const Pnp = () => {
     }
   };
 
-  const fetchPnpData = async (date) => {
-    if (!date) return;
+  const fetchPnpDataForDates = async (dates) => {
+    if (!dates || dates.length === 0) return;
     
     setLoading(true);
     try {
-      // Fetch PnP data
-      const dataResponse = await api.get(`/pnp/data?date=${encodeURIComponent(date)}`);
-      const dataResult = dataResponse.data;
-
-  
-
-      if (dataResult.success) {
-        // Add sequential IDs and convert string values to numbers for proper sorting
-        let dataWithIds = dataResult.data.map((row, index) => ({
-          ...row,
-          id: row.id || index + 1,
-          ...convertPnpRowData(row)
-        }));
-
-        // Apply hierarchy filtering for non-admin users (includes managerActive filtering)
-        if (!isAdmin && allowedNamesSet.size > 0) {
-          dataWithIds = dataWithIds.filter(row => {
-            const nameLineMatch = row.name_line && allowedNamesSet.has(String(row.name_line).toLowerCase());
-            return nameLineMatch;
-          });
-        } else if (isAdmin) {
-          // For admin users, still filter out managerActive = 'n' users
-          // Get full hierarchy data to check managerActive status
-          const fullHierarchyData = hierarchyData ? getHierarchyForComponent('full') || [] : [];
-          const managerActiveMap = new Map();
-          fullHierarchyData.forEach(user => {
-            if (user.lagnname && user.managerActive !== undefined) {
-              managerActiveMap.set(String(user.lagnname).toLowerCase(), String(user.managerActive).toLowerCase() === 'y');
-            }
-          });
-          
-          // Filter out managerActive = 'n' users for admins too
-          dataWithIds = dataWithIds.filter(row => {
-            if (!row.name_line) return false;
-            const isManagerActive = managerActiveMap.get(String(row.name_line).toLowerCase());
-            return isManagerActive !== false; // Include if not found (undefined) or if true
-          });
+      // Fetch PnP data for all selected dates
+      const allData = [];
+      
+      for (const date of dates) {
+        const dataResponse = await api.get(`/pnp/data?date=${encodeURIComponent(date)}`);
+        const dataResult = dataResponse.data;
+        
+        if (dataResult.success) {
+          // Add date to each row and convert values
+          const dataWithDate = dataResult.data.map((row, index) => ({
+            ...row,
+            report_date: date, // Add the report date to each row
+            id: `${date}_${row.id || index + 1}`,
+            ...convertPnpRowData(row)
+          }));
+          allData.push(...dataWithDate);
         }
-
-        setPnpData(dataWithIds);
-      } else {
-        setError(dataResult.message || 'Failed to fetch P&P data');
       }
+
+      let processedData = allData;
+
+      // Apply hierarchy filtering for non-admin users (includes managerActive filtering)
+      if (!isAdmin && allowedNamesSet.size > 0) {
+        processedData = processedData.filter(row => {
+          const nameLineMatch = row.name_line && allowedNamesSet.has(String(row.name_line).toLowerCase());
+          return nameLineMatch;
+        });
+      } else if (isAdmin) {
+        // For admin users, still filter out managerActive = 'n' users
+        // Get full hierarchy data to check managerActive status
+        const fullHierarchyData = hierarchyData ? getHierarchyForComponent('full') || [] : [];
+        const managerActiveMap = new Map();
+        fullHierarchyData.forEach(user => {
+          if (user.lagnname && user.managerActive !== undefined) {
+            managerActiveMap.set(String(user.lagnname).toLowerCase(), String(user.managerActive).toLowerCase() === 'y');
+          }
+        });
+        
+        // Filter out managerActive = 'n' users for admins too
+        processedData = processedData.filter(row => {
+          if (!row.name_line) return false;
+          const isManagerActive = managerActiveMap.get(String(row.name_line).toLowerCase());
+          return isManagerActive !== false; // Include if not found (undefined) or if true
+        });
+      }
+
+      setPnpData(processedData);
     } catch (err) {
       console.error('Error fetching PnP data:', err);
       setError('Failed to fetch P&P data');
@@ -772,20 +846,8 @@ const Pnp = () => {
     }
   };
 
-  const goToPreviousDate = () => {
-    if (currentDateIndex < availableDates.length - 1) {
-      setCurrentDateIndex(currentDateIndex + 1);
-    }
-  };
-
-  const goToNextDate = () => {
-    if (currentDateIndex > 0) {
-      setCurrentDateIndex(currentDateIndex - 1);
-    }
-  };
-
-  // Base columns (always shown)
-  const baseColumns = [
+  // Base columns (always shown) - memoized
+  const baseColumns = useMemo(() => [
     {
       Header: 'Name Line',
       accessor: 'name_line',
@@ -801,38 +863,140 @@ const Pnp = () => {
       accessor: 'agent_num',
       width: 100
     }
-  ];
+  ], []);
 
-  // Rate-specific columns for Over/Under tabs
-  const rateColumns = [
+  // Rate-specific columns for Over/Under tabs - memoized
+  const rateColumns = useMemo(() => [
     ...baseColumns,
     {
       Header: 'Current Month 4Mo Rate',
       accessor: 'curr_mo_4mo_rate',
       width: 120,
       className: 'text-right',
-      Cell: ({ value }) => formatPercentage(value)
+      Cell: PercentageCell
     },
     {
       Header: 'Proj+1 4Mo Rate',
       accessor: 'proj_plus_1_4mo_rate',
       width: 120,
       className: 'text-right',
-      Cell: ({ value }) => formatPercentage(value)
+      Cell: PercentageCell
     },
     {
       Header: 'Proj+2 4Mo Rate',
       accessor: 'proj_plus_2_4mo_rate',
       width: 120,
       className: 'text-right',
-      Cell: ({ value }) => formatPercentage(value)
+      Cell: PercentageCell
     }
-  ];
+  ], [baseColumns]);
 
+  // Multi-month columns - simplified view with Report Date - memoized
+  const multiMonthColumns = useMemo(() => [
+    {
+      Header: 'Report Date',
+      accessor: 'report_date',
+      width: 120,
+      sticky: 'left'
+    },
+    {
+      Header: 'Name Line',
+      accessor: 'name_line',
+      autoWidth: true,
+      sticky: 'left'
+    },
+    {
+      Header: 'ESID',
+      accessor: 'esid',
+      width: 100
+    },
+    {
+      Header: 'Agent #',
+      accessor: 'agent_num',
+      width: 100
+    },
+    {
+      Header: 'Current Month',
+      columns: [
+        {
+          Header: 'Gross Submit',
+          accessor: 'curr_mo_grs_submit',
+          width: 120,
+          className: 'text-right',
+          Cell: CurrencyCell
+        },
+        {
+          Header: 'Net Submit',
+          accessor: 'curr_mo_net_submit',
+          width: 120,
+          className: 'text-right',
+          Cell: CurrencyCell
+        },
+        {
+          Header: 'Percentage',
+          accessor: 'curr_mo_pct',
+          width: 100,
+          className: 'text-right',
+          Cell: PercentageCell
+        }
+      ]
+    },
+    {
+      Header: 'Past 12 Months',
+      columns: [
+        {
+          Header: 'Gross Submit',
+          accessor: 'past_12_mo_life_grs_submit',
+          width: 120,
+          className: 'text-right',
+          Cell: CurrencyCell
+        },
+        {
+          Header: 'Net Submit',
+          accessor: 'past_12_mo_life_net_submit',
+          width: 120,
+          className: 'text-right',
+          Cell: CurrencyCell
+        },
+        {
+          Header: 'Percentage',
+          accessor: 'past_12_mo_life_pct',
+          width: 100,
+          className: 'text-right',
+          Cell: PercentageCell
+        }
+      ]
+    },
+    {
+      Header: 'Current YTD',
+      columns: [
+        {
+          Header: 'Gross Submit',
+          accessor: 'cur_ytd_life_grs_submit',
+          width: 120,
+          className: 'text-right',
+          Cell: CurrencyCell
+        },
+        {
+          Header: 'Net Submit',
+          accessor: 'cur_ytd_life_net_submit',
+          width: 120,
+          className: 'text-right',
+          Cell: CurrencyCell
+        },
+        {
+          Header: 'Percentage',
+          accessor: 'cur_ytd_pct',
+          width: 100,
+          className: 'text-right',
+          Cell: PercentageCell
+        }
+      ]
+    }
+  ], []);
 
-
-  // Define all available columns for "All" tab
-  const allColumns = [
+  // Define all available columns for "All" tab - memoized with dependencies
+  const allColumns = useMemo(() => [
     // Add role column for hierarchy view
     ...(viewMode === 'hierarchy' ? [{
       Header: 'Role',
@@ -949,21 +1113,21 @@ const Pnp = () => {
           accessor: 'curr_mo_grs_submit',
           width: 120,
           className: 'text-right',
-          Cell: ({ value }) => formatCurrency(value)
+          Cell: CurrencyCell
         },
         {
           Header: 'Net Submit',
           accessor: 'curr_mo_net_submit',
           width: 120,
           className: 'text-right',
-          Cell: ({ value }) => formatCurrency(value)
+          Cell: CurrencyCell
         },
         {
           Header: 'Percentage',
           accessor: 'curr_mo_pct',
           width: 100,
           className: 'text-right',
-          Cell: ({ value }) => formatPercentage(value)
+          Cell: PercentageCell
         }
       ]
     },
@@ -975,21 +1139,21 @@ const Pnp = () => {
           accessor: 'past_12_mo_life_grs_submit',
           width: 120,
           className: 'text-right',
-          Cell: ({ value }) => formatCurrency(value)
+          Cell: CurrencyCell
         },
         {
           Header: 'Net Submit',
           accessor: 'past_12_mo_life_net_submit',
           width: 120,
           className: 'text-right',
-          Cell: ({ value }) => formatCurrency(value)
+          Cell: CurrencyCell
         },
         {
           Header: 'Percentage',
           accessor: 'past_12_mo_life_pct',
           width: 100,
           className: 'text-right',
-          Cell: ({ value }) => formatPercentage(value)
+          Cell: PercentageCell
         }
       ]
     },
@@ -1001,21 +1165,21 @@ const Pnp = () => {
           accessor: 'cur_ytd_life_grs_submit',
           width: 120,
           className: 'text-right',
-          Cell: ({ value }) => formatCurrency(value)
+          Cell: CurrencyCell
         },
         {
           Header: 'Net Submit',
           accessor: 'cur_ytd_life_net_submit',
           width: 120,
           className: 'text-right',
-          Cell: ({ value }) => formatCurrency(value)
+          Cell: CurrencyCell
         },
         {
           Header: 'Percentage',
           accessor: 'cur_ytd_pct',
           width: 100,
           className: 'text-right',
-          Cell: ({ value }) => formatPercentage(value)
+          Cell: PercentageCell
         }
       ]
     },
@@ -1033,35 +1197,35 @@ const Pnp = () => {
           accessor: 'proj_plus_1_submit',
           width: 120,
           className: 'text-right',
-          Cell: ({ value }) => formatCurrency(value)
+          Cell: CurrencyCell
         },
         {
           Header: 'Net Issue',
           accessor: 'proj_plus_1_net_iss',
           width: 120,
           className: 'text-right',
-          Cell: ({ value }) => formatCurrency(value)
+          Cell: CurrencyCell
         },
         {
           Header: 'Net Sub',
           accessor: 'proj_plus_1_net_sub',
           width: 120,
           className: 'text-right',
-          Cell: ({ value }) => formatCurrency(value)
+          Cell: CurrencyCell
         },
         {
           Header: 'Paid 4 Mo',
           accessor: 'proj_plus_1_paid4mo',
           width: 100,
           className: 'text-right',
-          Cell: ({ value }) => formatNumber(value)
+          Cell: NumberCell
         },
         {
           Header: '4 Mo Rate',
           accessor: 'proj_plus_1_4mo_rate',
           width: 100,
           className: 'text-right',
-          Cell: ({ value }) => formatPercentage(value)
+          Cell: PercentageCell
         }
       ]
     },
@@ -1079,42 +1243,47 @@ const Pnp = () => {
           accessor: 'proj_plus_2_submit',
           width: 120,
           className: 'text-right',
-          Cell: ({ value }) => formatCurrency(value)
+          Cell: CurrencyCell
         },
         {
           Header: 'Net Issue',
           accessor: 'proj_plus_2_net_iss',
           width: 120,
           className: 'text-right',
-          Cell: ({ value }) => formatCurrency(value)
+          Cell: CurrencyCell
         },
         {
           Header: 'Net Sub',
           accessor: 'proj_plus_2_net_sub',
           width: 120,
           className: 'text-right',
-          Cell: ({ value }) => formatCurrency(value)
+          Cell: CurrencyCell
         },
         {
           Header: 'Paid 4 Mo',
           accessor: 'proj_plus_2_paid4mo',
           width: 100,
           className: 'text-right',
-          Cell: ({ value }) => formatNumber(value)
+          Cell: NumberCell
         },
         {
           Header: '4 Mo Rate',
           accessor: 'proj_plus_2_4mo_rate',
           width: 100,
           className: 'text-right',
-          Cell: ({ value }) => formatPercentage(value)
+          Cell: PercentageCell
         }
       ]
     }
-  ];
+  ], [viewMode]); // Note: expandedMga and handleMgaExpansion are accessed in Cell functions but don't need to trigger column recreation
 
-  // Function to get columns based on active tab
-  const getColumnsForTab = () => {
+  // Memoized columns based on active tab and multi-month selection
+  const columns = useMemo(() => {
+    // If multiple months are selected, use simplified multi-month columns
+    if (isMultiMonth) {
+      return multiMonthColumns;
+    }
+    
     // If user shouldn't see tabs, always use all columns
     if (!shouldShowTabs) {
       return allColumns;
@@ -1128,10 +1297,25 @@ const Pnp = () => {
       default:
         return allColumns;
     }
-  };
+  }, [isMultiMonth, multiMonthColumns, shouldShowTabs, activeTab, rateColumns, allColumns]);
 
-  const columns = getColumnsForTab();
-  const currentDate = availableDates[currentDateIndex];
+  const currentDate = selectedDates.length === 1 ? selectedDates[0] : null;
+
+  // Debug logging for columns and data (after columns are defined)
+  useEffect(() => {
+    console.log('🔍 PnP Debug - Columns:', {
+      columnCount: columns?.length,
+      columnsType: Array.isArray(columns) ? 'Array' : typeof columns,
+      isMultiMonth,
+      activeTab,
+      viewMode
+    });
+    console.log('🔍 PnP Debug - Data:', {
+      displayDataCount: displayData?.length,
+      pnpDataCount: pnpData?.length,
+      filteredDataCount: filteredData?.length
+    });
+  }, [columns, displayData, pnpData, filteredData, isMultiMonth, activeTab, viewMode]);
 
   // Helper function to get data for a specific tab
   const getDataForTab = (tabId) => {
@@ -1172,83 +1356,119 @@ const Pnp = () => {
 
   // Helper function to transform data for export
   const transformDataForExport = (data) => {
-    return data.map(item => ({
-      // Basic info
-      name_line: item.name_line,
-      esid: item.esid,
-      agent_num: item.agent_num,
-      date: currentDate,
+    return data.map(item => {
+      // For multi-month exports, include report_date and simplified columns
+      if (isMultiMonth) {
+        return {
+          report_date: item.report_date,
+          name_line: item.name_line,
+          esid: item.esid,
+          agent_num: item.agent_num,
+          
+          // Current Month
+          curr_mo_grs_submit: item.curr_mo_grs_submit,
+          curr_mo_net_submit: item.curr_mo_net_submit,
+          curr_mo_pct: item.curr_mo_pct,
+          
+          // Past 12 Months
+          past_12_mo_life_grs_submit: item.past_12_mo_life_grs_submit,
+          past_12_mo_life_net_submit: item.past_12_mo_life_net_submit,
+          past_12_mo_life_pct: item.past_12_mo_life_pct,
+          
+          // Current YTD
+          cur_ytd_life_grs_submit: item.cur_ytd_life_grs_submit,
+          cur_ytd_life_net_submit: item.cur_ytd_life_net_submit,
+          cur_ytd_pct: item.cur_ytd_pct
+        };
+      }
       
-      // Current Month
-      curr_mo_grs_submit: item.curr_mo_grs_submit,
-      curr_mo_net_submit: item.curr_mo_net_submit,
-      curr_mo_pct: item.curr_mo_pct,
-      curr_mo_4mo_rate: item.curr_mo_4mo_rate,
-      
-      // Past 12 Months
-      past_12_mo_life_grs_submit: item.past_12_mo_life_grs_submit,
-      past_12_mo_life_net_submit: item.past_12_mo_life_net_submit,
-      past_12_mo_life_pct: item.past_12_mo_life_pct,
-      
-      // Current YTD
-      cur_ytd_life_grs_submit: item.cur_ytd_life_grs_submit,
-      cur_ytd_life_net_submit: item.cur_ytd_life_net_submit,
-      cur_ytd_pct: item.cur_ytd_pct,
-      
-      // Projection +1
-      proj_plus_1_months: item.proj_plus_1_months,
-      proj_plus_1_submit: item.proj_plus_1_submit,
-      proj_plus_1_net_iss: item.proj_plus_1_net_iss,
-      proj_plus_1_net_sub: item.proj_plus_1_net_sub,
-      proj_plus_1_paid4mo: item.proj_plus_1_paid4mo,
-      proj_plus_1_4mo_rate: item.proj_plus_1_4mo_rate,
-      
-      // Projection +2
-      proj_plus_2_months: item.proj_plus_2_months,
-      proj_plus_2_submit: item.proj_plus_2_submit,
-      proj_plus_2_net_iss: item.proj_plus_2_net_iss,
-      proj_plus_2_net_sub: item.proj_plus_2_net_sub,
-      proj_plus_2_paid4mo: item.proj_plus_2_paid4mo,
-      proj_plus_2_4mo_rate: item.proj_plus_2_4mo_rate
-    }));
+      // For single month, include all columns
+      return {
+        // Basic info
+        name_line: item.name_line,
+        esid: item.esid,
+        agent_num: item.agent_num,
+        date: item.report_date || currentDate,
+        
+        // Current Month
+        curr_mo_grs_submit: item.curr_mo_grs_submit,
+        curr_mo_net_submit: item.curr_mo_net_submit,
+        curr_mo_pct: item.curr_mo_pct,
+        curr_mo_4mo_rate: item.curr_mo_4mo_rate,
+        
+        // Past 12 Months
+        past_12_mo_life_grs_submit: item.past_12_mo_life_grs_submit,
+        past_12_mo_life_net_submit: item.past_12_mo_life_net_submit,
+        past_12_mo_life_pct: item.past_12_mo_life_pct,
+        
+        // Current YTD
+        cur_ytd_life_grs_submit: item.cur_ytd_life_grs_submit,
+        cur_ytd_life_net_submit: item.cur_ytd_life_net_submit,
+        cur_ytd_pct: item.cur_ytd_pct,
+        
+        // Projection +1
+        proj_plus_1_months: item.proj_plus_1_months,
+        proj_plus_1_submit: item.proj_plus_1_submit,
+        proj_plus_1_net_iss: item.proj_plus_1_net_iss,
+        proj_plus_1_net_sub: item.proj_plus_1_net_sub,
+        proj_plus_1_paid4mo: item.proj_plus_1_paid4mo,
+        proj_plus_1_4mo_rate: item.proj_plus_1_4mo_rate,
+        
+        // Projection +2
+        proj_plus_2_months: item.proj_plus_2_months,
+        proj_plus_2_submit: item.proj_plus_2_submit,
+        proj_plus_2_net_iss: item.proj_plus_2_net_iss,
+        proj_plus_2_net_sub: item.proj_plus_2_net_sub,
+        proj_plus_2_paid4mo: item.proj_plus_2_paid4mo,
+        proj_plus_2_4mo_rate: item.proj_plus_2_4mo_rate
+      };
+    });
   };
 
   // Create export data structure with multiple worksheets
-  const exportData = {
-    summary: {
-      currentDate: currentDate,
-      searchTerm: searchTerm,
-      totalAllRecords: pnpData.length,
-      isFiltered: searchTerm.trim() !== '',
-      generatedTabs: shouldShowTabs ? tabs.length : 1
-    },
-    // Multiple worksheets - one for each tab (or single sheet if no tabs)
-    worksheets: shouldShowTabs ? tabs.map(tab => {
-      const tabData = getDataForTab(tab.id);
-      const worksheet = {
-        name: tab.label,
-        description: tab.description,
-        data: transformDataForExport(tabData),
-        recordCount: tabData.length,
-        columns: tab.id === 'all' ? 'all' : 'rates' // Column set identifier
-      };
+  const exportData = useMemo(() => {
+    const dateLabel = isMultiMonth 
+      ? `${selectedDates.length} months` 
+      : currentDate;
       
-      // Debug logging in development
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`📊 PnP Export - Tab "${tab.label}": ${tabData.length} records`);
-      }
-      
-      return worksheet;
-    }) : [{
-      name: 'PnP Data',
-      description: 'All P&P records',
-      data: transformDataForExport(filteredData),
-      recordCount: filteredData.length,
-      columns: 'all'
-    }],
-    // Maintain backward compatibility
-    chartData: transformDataForExport(filteredData)
-  };
+    return {
+      summary: {
+        currentDate: dateLabel,
+        selectedDates: selectedDates,
+        searchTerm: searchTerm,
+        totalAllRecords: pnpData.length,
+        isFiltered: searchTerm.trim() !== '',
+        isMultiMonth: isMultiMonth,
+        generatedTabs: shouldShowTabs && !isMultiMonth ? TABS_CONFIG.length : 1
+      },
+      // Multiple worksheets - one for each tab (or single sheet if no tabs or multi-month)
+      worksheets: (shouldShowTabs && !isMultiMonth) ? TABS_CONFIG.map(tab => {
+        const tabData = getDataForTab(tab.id);
+        const worksheet = {
+          name: tab.label,
+          description: tab.description,
+          data: transformDataForExport(tabData),
+          recordCount: tabData.length,
+          columns: tab.id === 'all' ? 'all' : 'rates' // Column set identifier
+        };
+        
+        // Debug logging in development
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`📊 PnP Export - Tab "${tab.label}": ${tabData.length} records`);
+        }
+        
+        return worksheet;
+      }) : [{
+        name: isMultiMonth ? 'Multi-Month Data' : 'PnP Data',
+        description: isMultiMonth ? `P&P data for ${selectedDates.length} months` : 'All P&P records',
+        data: transformDataForExport(filteredData),
+        recordCount: filteredData.length,
+        columns: isMultiMonth ? 'multiMonth' : 'all'
+      }],
+      // Maintain backward compatibility
+      chartData: transformDataForExport(filteredData)
+    };
+  }, [pnpData, filteredData, selectedDates, isMultiMonth, currentDate, searchTerm, shouldShowTabs]);
 
   // Create multi-sheet XLSX export function
   const handleXLSXExport = async () => {
@@ -1268,7 +1488,22 @@ const Pnp = () => {
         let headers = [];
         let dataRows = [];
         
-        if (worksheet.columns === 'all') {
+        if (worksheet.columns === 'multiMonth') {
+          // Multi-month columns (simplified with report date)
+          headers = [
+            'Report Date', 'Name Line', 'ESID', 'Agent #',
+            'Current Month Gross Submit', 'Current Month Net Submit', 'Current Month %',
+            'Past 12 Mo Gross Submit', 'Past 12 Mo Net Submit', 'Past 12 Mo %',
+            'Current YTD Gross Submit', 'Current YTD Net Submit', 'Current YTD %'
+          ];
+          
+          dataRows = worksheet.data.map(item => [
+            item.report_date, item.name_line, item.esid, item.agent_num,
+            item.curr_mo_grs_submit, item.curr_mo_net_submit, item.curr_mo_pct,
+            item.past_12_mo_life_grs_submit, item.past_12_mo_life_net_submit, item.past_12_mo_life_pct,
+            item.cur_ytd_life_grs_submit, item.cur_ytd_life_net_submit, item.cur_ytd_pct
+          ]);
+        } else if (worksheet.columns === 'all') {
           // All columns (removed Level)
           headers = [
             'Name Line', 'ESID', 'Agent #',
@@ -1379,8 +1614,11 @@ const Pnp = () => {
       });
       
       // Generate filename and save
-      const tabsSuffix = shouldShowTabs ? '_All_Tabs' : '';
-      const filename = `PnP_Report${tabsSuffix}${searchTerm ? '_filtered' : ''}_${currentDate?.replace(/\//g, '-') || 'current'}.xlsx`;
+      const tabsSuffix = shouldShowTabs && !isMultiMonth ? '_All_Tabs' : '';
+      const dateSuffix = isMultiMonth 
+        ? `${selectedDates.length}_months`
+        : (currentDate?.replace(/\//g, '-') || 'current');
+      const filename = `PnP_Report${tabsSuffix}${searchTerm ? '_filtered' : ''}_${dateSuffix}.xlsx`;
       
       // Write and download the file
       XLSX.writeFile(workbook, filename);
@@ -1424,30 +1662,212 @@ const Pnp = () => {
     <div className={`pnp-container ${viewMode === 'hierarchy' ? 'hierarchy-mode' : ''}`}>
       {/* Header with search and controls */}
       <div className="pnp-header" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        {/* Date Navigation */}
-        <div className="date-navigation" style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '0 0 auto' }}>
+        {/* Date Navigation / Multi-Select */}
+        <div className="date-navigation" style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '0 0 auto' }} ref={datePickerRef}>
+          {/* Previous button (only enabled in single-month mode) */}
           <button 
             onClick={goToPreviousDate}
-            disabled={currentDateIndex >= availableDates.length - 1}
+            disabled={isMultiMonth || availableDates.indexOf(selectedDates[0]) >= availableDates.length - 1}
             className="date-nav-btn"
             style={{ padding: 4, width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+            title={isMultiMonth ? 'Navigation disabled in multi-month mode' : 'Previous month'}
           >
             <FiChevronLeft />
           </button>
           
-          <div className="current-date" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#333', maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            <FiCalendar />
-            <span>{currentDate || 'No date selected'}</span>
-          </div>
+          {/* Date selector button */}
+          <button
+            onClick={() => setShowDatePicker(!showDatePicker)}
+            className="date-selector-btn"
+            style={{ 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: 6, 
+              fontSize: 12, 
+              color: 'var(--text-primary)', 
+              padding: '6px 10px',
+              background: 'var(--card-bg)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 4,
+              cursor: 'pointer',
+              minWidth: 140,
+              justifyContent: 'space-between'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <FiCalendar />
+              <span>
+                {selectedDates.length === 1 
+                  ? selectedDates[0] 
+                  : `${selectedDates.length} months selected`}
+              </span>
+            </div>
+            <FiChevronDown style={{ fontSize: 14 }} />
+          </button>
           
+          {/* Next button (only enabled in single-month mode) */}
           <button 
             onClick={goToNextDate}
-            disabled={currentDateIndex <= 0}
+            disabled={isMultiMonth || availableDates.indexOf(selectedDates[0]) <= 0}
             className="date-nav-btn"
             style={{ padding: 4, width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+            title={isMultiMonth ? 'Navigation disabled in multi-month mode' : 'Next month'}
           >
             <FiChevronRight />
           </button>
+          
+          {/* Date picker dropdown */}
+          {showDatePicker && (
+            <div 
+              className="date-picker-dropdown"
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                marginTop: 4,
+                background: 'var(--card-bg)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 8,
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                zIndex: 1000,
+                minWidth: 240,
+                maxHeight: 360,
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+            >
+              {/* Header with quick actions */}
+              <div style={{ 
+                padding: '10px 12px', 
+                borderBottom: '1px solid var(--border-color)',
+                display: 'flex',
+                gap: 8,
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Select Months
+                </span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    onClick={selectAllDates}
+                    style={{
+                      fontSize: 11,
+                      padding: '4px 8px',
+                      background: 'var(--button-secondary-bg)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      color: 'var(--text-secondary)'
+                    }}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={selectSingleDate}
+                    style={{
+                      fontSize: 11,
+                      padding: '4px 8px',
+                      background: 'var(--button-secondary-bg)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      color: 'var(--text-secondary)'
+                    }}
+                  >
+                    Latest
+                  </button>
+                </div>
+              </div>
+              
+              {/* Info banner when multiple selected */}
+              {isMultiMonth && (
+                <div style={{
+                  padding: '8px 12px',
+                  background: 'rgba(0, 85, 140, 0.1)',
+                  borderBottom: '1px solid var(--border-color)',
+                  fontSize: 11,
+                  color: 'var(--text-secondary)'
+                }}>
+                  📊 Showing Current Month, Past 12 Mo, and YTD only
+                </div>
+              )}
+              
+              {/* Date list */}
+              <div style={{ 
+                overflowY: 'auto', 
+                maxHeight: 260,
+                padding: '8px 0'
+              }}>
+                {availableDates.map((date) => {
+                  const isSelected = selectedDates.includes(date);
+                  return (
+                    <div
+                      key={date}
+                      onClick={() => toggleDateSelection(date)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '8px 12px',
+                        cursor: 'pointer',
+                        background: isSelected ? 'rgba(0, 85, 140, 0.1)' : 'transparent',
+                        transition: 'background 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = isSelected ? 'rgba(0, 85, 140, 0.15)' : 'var(--hover-bg)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = isSelected ? 'rgba(0, 85, 140, 0.1)' : 'transparent'}
+                    >
+                      <div style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 4,
+                        border: isSelected ? '2px solid #00558c' : '2px solid var(--border-color)',
+                        background: isSelected ? '#00558c' : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        {isSelected && <FiCheck style={{ color: 'white', fontSize: 12 }} />}
+                      </div>
+                      <span style={{ 
+                        fontSize: 13, 
+                        color: 'var(--text-primary)',
+                        fontWeight: isSelected ? 500 : 400
+                      }}>
+                        {date}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* Footer */}
+              <div style={{ 
+                padding: '10px 12px', 
+                borderTop: '1px solid var(--border-color)',
+                display: 'flex',
+                justifyContent: 'flex-end'
+              }}>
+                <button
+                  onClick={() => setShowDatePicker(false)}
+                  style={{
+                    fontSize: 12,
+                    padding: '6px 14px',
+                    background: '#00558c',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    color: 'white',
+                    fontWeight: 500
+                  }}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
         </div>
         
         {/* Search Bar */}
@@ -1724,7 +2144,7 @@ const Pnp = () => {
         {/* Performance Tabs - only show for Admin or teamRole = 'app' */}
         {shouldShowTabs && (
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            {tabs.map(tab => (
+            {TABS_CONFIG.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
@@ -1769,7 +2189,7 @@ const Pnp = () => {
               opacity: isPreparedForExport ? 0.6 : 1,
               fontSize: '16px'
             }}
-            title={`Export ${shouldShowTabs ? 'all tabs' : 'data'} to Excel${searchTerm ? ' (filtered)' : ''}`}
+            title={`Export ${isMultiMonth ? `${selectedDates.length} months` : (shouldShowTabs ? 'all tabs' : 'data')} to Excel${searchTerm ? ' (filtered)' : ''}`}
           >
             <FiDownload className={isPreparedForExport ? 'spinning' : ''} />
           </button>
@@ -1782,7 +2202,7 @@ const Pnp = () => {
           <div className="spinner"></div>
           <p>Loading table data...</p>
         </div>
-      ) : (
+      ) : columns && Array.isArray(columns) && columns.length > 0 && displayData && Array.isArray(displayData) ? (
         <DataTable
           columns={columns}
           data={displayData}
@@ -1793,13 +2213,21 @@ const Pnp = () => {
           stickyHeader={true}
           entityName="PnP record"
         />
+      ) : (
+        <div className="error-message">
+          <p>Unable to display table: Invalid columns or data</p>
+          <p style={{ fontSize: 12, color: '#666' }}>
+            Columns: {columns ? `${columns.length} defined` : 'undefined'}, 
+            Data: {displayData ? `${displayData.length} rows` : 'undefined'}
+          </p>
+        </div>
       )}
 
       {!loading && displayData.length === 0 && pnpData.length > 0 && (
         <div className="no-data-message">
           <p>
             {shouldShowTabs 
-              ? `No records match the "${tabs.find(t => t.id === activeTab)?.label}" filter criteria`
+              ? `No records match the "${TABS_CONFIG.find(t => t.id === activeTab)?.label}" filter criteria`
               : 'No records match your search criteria'
             }
           </p>
@@ -1808,7 +2236,7 @@ const Pnp = () => {
 
       {!loading && pnpData.length === 0 && (
         <div className="no-data-message">
-          <p>No P&P data available for {currentDate}</p>
+          <p>No P&P data available for {isMultiMonth ? `${selectedDates.length} selected months` : currentDate}</p>
         </div>
       )}
     </div>

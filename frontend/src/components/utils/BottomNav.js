@@ -6,9 +6,12 @@ import { useTeamStyles } from "../../context/TeamStyleContext";
 import { useLicenseWarning } from "../../context/LicenseWarningContext";
 import { AuthContext } from "../../context/AuthContext";
 import { useNotificationContext } from '../../context/NotificationContext';
-import { FiSettings, FiChevronUp, FiActivity, FiAward, FiList, FiPercent, FiCheckCircle, FiStar, FiTarget, FiFileText, FiMessageSquare, FiUser, FiPenTool, FiUsers, FiBell, FiMail, FiClipboard, FiBarChart2 } from "react-icons/fi";
+import { FiSettings, FiChevronUp, FiActivity, FiAward, FiList, FiPercent, FiCheckCircle, FiStar, FiTarget, FiFileText, FiMessageSquare, FiUser, FiPenTool, FiUsers, FiBell, FiMail, FiClipboard, FiBarChart2, FiSearch } from "react-icons/fi";
 import Logo from "../Layout/Logo";
 import ContextMenuPortal from "./ContextMenuPortal";
+import GlobalSearch from "./GlobalSearch";
+import RightDetails from "./RightDetails";
+import ThemeContext from "../../context/ThemeContext";
 import "./BottomNav.css";
 
 const BottomNav = () => {
@@ -18,12 +21,16 @@ const BottomNav = () => {
   const { hasWarning: licenseWarning } = useLicenseWarning();
   const { user, hasPermission } = useContext(AuthContext);
   const { unreadCount } = useNotificationContext();
+  const { theme, toggleTheme } = useContext(ThemeContext);
   
   // Submenu state
   const [activeSubmenu, setActiveSubmenu] = useState(null);
   const [submenuPosition, setSubmenuPosition] = useState({ left: 0, top: 0 });
   const bottomNavRef = useRef(null);
   const submenuRef = useRef(null);
+  
+  // Agent profile state
+  const [agentProfileData, setAgentProfileData] = useState(null);
   
   // Check if user is admin
   const isAdmin = user?.isAdmin || false;
@@ -35,20 +42,27 @@ const BottomNav = () => {
   const shouldShowLicenseWarning = teamRole !== "app" ? licenseWarning : false;
   
   // Get nav items with warning status
-  const allNavItems = getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole, user?.userId);
+  const allNavItems = getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole, user?.userId, user?.lagnname, user?.clname);
 
   // Helper function to get production submenu items
   const getProductionItems = () => {
     const isAppAdmin = user?.Role === 'Admin' && user?.teamRole === 'app';
     const hideDailyActivity = isAppAdmin;
     
+    // Hide Daily Activity, Goals, and Verification for SGA users who are not Admin
+    // Use case-insensitive check for clname
+    const isSGANonAdmin = String(user?.clname || '').toUpperCase() === 'SGA' && user?.Role !== 'Admin';
+    const shouldHideDailyActivity = hideDailyActivity || isSGANonAdmin;
+    const shouldHideGoals = user?.teamRole === 'app' || isSGANonAdmin;
+    const shouldHideVerification = isSGANonAdmin;
+    
     let items = [
-      ...(hideDailyActivity ? [] : [{ id: 'daily-activity', name: 'Daily Activity', path: '/production?section=daily-activity', icon: <FiActivity /> }]),
-      { id: 'goals', name: 'Goals', path: '/production?section=goals', icon: <FiTarget /> },
+      ...(shouldHideDailyActivity ? [] : [{ id: 'daily-activity', name: 'Daily Activity', path: '/production?section=daily-activity', icon: <FiActivity /> }]),
+      ...(shouldHideGoals ? [] : [{ id: 'goals', name: 'Goals', path: '/production?section=goals', icon: <FiTarget /> }]),
       { id: 'leaderboard', name: 'Leaderboard', path: '/production?section=leaderboard', icon: <FiAward /> },
       ...(hideDailyActivity ? [{ id: 'release', name: 'Release', path: '/production?section=release', icon: <FiList /> }] : []),
       { id: 'scorecard', name: 'Scorecard', path: '/production?section=scorecard', icon: <FiPercent /> },
-      { id: 'verification', name: 'Verification', path: '/production?section=verification', icon: <FiCheckCircle /> },
+      ...(shouldHideVerification ? [] : [{ id: 'verification', name: 'Verification', path: '/production?section=verification', icon: <FiCheckCircle /> }]),
       { id: 'vips', name: 'Codes and VIPs', path: '/production?section=vips', icon: <FiStar /> },
     ];
     
@@ -92,14 +106,13 @@ const BottomNav = () => {
       { id: 'hierarchy', name: 'Hierarchy', path: '/utilities?section=hierarchy', icon: <FiUsers /> },
       { id: 'notifications', name: 'Notifications', path: '/utilities?section=notifications', icon: <FiBell /> },
       { id: 'pnp', name: 'P&P', path: '/utilities?section=pnp', icon: <FiBarChart2 /> },
-      { id: 'licensing', name: 'Licensing', path: isAppAdmin ? '/utilities?section=licensing' : '/resources?active=licensing', icon: <FiFileText /> },
-      { id: 'leads', name: 'Leads', path: isAppAdmin ? '/utilities?section=leads' : '/resources?active=leads', icon: <FiMail /> },
+      // Licensing and Leads removed from utilities - they're now only in Resources
     ];
     
     // Filter items based on user type
     const filteredItems = isAppAdmin 
-      ? allItems.filter(item => !['account'].includes(item.id)) // App admins get pnp, licensing and leads in utilities
-      : allItems.filter(item => !['licensing', 'leads'].includes(item.id)); // Non-app users see account, hierarchy, notifications, and pnp
+      ? allItems.filter(item => !['account'].includes(item.id)) // App admins get pnp, hierarchy, and notifications in utilities
+      : allItems; // Non-app users see account, hierarchy, notifications, and pnp
     
     return filteredItems;
   };
@@ -232,9 +245,21 @@ const BottomNav = () => {
     return false;
   };
   
+  // Calculate active tab index for sliding indicator
+  const allTabs = [...navItems, settingsItem].filter(Boolean);
+  const activeIndex = allTabs.findIndex(item => isItemActive(item));
+  
   return (
-    <div className="bottom-nav" ref={bottomNavRef}>
-      {/* Submenu popup positioned above clicked button */}
+    <>
+      <div 
+        className="bottom-nav" 
+        ref={bottomNavRef}
+        style={{
+          '--tab-count': allTabs.length,
+          '--active-tab': activeIndex >= 0 ? activeIndex : 0
+        }}
+      >
+        {/* Submenu popup positioned above clicked button */}
       {activeSubmenu && (
         <ContextMenuPortal>
           <div 
@@ -308,7 +333,22 @@ const BottomNav = () => {
           </div>
         );
       })()}
-    </div>
+      </div>
+      
+      {/* Floating Search Button - Mobile Only */}
+      <div className="bottom-nav-search-fab">
+        <GlobalSearch theme={theme} toggleTheme={toggleTheme} onOpenAgentProfile={setAgentProfileData} />
+      </div>
+
+      {/* Agent Profile Panel */}
+      {agentProfileData && (
+        <RightDetails
+          data={agentProfileData}
+          fromPage="Agent"
+          onClose={() => setAgentProfileData(null)}
+        />
+      )}
+    </>
   );
 };
 

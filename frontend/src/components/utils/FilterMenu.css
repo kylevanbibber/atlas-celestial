@@ -1,8 +1,27 @@
+.filter-menu {
+  position: relative;
+}
+
 .filter-menu select {
-    padding: 0.5rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    outline: none;
-    cursor: pointer;
-  }
+  padding: 8px 16px;
+  border: 1px solid var(--border-color, #dee2e6);
+  border-radius: 6px;
+  background: white;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 200px;
+}
+
+.filter-menu select:hover {
+  border-color: var(--primary-color, #00558c);
+}
+
+.filter-menu select:focus {
+  border-color: var(--primary-color, #00558c);
+  box-shadow: 0 0 0 3px rgba(0, 85, 140, 0.1);
+}
   

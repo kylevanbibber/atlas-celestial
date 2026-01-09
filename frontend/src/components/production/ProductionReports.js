@@ -29,6 +29,7 @@ import { FaHandshake } from 'react-icons/fa';
 import './ProductionReports.css';
 import './ProductionReportsAdmin.css';
 import ReportVersionModal from './ReportVersionModal';
+import FilterMenu from '../common/FilterMenu';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api';
 
@@ -1151,7 +1152,12 @@ const ProductionReports = () => {
       
       const componentMap = {
         'RefReport': RefReport,
-        'MoreReport': MoreReport
+        'MoreReport': MoreReport,
+        'PotentialVIPsReport': require('./reports').PotentialVIPsReport,
+        'PendingUsersReport': require('./reports').PendingUsersReport,
+        'CodesReport': require('./reports').CodesReport,
+        'SAGACodesReport': require('./reports').SAGACodesReport,
+        'CodePotentialReport': require('./reports').CodePotentialReport
         // Add more components here as they are created
         // 'SalesReport': SalesReport,
         // 'ProductionReport': ProductionReport
@@ -1520,34 +1526,113 @@ const ProductionReports = () => {
           </div>
         </div>
 
-        <div className="reports-filters">
-          <div className="category-filters">
-            {reportCategories.map(category => (
-              <button
-                key={category.id}
-                className={`category-filter ${activeCategory === category.id ? 'active' : ''}`}
-                onClick={() => setActiveCategory(category.id)}
-              >
-                {category.icon}
-                {category.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <div className="reports-filters-actions">
+          {/* Filter Menu */}
+          <FilterMenu
+            activeFilters={{}}
+            onFilterToggle={() => {}}
+            onStatusFilterToggle={() => {}}
+            onToggleAllRoles={() => {}}
+            onResetFilters={() => {
+              setActiveCategory('all');
+            }}
+            menuType="expandable"
+            buttonLabel={
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FiFilter />
+                <span>Filters</span>
+                {activeCategory !== 'all' && (
+                  <span style={{ 
+                    background: 'var(--button-primary-bg)', 
+                    color: 'white',
+                    borderRadius: '50%',
+                    width: '18px',
+                    height: '18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '11px',
+                    fontWeight: 'bold'
+                  }}>1</span>
+                )}
+              </div>
+            }
+            position="bottom-right"
+            customContent={
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '280px', padding: '8px' }}>
+                <label style={{ 
+                  fontWeight: '500', 
+                  marginBottom: '4px', 
+                  display: 'block', 
+                  color: 'var(--text-primary)',
+                  fontSize: '0.85rem'
+                }}>
+                  Category
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {reportCategories.map(category => (
+                    <button
+                      key={category.id}
+                      className={`filter-menu-item ${activeCategory === category.id ? 'active' : ''}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '10px 12px',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        transition: 'all 0.2s ease',
+                        backgroundColor: activeCategory === category.id ? 'var(--button-primary-bg)' : 'transparent',
+                        color: activeCategory === category.id ? 'white' : 'var(--text-primary)',
+                        fontWeight: activeCategory === category.id ? '500' : '400',
+                        textAlign: 'left',
+                        width: '100%'
+                      }}
+                      onClick={() => {
+                        setActiveCategory(category.id);
+                      }}
+                      onMouseEnter={(e) => {
+                        if (activeCategory !== category.id) {
+                          e.target.style.backgroundColor = 'var(--sidebar-hover)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (activeCategory !== category.id) {
+                          e.target.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      <span style={{ fontSize: '16px', display: 'flex', alignItems: 'center' }}>
+                        {category.icon}
+                      </span>
+                      <span style={{ flex: 1 }}>{category.label}</span>
+                      {activeCategory === category.id && <span>✓</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            }
+            customContentOnly={true}
+          />
 
-        <div className="view-controls">
-          <button
-            className={`view-toggle ${viewMode === 'grid' ? 'active' : ''}`}
-            onClick={() => setViewMode('grid')}
-          >
-            <FiGrid />
-          </button>
-          <button
-            className={`view-toggle ${viewMode === 'list' ? 'active' : ''}`}
-            onClick={() => setViewMode('list')}
-          >
-            <FiList />
-          </button>
+          <div className="view-controls">
+            <button
+              className={`view-toggle ${viewMode === 'grid' ? 'active' : ''}`}
+              onClick={() => setViewMode('grid')}
+              title="Grid View"
+            >
+              <FiGrid />
+            </button>
+            <button
+              className={`view-toggle ${viewMode === 'list' ? 'active' : ''}`}
+              onClick={() => setViewMode('list')}
+              title="List View"
+            >
+              <FiList />
+            </button>
+          </div>
         </div>
       </div>
 

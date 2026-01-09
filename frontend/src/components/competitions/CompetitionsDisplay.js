@@ -9,7 +9,7 @@ const CompetitionsDisplay = ({ user, className = '' }) => {
   if (loading) {
     return (
       <div className={`competitions-loading ${className}`}>
-        <div className="loading-spinner">Loading competitions...</div>
+        <div className="loading-spinner"></div>
       </div>
     );
   }

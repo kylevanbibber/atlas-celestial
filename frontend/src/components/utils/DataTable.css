@@ -155,26 +155,31 @@
   
   .table select {
     width: 100%;
-    font-size: inherit;
-    font-family: inherit;
-    border: 1px solid var(--border-color);
-    padding: 2px 6px;
-    border-radius: 4px;
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
-    box-sizing: border-box;
     font-size: 12px;
+    font-family: inherit;
+    padding: 4px 8px;
+    border-radius: 4px;
+    box-sizing: border-box;
+    cursor: pointer;
+    -webkit-appearance: menulist;
+    -moz-appearance: menulist;
+    appearance: menulist;
   }
   
   .table select:focus {
-    border-color: var(--hover-color);
     outline: none;
-    box-shadow: 0 0 5px var(--shadow-color);
+    box-shadow: 0 0 0 2px rgba(0, 85, 140, 0.3);
   }
+  
   .table select option {
-    background-color: var(--bg-primary) !important;
-    color: var(--text-primary) !important;
-    font-size: 11px;
+    padding: 8px;
+    font-size: 13px;
+  }
+  
+  /* Ensure td with select doesn't clip the dropdown */
+  .table td select {
+    position: relative;
+    z-index: 1;
   }
   .chip-container {
     display: flex;

@@ -1,18 +1,43 @@
 /* AllotmentTab specific styles */
 
-/* Grey row styling for inactive managers */
-.inactive-manager-row {
+/* Spinner animation for loading overlay */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Grey row styling for inactive agents (either Active='n' or managerActive='n') */
+.inactive-agent-row {
   background-color: #f5f5f5 !important;
   color: #666666 !important;
   opacity: 0.8;
 }
 
 /* Ensure inactive rows maintain grey styling even on hover */
-.inactive-manager-row:hover {
+.inactive-agent-row:hover {
   background-color: #eeeeee !important;
 }
 
 /* Style text in inactive rows */
+.inactive-agent-row td {
+  color: #666666 !important;
+}
+
+/* Legacy class name for backwards compatibility */
+.inactive-manager-row {
+  background-color: #f5f5f5 !important;
+  color: #666666 !important;
+  opacity: 0.8;
+}
+
+.inactive-manager-row:hover {
+  background-color: #eeeeee !important;
+}
+
 .inactive-manager-row td {
   color: #666666 !important;
 }

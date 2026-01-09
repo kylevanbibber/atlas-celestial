@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import DashboardSection from './DashboardSection';
 import Leaderboard from '../utils/Leaderboard';
 import CompetitionsDisplay from '../competitions/CompetitionsDisplay';
+import RightDetails from '../utils/RightDetails';
 import { getDashboardConfig, DASHBOARD_SECTIONS, CARD_TYPES } from '../../config/dashboardConfig';
 import { useDashboardData, getPreviousMonthRange, getCurrentWeekRange, getCurrentMonthRange, getYearToDateRange } from '../../hooks/useDashboardData';
 import '../../pages/Dashboard.css';
@@ -21,6 +22,10 @@ const UnifiedDashboard = ({ userRole, user }) => {
   const [gaViewMode, setGaViewMode] = useState('team'); // 'personal' or 'team' for GA users
   const [mgaViewMode, setMgaViewMode] = useState('team'); // 'personal' or 'team' for MGA users
   const [rgaViewMode, setRgaViewMode] = useState('mga'); // 'personal', 'mga', or 'rga' for RGA users
+  
+  // RightDetails state for agent profile
+  const [showRightDetails, setShowRightDetails] = useState(false);
+  const [rightDetailsData, setRightDetailsData] = useState(null);
   
   // Get configuration for this user role
   const config = getDashboardConfig(userRole);
@@ -97,16 +102,8 @@ const UnifiedDashboard = ({ userRole, user }) => {
     );
   }
 
-  // Show loading state
-  if (loading) {
-    return (
-      <div className="route-loading" role="alert" aria-busy="true">
-        <div className="spinner"></div>
-        <p>Loading dashboard data...</p>
-      </div>
-    );
-  }
-
+  // Note: Removed global loading state - components now render immediately with individual loading states
+  
   // Show error state
   if (error) {
     return (
@@ -136,7 +133,10 @@ const UnifiedDashboard = ({ userRole, user }) => {
           ...codesAndHiresMetrics,
           // YTD Ref Sales data
           ytdRefSales: ytdRefSalesData.ytdRefSales || 0,
-          previousYearYtdRefSales: ytdRefSalesData.previousYearYtdRefSales || 0
+          previousYearYtdRefSales: ytdRefSalesData.previousYearYtdRefSales || 0,
+          // Loading states
+          loading: loading,
+          dailyActivityLoading: dailyActivityLoading
         };
         
         // For AGT users or SA users (any mode), also include Daily Activity data for YTD
@@ -168,7 +168,10 @@ const UnifiedDashboard = ({ userRole, user }) => {
           ...codesAndHiresMetrics,
           // Last Month Ref Sales data
           totalRefSales: refSalesData.totalRefSales || 0,
-          previousMonthRefSales: refSalesData.previousMonthRefSales || 0
+          previousMonthRefSales: refSalesData.previousMonthRefSales || 0,
+          // Loading states
+          loading: loading,
+          dailyActivityLoading: dailyActivityLoading
         };
         
         // For AGT users or SA users (any mode), also include Daily Activity data for last month
@@ -205,9 +208,10 @@ const UnifiedDashboard = ({ userRole, user }) => {
             // Monthly ALP data (from MTD Recap)
             monthlyAlp: monthlyAlpSumData.monthlyAlp || 0,
             comparisonAlp: monthlyAlpSumData.comparisonAlp || 0,
-            // Monthly date range
+            // Monthly date range AND maxReportDate for "as of" formatting
             monthStart: monthlyAlpSumData.monthStart,
             monthEnd: monthlyAlpSumData.monthEnd,
+            maxReportDate: monthlyAlpSumData.maxReportDate, // IMPORTANT: Used for "as of [date]" display
             // Monthly hires data (SGA only)
             monthlyHires: monthlyHiresSumData.monthlyHires || 0,
             hiresMonthStart: monthlyHiresSumData.monthStart,
@@ -226,10 +230,11 @@ const UnifiedDashboard = ({ userRole, user }) => {
             // Current month hires and VIPs data (MGA/RGA only)
             monthlyHires: currentMonthHiresData.monthlyHires || monthlyHiresSumData.monthlyHires || 0,
             monthlyVips: currentMonthVipsData.monthlyVips || 0,
-            // Include loading state for conditional rendering
-            dailyActivityLoading,
-            currentMonthHiresLoading,
-            currentMonthVipsLoading
+            // Include loading states for conditional rendering
+            loading: loading,
+            dailyActivityLoading: dailyActivityLoading,
+            currentMonthHiresLoading: currentMonthHiresLoading,
+            currentMonthVipsLoading: currentMonthVipsLoading
           };
 
           console.log(`📊 [Dashboard] Monthly activity section data for ${userRole}:`, {
@@ -319,8 +324,9 @@ const UnifiedDashboard = ({ userRole, user }) => {
             // Current month ref sales data
             totalRefSales: currentMonthRefSalesData.totalRefSales || 0,
             previousMonthRefSales: currentMonthRefSalesData.previousMonthRefSales || 0,
-            // Include loading state for conditional rendering
-            dailyActivityLoading
+            // Include loading states for conditional rendering
+            loading: loading,
+            dailyActivityLoading: dailyActivityLoading
           };
           
           console.log(`📊 [Dashboard] Weekly activity section data for ${userRole}:`, {
@@ -377,6 +383,31 @@ const UnifiedDashboard = ({ userRole, user }) => {
       return value.toLocaleString();
     }
     return value || '0';
+  };
+
+  /**
+   * Handle profile picture click - open agent profile in RightDetails
+   */
+  const handleProfileClick = (item) => {
+    // Create agent profile data from leaderboard item
+    const agentData = {
+      __isAgentProfile: true,
+      id: item.user_id || item.userId || item.id,
+      lagnname: item.name,
+      displayName: item.name,
+      clname: item.clname,
+      profpic: item.profile_picture,
+      managerActive: item.Active || item.managerActive || 'y',
+      esid: item.esid,
+      licenses: item.licenses || [],
+      sa: item.sa,
+      ga: item.ga,
+      mga: item.mga,
+      rga: item.rga
+    };
+    
+    setRightDetailsData(agentData);
+    setShowRightDetails(true);
   };
 
   /**
@@ -1126,12 +1157,22 @@ const UnifiedDashboard = ({ userRole, user }) => {
                   className="dashboard-leaderboard"
                   currentUser={user}
                   showScrollButtons={true}
+                  onProfileClick={handleProfileClick}
                 />
               </div>
             </div>
           </div>
         )}
       </div>
+      
+      {/* Agent Profile Right Details */}
+      {showRightDetails && rightDetailsData && (
+        <RightDetails
+          data={rightDetailsData}
+          isOpen={showRightDetails}
+          onClose={() => setShowRightDetails(false)}
+        />
+      )}
     </div>
   );
 };

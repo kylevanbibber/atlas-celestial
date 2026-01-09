@@ -66,8 +66,21 @@ const AccountUtilities = () => {
   const [zoomError, setZoomError] = useState('');
   const [zoomSuccess, setZoomSuccess] = useState('');
   
+  // SMS credits state
+  const [smsCredits, setSmsCredits] = useState(0);
+  const [smsCreditsLoading, setSmsCreditsLoading] = useState(true);
+  const [smsCreditsError, setSmsCreditsError] = useState('');
+  const [smsCreditsSummary, setSmsCreditsSummary] = useState({
+    totalPurchased: 0,
+    totalDebited: 0
+  });
+  const [smsPurchaseAmount, setSmsPurchaseAmount] = useState(100);
+  const [smsPurchaseSubmitting, setSmsPurchaseSubmitting] = useState(false);
+  const [smsPurchaseSuccess, setSmsPurchaseSuccess] = useState('');
+  
   // Tab state for Integrations section
-  const [activeIntegrationTab, setActiveIntegrationTab] = useState('calendly');
+  const [activeIntegrationTab, setActiveIntegrationTab] = useState('discord');
+  const [integrationsCollapsed, setIntegrationsCollapsed] = useState(true);
   
   // Tab state for Zoom sub-tabs
   const [activeZoomTab, setActiveZoomTab] = useState('account');
@@ -175,6 +188,9 @@ const AccountUtilities = () => {
       
       // Fetch Zoom status
       fetchZoomStatus();
+
+      // Fetch SMS credits
+      fetchSmsCredits();
     }
   }, [user, authLoading]);
   
@@ -196,6 +212,25 @@ const AccountUtilities = () => {
       console.error('Error fetching Calendly status:', error);
     } finally {
       setCalendlyLoading(false);
+    }
+  };
+
+  // Fetch SMS credits/balance
+  const fetchSmsCredits = async () => {
+    try {
+      setSmsCreditsLoading(true);
+      setSmsCreditsError('');
+      const response = await api.get('/account/sms/credits');
+
+      if (response.data?.success) {
+        setSmsCredits(response.data.balance ?? 0);
+        setSmsCreditsSummary(response.data.summary || { totalPurchased: 0, totalDebited: 0 });
+      }
+    } catch (err) {
+      console.error('Error fetching SMS credits:', err);
+      setSmsCreditsError('Unable to load texting credits right now.');
+    } finally {
+      setSmsCreditsLoading(false);
     }
   };
   
@@ -310,6 +345,37 @@ const AccountUtilities = () => {
       console.error('Error fetching Zoom status:', error);
     } finally {
       setZoomLoading(false);
+    }
+  };
+
+  // Handle purchasing SMS credits
+  const handlePurchaseSmsCredits = async (e) => {
+    e.preventDefault();
+    setSmsCreditsError('');
+    setSmsPurchaseSuccess('');
+
+    const amount = parseInt(smsPurchaseAmount, 10);
+    if (!amount || Number.isNaN(amount) || amount <= 0) {
+      setSmsCreditsError('Please enter a positive number of credits.');
+      return;
+    }
+
+    setSmsPurchaseSubmitting(true);
+    try {
+      const response = await api.post('/account/sms/credits/purchase', { amount });
+
+      if (response.data?.success) {
+        setSmsPurchaseSuccess(response.data.message || 'Credits added successfully.');
+        setSmsCredits(response.data.balance ?? amount);
+        await fetchSmsCredits();
+      } else {
+        setSmsCreditsError(response.data?.message || 'Failed to add credits.');
+      }
+    } catch (err) {
+      console.error('Error purchasing SMS credits:', err);
+      setSmsCreditsError('An error occurred while adding credits.');
+    } finally {
+      setSmsPurchaseSubmitting(false);
     }
   };
   
@@ -907,322 +973,49 @@ const AccountUtilities = () => {
             )}
           </div>
           
-          {/* Integrations Section */}
+          {/* Integrations Section (collapsed by default with expand/collapse control) */}
           <div className="settings-card">
-            <h2 className="settings-card-title">Integrations</h2>
-            <p className="settings-help-text" style={{ marginBottom: '20px' }}>
-              Connect external services like Calendly, Zoom, and Discord to enhance your experience.
-            </p>
-            
-            <Tabs
-              tabs={[
-                { key: 'calendly', label: '📅 Calendly' },
-                { key: 'zoom', label: '📹 Zoom' },
-                { key: 'discord', label: <><FaDiscord style={{ marginRight: '4px' }} /> Discord</> }
-              ]}
-              activeTab={activeIntegrationTab}
-              onTabChange={setActiveIntegrationTab}
-              className="integration-tabs"
-            >
-              {/* Calendly Tab Content */}
-              {activeIntegrationTab === 'calendly' && (
-                <div style={{ paddingTop: '20px', borderTop: '1px solid var(--border-color)' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>Calendly Integration</h3>
-            
-            {calendlyError && <div className="settings-alert settings-alert-error">{calendlyError}</div>}
-            {calendlySuccess && <div className="settings-alert settings-alert-success">{calendlySuccess}</div>}
-            
-            {calendlyLoading ? (
-              <div style={{ padding: '20px', textAlign: 'center' }}>
-                <div className="spinner"></div>
-                <p>Loading Calendly status...</p>
+            <div className="settings-card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <h2 className="settings-card-title" style={{ marginBottom: 4 }}>Integrations</h2>
+                <p className="settings-help-text" style={{ marginBottom: 0 }}>
+                  Connect external services like Discord to enhance your experience.
+                </p>
               </div>
-            ) : calendlyStatus.isLinked ? (
-              /* Linked State */
-              <div className="calendly-linked-state">
-                <div className="calendly-info">
-                  <div className="calendly-status-badge" style={{ 
-                    background: '#10b981', 
-                    color: 'white', 
-                    padding: '4px 12px', 
-                    borderRadius: '12px', 
-                    display: 'inline-block',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    marginBottom: '12px'
-                  }}>
-                    ✓ Connected
-                  </div>
-                  
-                  <div className="settings-row" style={{ marginBottom: '12px' }}>
-                    <label>Username</label>
-                    <input 
-                      type="text" 
-                      value={calendlyStatus.username || ''}
-                      disabled
-                      style={{ background: 'var(--secondary-background, #f5f7fa)' }}
-                    />
-                  </div>
-                  
-                  {calendlyStatus.linkUrl && (
-                    <div className="settings-row" style={{ marginBottom: '12px' }}>
-                      <label>Scheduling Link</label>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <input 
-                          type="text" 
-                          value={calendlyStatus.linkUrl}
-                          disabled
-                          style={{ flex: 1, background: 'var(--secondary-background, #f5f7fa)' }}
-                        />
-                        <a 
-                          href={calendlyStatus.linkUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="settings-button"
-                          style={{ 
-                            padding: '8px 16px',
-                            textDecoration: 'none',
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          Open Link
-                        </a>
-                      </div>
+              <button
+                type="button"
+                className="settings-icon-button"
+                onClick={() => setIntegrationsCollapsed(!integrationsCollapsed)}
+                aria-expanded={!integrationsCollapsed}
+                style={{ marginLeft: '12px' }}
+              >
+                {integrationsCollapsed ? 'Expand' : 'Collapse'}
+              </button>
+            </div>
+
+            {!integrationsCollapsed && (
+              <div style={{ marginTop: '16px' }}>
+                <Tabs
+                  tabs={[
+                    { key: 'discord', label: <><FaDiscord style={{ marginRight: '4px' }} /> Discord</> }
+                  ]}
+                  activeTab={activeIntegrationTab}
+                  onTabChange={setActiveIntegrationTab}
+                  className="integration-tabs"
+                >
+                  {/* Discord Tab Content */}
+                  {activeIntegrationTab === 'discord' && (
+                    <div style={{ paddingTop: '20px', borderTop: '1px solid var(--border-color)' }}>
+                      <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>
+                        <FaDiscord style={{ marginRight: '8px', color: '#5865f2', verticalAlign: 'middle' }} />
+                        Discord Integration
+                      </h3>
+                      <DiscordUtilities />
                     </div>
                   )}
-                  
-                  {calendlyStatus.linkedAt && (
-                    <p className="settings-help-text" style={{ marginBottom: '16px' }}>
-                      Connected on {new Date(calendlyStatus.linkedAt).toLocaleDateString()}
-                    </p>
-                  )}
-                </div>
-                
-                <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-                  <button 
-                    onClick={handleRefreshCalendly}
-                    className="settings-button"
-                    disabled={calendlySubmitting}
-                    style={{ flex: 1 }}
-                  >
-                    {calendlySubmitting ? (
-                      <>
-                        <div className="spinner button-spinner"></div>
-                        <span style={{ marginLeft: '8px' }}>Refreshing...</span>
-                      </>
-                    ) : (
-                      '🔄 Refresh Info'
-                    )}
-                  </button>
-                  
-                  <button 
-                    onClick={handleUnlinkCalendly}
-                    className="settings-button settings-button-secondary"
-                    disabled={calendlySubmitting}
-                    style={{ flex: 1 }}
-                  >
-                    {calendlySubmitting ? (
-                      <>
-                        <div className="spinner button-spinner"></div>
-                        <span style={{ marginLeft: '8px' }}>Unlinking...</span>
-                      </>
-                    ) : (
-                      'Unlink Account'
-                    )}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              /* Not Linked State */
-              <div className="calendly-not-linked-state" style={{ textAlign: 'center', padding: '40px 20px' }}>
-                <p className="settings-help-text" style={{ marginBottom: '20px' }}>
-                  No Calendly account linked yet. Connect your account to enable scheduling features.
-                </p>
-                <button 
-                  onClick={handleLinkCalendlyOAuth}
-                  className="settings-button"
-                  disabled={calendlySubmitting}
-                >
-                  {calendlySubmitting ? (
-                    <>
-                      <div className="spinner button-spinner"></div>
-                      <span style={{ marginLeft: '8px' }}>Connecting...</span>
-                    </>
-                  ) : (
-                    'Connect with Calendly'
-                  )}
-                </button>
+                </Tabs>
               </div>
             )}
-                </div>
-              )}
-              
-              {/* Zoom Tab Content */}
-              {activeIntegrationTab === 'zoom' && (
-                <div style={{ paddingTop: '20px', borderTop: '1px solid var(--border-color)' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>Zoom Integration</h3>
-                  
-                  {zoomError && <div className="settings-alert settings-alert-error">{zoomError}</div>}
-                  {zoomSuccess && <div className="settings-alert settings-alert-success">{zoomSuccess}</div>}
-                  
-                  {zoomLoading ? (
-                    <div style={{ padding: '20px', textAlign: 'center' }}>
-                      <div className="spinner"></div>
-                      <p>Loading Zoom status...</p>
-                    </div>
-                  ) : !zoomStatus.isLinked ? (
-                    /* Not Linked State */
-                    <div className="zoom-not-linked-state" style={{ textAlign: 'center', padding: '40px 20px' }}>
-                      <p className="settings-help-text" style={{ marginBottom: '20px' }}>
-                        No Zoom account linked yet. Connect your account to enable video meeting features.
-                      </p>
-                      <button 
-                        onClick={handleLinkZoomOAuth}
-                        className="settings-button"
-                        disabled={zoomSubmitting}
-                      >
-                        {zoomSubmitting ? (
-                          <>
-                            <div className="spinner button-spinner"></div>
-                            <span style={{ marginLeft: '8px' }}>Connecting...</span>
-                          </>
-                        ) : (
-                          'Connect with Zoom'
-                        )}
-                      </button>
-                    </div>
-                  ) : (
-                    /* Linked State - Show Tabs */
-                    <>
-                      <Tabs
-                        tabs={[
-                          { key: 'account', label: '⚙️ Account Settings' },
-                          { key: 'history', label: '📅 Meeting History' },
-                          { key: 'attendance', label: '✅ Attendance Tracker' }
-                        ]}
-                        activeTab={activeZoomTab}
-                        onTabChange={setActiveZoomTab}
-                        styleSet="minimal"
-                      >
-                        {/* Account Settings Tab */}
-                        {activeZoomTab === 'account' && (
-                          <div style={{ paddingTop: '20px' }}>
-                    {zoomStatus.isLinked && (
-                    /* Linked State */
-                    <div className="zoom-linked-state">
-                      <div className="zoom-info">
-                        <div className="zoom-status-badge" style={{ 
-                          background: '#2D8CFF', 
-                          color: 'white', 
-                          padding: '4px 12px', 
-                          borderRadius: '12px', 
-                          display: 'inline-block',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          marginBottom: '12px'
-                        }}>
-                          ✓ Connected
-                        </div>
-                        
-                        {zoomStatus.username && (
-                          <div className="settings-row" style={{ marginBottom: '12px' }}>
-                            <label>Name</label>
-                            <input 
-                              type="text" 
-                              value={zoomStatus.username}
-                              disabled
-                              style={{ background: 'var(--secondary-background, #f5f7fa)' }}
-                            />
-                          </div>
-                        )}
-                        
-                        {zoomStatus.email && (
-                          <div className="settings-row" style={{ marginBottom: '12px' }}>
-                            <label>Email</label>
-                            <input 
-                              type="text" 
-                              value={zoomStatus.email}
-                              disabled
-                              style={{ background: 'var(--secondary-background, #f5f7fa)' }}
-                            />
-                          </div>
-                        )}
-                        
-                        {zoomStatus.linkedAt && (
-                          <p className="settings-help-text" style={{ marginBottom: '16px' }}>
-                            Connected on {new Date(zoomStatus.linkedAt).toLocaleDateString()}
-                          </p>
-                        )}
-                      </div>
-                      
-                      <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-                        <button 
-                          onClick={handleRefreshZoom}
-                          className="settings-button"
-                          disabled={zoomSubmitting}
-                          style={{ flex: 1 }}
-                        >
-                          {zoomSubmitting ? (
-                            <>
-                              <div className="spinner button-spinner"></div>
-                              <span style={{ marginLeft: '8px' }}>Refreshing...</span>
-                            </>
-                          ) : (
-                            '🔄 Refresh Info'
-                          )}
-                        </button>
-                        
-                        <button 
-                          onClick={handleUnlinkZoom}
-                          className="settings-button settings-button-secondary"
-                          disabled={zoomSubmitting}
-                          style={{ flex: 1 }}
-                        >
-                          {zoomSubmitting ? (
-                            <>
-                              <div className="spinner button-spinner"></div>
-                              <span style={{ marginLeft: '8px' }}>Unlinking...</span>
-                            </>
-                          ) : (
-                            'Unlink Account'
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                    )}
-                          </div>
-                        )}
-                        
-                        {/* Meeting History Tab */}
-                        {activeZoomTab === 'history' && (
-                          <div style={{ paddingTop: '20px' }}>
-                            <ZoomMeetingHistory />
-                          </div>
-                        )}
-                        
-                        {/* Attendance Tracker Tab */}
-                        {activeZoomTab === 'attendance' && (
-                          <div style={{ paddingTop: '20px' }}>
-                            <MeetingAttendanceTracker />
-                          </div>
-                        )}
-                      </Tabs>
-                    </>
-                  )}
-                </div>
-              )}
-              
-              {/* Discord Tab Content */}
-              {activeIntegrationTab === 'discord' && (
-                <div style={{ paddingTop: '20px', borderTop: '1px solid var(--border-color)' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>
-                    <FaDiscord style={{ marginRight: '8px', color: '#5865f2', verticalAlign: 'middle' }} />
-                    Discord Integration
-                  </h3>
-                  <DiscordUtilities />
-                </div>
-              )}
-            </Tabs>
           </div>
         </div>
       </form>

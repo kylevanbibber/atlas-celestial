@@ -36,6 +36,15 @@ const ContextMenu = ({ options, onClose, style, className, searchable, searchPla
   }, [onClose]);
 
   const handleSubmenuClick = (option, index, event) => {
+    // Always call onClick if it exists and the item is not disabled
+    if (!option.disabled && option.onClick) {
+      option.onClick();
+      if (!option.preventClose) {
+        onClose();
+      }
+    }
+    
+    // If item has submenu, also show it (but onClick already navigated)
     if (option.submenu) {
       // Calculate position using the shared function
       const position = calculateSubmenuPosition(event.currentTarget);
@@ -45,13 +54,6 @@ const ContextMenu = ({ options, onClose, style, className, searchable, searchPla
       // Clear any existing timeout
       if (submenuTimeoutRef.current) {
         clearTimeout(submenuTimeoutRef.current);
-      }
-    } else {
-      if (!option.disabled) {
-        option.onClick();
-        if (!option.preventClose) {
-          onClose();
-        }
       }
     }
   };

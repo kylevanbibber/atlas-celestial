@@ -64,6 +64,8 @@ const DashboardSection = ({
         previousKey = 'previousMonthAlp';
       } else if (card.dataKey === 'currentMonthCodes') {
         previousKey = 'previousMonthCodes';
+      } else if (card.dataKey === 'currentMonthVips') {
+        previousKey = 'previousMonthVips';
       } else if (card.dataKey === 'currentMonthHires') {
         previousKey = 'previousMonthHires';
       } else if (card.dataKey === 'totalRefSales') {
@@ -72,7 +74,20 @@ const DashboardSection = ({
         previousKey = `previous${card.dataKey.charAt(0).toUpperCase() + card.dataKey.slice(1)}`;
       }
       previousValue = data[previousKey] || 0;
-      comparisonLabel = `from ${data.comparisonMonth || 'previous month'}`;
+      
+      // Use the appropriate comparison month label based on the metric
+      let comparisonMonthLabel = 'previous month';
+      if (card.dataKey === 'currentMonthCodes' && data.codesComparisonMonth) {
+        comparisonMonthLabel = data.codesComparisonMonth;
+      } else if (card.dataKey === 'currentMonthVips' && data.vipsComparisonMonth) {
+        comparisonMonthLabel = data.vipsComparisonMonth;
+      } else if (card.dataKey === 'currentMonthHires' && data.hiresComparisonMonth) {
+        comparisonMonthLabel = data.hiresComparisonMonth;
+      } else if (data.comparisonMonth) {
+        comparisonMonthLabel = data.comparisonMonth;
+      }
+      
+      comparisonLabel = `from ${comparisonMonthLabel}`;
     }
 
     console.log(`🔍 [DashboardSection] Card: ${card.title}, DataKey: ${card.dataKey}, CurrentValue: ${currentValue}, PreviousValue: ${previousValue}`);
@@ -179,11 +194,14 @@ const DashboardSection = ({
                 return '';
               // Monthly card date ranges
               case 'monthly_alp':
-                console.log('📊 [Monthly ALP Card] Date formatting:', {
+                console.log('🔍🔍🔍 [Monthly ALP Card] Date formatting DEBUG:', {
+                  hasMaxReportDate: !!data.maxReportDate,
                   maxReportDate: data.maxReportDate,
+                  maxReportDateType: typeof data.maxReportDate,
                   monthStart: data.monthStart,
                   monthEnd: data.monthEnd,
-                  cardType: 'monthly_alp'
+                  cardType: 'monthly_alp',
+                  allData: data
                 });
                 
                 if (data.maxReportDate) {
@@ -198,17 +216,24 @@ const DashboardSection = ({
                       year: 'numeric'
                     });
                     const asOfText = `as of ${formattedDate}`;
-                    console.log('📊 [Monthly ALP Card] Using maxReportDate format:', asOfText);
+                    console.log('✅ [Monthly ALP Card] Using maxReportDate format:', asOfText);
                     return asOfText;
+                  } else {
+                    console.warn('⚠️ [Monthly ALP Card] maxReportDate has wrong format:', data.maxReportDate);
                   }
                 }
-                // Fallback to month range if no maxReportDate
+                
+                console.warn('⚠️ [Monthly ALP Card] No maxReportDate found, falling back to month range');
+                
+                // Fallback to month range if no maxReportDate (with timezone fix)
                 if (data.monthStart && data.monthEnd) {
-                  const startDate = new Date(data.monthStart).toLocaleDateString('en-US', { 
+                  const start = data.monthStart.includes('T') ? new Date(data.monthStart) : new Date(data.monthStart + 'T12:00:00');
+                  const end = data.monthEnd.includes('T') ? new Date(data.monthEnd) : new Date(data.monthEnd + 'T12:00:00');
+                  const startDate = start.toLocaleDateString('en-US', { 
                     month: 'short', 
                     day: 'numeric' 
                   });
-                  const endDate = new Date(data.monthEnd).toLocaleDateString('en-US', { 
+                  const endDate = end.toLocaleDateString('en-US', { 
                     month: 'short', 
                     day: 'numeric' 
                   });
@@ -220,11 +245,14 @@ const DashboardSection = ({
                 return '';
               case 'monthly_hires':
                 if (data.hiresMonthStart && data.hiresMonthEnd) {
-                  const startDate = new Date(data.hiresMonthStart).toLocaleDateString('en-US', { 
+                  // Parse as UTC to avoid timezone shifts: append 'T00:00:00Z' or use Date.UTC
+                  const start = data.hiresMonthStart.includes('T') ? new Date(data.hiresMonthStart) : new Date(data.hiresMonthStart + 'T12:00:00');
+                  const end = data.hiresMonthEnd.includes('T') ? new Date(data.hiresMonthEnd) : new Date(data.hiresMonthEnd + 'T12:00:00');
+                  const startDate = start.toLocaleDateString('en-US', { 
                     month: 'short', 
                     day: 'numeric' 
                   });
-                  const endDate = new Date(data.hiresMonthEnd).toLocaleDateString('en-US', { 
+                  const endDate = end.toLocaleDateString('en-US', { 
                     month: 'short', 
                     day: 'numeric' 
                   });
@@ -233,11 +261,13 @@ const DashboardSection = ({
                 return '';
               case 'monthly_codes':
                 if (data.codesMonthStart && data.codesMonthEnd) {
-                  const startDate = new Date(data.codesMonthStart).toLocaleDateString('en-US', { 
+                  const start = data.codesMonthStart.includes('T') ? new Date(data.codesMonthStart) : new Date(data.codesMonthStart + 'T12:00:00');
+                  const end = data.codesMonthEnd.includes('T') ? new Date(data.codesMonthEnd) : new Date(data.codesMonthEnd + 'T12:00:00');
+                  const startDate = start.toLocaleDateString('en-US', { 
                     month: 'short', 
                     day: 'numeric' 
                   });
-                  const endDate = new Date(data.codesMonthEnd).toLocaleDateString('en-US', { 
+                  const endDate = end.toLocaleDateString('en-US', { 
                     month: 'short', 
                     day: 'numeric' 
                   });
@@ -246,11 +276,13 @@ const DashboardSection = ({
                 return '';
               case 'monthly_ref_sales':
                 if (data.refSalesMonthStart && data.refSalesMonthEnd) {
-                  const startDate = new Date(data.refSalesMonthStart).toLocaleDateString('en-US', { 
+                  const start = data.refSalesMonthStart.includes('T') ? new Date(data.refSalesMonthStart) : new Date(data.refSalesMonthStart + 'T12:00:00');
+                  const end = data.refSalesMonthEnd.includes('T') ? new Date(data.refSalesMonthEnd) : new Date(data.refSalesMonthEnd + 'T12:00:00');
+                  const startDate = start.toLocaleDateString('en-US', { 
                     month: 'short', 
                     day: 'numeric' 
                   });
-                  const endDate = new Date(data.refSalesMonthEnd).toLocaleDateString('en-US', { 
+                  const endDate = end.toLocaleDateString('en-US', { 
                     month: 'short', 
                     day: 'numeric' 
                   });

@@ -1,582 +1,629 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext';
+import { toast } from 'react-hot-toast';
 import api from '../../../api';
-import { FiPlus, FiEdit2, FiTrash2, FiSave, FiX, FiChevronDown, FiChevronRight } from 'react-icons/fi';
+import { FiCreditCard, FiShoppingCart, FiMessageCircle, FiFileText, FiDollarSign, FiRefreshCw } from 'react-icons/fi';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
+import StripeCardForm from './StripeCardForm';
+import CardManagementModal from './CardManagementModal';
+import PurchaseCreditsModal from './PurchaseCreditsModal';
+import AutoReloadSettings from './AutoReloadSettings';
+import CheckInSettings from './CheckInSettings';
+import SMSTemplates from './SMSTemplates';
+import AOBExportModal from './AOBExportModal';
 import './PipelineSettings.css';
 
+// Initialize Stripe with publishable key
+const stripePublishableKey = process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || 'pk_live_51RWdlFCWGp502EtX31JKFMyHlTGUdoKzPdSXyVW5Z5iELKPnadNDMIygB3EodwXsOIwmEIOmmiJXaEOWk7eyx8hx002MQKBpBn';
+console.log('[PipelineSettings] Stripe publishable key present?', !!stripePublishableKey);
+console.log('[PipelineSettings] Stripe publishable key (first 20 chars):', stripePublishableKey?.substring(0, 20));
+
+const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
+
 const PipelineSettings = () => {
-  const { user } = useAuth();
-  const [stages, setStages] = useState([]);
-  const [orderedStages, setOrderedStages] = useState([]);
-  const [checklistItems, setChecklistItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedStage, setSelectedStage] = useState(null);
-  const [expandedStage, setExpandedStage] = useState(null);
-  const [editingStage, setEditingStage] = useState(null);
-  const [editingItem, setEditingItem] = useState(null);
-  const [newItemForm, setNewItemForm] = useState(null);
-  const [newStageForm, setNewStageForm] = useState(null);
+  const { user } = useAuth(); // user kept in case we extend billing with team-level options later
+  const [activeTab, setActiveTab] = useState('billing'); // 'billing', 'checkins', 'templates', 'sync'
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [showAOBExportModal, setShowAOBExportModal] = useState(false);
+  const [smsCredits, setSmsCredits] = useState(0);
+  const [smsCreditsSummary, setSmsCreditsSummary] = useState({ totalPurchased: 0, totalDebited: 0 });
+  const [smsCreditsLoading, setSmsCreditsLoading] = useState(true);
+  const [smsCreditsError, setSmsCreditsError] = useState('');
+  const [billingInfoMessage, setBillingInfoMessage] = useState('');
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [showCardForm, setShowCardForm] = useState(false);
+  const [showManageCard, setShowManageCard] = useState(false);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  
+  // Test SMS state
+  const [testPhoneNumber, setTestPhoneNumber] = useState('');
+  const [testMessage, setTestMessage] = useState('');
+  const [testSending, setTestSending] = useState(false);
+  const [testSmsMessage, setTestSmsMessage] = useState('');
+  const [clientSecret, setClientSecret] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState(null);
+  const [hasCard, setHasCard] = useState(false);
 
   useEffect(() => {
-    fetchData();
+    console.log('[PipelineSettings] useEffect: fetching data');
+    fetchSmsCredits();
+    fetchPaymentMethods();
   }, []);
 
-  // Build ordered stages from before/after relationships
-  const buildStageOrder = (stageList) => {
-    // Filter out terminal stages (they're not in the main pipeline flow)
-    const pipelineStages = stageList.filter(s => !s.is_terminal);
+  // Handle onboarding sync
+  const handleSyncOnboarding = async () => {
+    if (isSyncing) return;
     
-    // Find the starting stage (position_after is NULL)
-    let currentStage = pipelineStages.find(s => s.position_after === null);
+    setIsSyncing(true);
+    const loadingToast = toast.loading('Syncing pending agents...');
     
-    if (!currentStage) {
-      console.warn('[Pipeline Settings] No starting stage found');
-      return pipelineStages;
-    }
-    
-    const ordered = [];
-    const visited = new Set();
-    
-    // Follow the chain
-    while (currentStage && !visited.has(currentStage.stage_name)) {
-      ordered.push(currentStage);
-      visited.add(currentStage.stage_name);
+    try {
+      const response = await api.get('/pending-agent-sync/sync-all');
       
-      // Find next stage (where position_after === current stage_name)
-      currentStage = pipelineStages.find(s => 
-        s.position_after === currentStage.stage_name && 
-        !visited.has(s.stage_name)
-      );
-    }
-    
-    // Add any stages not in the chain (shouldn't happen, but safety check)
-    pipelineStages.forEach(stage => {
-      if (!visited.has(stage.stage_name)) {
-        console.warn(`[Pipeline Settings] Stage "${stage.stage_name}" not in chain, appending to end`);
-        ordered.push(stage);
+      if (response.data.success) {
+        const { created, linked, skipped, errors } = response.data;
+        
+        toast.success(
+          `Sync complete! ${created} created, ${linked} linked, ${skipped} skipped${errors > 0 ? `, ${errors} errors` : ''}`,
+          { 
+            id: loadingToast,
+            duration: 5000 
+          }
+        );
+      } else {
+        toast.error('Sync failed: ' + response.data.message, { id: loadingToast });
       }
-    });
-    
-    return ordered;
+    } catch (error) {
+      console.error('Error syncing onboarding:', error);
+      toast.error('Error syncing pending agents. Please try again.', { id: loadingToast });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
-  const fetchData = async () => {
+  // Handle AOB export
+  const handleExportAOB = () => {
+    setShowAOBExportModal(true);
+  };
+
+  const handleAOBExportComplete = () => {
+    toast.success('AOB export completed successfully!', { duration: 5000 });
+    // Optionally refresh any data here
+  };
+
+  const fetchSmsCredits = async () => {
     try {
-      setLoading(true);
-      
-      // Fetch stages
-      const stagesResponse = await api.get('/recruitment/stages');
-      if (stagesResponse.data.success) {
-        const allStages = stagesResponse.data.data;
-        setStages(allStages);
-        setOrderedStages(buildStageOrder(allStages));
-        if (!selectedStage && allStages.length > 0) {
-          setSelectedStage(allStages[0].stage_name);
+      setSmsCreditsLoading(true);
+      setSmsCreditsError('');
+      console.log('[PipelineSettings] Calling GET /recruitment/sms/credits');
+      const response = await api.get('/recruitment/sms/credits');
+      console.log('[PipelineSettings] /recruitment/sms/credits response:', response);
+
+      if (response.data?.success) {
+        setSmsCredits(response.data.balance ?? 0);
+        setSmsCreditsSummary(response.data.summary || { totalPurchased: 0, totalDebited: 0 });
+      } else {
+        setSmsCreditsError(response.data?.message || 'Unable to load texting credits.');
+      }
+    } catch (error) {
+      console.error('Error fetching pipeline SMS credits:', error);
+      setSmsCreditsError('Unable to load texting credits.');
+    } finally {
+      setSmsCreditsLoading(false);
+    }
+  };
+
+  const fetchPaymentMethods = async () => {
+    try {
+      console.log('[PipelineSettings] Calling GET /recruitment/billing/payment-methods');
+      const response = await api.get('/recruitment/billing/payment-methods');
+      console.log('[PipelineSettings] payment-methods response:', response);
+
+      if (response.data?.success) {
+        const methods = response.data.paymentMethods || [];
+        setHasCard(response.data.hasCard || false);
+        if (methods.length > 0) {
+          // Use the first payment method (or you could let user select default)
+          setPaymentMethod(methods[0]);
+        } else {
+          setPaymentMethod(null);
         }
       }
-      
-      // Fetch all checklist items
-      const itemsResponse = await api.get('/recruitment/checklist');
-      if (itemsResponse.data.success) {
-        setChecklistItems(itemsResponse.data.data);
+    } catch (error) {
+      console.error('[PipelineSettings] Error fetching payment methods:', error);
+    }
+  };
+
+  const handleCardButtonClick = () => {
+    if (hasCard && paymentMethod) {
+      // Show management modal
+      setShowManageCard(true);
+    } else {
+      // Show add card form
+      handleAddBillingCard();
+    }
+  };
+
+  const handleAddBillingCard = async () => {
+    try {
+      setBillingLoading(true);
+      setBillingInfoMessage('');
+      console.log('[PipelineSettings] Calling POST /recruitment/billing/create-setup-intent');
+      const response = await api.post('/recruitment/billing/create-setup-intent');
+      console.log('[PipelineSettings] create-setup-intent response:', response);
+
+      if (response.data?.success && response.data.clientSecret) {
+        console.log('[PipelineSettings] Got clientSecret, showing card form');
+        setClientSecret(response.data.clientSecret);
+        setShowCardForm(true);
+      } else {
+        console.log('[PipelineSettings] No clientSecret in response');
+        setBillingInfoMessage(response.data?.message || 'Unable to start billing setup.');
       }
     } catch (error) {
-      console.error('Error fetching settings data:', error);
+      console.error('[PipelineSettings] Error starting billing setup:', error);
+      setBillingInfoMessage('An error occurred while starting billing setup.');
     } finally {
-      setLoading(false);
+      setBillingLoading(false);
     }
   };
 
-  // Get items for selected stage
-  const getStageItems = (stageName) => {
-    return checklistItems
-      .filter(item => item.stage_name === stageName)
-      .sort((a, b) => a.item_order - b.item_order);
+  const handleCardSuccess = (paymentMethodId) => {
+    console.log('[PipelineSettings] Card added successfully:', paymentMethodId);
+    setShowCardForm(false);
+    setClientSecret(null);
+    setBillingInfoMessage('Payment card added successfully!');
+    // Refresh payment methods
+    fetchPaymentMethods();
   };
 
-  // Handle creating new checklist item
-  const handleAddItem = (stageName) => {
-    setNewItemForm({
-      stage_name: stageName,
-      item_name: '',
-      item_description: '',
-      item_order: getStageItems(stageName).length + 1,
-      is_required: false,
-      item_type: 'checkbox'
-    });
+  const handleCardCancel = () => {
+    console.log('[PipelineSettings] Card form cancelled');
+    setShowCardForm(false);
+    setClientSecret(null);
   };
 
-  // Save new checklist item
-  const handleSaveNewItem = async () => {
+  const handleManageCardClose = () => {
+    setShowManageCard(false);
+  };
+
+  const handleRemoveCard = async (paymentMethodId) => {
     try {
-      const response = await api.post('/recruitment/checklist', {
-        ...newItemForm,
-        created_by: user.userId
-      });
-      
-      if (response.data.success) {
-        fetchData();
-        setNewItemForm(null);
+      console.log('[PipelineSettings] Removing payment method:', paymentMethodId);
+      const response = await api.delete(`/recruitment/billing/payment-method/${paymentMethodId}`);
+      console.log('[PipelineSettings] Remove response:', response);
+
+      if (response.data?.success) {
+        setBillingInfoMessage('Payment card removed successfully!');
+        setShowManageCard(false);
+        // Refresh payment methods
+        fetchPaymentMethods();
+      } else {
+        throw new Error(response.data?.message || 'Failed to remove card');
       }
     } catch (error) {
-      console.error('Error creating checklist item:', error);
+      console.error('[PipelineSettings] Error removing card:', error);
+      throw error;
     }
   };
 
-  // Handle updating checklist item
-  const handleUpdateItem = async (itemId, updates) => {
-    try {
-      await api.put(`/recruitment/checklist/${itemId}`, updates);
-      fetchData();
-      setEditingItem(null);
-    } catch (error) {
-      console.error('Error updating checklist item:', error);
-    }
+  const handleUpdateCard = () => {
+    // Close management modal and open add card form
+    setShowManageCard(false);
+    handleAddBillingCard();
   };
 
-  // Handle deleting checklist item
-  const handleDeleteItem = async (itemId) => {
-    if (!window.confirm('Are you sure you want to delete this checklist item?')) {
-      return;
-    }
-    
-    try {
-      await api.delete(`/recruitment/checklist/${itemId}`);
-      fetchData();
-    } catch (error) {
-      console.error('Error deleting checklist item:', error);
-    }
+  const handlePurchaseCredits = () => {
+    setShowPurchaseModal(true);
   };
 
-  // Toggle stage expansion
-  const toggleStageExpansion = (stageName) => {
-    setExpandedStage(expandedStage === stageName ? null : stageName);
+  const handlePurchaseSuccess = (credits) => {
+    const dollarAmount = (credits / 100).toFixed(2);
+    console.log('[PipelineSettings] Purchase successful: $', dollarAmount);
+    setShowPurchaseModal(false);
+    setBillingInfoMessage(`Successfully added $${dollarAmount} to your balance!`);
+    // Refresh balance
+    fetchSmsCredits();
   };
 
-  // Handle creating new custom stage
-  const handleAddStage = () => {
-    setNewStageForm({
-      stage_name: '',
-      stage_color: '#3498db',
-      stage_description: '',
-      position_after: orderedStages.length > 0 ? orderedStages[orderedStages.length - 1].stage_name : null,
-      position_before: null,
-      is_default: false
-    });
+  const handlePurchaseClose = () => {
+    setShowPurchaseModal(false);
   };
 
-  // Save new custom stage
-  const handleSaveNewStage = async () => {
-    if (!newStageForm.stage_name) {
-      alert('Please enter a stage name');
+  const handleTestSMS = async () => {
+    if (!testPhoneNumber || !testMessage) {
+      setTestSmsMessage('Please enter both phone number and message.');
       return;
     }
 
+    setTestSending(true);
+    setTestSmsMessage('');
+
     try {
-      const response = await api.post('/recruitment/stages', {
-        ...newStageForm,
-        created_by: user.userId,
-        team_id: user.userId // Team-specific stage
+      // Check if multiple numbers (MMS/group message)
+      const phoneNumbers = testPhoneNumber.split(';').map(num => num.trim()).filter(num => num);
+      const isGroupMessage = phoneNumbers.length > 1;
+
+      const response = await api.post('/recruitment/sms/send', {
+        toNumber: testPhoneNumber,
+        message: testMessage,
+        isGroupMessage,
       });
-      
+
       if (response.data.success) {
-        fetchData();
-        setNewStageForm(null);
+        const messageType = isGroupMessage ? 'Messages' : 'Text';
+        const recipientCount = isGroupMessage ? ` to ${phoneNumbers.length} recipients` : '';
+        setTestSmsMessage(`✓ ${messageType} sent successfully${recipientCount}! Cost: $${response.data.cost}. Remaining balance: $${response.data.remainingBalance}`);
+        setTestPhoneNumber('');
+        setTestMessage('');
+        // Refresh balance
+        fetchSmsCredits();
+      } else {
+        setTestSmsMessage(`✗ Failed to send: ${response.data.message}`);
       }
     } catch (error) {
-      console.error('Error creating stage:', error);
-      alert('Error creating stage. Please try again.');
+      console.error('Error sending test SMS:', error);
+      if (error.response?.status === 402) {
+        setTestSmsMessage('✗ Insufficient balance. Please add more balance to send texts.');
+      } else {
+        setTestSmsMessage(`✗ Error: ${error.response?.data?.message || error.message}`);
+      }
+    } finally {
+      setTestSending(false);
     }
   };
 
-  // Handle deleting custom stage
-  const handleDeleteStage = async (stageId, isDefault) => {
-    if (isDefault) {
-      alert('Cannot delete default stages');
-      return;
-    }
-
-    if (!window.confirm('Are you sure you want to delete this stage? All checklist items for this stage will also be removed.')) {
-      return;
-    }
-    
-    try {
-      await api.delete(`/recruitment/stages/${stageId}`);
-      fetchData();
-    } catch (error) {
-      console.error('Error deleting stage:', error);
-      alert('Error deleting stage. Please try again.');
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="pipeline-settings-loading">
-        <div className="pipeline-loading-spinner"></div>
-        <span>Loading settings...</span>
-      </div>
-    );
-  }
+  // Check if user should see test SMS section
+  const canTestSMS = user?.clname === 'SGA' && user?.Role === 'Admin' && smsCredits > 0;
 
   return (
     <div className="pipeline-settings-container">
       <div className="settings-header">
         <h2>Pipeline Configuration</h2>
-        <p>Configure pipeline stages and checklist items for your team</p>
+        <p>Configure pipeline stages, checklist items, and texting/billing for your team</p>
       </div>
 
-      <div className="settings-content">
-        {/* Stages List */}
-        <div className="settings-stages-section">
-          <div className="stages-section-header">
-            <div>
-              <h3>Pipeline Stages</h3>
-              <p className="settings-note">
-                Default stages are locked and cannot be deleted. You can add custom stages between any existing stages.
-              </p>
-            </div>
-            <button
-              onClick={handleAddStage}
-              className="pipeline-btn pipeline-btn-primary"
-            >
-              <FiPlus /> Add Custom Stage
-            </button>
+      {/* Tabs */}
+      <div className="pipeline-settings-tabs">
+        <button
+          className={`pipeline-settings-tab ${activeTab === 'billing' ? 'active' : ''}`}
+          onClick={() => setActiveTab('billing')}
+        >
+          <FiDollarSign size={18} />
+          <span>Billing & Balance</span>
+        </button>
+        <button
+          className={`pipeline-settings-tab ${activeTab === 'checkins' ? 'active' : ''}`}
+          onClick={() => setActiveTab('checkins')}
+        >
+          <FiMessageCircle size={18} />
+          <span>Check-Ins</span>
+        </button>
+        <button
+          className={`pipeline-settings-tab ${activeTab === 'templates' ? 'active' : ''}`}
+          onClick={() => setActiveTab('templates')}
+        >
+          <FiFileText size={18} />
+          <span>Templates</span>
+        </button>
+        <button
+          className={`pipeline-settings-tab ${activeTab === 'sync' ? 'active' : ''}`}
+          onClick={() => setActiveTab('sync')}
+        >
+          <FiRefreshCw size={18} />
+          <span>Sync Onboarding</span>
+        </button>
+      </div>
+
+      <div className="pipeline-settings-tab-content">
+        {/* Billing & Balance Tab */}
+        {activeTab === 'billing' && (
+          <div className="settings-content">
+        {/* Texting Balance & Billing */}
+        <div className="pipeline-billing-card">
+          <div className="pipeline-billing-header">
+            <h3>Texting Balance & Billing</h3>
+            <p className="settings-note">
+              Manage your SMS balance for recruiting pipeline texts and set up a billing card via Stripe.
+            </p>
           </div>
-          
-          {/* New Stage Form */}
-          {newStageForm && (
-            <div className="new-stage-form">
-              <h4>Add Custom Stage</h4>
-              <div className="form-group">
-                <label>Stage Name *</label>
-                <input
-                  type="text"
-                  value={newStageForm.stage_name}
-                  onChange={(e) => setNewStageForm({ ...newStageForm, stage_name: e.target.value })}
-                  className="form-input"
-                  placeholder="Enter stage name..."
-                />
-              </div>
-              
-              <div className="form-group">
-                <label>Description</label>
-                <textarea
-                  value={newStageForm.stage_description}
-                  onChange={(e) => setNewStageForm({ ...newStageForm, stage_description: e.target.value })}
-                  className="form-textarea"
-                  placeholder="Optional description..."
-                  rows={2}
-                />
-              </div>
-              
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Stage Color</label>
-                  <input
-                    type="color"
-                    value={newStageForm.stage_color}
-                    onChange={(e) => setNewStageForm({ ...newStageForm, stage_color: e.target.value })}
-                    className="form-color-input"
-                  />
-                </div>
-              </div>
-              
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Position After</label>
-                  <select
-                    value={newStageForm.position_after || ''}
-                    onChange={(e) => {
-                      const selectedAfter = e.target.value || null;
-                      // Find what comes after the selected stage
-                      const afterIndex = orderedStages.findIndex(s => s.stage_name === selectedAfter);
-                      const before = afterIndex >= 0 && afterIndex < orderedStages.length - 1 
-                        ? orderedStages[afterIndex + 1].stage_name 
-                        : null;
-                      setNewStageForm({ 
-                        ...newStageForm, 
-                        position_after: selectedAfter,
-                        position_before: before
-                      });
-                    }}
-                    className="form-select"
-                  >
-                    <option value="">-- Start of Pipeline --</option>
-                    {orderedStages.map(stage => (
-                      <option key={stage.id} value={stage.stage_name}>
-                        {stage.stage_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="form-group">
-                  <label>Position Before</label>
-                  <select
-                    value={newStageForm.position_before || ''}
-                    onChange={(e) => {
-                      const selectedBefore = e.target.value || null;
-                      // Find what comes before the selected stage
-                      const beforeIndex = orderedStages.findIndex(s => s.stage_name === selectedBefore);
-                      const after = beforeIndex > 0 
-                        ? orderedStages[beforeIndex - 1].stage_name 
-                        : null;
-                      setNewStageForm({ 
-                        ...newStageForm, 
-                        position_before: selectedBefore,
-                        position_after: after
-                      });
-                    }}
-                    className="form-select"
-                  >
-                    <option value="">-- End of Pipeline --</option>
-                    {orderedStages.map(stage => (
-                      <option key={stage.id} value={stage.stage_name}>
-                        {stage.stage_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              
-              <div className="form-actions">
-                <button
-                  onClick={handleSaveNewStage}
-                  className="pipeline-btn pipeline-btn-primary"
-                  disabled={!newStageForm.stage_name}
-                >
-                  <FiSave /> Save Stage
-                </button>
-                <button
-                  onClick={() => setNewStageForm(null)}
-                  className="pipeline-btn"
-                >
-                  <FiX /> Cancel
-                </button>
-              </div>
+
+          {smsCreditsError && (
+            <div className="pipeline-billing-alert error">
+              {smsCreditsError}
             </div>
           )}
-          
-          <div className="stages-list">
-            {orderedStages.map(stage => (
-                <div key={stage.id} className="stage-config-item">
-                  <div 
-                    className="stage-config-header"
-                    onClick={() => toggleStageExpansion(stage.stage_name)}
-                  >
-                    <div className="stage-config-info">
-                      {expandedStage === stage.stage_name ? <FiChevronDown /> : <FiChevronRight />}
-                      <div 
-                        className="stage-color-indicator"
-                        style={{ backgroundColor: stage.stage_color }}
-                      />
-                      <span className="stage-name">{stage.stage_name}</span>
-                      {stage.is_default && (
-                        <span className="default-badge">Default</span>
-                      )}
-                    </div>
-                    
-                    <div className="stage-config-actions">
-                      <span className="items-count">
-                        {getStageItems(stage.stage_name).length} items
-                      </span>
-                      {!stage.is_default && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteStage(stage.id, stage.is_default);
-                          }}
-                          className="icon-btn delete"
-                          title="Delete custom stage"
-                        >
-                          <FiTrash2 />
-                        </button>
-                      )}
-                    </div>
+
+          {smsCreditsLoading ? (
+            <div className="pipeline-billing-loading-row">
+              <div className="pipeline-loading-spinner" />
+              <span>Loading balance…</span>
+            </div>
+          ) : (
+            <div className="pipeline-billing-body">
+              <div className="pipeline-billing-row">
+                <div>
+                  <div className="pipeline-billing-label">Current Balance</div>
+                  <div className="pipeline-billing-value">
+                    ${(smsCredits / 100).toFixed(2)}
                   </div>
-                  
-                  {expandedStage === stage.stage_name && (
-                    <div className="stage-config-body">
-                      {/* Stage Description */}
-                      {stage.stage_description && (
-                        <p className="stage-description">{stage.stage_description}</p>
-                      )}
-                      
-                      {/* Checklist Items */}
-                      <div className="stage-checklist-items">
-                        <div className="checklist-items-header">
-                          <h4>Checklist Items</h4>
-                          <button
-                            onClick={() => handleAddItem(stage.stage_name)}
-                            className="pipeline-btn pipeline-btn-primary"
-                          >
-                            <FiPlus /> Add Item
-                          </button>
+                  <div className="pipeline-billing-subtext">
+                    {smsCreditsSummary.totalDebited
+                      ? `You've used $${(smsCreditsSummary.totalDebited / 100).toFixed(2)} so far.`
+                      : 'No texts have been sent yet.'}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    className="pipeline-btn pipeline-btn-primary"
+                    onClick={handlePurchaseCredits}
+                  >
+                    <FiShoppingCart style={{ marginRight: 6 }} />
+                    Add Balance
+                  </button>
+                  <button
+                    type="button"
+                    className="pipeline-btn"
+                    onClick={fetchSmsCredits}
+                  >
+                    Refresh
+                  </button>
+                </div>
+              </div>
+
+              <div className="pipeline-billing-row">
+                <div>
+                  <div className="pipeline-billing-label">Billing Card</div>
+                  <div className="pipeline-billing-subtext">
+                    {hasCard && paymentMethod
+                      ? `${paymentMethod.brand.charAt(0).toUpperCase() + paymentMethod.brand.slice(1)} ending in ${paymentMethod.last4}`
+                      : 'Connect a payment method to fund SMS credit purchases through Stripe.'}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="pipeline-btn"
+                  onClick={handleCardButtonClick}
+                  disabled={billingLoading}
+                >
+                  <FiCreditCard style={{ marginRight: 6 }} />
+                  {billingLoading ? 'Starting…' : (hasCard ? 'Manage Card' : 'Add Card')}
+                </button>
+              </div>
+
+               {billingInfoMessage && (
+                 <div className="pipeline-billing-alert info">
+                   {billingInfoMessage}
+                 </div>
+               )}
+            </div>
+          )}
+        </div>
+
+            {/* Auto-Reload Settings */}
+            <div className="pipeline-billing-card">
+              <AutoReloadSettings />
+            </div>
+          </div>
+        )}
+
+        {/* Check-Ins Tab */}
+        {activeTab === 'checkins' && (
+          <div className="settings-content">
+            <CheckInSettings />
+          </div>
+        )}
+
+        {/* Templates Tab */}
+        {activeTab === 'templates' && (
+          <div className="settings-content">
+            <div className="pipeline-billing-card">
+              <SMSTemplates />
+            </div>
+
+            {/* Test SMS Section - Only for SGA Admin with balance */}
+            {canTestSMS && (
+              <div className="pipeline-billing-card">
+                <div className="pipeline-billing-header">
+                  <h3>Test SMS</h3>
+                  <p className="settings-note">
+                    Send a test text message to verify your TextMagic integration. Use semicolons to send to multiple recipients.
+                  </p>
+                </div>
+
+                <div className="pipeline-billing-body">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div className="form-field">
+                      <label>Phone Number(s)</label>
+                      <input
+                        type="text"
+                        className="pipeline-input"
+                        placeholder="+1234567890 or +1234567890;+0987654321 for multiple"
+                        value={testPhoneNumber}
+                        onChange={(e) => setTestPhoneNumber(e.target.value)}
+                        disabled={testSending}
+                      />
+                      {testPhoneNumber.includes(';') && (
+                        <div style={{ fontSize: '12px', color: '#3b82f6', marginTop: 4 }}>
+                          Will send to {testPhoneNumber.split(';').filter(n => n.trim()).length} recipients individually
                         </div>
-                        
-                        {getStageItems(stage.stage_name).length === 0 ? (
-                          <div className="no-items">
-                            <p>No checklist items for this stage yet.</p>
-                            <button
-                              onClick={() => handleAddItem(stage.stage_name)}
-                              className="pipeline-btn"
-                            >
-                              Add First Item
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="checklist-items-list">
-                            {getStageItems(stage.stage_name).map(item => (
-                              <div key={item.id} className="checklist-config-item">
-                                {editingItem === item.id ? (
-                                  <div className="item-edit-form">
-                                    <input
-                                      type="text"
-                                      value={item.item_name}
-                                      onChange={(e) => {
-                                        setChecklistItems(prev => 
-                                          prev.map(i => 
-                                            i.id === item.id 
-                                              ? { ...i, item_name: e.target.value }
-                                              : i
-                                          )
-                                        );
-                                      }}
-                                      className="form-input"
-                                      placeholder="Item name"
-                                    />
-                                    <div className="item-edit-actions">
-                                      <button
-                                        onClick={() => handleUpdateItem(item.id, {
-                                          item_name: item.item_name
-                                        })}
-                                        className="pipeline-btn pipeline-btn-primary"
-                                      >
-                                        <FiSave /> Save
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          setEditingItem(null);
-                                          fetchData();
-                                        }}
-                                        className="pipeline-btn"
-                                      >
-                                        <FiX /> Cancel
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <div className="item-info">
-                                      <span className="item-name">
-                                        {item.item_name}
-                                        {item.is_required && <span className="required-star">*</span>}
-                                      </span>
-                                      <span className="item-type-badge">{item.item_type}</span>
-                                    </div>
-                                    <div className="item-actions">
-                                      <button
-                                        onClick={() => setEditingItem(item.id)}
-                                        className="icon-btn"
-                                        title="Edit"
-                                      >
-                                        <FiEdit2 />
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteItem(item.id)}
-                                        className="icon-btn delete"
-                                        title="Delete"
-                                      >
-                                        <FiTrash2 />
-                                      </button>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        
-                        {/* New Item Form */}
-                        {newItemForm && newItemForm.stage_name === stage.stage_name && (
-                          <div className="new-item-form">
-                            <h5>Add New Checklist Item</h5>
-                            <div className="form-group">
-                              <label>Item Name *</label>
-                              <input
-                                type="text"
-                                value={newItemForm.item_name}
-                                onChange={(e) => setNewItemForm({ ...newItemForm, item_name: e.target.value })}
-                                className="form-input"
-                                placeholder="Enter item name..."
-                              />
-                            </div>
-                            
-                            <div className="form-group">
-                              <label>Description</label>
-                              <textarea
-                                value={newItemForm.item_description}
-                                onChange={(e) => setNewItemForm({ ...newItemForm, item_description: e.target.value })}
-                                className="form-textarea"
-                                placeholder="Optional description..."
-                                rows={2}
-                              />
-                            </div>
-                            
-                            <div className="form-row">
-                              <div className="form-group">
-                                <label>Type</label>
-                                <select
-                                  value={newItemForm.item_type}
-                                  onChange={(e) => setNewItemForm({ ...newItemForm, item_type: e.target.value })}
-                                  className="form-select"
-                                >
-                                  <option value="checkbox">Checkbox</option>
-                                  <option value="text">Text</option>
-                                  <option value="date">Date</option>
-                                  <option value="number">Number</option>
-                                  <option value="select">Select</option>
-                                  <option value="textarea">Textarea</option>
-                                </select>
-                              </div>
-                              
-                              <div className="form-group">
-                                <label className="checkbox-label">
-                                  <input
-                                    type="checkbox"
-                                    checked={newItemForm.is_required}
-                                    onChange={(e) => setNewItemForm({ ...newItemForm, is_required: e.target.checked })}
-                                  />
-                                  Required
-                                </label>
-                              </div>
-                            </div>
-                            
-                            <div className="form-actions">
-                              <button
-                                onClick={handleSaveNewItem}
-                                className="pipeline-btn pipeline-btn-primary"
-                                disabled={!newItemForm.item_name}
-                              >
-                                <FiSave /> Save Item
-                              </button>
-                              <button
-                                onClick={() => setNewItemForm(null)}
-                                className="pipeline-btn"
-                              >
-                                <FiX /> Cancel
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                      )}
+                    </div>
+
+                    <div className="form-field">
+                      <label>Message</label>
+                      <textarea
+                        className="pipeline-input"
+                        placeholder="Enter your test message..."
+                        rows={3}
+                        value={testMessage}
+                        onChange={(e) => setTestMessage(e.target.value)}
+                        disabled={testSending}
+                        maxLength={5000}
+                      />
+                      <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 4 }}>
+                        {testMessage.length}/5000 characters
+                        {testMessage.length > 160 && <span style={{ color: '#f59e0b', marginLeft: '8px' }}>(multiple segments)</span>}
                       </div>
                     </div>
-                  )}
+
+                    <button
+                      type="button"
+                      className="pipeline-btn pipeline-btn-primary"
+                      onClick={handleTestSMS}
+                      disabled={testSending || !testPhoneNumber || !testMessage}
+                      style={{ alignSelf: 'flex-start' }}
+                    >
+                      {testSending ? 'Sending...' : 'Send Test SMS'}
+                    </button>
+
+                    {testSmsMessage && (
+                      <div className={`pipeline-billing-alert ${testSmsMessage.startsWith('✓') ? 'success' : 'error'}`}>
+                        {testSmsMessage}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              ))}
+              </div>
+            )}
           </div>
-        </div>
+        )}
+
+        {/* Sync Onboarding Tab */}
+        {activeTab === 'sync' && (
+          <div className="settings-content">
+            <div className="pipeline-billing-card">
+              <h3 style={{ marginTop: 0 }}>Sync Onboarding Portal</h3>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>
+                Sync pending agents from the onboarding portal and automatically create pipeline records with completed checklists for prior stages.
+              </p>
+              
+              <button
+                className="pipeline-btn pipeline-btn-primary"
+                onClick={handleSyncOnboarding}
+                disabled={isSyncing}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '12px 24px',
+                  fontSize: '16px'
+                }}
+              >
+                {isSyncing ? (
+                  <>
+                    <span className="sync-spinner" style={{
+                      display: 'inline-block',
+                      animation: 'spin 1s linear infinite'
+                    }}>⟳</span>
+                    <span>Syncing...</span>
+                  </>
+                ) : (
+                  <>
+                    <FiRefreshCw size={18} />
+                    <span>Sync Onboarding</span>
+                  </>
+                )}
+              </button>
+
+              <style>{`
+                @keyframes spin {
+                  from { transform: rotate(0deg); }
+                  to { transform: rotate(360deg); }
+                }
+              `}</style>
+
+              <div style={{ marginTop: '24px', padding: '16px', background: 'var(--info-bg, #e3f2fd)', borderRadius: '8px', border: '1px solid var(--info-border, #90caf9)' }}>
+                <h4 style={{ margin: '0 0 8px 0', color: 'var(--info-text, #1976d2)' }}>What This Does:</h4>
+                <ul style={{ margin: 0, paddingLeft: '20px', color: 'var(--text-secondary)' }}>
+                  <li>Fetches all pending agents from the onboarding portal</li>
+                  <li>Creates pipeline records for new agents</li>
+                  <li>Links existing agents if they're already in the system</li>
+                  <li>Auto-completes checklist items for stages they've passed</li>
+                  <li>Skips agents that are already synced</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* AOB Export Section */}
+            <div className="pipeline-billing-card" style={{ marginTop: '30px' }}>
+              <h3 style={{ marginTop: 0 }}>Export AOB Updates</h3>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>
+                Export Application Processing Status data from AIL Portal and track historical changes in workflow status, steps, and progress for all agents. Each export creates a new snapshot to monitor changes over time.
+              </p>
+              
+              <button
+                className="pipeline-btn pipeline-btn-success"
+                onClick={handleExportAOB}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '12px 24px',
+                  fontSize: '16px',
+                  background: '#10b981',
+                  border: 'none',
+                  color: 'white',
+                  cursor: 'pointer'
+                }}
+              >
+                <FiFileText size={18} />
+                <span>Export AOB Updates</span>
+              </button>
+
+              <div style={{ marginTop: '24px', padding: '16px', background: 'var(--info-bg, #e3f2fd)', borderRadius: '8px', border: '1px solid var(--info-border, #90caf9)' }}>
+                <h4 style={{ margin: '0 0 8px 0', color: 'var(--info-text, #1976d2)' }}>What This Does:</h4>
+                <ul style={{ margin: 0, paddingLeft: '20px', color: 'var(--text-secondary)' }}>
+                  <li>Logs into AIL Portal with your credentials</li>
+                  <li>Navigates to Application Processing Status page</li>
+                  <li>Exports all status data (ALL statuses) to Excel</li>
+                  <li>Inserts new rows into AOBUpdates table to track changes over time</li>
+                  <li>Allows you to monitor workflow status, steps, and progress for each agent</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* AOB Export Modal */}
+        <AOBExportModal
+          isOpen={showAOBExportModal}
+          onClose={() => setShowAOBExportModal(false)}
+          onComplete={handleAOBExportComplete}
+        />
       </div>
+
+      {/* Stripe Card Form Modal */}
+      {showCardForm && clientSecret && (
+        <Elements stripe={stripePromise}>
+          <StripeCardForm
+            clientSecret={clientSecret}
+            onSuccess={handleCardSuccess}
+            onCancel={handleCardCancel}
+          />
+        </Elements>
+      )}
+
+      {/* Card Management Modal */}
+      {showManageCard && paymentMethod && (
+        <CardManagementModal
+          paymentMethod={paymentMethod}
+          onClose={handleManageCardClose}
+          onRemove={handleRemoveCard}
+          onUpdate={handleUpdateCard}
+        />
+      )}
+
+      {/* Purchase Credits Modal */}
+      {showPurchaseModal && (
+        <PurchaseCreditsModal
+          onClose={handlePurchaseClose}
+          onSuccess={handlePurchaseSuccess}
+          hasPaymentMethod={hasCard}
+        />
+      )}
     </div>
   );
 };

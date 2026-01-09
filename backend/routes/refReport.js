@@ -1573,6 +1573,84 @@ router.get("/date-options", async (req, res) => {
     }
 });
 
+// GET /api/ref-report/historical-data - Daily historical refs for a person or team (used for personal record checks)
+router.get("/historical-data", async (req, res) => {
+    const { person_name, team_name, aggregate_team, hierarchy_level, start_date, end_date } = req.query;
+
+    try {
+        if (!person_name && !team_name) {
+            return res.status(400).json({ success: false, message: "person_name or team_name is required" });
+        }
+
+        // Default window: last 2 years if dates not provided
+        let start = start_date;
+        let end = end_date;
+        if (!start || !end) {
+            const now = new Date();
+            const from = new Date();
+            from.setFullYear(now.getFullYear() - 2);
+            start = from.toISOString().split('T')[0];
+            end = now.toISOString().split('T')[0];
+        }
+
+        let rows;
+
+        // If requesting team aggregation (for MGA/GA/SA level views)
+        if (team_name && aggregate_team === 'true' && hierarchy_level) {
+            console.log(`[Historical Data] Fetching aggregated team data for ${team_name} at ${hierarchy_level} level`);
+            
+            // Determine which column to join on based on hierarchy level
+            let teamColumn;
+            switch (hierarchy_level.toLowerCase()) {
+                case 'mga':
+                    teamColumn = 'mga';
+                    break;
+                case 'ga':
+                    teamColumn = 'ga';
+                    break;
+                case 'sa':
+                    teamColumn = 'sa';
+                    break;
+                default:
+                    return res.status(400).json({ success: false, message: "Invalid hierarchy_level for team aggregation" });
+            }
+
+            // Get all agents under this team and aggregate their refs
+            rows = await query(`
+                SELECT 
+                    DATE(r.created_at) AS date,
+                    COUNT(CASE WHEN r.true_ref = 'Y' THEN 1 END) AS true_refs
+                FROM refvalidation r
+                INNER JOIN activeusers au ON r.lagnname = au.lagnname
+                WHERE au.${teamColumn} = ?
+                  AND DATE(r.created_at) BETWEEN ? AND ?
+                GROUP BY DATE(r.created_at)
+                ORDER BY DATE(r.created_at) DESC
+            `, [team_name, start, end]);
+            
+            console.log(`[Historical Data] Found ${rows.length} days of aggregated team data`);
+        } else {
+            // Individual person data
+            const name = person_name || team_name;
+            rows = await query(`
+                SELECT 
+                    DATE(r.created_at) AS date,
+                    COUNT(CASE WHEN r.true_ref = 'Y' THEN 1 END) AS true_refs
+                FROM refvalidation r
+                WHERE r.lagnname = ?
+                  AND DATE(r.created_at) BETWEEN ? AND ?
+                GROUP BY DATE(r.created_at)
+                ORDER BY DATE(r.created_at) DESC
+            `, [name, start, end]);
+        }
+
+        return res.json({ success: true, data: rows });
+    } catch (error) {
+        console.error("Error fetching historical data:", error);
+        return res.status(500).json({ success: false, message: "Failed to fetch historical data" });
+    }
+});
+
 // GET /api/ref-report/teams - Get teams based on hierarchy level from activeusers
 router.get("/teams", async (req, res) => {
     const { hierarchy_level, date_range, start_date, end_date } = req.query;

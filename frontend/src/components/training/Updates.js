@@ -48,7 +48,9 @@ const Updates = () => {
       const isAdmin = user?.Role === 'Admin';
       const teamRole = user?.teamRole || null;
       const userId = user?.userId || null;
-      const navItems = getSidebarNavItems(false, isAdmin, 0, teamRole, userId) || [];
+      const userLagnname = user?.lagnname || null;
+      const userClname = user?.clname || null;
+      const navItems = getSidebarNavItems(false, isAdmin, 0, teamRole, userId, userLagnname, userClname) || [];
 
       const topLevel = navItems.flatMap(item => {
         const items = [{ label: item.name, value: item.path }];
@@ -60,9 +62,20 @@ const Updates = () => {
 
       // Production sections (mirror Production.js)
       const hideDailyActivity = isAdmin && teamRole === 'app';
-      const prodSections = hideDailyActivity
-        ? ['scorecard', 'leaderboard', 'verification', 'release', 'vips', 'goals']
-        : ['daily-activity', 'scorecard', 'leaderboard', 'verification', 'vips', 'goals'];
+      const isSGANonAdmin = String(user?.clname || '').toUpperCase() === 'SGA' && user?.Role !== 'Admin';
+      const shouldHideDailyActivity = hideDailyActivity || isSGANonAdmin;
+      const shouldHideGoals = teamRole === 'app' || isSGANonAdmin;
+      const shouldHideVerification = isSGANonAdmin;
+      
+      // Build sections array based on permissions
+      const prodSections = [];
+      if (!shouldHideDailyActivity) prodSections.push('daily-activity');
+      if (!shouldHideGoals) prodSections.push('goals');
+      prodSections.push('leaderboard');
+      prodSections.push('scorecard');
+      if (!shouldHideVerification) prodSections.push('verification');
+      if (hideDailyActivity) prodSections.push('release');
+      prodSections.push('vips');
       const prodOptions = prodSections.map(sec => ({
         label: `Production - ${
           sec === 'daily-activity' ? 'Daily Activity' :

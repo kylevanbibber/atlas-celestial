@@ -201,6 +201,7 @@
   font-size: 0.9rem;
   background-color: var(--card-bg);
   color: var(--text-primary);
+  overflow: visible;
 }
 
 .hierarchy-table th,
@@ -251,6 +252,228 @@
 
 .hierarchy-table tr.hierarchy-card-current:hover {
   background-color: rgba(0, 123, 255, 0.07);
+}
+
+/* Hierarchy depth styling - add left border to show parent relationship */
+.hierarchy-table tr.hierarchy-depth-0 {
+  font-weight: 500;
+  background-color: var(--card-bg);
+}
+
+.hierarchy-table tr.hierarchy-depth-1,
+.hierarchy-table tr.hierarchy-depth-2,
+.hierarchy-table tr.hierarchy-depth-3,
+.hierarchy-table tr.hierarchy-depth-4,
+.hierarchy-table tr.hierarchy-depth-5 {
+  border-left: 3px solid var(--border-color);
+  background-color: rgba(0, 0, 0, 0.015);
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .hierarchy-table tr.hierarchy-depth-1,
+  .hierarchy-table tr.hierarchy-depth-2,
+  .hierarchy-table tr.hierarchy-depth-3,
+  .hierarchy-table tr.hierarchy-depth-4,
+  .hierarchy-table tr.hierarchy-depth-5 {
+    background-color: rgba(255, 255, 255, 0.02);
+    border-left-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Border colors based on parent role - match the role badge colors */
+.hierarchy-table tr.parent-role-rga {
+  border-left-color: #00558c !important;
+  border-left-width: 3px;
+}
+
+.hierarchy-table tr.parent-role-mga {
+  border-left-color: rgb(104, 182, 117) !important;
+  border-left-width: 3px;
+}
+
+.hierarchy-table tr.parent-role-ga {
+  border-left-color: rgb(237, 114, 47) !important;
+  border-left-width: 3px;
+}
+
+.hierarchy-table tr.parent-role-sa {
+  border-left-color: rgb(178, 82, 113) !important;
+  border-left-width: 3px;
+}
+
+/* Strengthen the top-level row appearance */
+.hierarchy-table tr.hierarchy-role-rga.hierarchy-depth-0,
+.hierarchy-table tr.hierarchy-role-mga.hierarchy-depth-0 {
+  border-bottom: 2px solid var(--border-color);
+  font-weight: 600;
+}
+
+/* Hover states preserve hierarchy colors */
+.hierarchy-table tr.hierarchy-depth-1:hover,
+.hierarchy-table tr.hierarchy-depth-2:hover,
+.hierarchy-table tr.hierarchy-depth-3:hover,
+.hierarchy-table tr.hierarchy-depth-4:hover,
+.hierarchy-table tr.hierarchy-depth-5:hover {
+  background-color: var(--sidebar-hover);
+}
+
+/* Inline status badges with +X more indicator */
+.status-badges-inline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+  overflow: visible !important;
+  position: relative;
+}
+
+.status-badges-inline .status-badge {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.status-badge-more-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.status-badge-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  cursor: help;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.status-badge-more:hover {
+  background-color: var(--sidebar-hover);
+  color: var(--text-primary);
+  border-color: var(--hover-color);
+  transform: scale(1.05);
+}
+
+/* Tooltip for hidden badges */
+.status-badge-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px;
+  background-color: var(--card-bg);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 10000;
+  min-width: 140px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Dark mode enhanced shadow */
+@media (prefers-color-scheme: dark) {
+  .status-badge-tooltip {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  }
+}
+
+.status-badge-tooltip::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid var(--border-color);
+  z-index: 1;
+}
+
+.status-badge-tooltip::after {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 7px solid var(--card-bg);
+  z-index: 2;
+}
+
+.status-badge-more-wrapper:hover .status-badge-tooltip,
+.status-badge-more:hover + .status-badge-tooltip {
+  display: flex !important;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.status-badge-tooltip .status-badge {
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+/* Ensure table cells don't clip the tooltip */
+.hierarchy-table tbody,
+.hierarchy-table tr,
+.hierarchy-table td {
+  overflow: visible !important;
+  position: relative;
+}
+
+/* Specific override for status column */
+.hierarchy-table td:has(.status-badges-inline) {
+  overflow: visible !important;
+  z-index: 1;
+}
+
+/* Grey out inactive or hidden MGAs/RGAs (from MGAs table) */
+.hierarchy-table tr.mga-inactive-hidden {
+  opacity: 0.5;
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+.hierarchy-table tr.mga-inactive-hidden:hover {
+  opacity: 0.65;
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .hierarchy-table tr.mga-inactive-hidden {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+  }
+  
+  .hierarchy-table tr.mga-inactive-hidden:hover {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+  }
 }
 
 .hierarchy-table .user-cell {

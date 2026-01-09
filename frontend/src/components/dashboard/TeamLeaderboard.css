@@ -1,0 +1,48 @@
+/* TeamLeaderboard component-specific table styles */
+/* Overrides global DataTable.css styles */
+
+.team-leaderboard-table th,
+.team-leaderboard-table td {
+  /* Remove all borders between columns */
+  border: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-top: none !important;
+  
+  /* Remove background colors */
+  background: transparent !important;
+  
+  /* Reset cursor */
+  cursor: inherit;
+  
+  /* Allow text wrapping */
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* Keep only the border-bottom on rows */
+.team-leaderboard-table tbody tr {
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+/* Remove header background and extra borders */
+.team-leaderboard-table thead th {
+  background: transparent !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+  cursor: default !important;
+  position: static !important;
+  z-index: auto !important;
+}
+
+/* Remove hover effects that might come from global styles */
+.team-leaderboard-table td:hover {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Apply hover to entire row instead */
+.team-leaderboard-table tbody tr:hover td {
+  background-color: hsl(var(--accent)) !important;
+}
+

@@ -134,6 +134,12 @@
   gap: 16px;
 }
 
+.reports-filters-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .category-filters {
   display: flex;
   gap: 8px;
@@ -168,7 +174,11 @@
 .view-controls {
   display: flex;
   gap: 4px;
-  border: 1px solid var(--border-color);
+  border: none;
+  border-width: 0px;
+  border-style: none;
+  border-color: transparent;
+  border-image: none;
   border-radius: 4px;
   overflow: hidden;
 }
@@ -211,10 +221,10 @@
   background-color: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 20px;
+  padding: 16px;
   cursor: pointer;
   transition: all 0.2s ease;
-  height: 380px; /* Fixed height for uniform cards */
+  height: 260px; /* Reduced height for more compact cards */
   display: flex;
   flex-direction: column;
 }
@@ -229,7 +239,7 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .report-header-main {
@@ -241,14 +251,14 @@
 }
 
 .report-icon {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   background-color: var(--bg-tertiary);
-  border-radius: 8px;
-  font-size: 20px;
+  border-radius: 6px;
+  font-size: 18px;
   color: var(--button-primary-bg);
   flex-shrink: 0;
 }
@@ -281,7 +291,7 @@
 }
 
 .report-content {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   flex: 1; /* Take up available space */
   display: flex;
   flex-direction: column;
@@ -290,7 +300,7 @@
 
 .report-card-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
   overflow: hidden;
@@ -299,14 +309,14 @@
 }
 
 .report-description {
-  margin: 8px 0 12px 0;
+  margin: 6px 0 8px 0;
   font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.4;
   flex: 1; /* Take up available space */
   overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 3; /* Limit to 3 lines */
+  -webkit-line-clamp: 2; /* Limit to 2 lines for more compact look */
   -webkit-box-orient: vertical;
   text-overflow: ellipsis;
 }
@@ -314,9 +324,9 @@
 .report-file-info {
   background-color: var(--bg-tertiary);
   border-radius: 4px;
-  padding: 8px;
+  padding: 6px 8px;
   margin-top: 2px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .file-name {
@@ -351,9 +361,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 5px 10px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;

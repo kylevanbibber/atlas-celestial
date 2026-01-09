@@ -3,6 +3,7 @@ import Select from 'react-select';
 import { FiFilter } from 'react-icons/fi';
 import Leaderboard from '../components/utils/Leaderboard';
 import FilterMenu from '../components/common/FilterMenu';
+import RightDetails from '../components/utils/RightDetails';
 import { useAuth } from '../context/AuthContext';
 import api from '../api';
 import './LeaderboardPage.css';
@@ -140,9 +141,21 @@ const LeaderboardPage = () => {
     const [isRefSales, setIsRefSales] = useState(false);
     // Add MORE toggle state
     const [isMORE, setIsMORE] = useState(false);
+    // Add Clubs toggle state
+    const [isClubs, setIsClubs] = useState(false);
+    // Add Clubs view state (personal or team)
+    const [clubsView, setClubsView] = useState('personal');
+    // Add Clubs year filter
+    const [clubsYear, setClubsYear] = useState('all');
+    const [availableClubYears, setAvailableClubYears] = useState([]);
     
     // Add dropdown state for Reported button
     const [isReportedDropdownOpen, setIsReportedDropdownOpen] = useState(false);
+    
+    // Club leaderboard data
+    const [clubLeaderboardData, setClubLeaderboardData] = useState([]);
+    // Club expanded data (for inline expansion)
+    const [clubExpandedData, setClubExpandedData] = useState({});
     
     // Filter states for the filter menu
     const [filters, setFilters] = useState({});
@@ -183,6 +196,33 @@ const LeaderboardPage = () => {
         mga: { data: [] },
         rga: { data: [] }
     });
+
+    // RightDetails state for agent profile
+    const [showRightDetails, setShowRightDetails] = useState(false);
+    const [rightDetailsData, setRightDetailsData] = useState(null);
+
+    // Handle profile picture click - open agent profile in RightDetails
+    const handleProfileClick = (item) => {
+        // Create agent profile data from leaderboard item
+        const agentData = {
+            __isAgentProfile: true,
+            id: item.user_id || item.userId || item.id,
+            lagnname: item.name,
+            displayName: item.name,
+            clname: item.clname,
+            profpic: item.profile_picture,
+            managerActive: item.Active || item.managerActive || 'y',
+            esid: item.esid,
+            licenses: item.licenses || [],
+            sa: item.sa,
+            ga: item.ga,
+            mga: item.mga,
+            rga: item.rga
+        };
+        
+        setRightDetailsData(agentData);
+        setShowRightDetails(true);
+    };
 
     // Format date to MM/DD/YYYY
     const formatToMMDDYYYY = (dateStr) => {
@@ -2053,6 +2093,100 @@ const LeaderboardPage = () => {
         }
     }, [selectedRGA, allOptions]);
 
+    // Fetch club leaderboard data
+    const fetchClubLeaderboardData = async () => {
+        try {
+            setLoading(true);
+            console.log(`📊 [Club Leaderboards] Fetching data for ${clubsView} view, year: ${clubsYear}, experience: ${experienceFilter}...`);
+            
+            const response = await api.get('/trophy/club-leaderboards', {
+                params: { 
+                    view: clubsView,
+                    year: clubsYear !== 'all' ? clubsYear : undefined,
+                    experience: experienceFilter !== 'all' ? experienceFilter : undefined
+                }
+            });
+            
+            if (response.data.success) {
+                console.log(`✅ [Club Leaderboards] Received ${response.data.data.length} agents`);
+                setClubLeaderboardData(response.data.data);
+                
+                // Extract available years from the data
+                if (response.data.availableYears) {
+                    setAvailableClubYears(response.data.availableYears);
+                }
+            }
+        } catch (error) {
+            console.error('❌ [Club Leaderboards] Error fetching data:', error);
+            setClubLeaderboardData([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Load clubs data when clubs tab is active
+    useEffect(() => {
+        if (isClubs) {
+            fetchClubLeaderboardData();
+        }
+    }, [isClubs, clubsView, clubsYear, experienceFilter]);
+
+    // Handle club row expansion - fetch detailed entries
+    const handleExpandClubItem = async (item, clubName) => {
+        const itemKey = `${item.name}-${clubName}`;
+        
+        // Set loading state
+        setClubExpandedData(prev => ({
+            ...prev,
+            [itemKey]: { loading: true, data: [] }
+        }));
+        
+        try {
+            console.log(`📊 [Club Details] Fetching ${clubName} entries for ${item.name}...`);
+            
+            const response = await api.get(`/trophy/club-details/${encodeURIComponent(item.name)}/${clubName}`, {
+                params: { 
+                    view: clubsView,
+                    year: clubsYear !== 'all' ? clubsYear : undefined
+                }
+            });
+            
+            if (response.data.success) {
+                console.log(`✅ [Club Details] Received ${response.data.data.entries.length} entries`);
+                
+                // Format entries as sub-items for the leaderboard
+                const formattedEntries = response.data.data.entries.map((entry, index) => ({
+                    name: entry.periodType === 'week' 
+                        ? new Date(entry.period).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : entry.period,
+                    value: new Intl.NumberFormat('en-US', { 
+                        style: 'currency', 
+                        currency: 'USD', 
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0
+                    }).format(entry.netValue),
+                    rawValue: entry.netValue, // Keep raw value for sorting if needed
+                    lvl1Net: entry.lvl1Net,
+                    lvl2Net: entry.lvl2Net,
+                    lvl3Net: entry.lvl3Net,
+                    team_rank: index + 1,
+                    mgaLastName: clubsView === 'team' ? `L1: $${entry.lvl1Net?.toLocaleString() || 0} | L2: $${entry.lvl2Net?.toLocaleString() || 0} | L3: $${entry.lvl3Net?.toLocaleString() || 0}` : null
+                }));
+                
+                setClubExpandedData(prev => ({
+                    ...prev,
+                    [itemKey]: { loading: false, data: formattedEntries }
+                }));
+            }
+        } catch (error) {
+            console.error('❌ [Club Details] Error fetching data:', error);
+            setClubExpandedData(prev => ({
+                ...prev,
+                [itemKey]: { loading: false, data: [] }
+            }));
+        }
+    };
+
     // Load data when filters change
     useEffect(() => {
         if ((selectedDate && reportDates.length > 0) || (isVIPs && selectedDate)) {
@@ -2060,8 +2194,8 @@ const LeaderboardPage = () => {
                 // For MORE, only fetch MGA and RGA data
                 fetchLeaderboardData('getweeklyall', 'mga'); // Use 'mga' as the main leaderboard for MORE
                 fetchLeaderboardData('getweeklyrga', 'rga');
-            } else {
-                // For other data sources, fetch all hierarchy levels
+            } else if (!isClubs) {
+                // For other data sources (not Clubs), fetch all hierarchy levels
                 fetchLeaderboardData('getweeklyall', 'all');
                 fetchLeaderboardData('getweeklysa', 'sa');
                 fetchLeaderboardData('getweeklyga', 'ga');
@@ -2072,7 +2206,7 @@ const LeaderboardPage = () => {
                 }
             }
         }
-    }, [selectedDate, reportType, selectedMGA, selectedRGA, selectedTree, isF6, netOrGross, experienceFilter, reportDates, includePrevDecember, isDailyActivity, dailyActivityMetric, isCodes, isVIPs, isRefSales, isMORE]);
+    }, [selectedDate, reportType, selectedMGA, selectedRGA, selectedTree, isF6, netOrGross, experienceFilter, reportDates, includePrevDecember, isDailyActivity, dailyActivityMetric, isCodes, isVIPs, isRefSales, isMORE, isClubs]);
 
     // Initialize data and refetch when reportType changes
     useEffect(() => {
@@ -2267,13 +2401,14 @@ const LeaderboardPage = () => {
             <div className="data-source-selection">
                 <div className="data-source-buttons">
                     <button 
-                        className={!isDailyActivity && !isCodes && !isVIPs && !isRefSales && !isMORE ? 'data-source-btn active' : 'data-source-btn'}
+                        className={!isDailyActivity && !isCodes && !isVIPs && !isRefSales && !isMORE && !isClubs ? 'data-source-btn active' : 'data-source-btn'}
                         onClick={() => {
                             setIsDailyActivity(false);
                             setIsCodes(false);
                             setIsVIPs(false);
                             setIsRefSales(false);
                             setIsMORE(false);
+                            setIsClubs(false);
                         }}
                     >
                         Official ALP
@@ -2287,6 +2422,7 @@ const LeaderboardPage = () => {
                                 setIsVIPs(false);
                                 setIsRefSales(false);
                                 setIsMORE(false);
+                                setIsClubs(false);
                             }}
                         >
                             <span>Reported {formatMetricName(dailyActivityMetric)}</span>
@@ -2334,6 +2470,7 @@ const LeaderboardPage = () => {
                             setIsVIPs(false);
                             setIsRefSales(false);
                             setIsMORE(false);
+                            setIsClubs(false);
                         }}
                     >
                         Codes
@@ -2346,6 +2483,7 @@ const LeaderboardPage = () => {
                             setIsVIPs(true);
                             setIsRefSales(false);
                             setIsMORE(false);
+                            setIsClubs(false);
                             // Switch to MTD if currently on Weekly since VIPs doesn't support weekly
                             if (reportType === 'Weekly Recap') {
                                 setReportType('MTD Recap');
@@ -2362,6 +2500,7 @@ const LeaderboardPage = () => {
                             setIsVIPs(false);
                             setIsRefSales(true);
                             setIsMORE(false);
+                            setIsClubs(false);
                         }}
                     >
                         Ref Sales
@@ -2374,9 +2513,23 @@ const LeaderboardPage = () => {
                             setIsVIPs(false);
                             setIsRefSales(false);
                             setIsMORE(true);
+                            setIsClubs(false);
                         }}
                     >
                         M.O.R.E.
+                    </button>
+                    <button 
+                        className={isClubs ? 'data-source-btn active' : 'data-source-btn'}
+                        onClick={() => {
+                            setIsDailyActivity(false);
+                            setIsCodes(false);
+                            setIsVIPs(false);
+                            setIsRefSales(false);
+                            setIsMORE(false);
+                            setIsClubs(true);
+                        }}
+                    >
+                        Clubs
                     </button>
                 </div>
             </div>
@@ -2384,8 +2537,8 @@ const LeaderboardPage = () => {
             {/* Filter Controls */}
             <div className="leaderboard-filters">
                 <div className="leaderboard-filters-left">
-                    {/* Experience Filter - Hide when VIPs, Codes, Ref Sales, or MORE is active */}
-                    {!isVIPs && !isCodes && !isRefSales && !isMORE && (
+                    {/* Experience Filter - Show for Clubs, hide for VIPs, Codes, Ref Sales, or MORE */}
+                    {(isClubs || (!isVIPs && !isCodes && !isRefSales && !isMORE)) && (
                     <div className="experience-filter-container">
                         <span 
                             className={experienceFilter === 'all' ? 'selected' : 'unselected'} 
@@ -2409,9 +2562,33 @@ const LeaderboardPage = () => {
                         </span>
                     </div>
                     )}
+                    
+                    {/* Year Filter - Only show for Clubs */}
+                    {isClubs && (
+                    <div className="experience-filter-container">
+                        <span 
+                            className={clubsYear === 'all' ? 'selected' : 'unselected'} 
+                            onClick={() => setClubsYear('all')}
+                        >
+                            All Years
+                        </span>
+                        {availableClubYears.map(year => (
+                            <React.Fragment key={year}>
+                                <span className="separator">|</span>
+                                <span 
+                                    className={clubsYear === year ? 'selected' : 'unselected'} 
+                                    onClick={() => setClubsYear(year)}
+                                >
+                                    {year}
+                                </span>
+                            </React.Fragment>
+                        ))}
+                    </div>
+                    )}
                     </div>
 
-                {/* Report Type Filter - Centered - Hide Week option when VIPs is active */}
+                {/* Report Type Filter - Centered - Hide for Clubs and hide Week option when VIPs is active */}
+                {!isClubs && (
                 <div className="leaderboard-filters-center">
                     <div className={`tabs-filter-container ${isVIPs ? 'vips-mode' : ''}`}>
                         {!isVIPs && (
@@ -2440,10 +2617,11 @@ const LeaderboardPage = () => {
                         </span>
                     </div>
                 </div>
+                )}
 
                 <div className="leaderboard-filters-right">
-                    {/* Toggle Controls - Hide when Daily Activity, Codes, VIPs, Ref Sales, or MORE is active */}
-                    {!isDailyActivity && !isCodes && !isVIPs && !isRefSales && !isMORE && (
+                    {/* Toggle Controls - Hide for Clubs and when Daily Activity, Codes, VIPs, Ref Sales, or MORE is active */}
+                    {!isClubs && !isDailyActivity && !isCodes && !isVIPs && !isRefSales && !isMORE && (
                     <div className="toggle-container">
                         <span 
                             className={isF6 ? 'selected' : 'unselected'} 
@@ -2468,7 +2646,8 @@ const LeaderboardPage = () => {
                     </div>
                     )}
 
-                    {/* Filter Button */}
+                    {/* Filter Button - Hide for Clubs */}
+                    {!isClubs && (
                     <div className="filter-button-container">
                         <FilterMenu
                             menuType="expandable"
@@ -2479,9 +2658,10 @@ const LeaderboardPage = () => {
                             customContentOnly={true}
                         />
                     </div>
+                    )}
 
-                    {/* YTD December Toggle - Only show when YTD is selected and not in Daily Activity, Codes, VIPs, Ref Sales, or MORE mode */}
-                    {reportType === 'YTD Recap' && !isDailyActivity && !isCodes && !isVIPs && !isRefSales && !isMORE && (
+                    {/* YTD December Toggle - Only show when YTD is selected and not in Clubs, Daily Activity, Codes, VIPs, Ref Sales, or MORE mode */}
+                    {!isClubs && reportType === 'YTD Recap' && !isDailyActivity && !isCodes && !isVIPs && !isRefSales && !isMORE && (
                         <div className="december-toggle-container">
                             <span 
                                 className={includePrevDecember ? 'selected' : 'unselected'} 
@@ -2495,7 +2675,8 @@ const LeaderboardPage = () => {
                 </div>
             </div>
 
-            {/* Date Selection */}
+            {/* Date Selection - Hide for Clubs */}
+            {!isClubs && (
             <div className="date-select-container">
                 <button className="arrow-change-button" onClick={handleNextDate}>&lt;</button>
                 <select
@@ -2563,11 +2744,267 @@ const LeaderboardPage = () => {
                 </select>
                 <button className="arrow-change-button" onClick={handlePreviousDate}>&gt;</button>
             </div>
+            )}
 
 
 
             {/* Leaderboards */}
             <div className="leaderboards-container">
+                {/* Clubs Section */}
+                {isClubs ? (
+                    <div className="clubs-leaderboard-section">
+                        <div className="clubs-header">
+                            <h2>Club Leaderboards</h2>
+                            <div className="clubs-view-toggle">
+                                <button 
+                                    className={clubsView === 'personal' ? 'active' : ''}
+                                    onClick={() => setClubsView('personal')}
+                                >
+                                    Personal
+                                </button>
+                                <button 
+                                    className={clubsView === 'team' ? 'active' : ''}
+                                    onClick={() => setClubsView('team')}
+                                >
+                                    Team
+                                </button>
+                            </div>
+                        </div>
+                        
+                        {/* Diamond Club */}
+                        <div className="club-leaderboard-row">
+                            <Leaderboard
+                                data={clubLeaderboardData.map(agent => ({
+                                    name: agent.lagnname,
+                                    value: agent.Diamond,
+                                    userId: agent.userId,
+                                    profile_picture: agent.profpic,
+                                    clname: agent.clname,
+                                    mga: agent.mga,
+                                    rga: agent.rga,
+                                    level: 'CLUB' // Mark as expandable
+                                })).filter(item => item.value > 0).sort((a, b) => b.value - a.value)}
+                                title={`Diamond Club ${clubsView === 'team' ? '($200K+ Team)' : '($100K+ Personal)'}`}
+                                nameField="name"
+                                valueField="value"
+                                allowedNames={allowedNames}
+                                allowedIds={allowedIds}
+                                rawNameField="name"
+                                formatValue={(value) => `${value || 0} ${value === 1 ? 'entry' : 'entries'}`}
+                                loading={loading}
+                                variant="detailed"
+                                showProfilePicture={true}
+                                profilePictureField="profile_picture"
+                                showLevelBadge={true}
+                                showMGA={true}
+                                hierarchyLevel="all"
+                                currentUser={user}
+                                showScrollButtons={true}
+                                onProfileClick={handleProfileClick}
+                                allowExpansion={true}
+                                onExpandItem={(item) => handleExpandClubItem(item, 'Diamond')}
+                                expandedData={Object.fromEntries(
+                                    Object.entries(clubExpandedData)
+                                        .filter(([key]) => key.endsWith('-Diamond'))
+                                        .map(([key, value]) => [key.replace('-Diamond', ''), value])
+                                )}
+                            />
+                            
+                            {/* Platinum Club */}
+                            <Leaderboard
+                                data={clubLeaderboardData.map(agent => ({
+                                    name: agent.lagnname,
+                                    value: agent.Platinum,
+                                    userId: agent.userId,
+                                    profile_picture: agent.profpic,
+                                    clname: agent.clname,
+                                    mga: agent.mga,
+                                    rga: agent.rga,
+                                    level: 'CLUB'
+                                })).filter(item => item.value > 0).sort((a, b) => b.value - a.value)}
+                                title={`Platinum Club ${clubsView === 'team' ? '($100K+ Team)' : '($50K+ Personal)'}`}
+                                nameField="name"
+                                valueField="value"
+                                allowedNames={allowedNames}
+                                allowedIds={allowedIds}
+                                rawNameField="name"
+                                formatValue={(value) => `${value || 0} ${value === 1 ? 'entry' : 'entries'}`}
+                                loading={loading}
+                                variant="detailed"
+                                showProfilePicture={true}
+                                profilePictureField="profile_picture"
+                                showLevelBadge={true}
+                                showMGA={true}
+                                hierarchyLevel="all"
+                                currentUser={user}
+                                showScrollButtons={true}
+                                onProfileClick={handleProfileClick}
+                                allowExpansion={true}
+                                onExpandItem={(item) => handleExpandClubItem(item, 'Platinum')}
+                                expandedData={Object.fromEntries(
+                                    Object.entries(clubExpandedData)
+                                        .filter(([key]) => key.endsWith('-Platinum'))
+                                        .map(([key, value]) => [key.replace('-Platinum', ''), value])
+                                )}
+                            />
+                        </div>
+                        
+                        {/* Gold and Silver Clubs */}
+                        <div className="club-leaderboard-row">
+                            <Leaderboard
+                                data={clubLeaderboardData.map(agent => ({
+                                    name: agent.lagnname,
+                                    value: agent.Gold,
+                                    userId: agent.userId,
+                                    profile_picture: agent.profpic,
+                                    clname: agent.clname,
+                                    mga: agent.mga,
+                                    rga: agent.rga,
+                                    level: 'CLUB'
+                                })).filter(item => item.value > 0).sort((a, b) => b.value - a.value)}
+                                title={`Gold Club ${clubsView === 'team' ? '($50K+ Team)' : '($25K+ Personal)'}`}
+                                nameField="name"
+                                valueField="value"
+                                allowedNames={allowedNames}
+                                allowedIds={allowedIds}
+                                rawNameField="name"
+                                formatValue={(value) => `${value || 0} ${value === 1 ? 'entry' : 'entries'}`}
+                                loading={loading}
+                                variant="detailed"
+                                showProfilePicture={true}
+                                profilePictureField="profile_picture"
+                                showLevelBadge={true}
+                                showMGA={true}
+                                hierarchyLevel="all"
+                                currentUser={user}
+                                showScrollButtons={true}
+                                onProfileClick={handleProfileClick}
+                                allowExpansion={true}
+                                onExpandItem={(item) => handleExpandClubItem(item, 'Gold')}
+                                expandedData={Object.fromEntries(
+                                    Object.entries(clubExpandedData)
+                                        .filter(([key]) => key.endsWith('-Gold'))
+                                        .map(([key, value]) => [key.replace('-Gold', ''), value])
+                                )}
+                            />
+                            
+                            <Leaderboard
+                                data={clubLeaderboardData.map(agent => ({
+                                    name: agent.lagnname,
+                                    value: agent.Silver,
+                                    userId: agent.userId,
+                                    profile_picture: agent.profpic,
+                                    clname: agent.clname,
+                                    mga: agent.mga,
+                                    rga: agent.rga,
+                                    level: 'CLUB'
+                                })).filter(item => item.value > 0).sort((a, b) => b.value - a.value)}
+                                title={`Silver Club ${clubsView === 'team' ? '($35K+ Team)' : '($20K+ Personal)'}`}
+                                nameField="name"
+                                valueField="value"
+                                allowedNames={allowedNames}
+                                allowedIds={allowedIds}
+                                rawNameField="name"
+                                formatValue={(value) => `${value || 0} ${value === 1 ? 'entry' : 'entries'}`}
+                                loading={loading}
+                                variant="detailed"
+                                showProfilePicture={true}
+                                profilePictureField="profile_picture"
+                                showLevelBadge={true}
+                                showMGA={true}
+                                hierarchyLevel="all"
+                                currentUser={user}
+                                showScrollButtons={true}
+                                onProfileClick={handleProfileClick}
+                                allowExpansion={true}
+                                onExpandItem={(item) => handleExpandClubItem(item, 'Silver')}
+                                expandedData={Object.fromEntries(
+                                    Object.entries(clubExpandedData)
+                                        .filter(([key]) => key.endsWith('-Silver'))
+                                        .map(([key, value]) => [key.replace('-Silver', ''), value])
+                                )}
+                            />
+                        </div>
+                        
+                        {/* Bronze Club and Wall of Fame */}
+                        <div className="club-leaderboard-row">
+                            <Leaderboard
+                                data={clubLeaderboardData.map(agent => ({
+                                    name: agent.lagnname,
+                                    value: agent.Bronze,
+                                    userId: agent.userId,
+                                    profile_picture: agent.profpic,
+                                    clname: agent.clname,
+                                    mga: agent.mga,
+                                    rga: agent.rga,
+                                    level: 'CLUB'
+                                })).filter(item => item.value > 0).sort((a, b) => b.value - a.value)}
+                                title={`Bronze Club ${clubsView === 'team' ? '($25K+ Team)' : '($15K+ Personal)'}`}
+                                nameField="name"
+                                valueField="value"
+                                allowedNames={allowedNames}
+                                allowedIds={allowedIds}
+                                rawNameField="name"
+                                formatValue={(value) => `${value || 0} ${value === 1 ? 'entry' : 'entries'}`}
+                                loading={loading}
+                                variant="detailed"
+                                showProfilePicture={true}
+                                profilePictureField="profile_picture"
+                                showLevelBadge={true}
+                                showMGA={true}
+                                hierarchyLevel="all"
+                                currentUser={user}
+                                showScrollButtons={true}
+                                onProfileClick={handleProfileClick}
+                                allowExpansion={true}
+                                onExpandItem={(item) => handleExpandClubItem(item, 'Bronze')}
+                                expandedData={Object.fromEntries(
+                                    Object.entries(clubExpandedData)
+                                        .filter(([key]) => key.endsWith('-Bronze'))
+                                        .map(([key, value]) => [key.replace('-Bronze', ''), value])
+                                )}
+                            />
+                            
+                            <Leaderboard
+                                data={clubLeaderboardData.map(agent => ({
+                                    name: agent.lagnname,
+                                    value: agent.WallOfFame,
+                                    userId: agent.userId,
+                                    profile_picture: agent.profpic,
+                                    clname: agent.clname,
+                                    mga: agent.mga,
+                                    rga: agent.rga,
+                                    level: 'CLUB'
+                                })).filter(item => item.value > 0).sort((a, b) => b.value - a.value)}
+                                title={`🌟 Wall of Fame ($8K+ Weekly ${clubsView === 'team' ? 'Team' : 'Personal'})`}
+                                nameField="name"
+                                valueField="value"
+                                allowedNames={allowedNames}
+                                allowedIds={allowedIds}
+                                rawNameField="name"
+                                formatValue={(value) => `${value || 0} ${value === 1 ? 'entry' : 'entries'}`}
+                                loading={loading}
+                                variant="detailed"
+                                showProfilePicture={true}
+                                profilePictureField="profile_picture"
+                                showLevelBadge={true}
+                                showMGA={true}
+                                hierarchyLevel="all"
+                                currentUser={user}
+                                showScrollButtons={true}
+                                onProfileClick={handleProfileClick}
+                                allowExpansion={true}
+                                onExpandItem={(item) => handleExpandClubItem(item, 'WallOfFame')}
+                                expandedData={Object.fromEntries(
+                                    Object.entries(clubExpandedData)
+                                        .filter(([key]) => key.endsWith('-WallOfFame'))
+                                        .map(([key, value]) => [key.replace('-WallOfFame', ''), value])
+                                )}
+                            />
+                        </div>
+                    </div>
+                ) : (
+                <>
                 {/* Top Producers - spans full width - hide for MORE mode since we show MGA/RGA below */}
                 {!isMORE && (
                     <div className="leaderboard-main-row">
@@ -2625,6 +3062,7 @@ const LeaderboardPage = () => {
                         className="main-leaderboard"
                         currentUser={user}
                         showScrollButtons={true}
+                        onProfileClick={handleProfileClick}
                     />
                 </div>
                 )}
@@ -2654,6 +3092,7 @@ const LeaderboardPage = () => {
                             achievementColors={achievementColors}
                             currentUser={user}
                             showScrollButtons={true}
+                            onProfileClick={handleProfileClick}
                         />
                         <Leaderboard
                             data={leaderboardData.rga.data}
@@ -2676,6 +3115,7 @@ const LeaderboardPage = () => {
                             achievementColors={achievementColors}
                             currentUser={user}
                             showScrollButtons={true}
+                            onProfileClick={handleProfileClick}
                         />
                     </div>
                 ) : (
@@ -2849,7 +3289,20 @@ const LeaderboardPage = () => {
                 </div>
                     </>
                 )}
+                </>
+                )}
             </div>
+            
+            {/* Agent Profile RightDetails */}
+            {showRightDetails && rightDetailsData && (
+                <RightDetails
+                    data={rightDetailsData}
+                    onClose={() => {
+                        setShowRightDetails(false);
+                        setRightDetailsData(null);
+                    }}
+                />
+            )}
         </div>
     );
 };

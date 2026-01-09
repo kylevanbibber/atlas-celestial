@@ -124,7 +124,7 @@ const MoreReportingStatus = ({ amoreData, filters, dateRange }) => {
   };
 
   return (
-    <div className="more-leaderboard-container">
+    <div className="more-reporting-status-container">
       <div className="more-header-with-toggle-and-filters">
         <div>
           <h5>Reporting Status</h5>

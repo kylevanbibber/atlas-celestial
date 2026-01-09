@@ -36,6 +36,13 @@
   flex: 1;
 }
 
+.more-reporting-status-container {
+  width: 100%;
+  max-width: 100%;
+  display: block;
+  overflow-x: auto;
+}
+
 .recruiting-table {
   width: 100%;
   border-collapse: collapse;
@@ -445,8 +452,9 @@
 
 .more-form-container {
   width: 100%;
+  max-width: 1000px;
   margin: 0 auto;
-  padding: 0;
+  padding: 0 16px;
   background: transparent;
   border-radius: 10px;
   font-family: inherit;
@@ -457,6 +465,7 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
+  margin-top: 16px;
   margin-bottom: 20px;
 }
 
@@ -465,6 +474,13 @@
   text-align: center;
   display: flex;
   align-items: center;
+  gap: 10px;
+}
+
+.week-selector-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 10px;
 }
 
@@ -568,6 +584,16 @@
 
 .more-form-input:focus {
   border-color: var(--button-primary-bg);
+}
+
+.more-form-input--readonly {
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+}
+
+.more-form-input--readonly:focus {
+  border-color: var(--border-color);
 }
 
 .warning-message-container {
@@ -703,6 +729,13 @@
 .horizontal-table {
   overflow-x: auto;
   margin-top: 20px;
+  margin-bottom: 28px;
+}
+
+.more-input-section {
+  max-width: 820px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .morebonus-table {
@@ -729,6 +762,29 @@
 .more-table-header {
   font-size: 12px;
   font-weight: 600;
+}
+
+/* Second header row (column labels) */
+.morebonus-table th.more-table-subheader {
+  background-color: var(--bg-secondary, #f3f4f6) !important;
+  color: var(--text-primary, #111827) !important;
+}
+
+/* Optional accent for a specific subheader cell (e.g., Hires Purchased) */
+.morebonus-table th.more-table-subheader.more-table-subheader--accent {
+  background-color: #dbeafe !important; /* light blue */
+  color: #0f172a !important;
+}
+
+[data-theme="dark"] .morebonus-table th.more-table-subheader.more-table-subheader--accent {
+  background-color: #1e3a8a !important;
+  color: #f9fafb !important;
+}
+
+/* Dark mode: keep subheader readable */
+[data-theme="dark"] .morebonus-table th.more-table-subheader {
+  background-color: var(--bg-tertiary, #1f2937) !important;
+  color: var(--text-primary, #f9fafb) !important;
 }
 
 .morebonus-table tr:nth-child(even) {

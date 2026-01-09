@@ -233,6 +233,11 @@ if (column?.massSelection) {
           border: `2px solid ${borderColor}`,
           width: "100%",
           boxSizing: "border-box",
+          padding: "4px 8px",
+          borderRadius: "4px",
+          fontSize: "12px",
+          fontWeight: "500",
+          cursor: "pointer",
         }}
         value={val}
         tabIndex={0}
@@ -274,7 +279,14 @@ if (column?.massSelection) {
         }}
       >
         {column.DropdownOptions.map((opt) => (
-          <option key={opt} value={opt}>
+          <option 
+            key={opt} 
+            value={opt}
+            style={{
+              backgroundColor: "#fff",
+              color: "#333",
+            }}
+          >
             {opt}
           </option>
         ))}

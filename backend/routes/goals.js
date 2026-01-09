@@ -361,6 +361,76 @@ router.post('/', async (req, res) => {
   }
 });
 
+// POST /api/goals/bulk - Get all goals for multiple users at once, or all goals for specific years
+router.post('/bulk', async (req, res) => {
+  try {
+    const { userIds, years, goalType } = req.body;
+    
+    let sql;
+    let params = [];
+    
+    // If years are provided, fetch all goals for those years (optionally filtered by userIds)
+    if (years && Array.isArray(years) && years.length > 0) {
+      const yearPlaceholders = years.map(() => '?').join(',');
+      
+      if (userIds && Array.isArray(userIds) && userIds.length > 0) {
+        // Fetch goals for specific users and years
+        const userPlaceholders = userIds.map(() => '?').join(',');
+        sql = `
+          SELECT * FROM production_goals 
+          WHERE year IN (${yearPlaceholders}) 
+          AND activeUserId IN (${userPlaceholders})
+          ${goalType ? 'AND goal_type = ?' : ''}
+          ORDER BY year DESC, month DESC
+        `;
+        params = goalType ? [...years, ...userIds, goalType] : [...years, ...userIds];
+      } else {
+        // Fetch ALL goals for the specified years
+        sql = `
+          SELECT * FROM production_goals 
+          WHERE year IN (${yearPlaceholders})
+          ${goalType ? 'AND goal_type = ?' : ''}
+          ORDER BY year DESC, month DESC
+        `;
+        params = goalType ? [...years, goalType] : years;
+      }
+    } else if (userIds && Array.isArray(userIds) && userIds.length > 0) {
+      // Original behavior: fetch goals for specific users
+      const placeholders = userIds.map(() => '?').join(',');
+      sql = `
+        SELECT * FROM production_goals 
+        WHERE activeUserId IN (${placeholders})
+        ${goalType ? 'AND goal_type = ?' : ''}
+        ORDER BY year DESC, month DESC
+      `;
+      params = goalType ? [...userIds, goalType] : userIds;
+    } else {
+      return res.status(400).json({ error: 'Either userIds or years array is required' });
+    }
+    
+    const results = await query(sql, params);
+    
+    // Parse JSON fields for each goal and ensure goal_type is set
+    const goals = results.map(goal => {
+      if (goal.customRates && typeof goal.customRates === 'string') {
+        goal.customRates = JSON.parse(goal.customRates);
+      }
+      if (goal.workingDays && typeof goal.workingDays === 'string') {
+        goal.workingDays = JSON.parse(goal.workingDays);
+      }
+      // Ensure goal_type is normalized for consistency
+      goal.goal_type = normalizeGoalType(goal.goal_type);
+      return goal;
+    });
+    
+    console.log(`📦 Bulk goals fetched: ${goals.length} goals (years: ${years || 'N/A'}, users: ${userIds?.length || 'all'}, goalType: ${goalType || 'all'})`);
+    res.json(goals);
+  } catch (error) {
+    console.error('Error fetching bulk user goals:', error);
+    res.status(500).json({ error: 'Failed to fetch bulk goals' });
+  }
+});
+
 // GET /api/goals/:userId - Get all goals for a user
 router.get('/:userId', async (req, res) => {
   try {

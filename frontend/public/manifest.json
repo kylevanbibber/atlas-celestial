@@ -1,6 +1,6 @@
 {
   "short_name": "Atlas",
-  "name": "Atlas Notification App",
+  "name": "Atlas - Arias Agencies",
   "icons": [
     {
       "src": "favicon.ico",
@@ -24,16 +24,28 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "theme_color": "#000000",
+  "theme_color": "#007AFF",
   "background_color": "#ffffff",
-  "description": "Atlas - Your Notification App with Push Notifications",
+  "description": "Atlas - Team management and productivity platform for Arias Agencies",
   "dir": "ltr",
   "lang": "en-US",
   "prefer_related_applications": false,
   "related_applications": [],
-  "categories": ["productivity", "utilities"],
+  "categories": ["productivity", "business", "utilities"],
   "screenshots": [],
   "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "View your dashboard",
+      "url": "/dashboard",
+      "icons": [
+        {
+          "src": "logo192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
     {
       "name": "Notifications",
       "short_name": "Notifications",

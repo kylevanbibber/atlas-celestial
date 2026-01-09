@@ -28,6 +28,29 @@ const ReportMore = ({ user, onDataUpdate }) => {
     Group_Invite: 0,
     Finals_Set: 0,
     Finals_Show: 0,
+    // New recruiting breakdown fields
+    PR_Final_Set: 0,
+    PR_Final_Show: 0,
+    Happenstance_PR_Hires: 0,
+    PPR_Hires: 0,
+    Social_Media_Hires: 0,
+    Webinar_Sets_Purchased: 0,
+    Webinar_Finals_Set: 0,
+    Webinar_Final_Show: 0,
+    Webinar_Hires: 0,
+    Surveys_Purchased: 0,
+    Survey_Finals_Set: 0,
+    Survey_Finals_Show: 0,
+    Survey_Hires: 0,
+    Vendor_Finals_Purchased: 0,
+    Vendor_Final_Show: 0,
+    Vendor_Final_Hires: 0,
+    Vendor_Hires_Purchased: 0,
+    Total_Vendor_Hires: 0,
+    Internal_Webinar_Sets: 0,
+    Internal_Finals_Set: 0,
+    Internal_Final_Show: 0,
+    Total_Internal_Hires: 0,
     Non_PR_Hires: 0,
     PR_Hires: 0,
     Total_Hires: 0,
@@ -146,6 +169,29 @@ const ReportMore = ({ user, onDataUpdate }) => {
           Group_Invite: null,
           Finals_Set: null,
           Finals_Show: null,
+          // New recruiting breakdown fields
+          PR_Final_Set: null,
+          PR_Final_Show: null,
+          Happenstance_PR_Hires: null,
+          PPR_Hires: null,
+          Social_Media_Hires: null,
+          Webinar_Sets_Purchased: null,
+          Webinar_Finals_Set: null,
+          Webinar_Final_Show: null,
+          Webinar_Hires: null,
+          Surveys_Purchased: null,
+          Survey_Finals_Set: null,
+          Survey_Finals_Show: null,
+          Survey_Hires: null,
+          Vendor_Finals_Purchased: null,
+          Vendor_Final_Show: null,
+          Vendor_Final_Hires: null,
+          Vendor_Hires_Purchased: null,
+          Total_Vendor_Hires: null,
+          Internal_Webinar_Sets: null,
+          Internal_Finals_Set: null,
+          Internal_Final_Show: null,
+          Total_Internal_Hires: null,
           Non_PR_Hires: null,
           PR_Hires: null,
           Total_Hires: null,
@@ -179,6 +225,29 @@ const ReportMore = ({ user, onDataUpdate }) => {
       Group_Invite: 0,
       Finals_Set: 0,
       Finals_Show: 0,
+      // New recruiting breakdown fields
+      PR_Final_Set: 0,
+      PR_Final_Show: 0,
+      Happenstance_PR_Hires: 0,
+      PPR_Hires: 0,
+      Social_Media_Hires: 0,
+      Webinar_Sets_Purchased: 0,
+      Webinar_Finals_Set: 0,
+      Webinar_Final_Show: 0,
+      Webinar_Hires: 0,
+      Surveys_Purchased: 0,
+      Survey_Finals_Set: 0,
+      Survey_Finals_Show: 0,
+      Survey_Hires: 0,
+      Vendor_Finals_Purchased: 0,
+      Vendor_Final_Show: 0,
+      Vendor_Final_Hires: 0,
+      Vendor_Hires_Purchased: 0,
+      Total_Vendor_Hires: 0,
+      Internal_Webinar_Sets: 0,
+      Internal_Finals_Set: 0,
+      Internal_Final_Show: 0,
+      Total_Internal_Hires: 0,
       Non_PR_Hires: 0,
       PR_Hires: 0,
       Total_Hires: 0,
@@ -247,38 +316,87 @@ const ReportMore = ({ user, onDataUpdate }) => {
         [name]: parsedValue,
       };
 
-      // Ensure Total Sets = External Sets + Internal Sets + Personal Sets
-      updatedFormData.Total_Set =
-        (parseInt(updatedFormData.External_Sets || 0, 10) +
-          parseInt(updatedFormData.Internal_Sets || 0, 10) +
-          parseInt(updatedFormData.Personal_Sets || 0, 10)) || 0;
+      // Auto-calculate Final Interview totals from section-level finals fields
+      // (Personal + Internal + Vendor sub-sections)
+      const calcFinalsSetTotal = () =>
+        (parseInt(updatedFormData.PR_Final_Set || 0, 10) +
+          parseInt(updatedFormData.Webinar_Finals_Set || 0, 10) +
+          parseInt(updatedFormData.Survey_Finals_Set || 0, 10) +
+          parseInt(updatedFormData.Internal_Finals_Set || 0, 10) +
+          // "Vendor_Finals_Purchased" acts as the finals-set count for the finals-purchased vendor stream
+          parseInt(updatedFormData.Vendor_Finals_Purchased || 0, 10)) || 0;
 
-      // Ensure Total Shows = External Shows + Internal Shows + Personal Shows
-      updatedFormData.Total_Show =
-        (parseInt(updatedFormData.External_Shows || 0, 10) +
-          parseInt(updatedFormData.Internal_Shows || 0, 10) +
-          parseInt(updatedFormData.Personal_Shows || 0, 10)) || 0;
+      const calcFinalsShowTotal = () =>
+        (parseInt(updatedFormData.PR_Final_Show || 0, 10) +
+          parseInt(updatedFormData.Webinar_Final_Show || 0, 10) +
+          parseInt(updatedFormData.Survey_Finals_Show || 0, 10) +
+          parseInt(updatedFormData.Internal_Final_Show || 0, 10) +
+          parseInt(updatedFormData.Vendor_Final_Show || 0, 10)) || 0;
 
-      // Validate PR Hires
-      if (name === "PR_Hires" || name === "Total_Hires") {
-        const totalHires = parseInt(updatedFormData.Total_Hires || 0, 10);
-        const prHires = parseInt(updatedFormData.PR_Hires || 0, 10);
+      const finalsSetTotal = calcFinalsSetTotal();
+      const finalsShowTotal = calcFinalsShowTotal();
 
-        if (prHires > totalHires) {
-          alert("PR Hires cannot be greater than Total Hires");
-          updatedFormData.PR_Hires = prev.PR_Hires || 0;
-        } else {
-          updatedFormData.Non_PR_Hires = totalHires - prHires;
-        }
-      } else {
-        updatedFormData.Non_PR_Hires =
-          (parseInt(updatedFormData.Total_Hires || 0, 10) -
-            parseInt(updatedFormData.PR_Hires || 0, 10)) || 0;
+      updatedFormData.Finals_Set = finalsSetTotal;
+      updatedFormData.Finals_Show = finalsShowTotal;
+
+      // Auto-calculate Total Hiring breakdown:
+      // - PR Hires: from Personal Recruiting section
+      // - Non-PR Hires: from Internal + Vendors sections
+      const prHiresTotal =
+        (parseInt(updatedFormData.Happenstance_PR_Hires || 0, 10) +
+          parseInt(updatedFormData.PPR_Hires || 0, 10) +
+          parseInt(updatedFormData.Social_Media_Hires || 0, 10)) || 0;
+
+      const vendorHiresTotal =
+        (parseInt(updatedFormData.Webinar_Hires || 0, 10) +
+          parseInt(updatedFormData.Survey_Hires || 0, 10) +
+          parseInt(updatedFormData.Vendor_Final_Hires || 0, 10) +
+          parseInt(updatedFormData.Vendor_Hires_Purchased || 0, 10)) || 0;
+
+      // Keep Total Vendor Hires synced (no direct entry needed)
+      updatedFormData.Total_Vendor_Hires = vendorHiresTotal;
+
+      const nonPrHiresTotal =
+        (parseInt(updatedFormData.Total_Internal_Hires || 0, 10) + vendorHiresTotal) || 0;
+
+      updatedFormData.PR_Hires = prHiresTotal;
+      updatedFormData.Non_PR_Hires = nonPrHiresTotal;
+
+      const computedTotalHires = prHiresTotal + nonPrHiresTotal;
+      const currentTotalHires = parseInt(updatedFormData.Total_Hires || 0, 10) || 0;
+
+      // Allow user to enter just Total Hires, but if section totals exceed it, bump Total Hires up
+      if (computedTotalHires > currentTotalHires) {
+        updatedFormData.Total_Hires = computedTotalHires;
+      }
+
+      // Only auto-calculate totals when editing the legacy source fields.
+      // This prevents overwriting totals when using the newer recruiting fields.
+      if (["External_Sets", "Internal_Sets", "Personal_Sets"].includes(name)) {
+        updatedFormData.Total_Set =
+          (parseInt(updatedFormData.External_Sets || 0, 10) +
+            parseInt(updatedFormData.Internal_Sets || 0, 10) +
+            parseInt(updatedFormData.Personal_Sets || 0, 10)) || 0;
+      }
+
+      if (["External_Shows", "Internal_Shows", "Personal_Shows"].includes(name)) {
+        updatedFormData.Total_Show =
+          (parseInt(updatedFormData.External_Shows || 0, 10) +
+            parseInt(updatedFormData.Internal_Shows || 0, 10) +
+            parseInt(updatedFormData.Personal_Shows || 0, 10)) || 0;
       }
 
       setPendingUpdates((prevUpdates) => ({
         ...prevUpdates,
         [name]: parsedValue,
+        // Keep finals totals synced in the backend whenever any field changes
+        Finals_Set: finalsSetTotal,
+        Finals_Show: finalsShowTotal,
+        // Keep hiring totals synced in the backend whenever any field changes
+        PR_Hires: updatedFormData.PR_Hires,
+        Non_PR_Hires: updatedFormData.Non_PR_Hires,
+        Total_Hires: updatedFormData.Total_Hires,
+        Total_Vendor_Hires: updatedFormData.Total_Vendor_Hires,
       }));
 
       return updatedFormData;
@@ -543,29 +661,38 @@ const ReportMore = ({ user, onDataUpdate }) => {
 
         {!isCollapsed && (
           <>
+            {/*
+              Helper renderer: turns a list of fields into a compact, consistent input table.
+              We keep the existing `.horizontal-table` / `.morebonus-table` styling for consistency.
+            */}
             <div className="more-date-navigation">
-              <button className="more-week-button" onClick={() => updateWeek(-1)}>
-                &lt;
-              </button>
               <div className="date-range-container">
                 <span className="recruiting-week-label">Recruiting Week:</span>
-                <select
-                  className="week-selector"
-                  value={currentWeek}
-                  onChange={(e) => setCurrentWeek(parseInt(e.target.value, 10))}
-                >
-                  {[...Array(100)]
-                    .map((_, index) => -index)
-                    .concat(0, 1)
-                    .map((offset) => {
-                      const { formattedRange } = calculateDateRange(offset);
-                      return (
-                        <option key={offset} value={offset}>
-                          {formattedRange}
-                        </option>
-                      );
-                    })}
-                </select>
+                <div className="week-selector-row">
+                  <button className="more-week-button" onClick={() => updateWeek(-1)}>
+                    &lt;
+                  </button>
+                  <select
+                    className="week-selector"
+                    value={currentWeek}
+                    onChange={(e) => setCurrentWeek(parseInt(e.target.value, 10))}
+                  >
+                    {[...Array(100)]
+                      .map((_, index) => -index)
+                      .concat(0, 1)
+                      .map((offset) => {
+                        const { formattedRange } = calculateDateRange(offset);
+                        return (
+                          <option key={offset} value={offset}>
+                            {formattedRange}
+                          </option>
+                        );
+                      })}
+                  </select>
+                  <button className="more-week-button" onClick={() => updateWeek(1)}>
+                    &gt;
+                  </button>
+                </div>
 
                 <div className="week-indicator-wrapper">
                   <span className="week-indicator">
@@ -576,9 +703,6 @@ const ReportMore = ({ user, onDataUpdate }) => {
                   <div className={`more-spinner ${loading ? "visible" : ""}`}></div>
                 </div>
               </div>
-              <button className="more-week-button" onClick={() => updateWeek(1)}>
-                &gt;
-              </button>
             </div>
 
             <div style={{ display: "flex", justifyContent: "center", marginTop: "10px", marginBottom: "10px" }}>
@@ -601,67 +725,175 @@ const ReportMore = ({ user, onDataUpdate }) => {
               </button>
             </div>
 
-            <div className="horizontal-table">
-              <table className="morebonus-table">
-                <thead>
-                  <tr>
-                    <th style={{ backgroundColor: "#00548c" }} colSpan="2" className="more-table-header">Vendor Data</th>
-                    <th style={{ backgroundColor: "#ED722F" }} colSpan="2" className="more-table-header">Resume Data</th>
-                    <th style={{ backgroundColor: "#B25271" }} colSpan="2" className="more-table-header">Personal Data</th>
-                    <th style={{ backgroundColor: "#bbbbbb" }} colSpan="3" className="more-table-header">Overview Data</th>
-                    <th style={{ backgroundColor: "#319b43bb" }} colSpan="2" className="more-table-header">Finals Data</th>
-                    <th style={{ backgroundColor: "#00548c" }} colSpan="3" className="more-table-header">Hires Data</th>
-                  </tr>
-                  <tr>
-                    <th style={{ backgroundColor: "#319b43bb" }} className="more-table-header">External Sets</th>
-                    <th style={{ backgroundColor: "#319b43bb" }} className="more-table-header">External Shows</th>
-                    <th style={{ backgroundColor: "#319b43bb" }} className="more-table-header">Internal Sets</th>
-                    <th style={{ backgroundColor: "#319b43bb" }} className="more-table-header">Internal Shows</th>
-                    <th style={{ backgroundColor: "#319b43bb" }} className="more-table-header">Personal Sets</th>
-                    <th style={{ backgroundColor: "#319b43bb" }} className="more-table-header">Personal Shows</th>
-                    <th style={{ backgroundColor: "#319b43bb" }} className="more-table-header">Total Sets</th>
-                    <th style={{ backgroundColor: "#319b43bb" }} className="more-table-header">Total Shows</th>
-                    <th style={{ backgroundColor: "#319b43bb" }} className="more-table-header">Group Invite</th>
-                    <th style={{ backgroundColor: "#319b43bb" }} className="more-table-header">Finals Set</th>
-                    <th style={{ backgroundColor: "#319b43bb" }} className="more-table-header">Finals Show</th>
-                    <th style={{ backgroundColor: "#319b43bb" }} className="more-table-header">Total Hires</th>
-                    <th style={{ backgroundColor: "#319b43bb" }} className="more-table-header">PR Hires</th>
-                    <th style={{ backgroundColor: "#319b43bb" }} className="more-table-header">Non PR Hires</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    {[
-                      "External_Sets",
-                      "External_Shows",
-                      "Internal_Sets",
-                      "Internal_Shows",
-                      "Personal_Sets",
-                      "Personal_Shows",
-                      "Total_Set",
-                      "Total_Show",
-                      "Group_Invite",
-                      "Finals_Set",
-                      "Finals_Show",
-                      "Total_Hires",
-                      "PR_Hires",
-                      "Non_PR_Hires",
-                    ].map((name) => (
-                      <td key={name}>
-                        <input
-                          className="more-form-input"
-                          type="number"
-                          name={name}
-                          value={formData[name] === null ? "" : formData[name]}
-                          onChange={handleChange}
-                          onFocus={handleFocus}
-                        />
-                      </td>
-                    ))}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            {(() => {
+              const renderSectionTable = ({ title, titleParts, headerColor, columns }) => (
+                <div className="horizontal-table more-input-section">
+                  <table className="morebonus-table">
+                    <thead>
+                      {Array.isArray(titleParts) && titleParts.length > 0 ? (
+                        <tr>
+                          {titleParts.map((part, idx) => (
+                            <th
+                              key={`${part.label || "title"}-${idx}`}
+                              colSpan={part.span}
+                              className="more-table-header"
+                              style={{ backgroundColor: part.backgroundColor || headerColor, color: "white" }}
+                            >
+                              {part.label}
+                            </th>
+                          ))}
+                        </tr>
+                      ) : (
+                        <tr>
+                          <th
+                            style={{ backgroundColor: headerColor }}
+                            colSpan={columns.length}
+                            className="more-table-header"
+                          >
+                            {title}
+                          </th>
+                        </tr>
+                      )}
+                      <tr>
+                        {columns.map((col) => (
+                          <th
+                            key={col.field}
+                            className={`more-table-header more-table-subheader${col.headerClassName ? ` ${col.headerClassName}` : ""}`}
+                            title={col.tooltip || undefined}
+                          >
+                            {col.label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        {columns.map((col) => (
+                          <td key={col.field}>
+                            <input
+                              className={`more-form-input${col.readOnly ? " more-form-input--readonly" : ""}`}
+                              type="number"
+                              name={col.field}
+                              value={
+                                col.getValue
+                                  ? col.getValue(formData)
+                                  : formData[col.field] === null
+                                    ? ""
+                                    : formData[col.field]
+                              }
+                              onChange={handleChange}
+                              onFocus={handleFocus}
+                              readOnly={!!col.readOnly}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              );
+
+              return (
+                <>
+                  {/* 1) Total Hiring Data first */}
+                  {renderSectionTable({
+                    title: "Total Hiring Data",
+                    headerColor: "#00548c", // legacy Hires Data color
+                    columns: [
+                      { field: "Non_PR_Hires", label: "Non-PR Hires", readOnly: true },
+                      { field: "PR_Hires", label: "PR Hires", readOnly: true },
+                      { field: "Total_Hires", label: "Total Hires" }, // user editable, but can be bumped up by section totals
+                    ],
+                  })}
+
+                  {/* 2) Personal */}
+                  {renderSectionTable({
+                    title: "Personal Recruiting",
+                    headerColor: "#B25271", // legacy Personal Data color
+                    columns: [
+                      { field: "PR_Final_Set", label: "Finals Set" },
+                      { field: "PR_Final_Show", label: "Final Show" },
+                      { 
+                        field: "Happenstance_PR_Hires", 
+                        label: "Happenstance PR Hires",
+                        tooltip: "A personal recruit you meet on random introduction. this would be someone at the gym, your waiter at a restaurant, or a personal friend"
+                      },
+                      { 
+                        field: "PPR_Hires", 
+                        label: "Presentation PR",
+                        tooltip: "Someone recruited through a sales presentation"
+                      },
+                      { field: "Social_Media_Hires", label: "Social Media Hires" },
+                    ],
+                  })}
+
+                  {/* 3) Internal */}
+                  {renderSectionTable({
+                    title: "Internal Recruiting",
+                    headerColor: "#ED722F", // legacy Resume Data color
+                    columns: [
+                      { field: "Internal_Webinar_Sets", label: "Webinar Sets" },
+                      { field: "Internal_Finals_Set", label: "Finals Set" },
+                      { field: "Internal_Final_Show", label: "Final Show" },
+                      { field: "Total_Internal_Hires", label: "Total Internal Hires" },
+                    ],
+                  })}
+
+                  {/* 4) Vendors broken up */}
+                  {renderSectionTable({
+                    title: "Vendors — Webinar",
+                    headerColor: "#319b43bb", // green
+                    columns: [
+                      { field: "Webinar_Sets_Purchased", label: "Sets Purchased" },
+                      { field: "Webinar_Finals_Set", label: "Finals Set" },
+                      { field: "Webinar_Final_Show", label: "Final Show" },
+                      { field: "Webinar_Hires", label: "Hires" },
+                    ],
+                  })}
+
+                  {renderSectionTable({
+                    title: "Vendors — Surveys",
+                    headerColor: "#319b43bb", // green
+                    columns: [
+                      { field: "Surveys_Purchased", label: "Purchased" },
+                      { field: "Survey_Finals_Set", label: "Finals Set" },
+                      { field: "Survey_Finals_Show", label: "Final Show" },
+                      { field: "Survey_Hires", label: "Hires" },
+                    ],
+                  })}
+
+                  {renderSectionTable({
+                    titleParts: [
+                      { label: "Vendors — Finals Purchased", span: 3, backgroundColor: "#319b43bb" },
+                      { label: "Vendor Totals", span: 2, backgroundColor: "#00548c" },
+                    ],
+                    headerColor: "#319b43bb", // green
+                    columns: [
+                      { field: "Vendor_Finals_Purchased", label: "Finals Purchased" },
+                      { field: "Vendor_Final_Show", label: "Final Show" },
+                      { field: "Vendor_Final_Hires", label: "Hires" },
+                      { 
+                        field: "Vendor_Hires_Purchased", 
+                        label: "Hires Purchased", 
+                        headerClassName: "more-table-subheader--accent",
+                        tooltip: "A recruit that is already enrolled in a pre licensing course, or already licensed."
+                      },
+                      { field: "Total_Vendor_Hires", label: "Total Vendor Hires", readOnly: true },
+                    ],
+                  })}
+
+                  {/* Final Interview Data at the end (auto-totals) */}
+                  {renderSectionTable({
+                    title: "Final Interview Data",
+                    headerColor: "#00548c", // match Total Hiring Data color
+                    columns: [
+                      { field: "Finals_Set", label: "Total Finals Set", readOnly: true },
+                      { field: "Finals_Show", label: "Total Final Show", readOnly: true },
+                    ],
+                  })}
+                </>
+              );
+            })()}
           </>
         )}
       </div>

@@ -6,7 +6,7 @@ DB_CONFIG = {
     'host': '208.109.78.44',
     'user': 'kvanbibber',
     'password': 'Atlas2024!',
-    'database': 'AriasLifeUsers',
+    'database': 'atlas',
     'charset': 'utf8mb4'
 }
 

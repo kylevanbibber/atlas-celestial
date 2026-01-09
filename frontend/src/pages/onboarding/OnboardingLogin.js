@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../../api';
 import './Onboarding.css';
 import logo from '../../img/globe1.png';
@@ -15,6 +15,11 @@ const OnboardingLogin = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [randomQuote, setRandomQuote] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Extract hm parameter from URL
+  const searchParams = new URLSearchParams(location.search);
+  const hmParam = searchParams.get('hm');
 
   useEffect(() => {
     setRandomQuote(quotes[Math.floor(Math.random() * quotes.length)]);
@@ -25,11 +30,34 @@ const OnboardingLogin = () => {
     setIsLoading(true);
     try {
       const res = await api.post('/onboarding/auth/start', { email: emailToCheck });
-      const { exists, hasPassword } = res.data || {};
-      if (!exists) {
-        navigate('/onboarding/register', { state: { email: emailToCheck } });
+      const { exists, needsRegistration, needsCompletion, missingFields, existingData, hasPassword } = res.data || {};
+      
+      // Determine which hm to use (URL param only on login; hiring manager selection is handled on register)
+      const effectiveHm = hmParam || null;
+      
+      // No pipeline record at all - full registration
+      if (!exists || needsRegistration) {
+        const registerUrl = effectiveHm ? `/onboarding/register?hm=${effectiveHm}` : '/onboarding/register';
+        navigate(registerUrl, { state: { email: emailToCheck, hm: effectiveHm } });
         return;
       }
+      
+      // Pipeline record exists but redeemed = 0 - complete registration with missing fields
+      if (needsCompletion) {
+        const registerUrl = effectiveHm ? `/onboarding/register?hm=${effectiveHm}` : '/onboarding/register';
+        navigate(registerUrl, { 
+          state: { 
+            email: emailToCheck,
+            needsCompletion: true,
+            missingFields,
+            existingData,
+            hm: effectiveHm
+          } 
+        });
+        return;
+      }
+      
+      // User is redeemed, proceed with password check
       setShowPassword(true);
       setRequiresSetPassword(!hasPassword);
       setLastCheckedEmail(emailToCheck);
@@ -60,8 +88,31 @@ const OnboardingLogin = () => {
       }
       const res = await api.post('/onboarding/auth/login', { email, password });
       if (res.data?.success) {
+        console.log('[OnboardingLogin] Login successful, storing token:', res.data.token ? 'Token received' : 'No token');
         localStorage.setItem('onboardingEmail', email);
         localStorage.setItem('onboardingPipelineId', String(res.data.pipeline_id));
+        // Store JWT token for authenticated API requests
+        if (res.data.token) {
+          localStorage.setItem('token', res.data.token);
+          console.log('[OnboardingLogin] Token stored in localStorage');
+          
+          // Decode and log token details for debugging
+          try {
+            const tokenParts = res.data.token.split('.');
+            const payload = JSON.parse(atob(tokenParts[1]));
+            console.log('[OnboardingLogin] Token payload:', {
+              id: payload.id,
+              email: payload.email,
+              role: payload.role,
+              exp: payload.exp,
+              expiresAt: new Date(payload.exp * 1000).toLocaleString()
+            });
+          } catch (e) {
+            console.error('[OnboardingLogin] Failed to decode token:', e);
+          }
+        } else {
+          console.error('[OnboardingLogin] No token received from server!');
+        }
         navigate('/onboarding/home');
       } else {
         setErrorMessage('Invalid credentials.');
@@ -109,6 +160,7 @@ const OnboardingLogin = () => {
                 <label htmlFor="email">Email</label>
                 <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
+              
               {showPassword && (
                 <div className="form-group onboarding-form-group">
                   <label htmlFor="password">{requiresSetPassword ? 'Set Password' : 'Password'}</label>
@@ -126,14 +178,6 @@ const OnboardingLogin = () => {
                 <button type="button" className="link-button" onClick={() => navigate('/login')}>Back to Agent Login</button>
               </div>
             </form>
-            <div className="login-links onboarding-links" style={{ marginTop: 20 }}>
-              <button
-                className="secondary-button"
-                onClick={() => window.open('https://ariaslife.mykajabi.com/', '_blank')}
-              >
-                New Agent Training Course
-              </button>
-            </div>
           </div>
         </div>
       </div>

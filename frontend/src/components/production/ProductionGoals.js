@@ -15,7 +15,7 @@ const ProductionGoals = () => {
   const [mgaGoalData, setMgaGoalData] = useState(null);
   const [rgaGoalData, setRgaGoalData] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [viewScope, setViewScope] = useState('personal'); // 'personal' | 'team'
+  const [viewScope, setViewScope] = useState('personal'); // 'personal' | 'team' | 'agency'
   
   // Goal setting state
   const [monthlyAlpGoal, setMonthlyAlpGoal] = useState('');
@@ -62,6 +62,13 @@ const ProductionGoals = () => {
   const [inactiveTeamRows, setInactiveTeamRows] = useState([]);
   const [showInactiveAgents, setShowInactiveAgents] = useState(false);
   const [mgaOnly, setMgaOnly] = useState(false);
+  
+  // Agency goals state (for SGA users)
+  const [agencyLoading, setAgencyLoading] = useState(false);
+  const [agencyRows, setAgencyRows] = useState([]);
+  const [agencyRowsAll, setAgencyRowsAll] = useState([]);
+  const [inactiveAgencyRows, setInactiveAgencyRows] = useState([]);
+  const [showInactiveAgencyAgents, setShowInactiveAgencyAgents] = useState(false);
   
   // Date override state
   const [dateOverride, setDateOverride] = useState(null);
@@ -362,6 +369,210 @@ const ProductionGoals = () => {
       loadTeamALPProgress();
     }
   }, [viewScope]); // Only trigger on viewScope change, not goal data changes
+
+  // Load agency hierarchy and goals when in agency scope (SGA users)
+  useEffect(() => {
+    const loadAgencyGoals = async () => {
+      if (viewScope !== 'agency') return;
+      if (!user?.userId || !selectedYear || !selectedMonth) {
+        setAgencyRows([]);
+        return;
+      }
+      
+      // Only allow SGA users to access agency view
+      const userRole = String(user?.clname || '').toUpperCase();
+      if (userRole !== 'SGA') {
+        setAgencyRows([]);
+        return;
+      }
+      
+      try {
+        setAgencyLoading(true);
+        
+        // For SGA users, fetch ALL users from the database (full agency)
+        // /users/active returns all Active='y' users with managerActive, sa, ga, mga, rga fields
+        const allUsersResponse = await api.get('/users/active');
+        const allHierUsers = allUsersResponse.data || [];
+        
+        console.log(`📊 [Agency Goals] Loaded ${allHierUsers.length} total users for SGA agency view`);
+        
+        const byUserId = new Map(allHierUsers.map(u => [u.id, { ...u, managerActive: u.managerActive || 'y' }]));
+        const members = allHierUsers.map(u => ({ 
+          id: u.id, 
+          name: u.lagnname, 
+          role: u.clname,
+          managerActive: u.managerActive || 'y'
+        }));
+        const byId = new Map(members.map(m => [m.id, m]));
+        if (!byId.has(user.userId)) {
+          byId.set(user.userId, { 
+            id: user.userId, 
+            name: user.lagnname || '', 
+            role: user.clname || '',
+            managerActive: 'y'
+          });
+        }
+        const finalMembers = Array.from(byId.values());
+
+        // Batch fetch personal goals for the month
+        const payload = { 
+          userIds: finalMembers.map(m => m.id), 
+          year: selectedYear, 
+          month: selectedMonth,
+          goalType: 'personal'
+        };
+        const batch = await api.post('/goals/batch', payload);
+        const goalsByUserId = batch.data?.goalsByUserId || {};
+
+        // Build hierarchy order (RGA > MGA > GA > SA > AGT)
+        const orderNames = buildHierarchyOrder(allHierUsers);
+        const indexByName = new Map(orderNames.map((n, i) => [n, i]));
+
+        // Load activity for the month and aggregate ALP by agent
+        const monthStart = new Date(selectedYear, selectedMonth - 1, 1);
+        const monthEnd = new Date(selectedYear, selectedMonth, 0);
+        const activityRes = await api.get('/dailyActivity/all');
+        const allActivity = (activityRes.data?.data || []).map(a => ({
+          ...a,
+          reportDate: new Date(new Date(a.reportDate).getTime() + new Date(a.reportDate).getTimezoneOffset() * 60000),
+          alp: (a.alp === null || a.alp === undefined || a.alp === '') ? 0 : (parseFloat(a.alp) || 0)
+        }));
+        const alpByName = new Map();
+        allActivity.forEach(a => {
+          const d = a.reportDate;
+          if (d >= monthStart && d <= monthEnd) {
+            const key = (a.agent || '').trim();
+            if (!key) return;
+            alpByName.set(key, (alpByName.get(key) || 0) + (a.alp || 0));
+          }
+        });
+
+        const today = new Date();
+        const isCurrentMonth = (today.getFullYear() === selectedYear) && ((today.getMonth() + 1) === selectedMonth);
+
+        const rows = finalMembers.map(member => {
+          const goalKey = `${member.id}_personal`;
+          const goal = goalsByUserId[goalKey] || null;
+          const monthlyGoal = goal?.monthlyAlpGoal ? parseFloat(goal.monthlyAlpGoal) : 0;
+          const reportedAlp = alpByName.get(member.name) || 0;
+          const remainingAlp = Math.max(0, (monthlyGoal || 0) - reportedAlp);
+          const workingDaysArr = Array.isArray(goal?.workingDays) ? goal.workingDays : [];
+          const workingDaysInMonth = workingDaysArr.filter(ds => {
+            const d = new Date(ds + 'T00:00:00');
+            return d.getFullYear() === selectedYear && (d.getMonth() + 1) === selectedMonth;
+          });
+          const workingDaysRemaining = isCurrentMonth
+            ? workingDaysInMonth.filter(ds => new Date(ds + 'T00:00:00') >= new Date(new Date().toDateString())).length
+            : workingDaysInMonth.length;
+
+          const rates = (() => {
+            if (goal?.rateSource === 'custom' && goal?.customRates) return goal.customRates;
+            return agencyRates;
+          })();
+
+          let effectiveGoal = monthlyGoal;
+          let effectiveDays = workingDaysInMonth.length || 1;
+          if (isCurrentMonth && workingDaysRemaining > 0) {
+            effectiveGoal = remainingAlp;
+            effectiveDays = workingDaysRemaining;
+          }
+          const requiredSales = Math.ceil((effectiveGoal || 0) / (rates.salesToAlp || 1200));
+          const requiredSits = Math.ceil(requiredSales / (rates.sitsToSales || 0.33));
+          const requiredAppts = Math.ceil(requiredSits / (rates.apptsToSits || 0.25));
+          const requiredCalls = Math.ceil(requiredAppts * (rates.callsToAppts || 35));
+          const dailyNeeded = {
+            alp: Math.round((effectiveGoal || 0) / effectiveDays),
+            sales: Math.ceil(requiredSales / effectiveDays),
+            sits: Math.ceil(requiredSits / effectiveDays),
+            appts: Math.ceil(requiredAppts / effectiveDays),
+            calls: Math.ceil(requiredCalls / effectiveDays)
+          };
+          return {
+            id: member.id,
+            role: member.role || '',
+            name: member.name || '',
+            mgaName: (byUserId.get(member.id)?.mga) || '',
+            rgaName: (byUserId.get(member.id)?.rga) || '',
+            managerActive: member.managerActive || 'y',
+            monthlyAlpGoal: monthlyGoal || '',
+            reportedAlp,
+            remainingAlp,
+            workingDaysCount: workingDaysInMonth.length,
+            dailyCallsNeeded: dailyNeeded.calls,
+            dailyApptsNeeded: dailyNeeded.appts,
+            dailySitsNeeded: dailyNeeded.sits,
+            dailySalesNeeded: dailyNeeded.sales,
+            dailyAlpNeeded: dailyNeeded.alp,
+            rateSource: goal?.rateSource ? (goal.rateSource === 'custom' ? 'Custom' : 'Agency') : ''
+          };
+        })
+        .sort((a, b) => {
+          const ia = indexByName.has(a.name) ? indexByName.get(a.name) : Number.MAX_SAFE_INTEGER;
+          const ib = indexByName.has(b.name) ? indexByName.get(b.name) : Number.MAX_SAFE_INTEGER;
+          if (ia !== ib) return ia - ib;
+          const order = { RGA: 0, MGA: 1, GA: 2, SA: 3, AGT: 4 };
+          const ra = order[(a.role || '').toUpperCase()] ?? 99;
+          const rb = order[(b.role || '').toUpperCase()] ?? 99;
+          if (ra !== rb) return ra - rb;
+          return a.name.localeCompare(b.name);
+        });
+        
+        // Separate active and inactive members
+        let activeRows = rows.filter(r => r.managerActive === 'y');
+        let inactiveRows = rows.filter(r => r.managerActive === 'n');
+        
+        setInactiveAgencyRows(inactiveRows);
+        
+        // Build combined table data with inactive agents integrated
+        const buildCombinedAgencyData = (filteredActiveRows) => {
+          const combinedRows = [...filteredActiveRows];
+          
+          if (inactiveRows.length > 0) {
+            combinedRows.push({
+              id: 'inactive-agents-header',
+              isInactiveHeader: true,
+              name: `Inactive Agents (${inactiveRows.length})`,
+              inactiveCount: inactiveRows.length,
+              monthlyAlpGoal: 0,
+              reportedAlp: 0,
+              remainingAlp: 0,
+              workingDaysCount: 0,
+              dailyCallsNeeded: 0,
+              dailyApptsNeeded: 0,
+              dailySitsNeeded: 0,
+              dailySalesNeeded: 0,
+              dailyAlpNeeded: 0,
+              rateSource: '',
+              role: ''
+            });
+            
+            if (showInactiveAgencyAgents) {
+              inactiveRows.forEach(inactiveRow => {
+                combinedRows.push({
+                  ...inactiveRow,
+                  isInactiveAgent: true
+                });
+              });
+            }
+          }
+          
+          return combinedRows;
+        };
+        
+        setAgencyRowsAll(activeRows);
+        const combinedData = buildCombinedAgencyData(activeRows);
+        setAgencyRows(combinedData);
+      } catch (e) {
+        console.error('Error loading agency goals:', e);
+        setAgencyRows([]);
+        setAgencyRowsAll([]);
+        setInactiveAgencyRows([]);
+      } finally {
+        setAgencyLoading(false);
+      }
+    };
+    loadAgencyGoals();
+  }, [viewScope, user?.userId, user?.lagnname, user?.clname, selectedYear, selectedMonth, showInactiveAgencyAgents]);
 
   // Load team hierarchy and goals when in team scope
   useEffect(() => {
@@ -1426,24 +1637,52 @@ const ProductionGoals = () => {
                 <FiChevronRight />
               </button>
             </div>
-            {isManagerRole() && (
-              <div className="edit-section" style={{ display: 'flex', gap: 8 }}>
-                <button
-                  className={`btn ${viewScope === 'personal' ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => setViewScope('personal')}
-                  title="View Personal Goals"
-                >
-                  Personal
-                </button>
-                <button
-                  className={`btn ${viewScope === 'team' ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => setViewScope('team')}
-                  title="View Team Goals"
-                >
-                  Team
-                </button>
-              </div>
-            )}
+            {(() => {
+              const userRole = String(user?.clname || '').toUpperCase();
+              
+              if (userRole === 'SGA') {
+                // SGA users get Individual and Agency tabs
+                return (
+                  <div className="edit-section" style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      className={`btn ${viewScope === 'personal' ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setViewScope('personal')}
+                      title="View Individual Goals"
+                    >
+                      Individual
+                    </button>
+                    <button
+                      className={`btn ${viewScope === 'agency' ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setViewScope('agency')}
+                      title="View Agency Goals"
+                    >
+                      Agency
+                    </button>
+                  </div>
+                );
+              } else if (isManagerRole()) {
+                // Other managers get Personal and Team tabs
+                return (
+                  <div className="edit-section" style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      className={`btn ${viewScope === 'personal' ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setViewScope('personal')}
+                      title="View Personal Goals"
+                    >
+                      Personal
+                    </button>
+                    <button
+                      className={`btn ${viewScope === 'team' ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setViewScope('team')}
+                      title="View Team Goals"
+                    >
+                      Team
+                    </button>
+                  </div>
+                );
+              }
+              return null;
+            })()}
             
             {/* Edit buttons for personal view */}
             {viewScope === 'personal' && !isEditing && (
@@ -1526,7 +1765,239 @@ const ProductionGoals = () => {
       </div>
 
       <div className="goals-content">
-        {viewScope === 'team' ? (
+        {viewScope === 'agency' ? (
+          <>
+            {/* Agency View - All Hierarchy Goals */}
+            <div className="agency-header" style={{ marginBottom: '20px', padding: '16px', background: 'var(--card-background)', borderRadius: '8px' }}>
+              <h3 style={{ margin: 0, marginBottom: '8px' }}>Agency Goals & Commits</h3>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '14px' }}>
+                Viewing goals and commits for entire agency hierarchy ({agencyRowsAll.length} active agents{inactiveAgencyRows.length > 0 ? `, ${inactiveAgencyRows.length} inactive` : ''})
+              </p>
+            </div>
+
+            <ActionBar
+              selectedCount={0}
+              totalCount={agencyRows.length}
+              entityName="agents"
+            />
+
+            <div className="goal-cards-section" style={{ position: 'relative' }}>
+              <DataTable
+                columns={[
+                  { 
+                    Header: 'Role', 
+                    accessor: 'role', 
+                    width: 70,
+                    minWidth: 70,
+                    Cell: ({ value, row }) => {
+                      if (row.original.isInactiveHeader) {
+                        return (
+                          <div 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setShowInactiveAgencyAgents(!showInactiveAgencyAgents);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              color: '#666',
+                              fontWeight: '500',
+                              width: '100%',
+                              height: '100%',
+                              padding: '8px 4px'
+                            }}
+                            title={showInactiveAgencyAgents ? 'Click to collapse inactive agents' : 'Click to expand inactive agents'}
+                          >
+                            <span style={{
+                              marginRight: '6px',
+                              transform: showInactiveAgencyAgents ? 'rotate(90deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.2s ease',
+                              fontSize: '10px'
+                            }}>
+                              ▶
+                            </span>
+                          </div>
+                        );
+                      }
+                      if (row.original.isInactiveAgent) {
+                        return (
+                          <span className="user-role-badge inactive-badge" style={{...getRoleBadgeStyle(value), opacity: 0.6}}>
+                            {value}
+                          </span>
+                        );
+                      }
+                      return (
+                        <span className="user-role-badge" style={getRoleBadgeStyle(value)}>{value}</span>
+                      );
+                    }
+                  },
+                  { 
+                    Header: 'Name', 
+                    accessor: 'name', 
+                    width: 200, 
+                    minWidth: 160,
+                    Cell: ({ value, row }) => {
+                      if (row.original.isInactiveHeader) {
+                        return (
+                          <div 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setShowInactiveAgencyAgents(!showInactiveAgencyAgents);
+                            }}
+                            style={{
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              color: '#666',
+                              fontWeight: '500',
+                              padding: '8px 12px',
+                              borderRadius: '4px',
+                              backgroundColor: '#f5f5f5',
+                              border: '1px solid #e0e0e0',
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between'
+                            }}
+                            title={showInactiveAgencyAgents ? 'Click to collapse inactive agents' : 'Click to expand inactive agents'}
+                          >
+                            <span>{value}</span>
+                            <span style={{
+                              fontSize: '12px',
+                              color: '#999',
+                              marginLeft: '8px'
+                            }}>
+                              {showInactiveAgencyAgents ? 'Click to collapse' : 'Click to expand'}
+                            </span>
+                          </div>
+                        );
+                      }
+                      if (row.original.isInactiveAgent) {
+                        return <span style={{ color: '#999' }}>{value}</span>;
+                      }
+                      return <span>{value}</span>;
+                    }
+                  },
+                  { 
+                    Header: 'RGA', 
+                    accessor: 'rgaName', 
+                    width: 150, 
+                    minWidth: 130,
+                    Cell: ({ value, row }) => {
+                      if (row.original.isInactiveHeader) return '';
+                      return row.original.isInactiveAgent ? <span style={{ color: '#999' }}>{value || '-'}</span> : (value || '-');
+                    }
+                  },
+                  { 
+                    Header: 'MGA', 
+                    accessor: 'mgaName', 
+                    width: 150, 
+                    minWidth: 130,
+                    Cell: ({ value, row }) => {
+                      if (row.original.isInactiveHeader) return '';
+                      return row.original.isInactiveAgent ? <span style={{ color: '#999' }}>{value || '-'}</span> : (value || '-');
+                    }
+                  },
+                  { 
+                    Header: 'Goal (ALP)', accessor: 'monthlyAlpGoal', width: 140, minWidth: 120, type: 'number',
+                    Cell: ({ value, row }) => {
+                      if (row.original.isInactiveHeader) return '';
+                      const formatted = value ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value) : '';
+                      return row.original.isInactiveAgent ? <span style={{ color: '#999' }}>{formatted}</span> : formatted;
+                    }
+                  },
+                  { 
+                    Header: 'Reported (ALP)', accessor: 'reportedAlp', width: 150, minWidth: 130, type: 'number',
+                    Cell: ({ value, row }) => {
+                      if (row.original.isInactiveHeader) return '';
+                      const formatted = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value || 0);
+                      return row.original.isInactiveAgent ? <span style={{ color: '#999' }}>{formatted}</span> : formatted;
+                    }
+                  },
+                  { 
+                    Header: 'Remaining (ALP)', accessor: 'remainingAlp', width: 160, minWidth: 140, type: 'number',
+                    Cell: ({ value, row }) => {
+                      if (row.original.isInactiveHeader) return '';
+                      const formatted = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value || 0);
+                      return row.original.isInactiveAgent ? <span style={{ color: '#999' }}>{formatted}</span> : formatted;
+                    }
+                  },
+                  { 
+                    Header: 'Working Days', accessor: 'workingDaysCount', width: 130, minWidth: 120, type: 'number',
+                    Cell: ({ value, row }) => {
+                      if (row.original.isInactiveHeader) return '';
+                      return row.original.isInactiveAgent ? <span style={{ color: '#999' }}>{value}</span> : value;
+                    }
+                  },
+                  { 
+                    Header: 'Daily Calls', accessor: 'dailyCallsNeeded', width: 110, minWidth: 100, type: 'number',
+                    Cell: ({ value, row }) => {
+                      if (row.original.isInactiveHeader) return '';
+                      return row.original.isInactiveAgent ? <span style={{ color: '#999' }}>{value}</span> : value;
+                    }
+                  },
+                  { 
+                    Header: 'Daily Appts', accessor: 'dailyApptsNeeded', width: 110, minWidth: 100, type: 'number',
+                    Cell: ({ value, row }) => {
+                      if (row.original.isInactiveHeader) return '';
+                      return row.original.isInactiveAgent ? <span style={{ color: '#999' }}>{value}</span> : value;
+                    }
+                  },
+                  { 
+                    Header: 'Daily Sits', accessor: 'dailySitsNeeded', width: 110, minWidth: 100, type: 'number',
+                    Cell: ({ value, row }) => {
+                      if (row.original.isInactiveHeader) return '';
+                      return row.original.isInactiveAgent ? <span style={{ color: '#999' }}>{value}</span> : value;
+                    }
+                  },
+                  { 
+                    Header: 'Daily Sales', accessor: 'dailySalesNeeded', width: 110, minWidth: 100, type: 'number',
+                    Cell: ({ value, row }) => {
+                      if (row.original.isInactiveHeader) return '';
+                      return row.original.isInactiveAgent ? <span style={{ color: '#999' }}>{value}</span> : value;
+                    }
+                  },
+                  { 
+                    Header: 'Daily ALP', accessor: 'dailyAlpNeeded', width: 120, minWidth: 110, type: 'number',
+                    Cell: ({ value, row }) => {
+                      if (row.original.isInactiveHeader) return '';
+                      const formatted = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value || 0);
+                      return row.original.isInactiveAgent ? <span style={{ color: '#999' }}>{formatted}</span> : formatted;
+                    }
+                  },
+                  { 
+                    Header: 'Rate Source', accessor: 'rateSource', width: 120, minWidth: 100,
+                    Cell: ({ value, row }) => {
+                      if (row.original.isInactiveHeader) return '';
+                      return row.original.isInactiveAgent ? <span style={{ color: '#999' }}>{value}</span> : value;
+                    }
+                  }
+                ]}
+                data={agencyRows}
+                disablePagination={true}
+                showActionBar={false}
+                disableCellEditing={true}
+                showTotals={true}
+                totalsPosition="bottom"
+                totalsColumns={[
+                  'monthlyAlpGoal','reportedAlp','remainingAlp','workingDaysCount',
+                  'dailyCallsNeeded','dailyApptsNeeded','dailySitsNeeded','dailySalesNeeded','dailyAlpNeeded'
+                ]}
+                totalsLabel="Agency Totals"
+                totalsLabelColumn="name"
+                bandedRows={true}
+                allowTableOverflow={true}
+              />
+              {(agencyLoading || loading) && (
+                <OverlaySpinner text="Loading agency goals..." />
+              )}
+            </div>
+          </>
+        ) : viewScope === 'team' ? (
           <>
             {/* Team Goal Cards */}
             <div className="team-goal-cards" style={{ marginBottom: '20px' }}>

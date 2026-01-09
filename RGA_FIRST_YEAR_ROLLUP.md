@@ -223,3 +223,4 @@ When testing, check the browser console for:
 4. **Notifications**: Alert RGA when MGA's first year is ending
 5. **Reports**: Generate first-year performance reports
 
+

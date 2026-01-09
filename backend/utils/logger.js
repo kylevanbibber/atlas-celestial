@@ -1,7 +1,6 @@
 /**
  * Simple logger utility
  */
-
 // Log levels
 const LOG_LEVELS = {
   ERROR: 0,

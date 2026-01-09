@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FiList } from 'react-icons/fi';
+import { FiList, FiPhone } from 'react-icons/fi';
 import './Training.css';
 
 // Import component files
-import SecondarySidebar from '../components/utils/SecondarySidebar';
+// import SecondarySidebar from '../components/utils/SecondarySidebar';
 import Release from '../components/production/release/Release';
 import { ProgressProvider } from '../components/production/release/ProgressContext';
+import RoleplayCall from '../components/training/RoleplayCall';
 
 // Main Training page component
 const Training = () => {
@@ -18,7 +19,7 @@ const Training = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const section = params.get('section');
-    if (section && ['release'].includes(section)) {
+    if (section && ['release', 'roleplay'].includes(section)) {
       setActiveSection(section);
     }
   }, [location]);
@@ -32,6 +33,7 @@ const Training = () => {
   // Training navigation items
   const trainingItems = [
     { id: 'release', label: 'Release', icon: <FiList /> },
+    { id: 'roleplay', label: 'Roleplay Call', icon: <FiPhone /> },
   ];
   
   // Items that need warning indicators (none for now)
@@ -46,6 +48,8 @@ const Training = () => {
             <Release />
           </ProgressProvider>
         );
+      case 'roleplay':
+        return <RoleplayCall />;
       default:
         return (
           <ProgressProvider>
@@ -57,12 +61,12 @@ const Training = () => {
   
   return (
     <div className="training-container">
-      <SecondarySidebar 
+      {/* <SecondarySidebar 
         items={trainingItems} 
         activeItem={activeSection} 
         onItemClick={handleSectionChange} 
         warningItems={warningItems}
-      />
+      /> */}
       <div className="training-content">
         <div className="padded-content">
           {renderTrainingSection()}

@@ -169,6 +169,9 @@ export const AuthProvider = ({ children }) => {
   const logout = useCallback((preserveIntendedPath = true) => {
     console.log('[AuthContext] 🚪 Logging out user', { preserveIntendedPath });
     
+    // Check if user is on onboarding pages
+    const isOnboardingPage = typeof window !== 'undefined' && window.location.pathname.startsWith('/onboarding');
+    
     // Clear token from state and storage
     setToken(null);
     setUser(null);
@@ -219,6 +222,13 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       // Non-critical error, continue with logout
     }
+    
+    // Redirect to appropriate login page if on onboarding
+    if (isOnboardingPage && typeof window !== 'undefined') {
+      setTimeout(() => {
+        window.location.href = '/onboarding/login';
+      }, 100);
+    }
   }, []);
 
   // Configure API interceptor to add the auth token to requests
@@ -231,8 +241,13 @@ export const AuthProvider = ({ children }) => {
           '/auth/login',
           '/auth/newlogin',
           '/auth/register',
+          '/auth/checkUserInfo',
+          '/auth/handleUserInfo',
           '/auth/forgot-password',
           '/auth/reset-password',
+          '/auth/send-reset-code-by-email',
+          '/auth/verify-reset-code',
+          '/auth/update-password',
           '/onboarding/auth/start',
           '/onboarding/auth/login',
           '/onboarding/auth/set-password',
@@ -241,7 +256,8 @@ export const AuthProvider = ({ children }) => {
           '/recruitment/',
           '/client-sign/',
           '/agent-sign/',
-          '/document-signing'
+          '/document-signing',
+          '/training/updates'
         ];
         
         // Check if this specific API endpoint is public (doesn't require auth)
@@ -376,8 +392,16 @@ export const AuthProvider = ({ children }) => {
     const handleTokenExpired = (event) => {
       console.log('[AuthContext] 🔒 Token expiration event received:', event.detail);
       
+      // Check if user is on onboarding pages
+      const isOnboardingPage = window.location.pathname.startsWith('/onboarding');
+      
       // Force logout when token expires
       logout();
+      
+      // Redirect to appropriate login page
+      if (isOnboardingPage) {
+        window.location.href = '/onboarding/login';
+      }
       
       // Optional: Show a user-friendly message
       setError('Your session has expired. Please log in again.');
@@ -404,9 +428,12 @@ export const AuthProvider = ({ children }) => {
         if (!decodedToken) {
           console.log('[AuthContext] ⏰ Periodic check: Token is invalid or expired, logging out');
           
+          // Check if user is on onboarding pages
+          const isOnboardingPage = window.location.pathname.startsWith('/onboarding');
+          
           // Save current page before auto-logout
           const currentPath = window.location.pathname + window.location.search + window.location.hash;
-          const isCurrentlyOnAuthPage = ['/login', '/register', '/adminlogin'].includes(window.location.pathname);
+          const isCurrentlyOnAuthPage = ['/login', '/register', '/adminlogin', '/onboarding/login'].includes(window.location.pathname);
           
           if (!isCurrentlyOnAuthPage && currentPath !== '/') {
             localStorage.setItem('intendedPath', currentPath);
@@ -416,6 +443,11 @@ export const AuthProvider = ({ children }) => {
           // Show user-friendly message and logout
           setError('Your session has expired. Please log in again.');
           logout();
+          
+          // Redirect to appropriate login page
+          if (isOnboardingPage) {
+            window.location.href = '/onboarding/login';
+          }
         } else {
           // Check if token will expire in the next 5 minutes (300 seconds)
           const now = Math.floor(Date.now() / 1000);

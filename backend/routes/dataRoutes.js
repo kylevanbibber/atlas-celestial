@@ -463,20 +463,43 @@ router.get('/associates/multiple', async (req, res) => {
 router.get('/vips-sga', async (req, res) => {
     const { column, value } = req.query;
 
+    console.log('📊 [VIPs-SGA] Request received:', { column, value });
+
     if (!column || !value) {
         return res.status(400).json({ success: false, message: 'Column and value are required' });
     }
 
     try {
-        const queryStr = `SELECT * FROM VIPs WHERE reg_dir = "ZOPHIN"`;
-        const results = await query(queryStr, [column, value]);
+        // For SGA endpoints, return all VIPs for the organization
+        // Query all VIPs without reg_dir filter to ensure we get all data
+        const queryStr = `SELECT * FROM VIPs`;
+        console.log('📊 [VIPs-SGA] Executing query:', queryStr);
+        
+        const results = await query(queryStr);
+        
+        console.log('📊 [VIPs-SGA] Query results:', {
+            totalRecords: results.length,
+            sampleRecord: results[0] || null,
+            uniqueAgents: results.length > 0 ? [...new Set(results.map(r => r.lagnname))].length : 0,
+            uniqueMGAs: results.length > 0 ? [...new Set(results.map(r => r.mga))].length : 0,
+            dateRange: results.length > 0 ? {
+                earliest: results.reduce((min, r) => {
+                    const date = new Date(r.vipdate || r.vip_month);
+                    return date < min ? date : min;
+                }, new Date(results[0].vipdate || results[0].vip_month)),
+                latest: results.reduce((max, r) => {
+                    const date = new Date(r.vipdate || r.vip_month);
+                    return date > max ? date : max;
+                }, new Date(results[0].vipdate || results[0].vip_month))
+            } : null
+        });
 
         res.status(200).json({
             success: true,
             data: results,
         });
     } catch (error) {
-        console.error('Error fetching data from VIPs:', error);
+        console.error('❌ [VIPs-SGA] Error fetching data from VIPs:', error);
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching data from VIPs',
@@ -489,20 +512,32 @@ router.get('/vips-sga', async (req, res) => {
 router.get('/associates-sga', async (req, res) => {
     const { column, value } = req.query;
 
+    console.log('📊 [Associates-SGA] Request received:', { column, value });
+
     if (!column || !value) {
         return res.status(400).json({ success: false, message: 'Column and value are required' });
     }
 
     try {
-        const queryStr = `SELECT * FROM associates WHERE DIR = "ZOPHIN"`;
-        const results = await query(queryStr, [column, value]);
+        // For SGA endpoints, return all associates for the organization
+        // Query all associates without DIR filter to ensure we get all data
+        const queryStr = `SELECT * FROM associates`;
+        console.log('📊 [Associates-SGA] Executing query:', queryStr);
+        
+        const results = await query(queryStr);
+        
+        console.log('📊 [Associates-SGA] Query results:', {
+            totalRecords: results.length,
+            sampleRecord: results[0] || null,
+            uniqueAgents: results.length > 0 ? [...new Set(results.map(r => r.LagnName || r.lagnname))].length : 0
+        });
 
         res.status(200).json({
             success: true,
             data: results,
         });
     } catch (error) {
-        console.error('Error fetching data from associates:', error);
+        console.error('❌ [Associates-SGA] Error fetching data from associates:', error);
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching data from associates',
@@ -520,8 +555,10 @@ router.get('/pending-sga', async (req, res) => {
     }
 
     try {
-        const queryStr = `SELECT * FROM pending WHERE DIR = "ZOPHIN"`;
-        const results = await query(queryStr, [column, value]);
+        // For SGA endpoints, return all pending for the organization
+        // Query all pending without DIR filter to ensure we get all data
+        const queryStr = `SELECT * FROM pending`;
+        const results = await query(queryStr);
 
         res.status(200).json({
             success: true,
@@ -945,15 +982,17 @@ router.get('/get-all-mgas', async (req, res) => {
     try {
         const queryStr = `
             SELECT DISTINCT 
-                lagnname,
-                rga,
-                tree,
+                m.lagnname,
+                m.rga,
+                m.tree,
                 'MGA' as clname,
-                Active,
-                hide,
-                start
-            FROM MGAs
-            ORDER BY lagnname
+                m.Active,
+                m.hide,
+                m.start,
+                a.id as userId
+            FROM MGAs m
+            LEFT JOIN activeusers a ON m.lagnname = a.lagnname
+            ORDER BY m.lagnname
         `;
         
         const results = await query(queryStr);

@@ -31,6 +31,8 @@ const AddRecruitModal = ({ isOpen, onClose, onRecruitAdded, initialStage, stages
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [teamMembers, setTeamMembers] = useState([]);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [pendingData, setPendingData] = useState(null);
   
   // Build ordered stages to determine which come before Compliance
   const orderedStages = React.useMemo(() => {
@@ -92,6 +94,7 @@ const AddRecruitModal = ({ isOpen, onClose, onRecruitAdded, initialStage, stages
     recruit_suffix: '',
     email: '',
     phone: '',
+    instagram: '',
     resident_license_number: '',
     step: initialStage || 'Careers Form',
     resident_state: '',
@@ -233,67 +236,74 @@ const AddRecruitModal = ({ isOpen, onClose, onRecruitAdded, initialStage, stages
       return;
     }
 
+    // Generate random password for recruit
+    const randomPassword = generateRandomPassword();
+
+    // Prepare full payload with all fields (most will be null)
+    const payload = {
+      recruiting_agent: user.userId,
+      recruit_first: formData.recruit_first,
+      recruit_middle: formData.recruit_middle || null,
+      recruit_last: formData.recruit_last,
+      recruit_suffix: formData.recruit_suffix || null,
+      step: formData.step || 'Careers Form',
+      email: formData.email || null,
+      phone: formData.phone || null,
+      instagram: formData.instagram || null,
+      overview_time: null,
+      hire: null,
+      final_time: null,
+      callback_time: null,
+      resident_state: formData.resident_state || null,
+      enrolled: null,
+      course: null,
+      expected_complete_date: null,
+      current_progress: null,
+      last_log_prelic: null,
+      prelic_passed: null,
+      prelic_cert: null,
+      test_date: null,
+      test_passed: null,
+      test_cert: null,
+      bg_date: null,
+      compliance1: null,
+      compliance2: null,
+      compliance3: null,
+      compliance4: null,
+      compliance5: null,
+      aob: null,
+      resident_license_number: formData.resident_license_number || null,
+      npn: null,
+      agentnum: null,
+      impact_setup: null,
+      training_start_date: null,
+      coded: null,
+      code_to: formData.code_to || null,
+      eapp_username: null,
+      impact_username: null,
+      referral_source: null,
+      Aspects: null,
+      Concern: null,
+      Spouse: null,
+      CareerGoals: null,
+      Compensation: null,
+      WhyChoose: null,
+      MGA: null,
+      redeemed: 0,
+      password: randomPassword
+    };
+
+    // Show confirmation screen
+    setPendingData(payload);
+    setShowConfirmation(true);
+  };
+
+  const handleConfirmSubmit = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // Generate random password for recruit
-      const randomPassword = generateRandomPassword();
-
-      // Prepare full payload with all fields (most will be null)
-      const payload = {
-        recruiting_agent: user.userId,
-        recruit_first: formData.recruit_first,
-        recruit_middle: formData.recruit_middle || null,
-        recruit_last: formData.recruit_last,
-        recruit_suffix: formData.recruit_suffix || null,
-        step: formData.step || 'Careers Form',
-        email: formData.email || null,
-        phone: formData.phone || null,
-        overview_time: null,
-        hire: null,
-        final_time: null,
-        callback_time: null,
-        resident_state: formData.resident_state || null,
-        enrolled: null,
-        course: null,
-        expected_complete_date: null,
-        current_progress: null,
-        last_log_prelic: null,
-        prelic_passed: null,
-        prelic_cert: null,
-        test_date: null,
-        test_passed: null,
-        test_cert: null,
-        bg_date: null,
-        compliance1: null,
-        compliance2: null,
-        compliance3: null,
-        compliance4: null,
-        compliance5: null,
-        aob: null,
-        resident_license_number: formData.resident_license_number || null,
-        npn: null,
-        agentnum: null,
-        impact_setup: null,
-        training_start_date: null,
-        coded: null,
-        code_to: formData.code_to || null,
-        eapp_username: null,
-        impact_username: null,
-        referral_source: null,
-        Aspects: null,
-        Concern: null,
-        Spouse: null,
-        CareerGoals: null,
-        Compensation: null,
-        WhyChoose: null,
-        MGA: null,
-        redeemed: 0,
-        password: randomPassword
-      };
-
-      const response = await api.post('/recruitment/recruits', payload);
+      const response = await api.post('/recruitment/recruits', pendingData);
       
       // Notify parent component of the new recruit
       if (onRecruitAdded) {
@@ -311,11 +321,14 @@ const AddRecruitModal = ({ isOpen, onClose, onRecruitAdded, initialStage, stages
         recruit_suffix: '',
         email: '',
         phone: '',
+        instagram: '',
         resident_license_number: '',
         step: initialStage || 'Careers Form',
         resident_state: '',
         code_to: user?.userId || ''
       });
+      setShowConfirmation(false);
+      setPendingData(null);
     } catch (err) {
       console.error('Error adding recruit:', err);
       setError(err.response?.data?.message || 'Failed to add recruit. Please try again.');
@@ -324,8 +337,15 @@ const AddRecruitModal = ({ isOpen, onClose, onRecruitAdded, initialStage, stages
     }
   };
 
+  const handleBackToEdit = () => {
+    setShowConfirmation(false);
+    setError(null);
+  };
+
   const handleCancel = () => {
     setError(null);
+    setShowConfirmation(false);
+    setPendingData(null);
     setFormData({
       recruit_first: '',
       recruit_middle: '',
@@ -333,6 +353,7 @@ const AddRecruitModal = ({ isOpen, onClose, onRecruitAdded, initialStage, stages
       recruit_suffix: '',
       email: '',
       phone: '',
+      instagram: '',
       resident_license_number: '',
       step: initialStage || 'Careers Form',
       resident_state: '',
@@ -341,14 +362,123 @@ const AddRecruitModal = ({ isOpen, onClose, onRecruitAdded, initialStage, stages
     onClose();
   };
 
+  // Get the team member name for code_to display
+  const getCodeToName = () => {
+    const member = teamMembers.find(m => m.id === parseInt(formData.code_to));
+    return member ? member.lagnname : 'Not assigned';
+  };
+
+  // Get the state label
+  const getStateLabel = () => {
+    const state = US_STATES.find(s => s.value === formData.resident_state);
+    return state ? state.label : 'Not specified';
+  };
+
   return (
-    <Modal isOpen={isOpen} onClose={handleCancel} title="Add New Recruit" maxWidth="600px">
-      <form onSubmit={handleSubmit} className="add-recruit-form">
-        {error && (
-          <div className="add-recruit-error">
-            {error}
+    <Modal isOpen={isOpen} onClose={handleCancel} title={showConfirmation ? "Confirm Recruit Information" : "Add New Recruit"} maxWidth="600px">
+      {showConfirmation ? (
+        // Confirmation Screen
+        <div className="add-recruit-confirmation">
+          <div className="confirmation-warning">
+            <strong>⚠️ Please verify all information is correct</strong>
+            <p>This information will be saved as the agent's official profile. Incorrect information can cause issues down the road.</p>
           </div>
-        )}
+
+          <div className="confirmation-details">
+            <div className="confirmation-section">
+              <h4>Personal Information</h4>
+              <div className="confirmation-row">
+                <span className="confirmation-label">Name:</span>
+                <span className="confirmation-value">
+                  {pendingData.recruit_first} {pendingData.recruit_middle} {pendingData.recruit_last} {pendingData.recruit_suffix}
+                </span>
+              </div>
+              {pendingData.email && (
+                <div className="confirmation-row">
+                  <span className="confirmation-label">Email:</span>
+                  <span className="confirmation-value">{pendingData.email}</span>
+                </div>
+              )}
+              {pendingData.phone && (
+                <div className="confirmation-row">
+                  <span className="confirmation-label">Phone:</span>
+                  <span className="confirmation-value">{pendingData.phone}</span>
+                </div>
+              )}
+              {pendingData.instagram && (
+                <div className="confirmation-row">
+                  <span className="confirmation-label">Instagram:</span>
+                  <span className="confirmation-value">@{pendingData.instagram}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="confirmation-section">
+              <h4>Location & Licensing</h4>
+              {pendingData.resident_state && (
+                <div className="confirmation-row">
+                  <span className="confirmation-label">State:</span>
+                  <span className="confirmation-value">{getStateLabel()}</span>
+                </div>
+              )}
+              {pendingData.resident_license_number && (
+                <div className="confirmation-row">
+                  <span className="confirmation-label">License Number:</span>
+                  <span className="confirmation-value">{pendingData.resident_license_number}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="confirmation-section">
+              <h4>Pipeline Details</h4>
+              <div className="confirmation-row">
+                <span className="confirmation-label">Stage:</span>
+                <span className="confirmation-value">{pendingData.step}</span>
+              </div>
+              <div className="confirmation-row">
+                <span className="confirmation-label">Coded To:</span>
+                <span className="confirmation-value">{getCodeToName()}</span>
+              </div>
+            </div>
+          </div>
+
+          {error && (
+            <div className="add-recruit-error">
+              {error}
+            </div>
+          )}
+
+          <div className="confirmation-actions">
+            <button 
+              type="button" 
+              className="btn-secondary" 
+              onClick={handleBackToEdit}
+              disabled={loading}
+            >
+              ← Back to Edit
+            </button>
+            <button 
+              type="button" 
+              className="btn-primary"
+              onClick={handleConfirmSubmit}
+              disabled={loading}
+            >
+              {loading ? 'Adding Recruit...' : '✓ Confirm & Add Recruit'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        // Form Screen
+        <form onSubmit={handleSubmit} className="add-recruit-form">
+          <div className="add-recruit-disclaimer">
+            <strong>⚠️ Important:</strong> Please fill out the recruit's information accurately. This is saved in the system as this agent's official profile, and incorrect information can cause issues down the road.
+          </div>
+
+          {error && (
+            <div className="add-recruit-error">
+              {error}
+            </div>
+          )}
 
         <div className="form-row">
           <div className="form-group">
@@ -440,6 +570,44 @@ const AddRecruitModal = ({ isOpen, onClose, onRecruitAdded, initialStage, stages
               placeholder="(555) 123-4567"
               maxLength="14"
             />
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="instagram">Instagram Handle</label>
+            <input
+              type="text"
+              id="instagram"
+              name="instagram"
+              value={formData.instagram}
+              onChange={(e) => {
+                let value = e.target.value;
+                // Remove @ if user types it
+                if (value.startsWith('@')) {
+                  value = value.substring(1);
+                }
+                handleChange({ target: { name: 'instagram', value } });
+              }}
+              disabled={loading}
+              placeholder="username"
+            />
+            {formData.instagram && (
+              <div style={{ marginTop: '6px', fontSize: '12px', color: '#6b7280' }}>
+                <a 
+                  href={`https://instagram.com/${formData.instagram}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{ color: 'var(--primary-color)', textDecoration: 'underline' }}
+                >
+                  View @{formData.instagram} on Instagram
+                </a>
+              </div>
+            )}
+          </div>
+
+          <div className="form-group">
+            {/* Empty div to maintain grid layout */}
           </div>
         </div>
 
@@ -539,10 +707,11 @@ const AddRecruitModal = ({ isOpen, onClose, onRecruitAdded, initialStage, stages
             disabled={loading}
             className="btn-submit"
           >
-            {loading ? 'Adding...' : 'Add Recruit'}
+            Continue to Review →
           </button>
         </div>
       </form>
+      )}
     </Modal>
   );
 };

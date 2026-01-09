@@ -639,12 +639,7 @@ const RefsPage = () => {
     {
       Header: "Referred By",
       accessor: "referred_by",
-      type: "autocomplete",
       width: 150,
-      autocompleteOptions: users,
-      autocompleteValueField: "id",
-      autocompleteDisplayField: "first_name",
-      autocompleteChipColor: (row) => row.archive ? "#F08080" : "#e0e0e0",
     },
     {
       Header: "Created By",
@@ -821,8 +816,6 @@ const RefsPage = () => {
         }
       }
       
-      const response = await api.put(`/refs/${id}`, updateData);
-      
       // If updating assigned_to, also update assigned_to_display
       if (field === 'assigned_to' && value) {
         const assignedUser = users.find(u => u.id === parseInt(value));
@@ -831,19 +824,37 @@ const RefsPage = () => {
         }
       }
       
-      const updatedTableData = tableData.map((row) => 
-        (row.id === id ? { ...row, ...updateData } : row)
-      );
+      // OPTIMISTIC UPDATE: Update UI immediately before API call
+      setTableData(prevTableData => {
+        const updatedData = prevTableData.map((row) => 
+          row.id === id ? { ...row, ...updateData } : row
+        );
+        
+        // If updating type or state fields, refresh available filters to include new values
+        if (field === 'type' || field === 'resstate') {
+          extractUniqueFilters(updatedData);
+        }
+        
+        return updatedData;
+      });
       
-      setTableData(updatedTableData);
+      // Prepare data for API call - only send database columns, not display fields
+      const apiUpdateData = { ...updateData };
       
-      // If updating type or state fields, refresh available filters to include new values
-      if (field === 'type' || field === 'resstate') {
-        extractUniqueFilters(updatedTableData);
-      }
+      // Remove display fields that don't exist in the database
+      delete apiUpdateData.assigned_to_display;
+      delete apiUpdateData.created_by_display;
+      
+      // Log what we're sending
+      console.log('📤 Sending to API:', { id, field, value, apiUpdateData });
+      
+      // Then make the API call
+      await api.put(`/refs/${id}`, apiUpdateData);
+      
     } catch (error) {
-      console.error('Error updating cell:', error);
-      // Silently handle errors
+      console.error('❌ Error updating cell:', error);
+      // On error, revert the optimistic update by refetching
+      fetchRefs();
     }
   };
 

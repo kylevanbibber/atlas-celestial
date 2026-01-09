@@ -18,7 +18,6 @@ const parseMgaStartDate = (startDateString) => {
       return new Date(year, month, day);
     }
   } catch (error) {
-    console.warn('Failed to parse MGA start date:', startDateString, error);
   }
   
   return null;
@@ -30,6 +29,13 @@ const isDataBeforeMgaStart = (dataDate, mgaStartDate) => {
   
   const parsedDataDate = typeof dataDate === 'string' ? new Date(dataDate) : dataDate;
   return parsedDataDate < mgaStartDate;
+};
+
+// Helper function to normalize names by removing extra whitespace
+const normalizeName = (name) => {
+  if (!name) return name;
+  // Replace multiple spaces with single space and trim
+  return name.replace(/\s+/g, ' ').trim();
 };
 
 // Define the header layout in the desired order.
@@ -110,9 +116,6 @@ const calculateQuarterTotals = (counts, isCurrentYear = false) => {
 
 // Function to calculate rolling hire to code ratios
 const calculateRollingHireToCode = (codesData, hiresData, selectedYear) => {
-  console.log(`==== HIRE TO CODE CALCULATION (${selectedYear}) ====`);
-  console.log(`Total codes data records: ${codesData.length}`);
-  console.log(`Total hires data records: ${hiresData.length}`);
   
   // Get current date to determine which months are in the future
   const currentDate = new Date();
@@ -124,15 +127,10 @@ const calculateRollingHireToCode = (codesData, hiresData, selectedYear) => {
     return (year > currentYear) || (year === currentYear && month > currentMonth);
   };
   
-  console.log(`Current date: ${currentDate.toDateString()}, will not display future months`);
-  
   // Generate all week ranges for the selected year and previous year
   const prevYear = selectedYear - 1;
   const weekRanges = generateWeekRanges(selectedYear);
   const prevYearWeekRanges = generateWeekRanges(prevYear);
-  
-  console.log(`Generated ${weekRanges.length} weeks for ${selectedYear}`);
-  console.log(`Generated ${prevYearWeekRanges.length} weeks for ${prevYear}`);
   
   // Map to store codes and hires by MGA and week
   const codesByMgaAndWeek = {};
@@ -263,57 +261,6 @@ const calculateRollingHireToCode = (codesData, hiresData, selectedYear) => {
         monthRatioCounts[month]++;
         
         // Detailed logging for week 3 (or another early week) for first MGA
-        if (weekIndex === 3 && mga === [...allMgas][0]) {
-          console.log(`\nDetailed calculation for week ${weekIndex+1} (${weekRanges[weekIndex].start.toDateString()} - ${weekRanges[weekIndex].end.toDateString()}):`);
-          
-          console.log(`Codes (sum of prior 13 weeks):`);
-          for (let offset = 1; offset <= 13; offset++) {
-            const priorWeekIndex = weekIndex - offset;
-            let weekDate, weekYear;
-            
-            if (priorWeekIndex < 0) {
-              // Previous year
-              const adjustedIndex = prevYearWeekRanges.length + priorWeekIndex;
-              weekDate = prevYearWeekRanges[adjustedIndex]?.start;
-              weekYear = prevYear;
-            } else {
-              weekDate = weekRanges[priorWeekIndex]?.start;
-              weekYear = selectedYear;
-            }
-            
-            const codes = getValueForWeek(codesByMgaAndWeek, mga, selectedYear, priorWeekIndex);
-            if (weekDate) {
-              console.log(`  - Week ${priorWeekIndex + 1 < 0 ? prevYearWeekRanges.length + priorWeekIndex + 1 : priorWeekIndex + 1} (${weekDate.toDateString()} - ${weekDate ? new Date(weekDate.getTime() + 6*86400000).toDateString() : 'unknown'}): ${codes} codes`);
-            } else {
-              console.log(`  - Week calculation error for index ${priorWeekIndex}`);
-            }
-          }
-          
-          console.log(`Hires (weeks 4-17 prior):`);
-          for (let offset = 4; offset <= 17; offset++) {
-            const priorWeekIndex = weekIndex - offset;
-            let weekDate, weekYear;
-            
-            if (priorWeekIndex < 0) {
-              // Previous year
-              const adjustedIndex = prevYearWeekRanges.length + priorWeekIndex;
-              weekDate = prevYearWeekRanges[adjustedIndex]?.start;
-              weekYear = prevYear;
-            } else {
-              weekDate = weekRanges[priorWeekIndex]?.start;
-              weekYear = selectedYear;
-            }
-            
-            const hires = getValueForWeek(hiresByMgaAndWeek, mga, selectedYear, priorWeekIndex);
-            if (weekDate) {
-              console.log(`  - Week ${priorWeekIndex + 1 < 0 ? prevYearWeekRanges.length + priorWeekIndex + 1 : priorWeekIndex + 1} (${weekDate.toDateString()} - ${weekDate ? new Date(weekDate.getTime() + 6*86400000).toDateString() : 'unknown'}): ${hires} hires`);
-            } else {
-              console.log(`  - Week calculation error for index ${priorWeekIndex}`);
-            }
-          }
-          
-          console.log(`Week ${weekIndex+1} ratio: ${totalHires} hires / ${totalCodes} codes = ${weeklyRatio.toFixed(4)}`);
-        }
       }
     }
     
@@ -327,29 +274,7 @@ const calculateRollingHireToCode = (codesData, hiresData, selectedYear) => {
       }
     }
     
-    // Log summary for the first MGA
-    if (mga === [...allMgas][0]) {
-      console.log(`\nWeekly ratios summary for "${mga}":`);
-      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      monthRatioCounts.forEach((count, idx) => {
-        if (count > 0) {
-          console.log(`  ${monthNames[idx]}: ${count} weeks, average ratio: ${monthlyRatios[mga][idx].toFixed(4)}`);
-        }
-      });
-    }
   });
-  
-  // Log a sample of the monthly ratios
-  if (allMgas.size > 0) {
-    const sampleMga = [...allMgas][0];
-    console.log(`\nFinal monthly hire-to-code ratios for "${sampleMga}":`);
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    monthlyRatios[sampleMga]?.forEach((ratio, idx) => {
-      console.log(`  ${monthNames[idx]}: ${ratio.toFixed(4)}`);
-    });
-  }
-  
-  console.log(`Calculated monthly ratios for ${Object.keys(monthlyRatios).length} MGAs`);
   return monthlyRatios;
 };
 
@@ -417,24 +342,43 @@ const groupDataByMGA = (
 ) => {
   const grouped = {};
   const preStartData = {}; // Track data before MGA start dates
-  console.log(`Grouping ${data.length} items for ${dateField}, year ${selectedYear}, type ${type}`);
   
   data.forEach((item) => {
-    const mga = mgaField ? item[mgaField] : (item.mga || item.MGA || "Unknown");
+    const mga = normalizeName(mgaField ? item[mgaField] : (item.mga || item.MGA || "Unknown"));
     if (!item[dateField]) return;
-    let d;
+
+    let dataDate;
+    let monthIndex;
+
     if (dateField === "month") {
+      // Monthly-aggregated data (e.g. ALP): we can only include or exclude whole months.
       const parts = item[dateField].split("/");
       if (parts.length < 2) return;
       const month = parseInt(parts[0], 10) - 1;
       const year = parseInt(parts[1], 10);
       if (year !== selectedYear) return;
-      d = new Date(year, month);
+      dataDate = new Date(year, month, 1);
+      monthIndex = dataDate.getMonth();
     } else {
-      d = new Date(item[dateField]);
-      if (d.getFullYear() !== selectedYear) return;
+      // Daily-level data: preserve the full date so we can apply per-record start-date filtering.
+      const raw = item[dateField];
+      let year;
+      if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        // Explicit YYYY-MM-DD format
+        const [yStr, mStr, dStr] = raw.split('-');
+        year = parseInt(yStr, 10);
+        const m = parseInt(mStr, 10) - 1;
+        const day = parseInt(dStr, 10);
+        dataDate = new Date(year, m, day);
+      } else {
+        const tmp = new Date(raw);
+        year = tmp.getFullYear();
+        dataDate = tmp;
+      }
+
+      if (year !== selectedYear) return;
+      monthIndex = dataDate.getMonth();
     }
-    const monthIndex = d.getMonth();
     
     // Check if this data should be excluded based on MGA start date
     const mgaStartDate = parseMgaStartDate(mgaStartDates[mga]);
@@ -443,13 +387,15 @@ const groupDataByMGA = (
     
     if (mgaStartDate) {
       // Only exclude if the data is from a month that's entirely before the start date
-      const monthEndDate = new Date(d.getFullYear(), monthIndex + 1, 0); // Last day of the month
+      const monthEndDate = new Date(dataDate.getFullYear(), monthIndex + 1, 0); // Last day of the month
       if (monthEndDate < mgaStartDate) {
         shouldExclude = true; // Skip this data entirely
-      } else {
-        // For partial months, check if this individual data point is before the start date
-        isPreStart = d < mgaStartDate;
+      } else if (dateField !== "month") {
+        // For partial months with daily-level data, mark only records before the start date
+        isPreStart = dataDate < mgaStartDate;
       }
+      // For monthly-aggregated data we cannot split the month, so we treat the entire
+      // month as post-start once it intersects the start date.
     }
     
     if (shouldExclude) return; // Skip data from months entirely before start date
@@ -465,27 +411,21 @@ const groupDataByMGA = (
       }
     }
     
-    // Add to the appropriate bucket (all data or pre-start only)
+    // Add to the appropriate bucket (all data and, separately, pre-start subset)
     if (type === "count") {
-      if (!isPreStart) {
-        grouped[mga][monthIndex] += 1;
-      }
+      grouped[mga][monthIndex] += 1;
       if (isPreStart) {
         preStartData[mga][monthIndex] += 1;
       }
     } else if (type === "sum") {
       const value = parseFloat(item[sumField]) || 0;
-      if (!isPreStart) {
-        grouped[mga][monthIndex] += value;
-      }
+      grouped[mga][monthIndex] += value;
       if (isPreStart) {
         preStartData[mga][monthIndex] += value;
       }
     } else if (type === "unique") {
       if (uniqueField && item[uniqueField] !== undefined && item[uniqueField] !== null) {
-        if (!isPreStart) {
-          grouped[mga][monthIndex].add(item[uniqueField]);
-        }
+        grouped[mga][monthIndex].add(item[uniqueField]);
         if (isPreStart) {
           preStartData[mga][monthIndex].add(item[uniqueField]);
         }
@@ -500,12 +440,10 @@ const groupDataByMGA = (
       preStartData[mga] = preStartData[mga].map((set) => set.size);
     }
   }
-  
-  console.log(`Grouped into ${Object.keys(grouped).length} MGAs:`, Object.keys(grouped));
   return { grouped, preStartData };
 };
 
-const ScorecardSGAData = () => {
+const ScorecardSGAData = ({ activeTab: propActiveTab, selectedAgency: propSelectedAgency, onSelectAgency }) => {
   // Get user data from auth context
   const { user } = useAuth();
   const userId = user?.userId;
@@ -516,16 +454,13 @@ const ScorecardSGAData = () => {
   // Use SGA role for app admins, otherwise use actual clname
   const userRole = isAppAdmin ? 'SGA' : user?.clname?.toUpperCase();
   
+  // Use prop activeTab if provided, otherwise default to 'mga'
+  const activeTab = propActiveTab || 'mga';
+  
   // Use "ARIAS SIMON A" as lagnname for app admins, otherwise use actual lagnname
   const agnName = isAppAdmin ? 'ARIAS SIMON A' : user?.lagnname; // Using lagnname as agent name
   
-  // Log for debugging app admin data fetching
   if (isAppAdmin) {
-    console.log('🏭 ScorecardSGAView: App admin detected, using SGA role and ARIAS SIMON A as lagnname', {
-      userRole,
-      agnName,
-      userId: user?.userId
-    });
   }
 
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -541,11 +476,17 @@ const ScorecardSGAData = () => {
   const [sortColumn, setSortColumn] = useState("mga");
   const [sortOrder, setSortOrder] = useState("asc");
   const [selectedTreeFilter, setSelectedTreeFilter] = useState("All");
-  const [hireToCodeView, setHireToCodeView] = useState("Month");
+  // Toggle between Hire-to-Code calculation modes
+  // 'YTD' (sum of hires / sum of codes; default) vs 'Rolling' (weekly rolling ratios averaged by month)
+  const [hireToCodeMode, setHireToCodeMode] = useState('YTD');
   const [showInactiveMgas, setShowInactiveMgas] = useState(false);
   const [showFutureMonths, setShowFutureMonths] = useState(true);
   const [quartersMode, setQuartersMode] = useState('show'); // 'show', 'hide', 'only'
   const [onlySortedColumn, setOnlySortedColumn] = useState(false); // show only MGA + sorted col
+  const [showCommits, setShowCommits] = useState(false); // Toggle between actuals and commits
+  const [commitsData, setCommitsData] = useState({}); // Store commits by MGA
+  const [showBreakdownModal, setShowBreakdownModal] = useState(false);
+  const [breakdownData, setBreakdownData] = useState({ metric: '', period: '', data: [], rgaName: '' });
   const currencyFormatter = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -554,9 +495,6 @@ const ScorecardSGAData = () => {
   
   const queryRole = (userRole === "RGA" || userRole === "SGA") ? "MGA" : userRole;
   const selectedMga = null;
-  if (!agnName) {
-    console.error("Invalid user role or agnName");
-  }
   const effectiveAgnName =
     (userRole === "MGA" || userRole === "RGA" || (userRole === "SGA" && selectedMga))
       ? selectedMga || agnName
@@ -596,7 +534,6 @@ const ScorecardSGAData = () => {
         setSubagentData(subagentRes.data.data || []);
       })
       .catch((err) => {
-        console.error("Error fetching endpoint data:", err);
         setError("Error fetching endpoint data");
       })
       .finally(() => setLoading(false));
@@ -608,8 +545,169 @@ const ScorecardSGAData = () => {
     endpoints.subagent,
   ]);
 
+  // Fetch commits data when showCommits is toggled on (only on MGA breakdown tab)
+  useEffect(() => {
+    const fetchCommitsData = async () => {
+      if (!showCommits || activeTab !== 'mga') {
+        return;
+      }
+
+      try {
+        // Get unique MGA lagnnames from the processed data
+        // We'll need to get all MGAs that are being displayed
+        const mgaRes = await api.get('/settings/hierarchy/by-clname/MGA');
+        const allMgas = mgaRes?.data?.data || [];
+        const mgaLagnnames = allMgas
+          .filter(mga => {
+            const activeValue = String(mga.Active || mga.active || '').trim().toLowerCase();
+            const hideValue = String(mga.hide || '').trim().toLowerCase();
+            return activeValue !== 'n' && hideValue !== 'y';
+          })
+          .map(mga => normalizeName(mga.lagnname))
+          .filter(Boolean);
+        
+        if (mgaLagnnames.length === 0) {
+          console.warn('📊 No MGAs found to fetch commits for');
+          return;
+        }
+
+
+        // Initialize commits data structure for each MGA
+        const commitsDataObj = {};
+        mgaLagnnames.forEach(lagnname => {
+          commitsDataObj[lagnname] = {};
+          for (const year of [selectedYear - 1, selectedYear]) {
+            commitsDataObj[lagnname][year] = {
+              hires: Array(12).fill(null),
+              codes: Array(12).fill(null),
+              vips: Array(12).fill(null),
+              alp: Array(12).fill(null)
+            };
+          }
+        });
+
+        // Fetch commits for each month of the current and previous year
+        try {
+          // Fetch ALL commits for ALL MGAs in one API call
+          const commitsResponse = await api.get('/commits/admin', {
+            params: {
+              time_period: 'month',
+              all: 'true'  // Get all commits (requires SGA+ permissions)
+            }
+          });
+
+          // Process all commits and organize by MGA, year, month, type
+          if (commitsResponse?.data?.success) {
+            const allCommits = commitsResponse.data.data || [];
+            
+            // Sort by created_at DESC to get most recent commits first
+            allCommits.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            
+            // Filter to only MGAs we care about and organize
+            allCommits.forEach(commit => {
+              const lagnname = normalizeName(commit.lagnname);
+              
+              // Only process commits for MGAs in our list
+              if (!commitsDataObj[lagnname]) return;
+              
+              const commitDate = new Date(commit.start);
+              const year = commitDate.getFullYear();
+              const month = commitDate.getMonth(); // 0-indexed (0 = January)
+              
+              // Only process commits for the years we care about
+              if (year === selectedYear || year === selectedYear - 1) {
+                const type = commit.type; // 'hires', 'codes', or 'vips'
+                
+                if (commitsDataObj[lagnname][year] && commitsDataObj[lagnname][year][type]) {
+                  // Only set if not already set (keeps most recent due to sort)
+                  if (commitsDataObj[lagnname][year][type][month] === null) {
+                    commitsDataObj[lagnname][year][type][month] = parseFloat(commit.amount) || 0;
+                  }
+                }
+              }
+            });
+          }
+
+          // Fetch ALL MGA goals for the relevant years
+          // Create mapping from userId to lagnname (normalized)
+          const userIdToLagnname = {};
+          allMgas.forEach(m => {
+            if (m.userId) userIdToLagnname[m.userId] = normalizeName(m.lagnname);
+          });
+
+          console.log('📊 MGA User ID to lagnname mapping:', userIdToLagnname);
+          console.log('📊 Fetching ALL goals for years:', [selectedYear - 1, selectedYear]);
+
+          try {
+            const bulkGoalsRes = await api.post('/goals/bulk', {
+              years: [selectedYear - 1, selectedYear],
+              goalType: 'mga'  // Only get MGA-type goals
+            });
+
+            const allGoals = bulkGoalsRes?.data || [];
+            console.log('📊 Total MGA goals fetched:', allGoals.length);
+            console.log('📊 Sample MGA goals:', allGoals.slice(0, 5));
+            
+            // Organize goals by MGA, year, month
+            allGoals.forEach(goal => {
+              const lagnname = userIdToLagnname[goal.activeUserId];
+              
+              if (!lagnname) {
+                // This MGA's goals but not in our filtered list, skip it
+                return;
+              }
+              
+              if (!commitsDataObj[lagnname]) {
+                // This MGA is not in our display list, skip it
+                return;
+              }
+              
+              const year = goal.year;
+              const month = goal.month - 1; // Convert to 0-indexed
+              
+              if (commitsDataObj[lagnname][year] && commitsDataObj[lagnname][year].alp) {
+                commitsDataObj[lagnname][year].alp[month] = parseFloat(goal.monthlyAlpGoal) || 0;
+                console.log(`✅ Set ALP goal for ${lagnname} ${year}-${month+1}: $${goal.monthlyAlpGoal}`);
+              }
+            });
+          } catch (goalsErr) {
+            console.error('Failed to fetch bulk goals:', goalsErr);
+          }
+
+          setCommitsData(commitsDataObj);
+          
+          console.log('✅ Commits data loaded for', Object.keys(commitsDataObj).length, 'MGAs');
+          
+          // Log a sample MGA's commits to verify structure
+          const sampleMgaName = Object.keys(commitsDataObj)[0];
+          if (sampleMgaName) {
+            console.log('\n📋 Sample commits data structure for:', sampleMgaName);
+            console.log('  Years:', Object.keys(commitsDataObj[sampleMgaName]));
+            console.log('  Data:', JSON.stringify(commitsDataObj[sampleMgaName], null, 2));
+          }
+        } catch (err) {
+          console.error('Failed to fetch commits/goals data:', err);
+          setCommitsData({});
+        }
+      } catch (err) {
+        console.error('Error fetching commits data:', err);
+      }
+    };
+
+    fetchCommitsData();
+  }, [showCommits, activeTab, selectedYear]);
+
+  // Reset showCommits when leaving MGA breakdown tab
+  useEffect(() => {
+    if (activeTab !== 'mga' && showCommits) {
+      setShowCommits(false);
+    }
+  }, [activeTab, showCommits]);
+
   const processAlpDataForMGA = (data, selectedYear) => {
-    const grouped = {};
+    
+    // First pass: check if each MGA has any "MGA" CL_Name rows for any month
+    const hasMgaRows = {};
     data.forEach((item) => {
       if (!item.month || typeof item.month !== "string") return;
       const parts = item.month.split("/");
@@ -617,7 +715,28 @@ const ScorecardSGAData = () => {
       const monthIndex = parseInt(parts[0], 10) - 1;
       const year = parseInt(parts[1], 10);
       if (year !== selectedYear) return;
-      const key = item.LagnName;
+      const key = normalizeName(item.LagnName);
+      if (!key) return;
+      
+      const trackerKey = `${key}-${year}-${monthIndex}`;
+      const isMga = (item.CL_Name || "").toUpperCase() === "MGA";
+      if (isMga) {
+        hasMgaRows[trackerKey] = true;
+      }
+    });
+    
+    // Second pass: process data with deduplication
+    const grouped = {};
+    const valueTracker = {}; // Track unique values per MGA per month
+    
+    data.forEach((item) => {
+      if (!item.month || typeof item.month !== "string") return;
+      const parts = item.month.split("/");
+      if (parts.length < 2) return;
+      const monthIndex = parseInt(parts[0], 10) - 1;
+      const year = parseInt(parts[1], 10);
+      if (year !== selectedYear) return;
+      const key = normalizeName(item.LagnName);
       if (!key) return;
       
       // Check if this data should be excluded based on MGA start date
@@ -636,29 +755,46 @@ const ScorecardSGAData = () => {
         parseFloat(
           rawValue.replace(/[$,()]/g, (match) => (match === "(" ? "-" : ""))
         ) || 0;
+      
       if (!grouped[key]) {
-        grouped[key] = Array(12).fill(undefined);
+        grouped[key] = Array(12).fill(0);
       }
-      if (grouped[key][monthIndex] === undefined) {
-        grouped[key][monthIndex] = { value: cleanedValue, clName: item.CL_Name };
-      } else if (
-        grouped[key][monthIndex].clName !== "MGA" &&
-        item.CL_Name === "MGA"
-      ) {
-        grouped[key][monthIndex] = { value: cleanedValue, clName: item.CL_Name };
+      
+      // Create tracker key for this MGA/month
+      const trackerKey = `${key}-${year}-${monthIndex}`;
+      if (!valueTracker[trackerKey]) {
+        valueTracker[trackerKey] = new Set();
+      }
+      
+      // Determine if this is an MGA row or blank row
+      const isMga = (item.CL_Name || "").toUpperCase() === "MGA";
+      const monthHasMgaRows = hasMgaRows[trackerKey];
+      
+      // Logic matching ScorecardTable.js:
+      // - If this month has "MGA" rows: Only count "MGA" rows
+      // - If this month has NO "MGA" rows: Count blank rows
+      // - Only add unique values (skip duplicates)
+      
+      if (monthHasMgaRows) {
+        // Month has MGA rows - only count MGA designated rows
+        if (isMga && !valueTracker[trackerKey].has(cleanedValue)) {
+          grouped[key][monthIndex] += cleanedValue;
+          valueTracker[trackerKey].add(cleanedValue);
+        }
+      } else {
+        // Month has NO MGA rows - count blank rows
+        if (!isMga && !valueTracker[trackerKey].has(cleanedValue)) {
+          grouped[key][monthIndex] += cleanedValue;
+          valueTracker[trackerKey].add(cleanedValue);
+        }
       }
     });
-    // Convert each grouped entry to a numeric array (defaulting missing entries to 0)
-    const final = {};
-    Object.keys(grouped).forEach((key) => {
-      final[key] = grouped[key].map((entry) => (entry ? entry.value : 0));
-    });
-    return final;
+    
+    return grouped;
   };
   
-  const buildHireToCodeRows = (codesRows, hiresRows) => {
+  const buildHireToCodeRows = (codesRows, hiresRows, mode = 'YTD') => {
     // Calculate rolling hire to code ratios
-    console.log(`Building Hire to Code rows for ${codesRows.length} MGAs`);
     const rollingRatios = calculateRollingHireToCode(associatesData, hiresData, selectedYear);
     
     const rows = codesRows.map((codeRow) => {
@@ -682,15 +818,34 @@ const ScorecardSGAData = () => {
         ? monthlyCounts.slice(9, 12).reduce((a, b) => a + b, 0) / monthlyCounts.slice(9, 12).filter(v => v > 0).length 
         : 0;
       
-      // For YTD, exclude current month if looking at current year
+      // Compute YTD based on selected mode
+      let YTD = 0;
       const today = new Date();
       const isCurrentYear = selectedYear === today.getFullYear();
-      const monthsToConsider = isCurrentYear ? Math.max(0, today.getMonth()) : 12;
-      const relevantMonths = monthlyCounts.slice(0, monthsToConsider);
+      const lastCompletedMonth = isCurrentYear ? Math.max(0, today.getMonth()) : 12; // exclude current month when current year
+
+      if (mode === 'Rolling') {
+        // Average of monthly ratios (existing behavior)
+        const relevantMonths = monthlyCounts.slice(0, lastCompletedMonth);
       const nonZeroMonths = relevantMonths.filter(v => v > 0).length;
-      const YTD = nonZeroMonths > 0 
+        YTD = nonZeroMonths > 0 
         ? relevantMonths.reduce((a, b) => a + b, 0) / nonZeroMonths 
         : 0;
+      } else {
+        // YTD ratio = (sum of hires) / (sum of codes) across completed months
+        // Use provided rows (already processed for pre-start) to get raw counts
+        const codeRow = codesRows.find(r => r.mga === mga);
+        const hireRow = hiresRows.find(r => r.mga === mga);
+        let sumCodes = 0;
+        let sumHires = 0;
+        for (let i = 0; i < lastCompletedMonth; i++) {
+          const codesVal = (codeRow?.monthlyCounts?.[i] || 0) - (codeRow?.preStartMonthlyCounts?.[i] || 0);
+          const hiresVal = (hireRow?.monthlyCounts?.[i] || 0) - (hireRow?.preStartMonthlyCounts?.[i] || 0);
+          sumCodes += Math.max(0, codesVal);
+          sumHires += Math.max(0, hiresVal);
+        }
+        YTD = sumCodes > 0 ? (sumHires / sumCodes) : 0;
+      }
       
       return {
         mga,
@@ -704,16 +859,6 @@ const ScorecardSGAData = () => {
       };
     });
     
-    // Log a sample row for verification
-    if (rows.length > 0) {
-      console.log("Sample Hire to Code row:");
-      console.log(`  MGA: ${rows[0].mga}`);
-      console.log(`  Monthly: ${rows[0].monthlyCounts.map(v => v.toFixed(4)).join(', ')}`);
-      console.log(`  Q1: ${rows[0].Q1.toFixed(4)}, Q2: ${rows[0].Q2.toFixed(4)}, Q3: ${rows[0].Q3.toFixed(4)}, Q4: ${rows[0].Q4.toFixed(4)}`);
-      console.log(`  YTD: ${rows[0].YTD.toFixed(4)}`);
-    }
-    
-    console.log("Hire to Code calculation complete");
     return rows;
   };
 
@@ -733,6 +878,73 @@ const ScorecardSGAData = () => {
     const YTD = rows.reduce((sum, row) => sum + row.YTD, 0) / rows.length;
     return { monthly: avgMonthly, Q1, Q2, Q3, Q4, YTD };
   };
+
+  // Specialized function for hire to code totals: sum of all MGAs' hires / sum of all MGAs' codes
+  const computeHireToCodeTotals = (hiresRows, codesRows) => {
+    
+    if (hiresRows.length === 0 || codesRows.length === 0) {
+      return { monthly: Array(12).fill(0), Q1: 0, Q2: 0, Q3: 0, Q4: 0, YTD: 0 };
+    }
+
+    // Sum up hires and codes for each month from the MGA rows
+    const totalHiresMonthly = Array(12).fill(0);
+    const totalCodesMonthly = Array(12).fill(0);
+
+    hiresRows.forEach((row) => {
+      row.monthlyCounts.forEach((val, idx) => {
+        const preStartVal = row.preStartMonthlyCounts?.[idx] || 0;
+        totalHiresMonthly[idx] += Math.max(0, val - preStartVal);
+      });
+    });
+
+    codesRows.forEach((row) => {
+      row.monthlyCounts.forEach((val, idx) => {
+        const preStartVal = row.preStartMonthlyCounts?.[idx] || 0;
+        totalCodesMonthly[idx] += Math.max(0, val - preStartVal);
+      });
+    });
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    // Calculate monthly ratios (not used for display but kept for consistency)
+    const monthlyRatios = totalHiresMonthly.map((hires, idx) => {
+      const codes = totalCodesMonthly[idx];
+      const ratio = codes > 0 ? hires / codes : 0;
+      return ratio;
+    });
+
+    // Calculate quarterly ratios by summing the months in each quarter
+    const calculateQuarterRatio = (startMonth, endMonth, quarterName) => {
+      let totalHires = 0;
+      let totalCodes = 0;
+      for (let i = startMonth; i < endMonth; i++) {
+        totalHires += totalHiresMonthly[i];
+        totalCodes += totalCodesMonthly[i];
+      }
+      const ratio = totalCodes > 0 ? totalHires / totalCodes : 0;
+      return ratio;
+    };
+
+    const Q1 = calculateQuarterRatio(0, 3, 'Q1');
+    const Q2 = calculateQuarterRatio(3, 6, 'Q2');
+    const Q3 = calculateQuarterRatio(6, 9, 'Q3');
+    const Q4 = calculateQuarterRatio(9, 12, 'Q4');
+
+    // Calculate YTD by summing YTD months from each MGA
+    const today = new Date();
+    const isCurrentYear = selectedYear === today.getFullYear();
+    const lastCompletedMonth = isCurrentYear ? Math.max(0, today.getMonth()) : 12;
+    
+    let ytdHires = 0;
+    let ytdCodes = 0;
+    for (let i = 0; i < lastCompletedMonth; i++) {
+      ytdHires += totalHiresMonthly[i];
+      ytdCodes += totalCodesMonthly[i];
+    }
+    const YTD = ytdCodes > 0 ? ytdHires / ytdCodes : 0;
+
+    return { monthly: monthlyRatios, Q1, Q2, Q3, Q4, YTD };
+  };
   
   const formatCellValue = (title, key, value, isPreStart = false) => {
     if (key === "mga") return value;
@@ -750,12 +962,14 @@ const ScorecardSGAData = () => {
     
     const monthIndex = monthOrder[headerKey];
     if (monthIndex !== undefined) {
-      // Check if this entire month is before the MGA start date
+      // Check if this entire month is before the MGA/RGA start date
       // Only grey out if the entire month is before the start date
       const monthStartDate = new Date(selectedYear, monthIndex, 1);
       const monthEndDate = new Date(selectedYear, monthIndex + 1, 0); // Last day of the month
       
-      return monthEndDate < row.mgaStartDate;
+      const isGreyedOut = monthEndDate < row.mgaStartDate;
+      
+      return isGreyedOut;
     }
     
     return false;
@@ -806,6 +1020,11 @@ const ScorecardSGAData = () => {
       return true;
     }
     
+    // When showing commits, always hide quarters (only show months and YTD)
+    if (showCommits && isQuarter) {
+      return false;
+    }
+    
     // Handle quarters mode
     if (quartersMode === 'hide' && isQuarter) {
       return false; // Hide quarters
@@ -823,10 +1042,11 @@ const ScorecardSGAData = () => {
     }
     
     return true;
-  }, [quartersMode, showFutureMonths]);
+  }, [quartersMode, showFutureMonths, showCommits]);
 
   // All MGA data for totals calculation (always includes all MGAs)
   const [allMgaData, setAllMgaData] = useState([]);
+  const [uniqueRgas, setUniqueRgas] = useState([]);
 
   // Deduplicate MGAs by lagnname with stable preference and latest start
   const dedupedMgaByName = useMemo(() => {
@@ -882,43 +1102,94 @@ const ScorecardSGAData = () => {
     return startDatesLookup;
   }, [dedupedMgaByName]);
 
-  // Fetch all MGAs for filtering and totals calculation
+  // Fetch all MGAs and RGAs for filtering and totals calculation
   useEffect(() => {
-    const fetchAllMgaData = async () => {
+    const fetchAllAgencyData = async () => {
       try {
-        const response = await api.get("/dataroutes/get-all-mgas");
-        
-        if (response.data.success) {
-          console.log("All MGA data loaded:", response.data.data.length, "MGAs");
-          setAllMgaData(response.data.data);
+        // Fetch MGAs
+        const mgaRes = await api.get("/dataroutes/get-all-mgas");
+        if (mgaRes.data.success) {
+          // Normalize lagnname for all MGAs
+          const normalizedMgas = (mgaRes.data.data || []).map(mga => ({
+            ...mga,
+            lagnname: normalizeName(mga.lagnname)
+          }));
+          setAllMgaData(normalizedMgas);
         }
+
+        // Fetch RGAs
+        const rgaRes = await api.get('/settings/hierarchy/by-clname/RGA');
+        const rgasData = rgaRes?.data?.data || [];
+        // Exclude if hide='y' OR active='n' and normalize lagnname
+        const rgas = rgasData
+          .filter(item => {
+            const activeValue = String(item.active || '').trim().toLowerCase();
+            const hideValue = String(item.hide || '').trim().toLowerCase();
+            return activeValue !== 'n' && hideValue !== 'y';
+          })
+          .map(rga => ({
+            ...rga,
+            lagnname: normalizeName(rga.lagnname)
+          }));
+        setUniqueRgas(rgas);
       } catch (err) {
-        console.error("Error fetching all MGA data:", err);
       }
     };
 
-    fetchAllMgaData();
+    fetchAllAgencyData();
   }, []);
 
-  // Filter MGA data based on showInactiveMgas state (deduped, one per lagnname)
+  // Create RGA start dates lookup object
+  const rgaStartDates = useMemo(() => {
+    const startDatesLookup = {};
+    uniqueRgas.forEach((rga) => {
+      if (rga.lagnname && rga.start) {
+        startDatesLookup[rga.lagnname] = rga.start;
+      }
+    });
+    return startDatesLookup;
+  }, [uniqueRgas]);
+
+  // Filter MGA/RGA data based on activeTab - return appropriate list
   const filteredMgaData = useMemo(() => {
-    if (dedupedMgaByName.size === 0) return [];
+    // On RGA breakdown tab, return RGA list
+    if (activeTab === 'rga') {
+      return uniqueRgas;
+    }
+    
+    // On MGA breakdown or agency tab, use MGA data
+    if (dedupedMgaByName.size === 0) {
+      return [];
+    }
 
     const result = [];
+    let filteredOutByInactive = 0;
+    
     dedupedMgaByName.forEach((mga) => {
       const isActive = mga.Active?.toLowerCase() === 'y';
       const isHidden = mga.hide?.toLowerCase() === 'y';
+      const clname = (mga.clname || '').toUpperCase();
+
+      // On MGA breakdown, exclude RGAs
+      if (activeTab === 'mga' && clname === 'RGA') {
+        return;
+      }
 
       if (!showInactiveMgas) {
         // Default view: only active, visible MGAs
-        if (isActive && !isHidden) result.push(mga);
+        if (isActive && !isHidden) {
+          result.push(mga);
+        } else {
+          filteredOutByInactive++;
+        }
       } else {
         // Include one record per MGA (best deduped record)
         result.push(mga);
       }
     });
+    
     return result;
-  }, [dedupedMgaByName, showInactiveMgas]);
+  }, [dedupedMgaByName, showInactiveMgas, activeTab, uniqueRgas]);
 
   // Get inactive MGAs for the "Inactive MGAs" row (disjoint from main list)
   const inactiveMgaData = useMemo(() => {
@@ -963,32 +1234,141 @@ const ScorecardSGAData = () => {
     return result;
   }, [allMgaData, dedupedMgaByName, filteredMgaData]);
 
+  // Fetch RGA hierarchy to map MGAs to RGAs (only when on RGA breakdown tab)
+  // Now stores full MGA objects with metadata (isFirstYear, uplineMGA)
+  const [rgaHierarchyMap, setRgaHierarchyMap] = useState(new Map()); // Map<rgaName, Set<mgaNames>>
+  const [rgaHierarchyMetadata, setRgaHierarchyMetadata] = useState(new Map()); // Map<rgaName, Map<mgaName, {isFirstYear, uplineMGA}>>
+  
+  useEffect(() => {
+    if (activeTab !== 'rga' || uniqueRgas.length === 0) return;
+    
+    const fetchRgaHierarchies = async () => {
+      const hierarchyMap = new Map();
+      const metadataMap = new Map();
+      
+      try {
+        // Fetch hierarchy for each RGA
+        const promises = uniqueRgas.map(async (rga) => {
+          try {
+            const rollupRes = await api.get(`/mga-hierarchy/rga-rollup/${encodeURIComponent(rga.lagnname)}`);
+            if (rollupRes?.data?.success) {
+              const mgas = rollupRes.data.data.mgas || [];
+              // Normalize MGA names from the rollup
+              const mgaNames = new Set(mgas.map(m => normalizeName(m.lagnname)).filter(Boolean));
+              // Also include the RGA themselves
+              mgaNames.add(rga.lagnname);
+              hierarchyMap.set(rga.lagnname, mgaNames);
+              
+              // Store metadata for each MGA (with normalized names)
+              const mgaMetadata = new Map();
+              mgas.forEach(mga => {
+                const normalizedMgaName = normalizeName(mga.lagnname);
+                mgaMetadata.set(normalizedMgaName, {
+                  isFirstYear: mga.isFirstYear || false,
+                  uplineMGA: normalizeName(mga.rga) || null, // The MGA they roll up to
+                  rollupReason: mga.rollupReason
+                });
+              });
+              metadataMap.set(rga.lagnname, mgaMetadata);
+            }
+          } catch (err) {
+            // If fetch fails, just include the RGA themselves
+            hierarchyMap.set(rga.lagnname, new Set([rga.lagnname]));
+            metadataMap.set(rga.lagnname, new Map());
+          }
+        });
+        
+        await Promise.all(promises);
+        setRgaHierarchyMap(hierarchyMap);
+        setRgaHierarchyMetadata(metadataMap);
+      } catch (err) {
+      }
+    };
+    
+    fetchRgaHierarchies();
+  }, [activeTab, uniqueRgas]);
+
   // Group each dataset by MGA.
   // For VIP, use the "vip_month" field, count occurrences, and use the "mga" field.
   const vipGroupedResult = groupDataByMGA(vipData, "vip_month", selectedYear, "count", "total", "mga", null, mgaStartDates);
   const vipGrouped = vipGroupedResult.grouped;
   const vipPreStartData = vipGroupedResult.preStartData;
-  console.log(`VIP grouped data:`, Object.keys(vipGrouped));
   
   // For Associates, use "PRODDATE", count occurrences, and use the "MGA" field.
   const associatesGroupedResult = groupDataByMGA(associatesData, "PRODDATE", selectedYear, "count", "total", "MGA", null, mgaStartDates);
   const associatesGrouped = associatesGroupedResult.grouped;
   const associatesPreStartData = associatesGroupedResult.preStartData;
-  console.log(`Associates grouped data:`, Object.keys(associatesGrouped));
   
   // For Hires, use "MORE_Date", sum the "Total_Hires" field, and use the "MGA" field.
   const hiresGroupedResult = groupDataByMGA(hiresData, "MORE_Date", selectedYear, "sum", "Total_Hires", "MGA", null, mgaStartDates);
   const hiresGrouped = hiresGroupedResult.grouped;
   const hiresPreStartData = hiresGroupedResult.preStartData;
-  console.log(`Hires grouped data:`, Object.keys(hiresGrouped));
   
   // For Subagent, use "month", count unique LagnName values, and use the "MGA_NAME" field.
 
-  // Build table rows for each dataset by iterating over filtered MGA records.
-  // If an MGA does not have data, default monthly counts to 0.
-  const buildTableRows = (groupedData, isSubagent = false, preStartData = {}) => {
-    console.log(`Building table rows for ${filteredMgaData.length} MGAs`);
-    console.log(`Grouped data keys:`, Object.keys(groupedData));
+  // Helper function to aggregate MGA data into RGA rollup data
+  const aggregateRgaData = (mgaGroupedData, preStartData = {}, rgaStartDatesLookup = {}) => {
+    if (activeTab !== 'rga' || rgaHierarchyMap.size === 0) {
+      return { grouped: mgaGroupedData, preStart: preStartData };
+    }
+    
+    const rgaAggregated = {};
+    
+    // For each RGA, sum up data from the RGA themselves + all their MGAs
+    // IMPORTANT: Subtract pre-start data at MGA level BEFORE aggregating to avoid negative value issues
+    rgaHierarchyMap.forEach((mgaSet, rgaName) => {
+      rgaAggregated[rgaName] = Array(12).fill(0);
+      
+    
+      
+      // Get RGA start date for filtering
+      const rgaStartDate = parseMgaStartDate(rgaStartDatesLookup[rgaName]);
+      if (rgaStartDate) {
+      }
+      
+      // Aggregate from the RGA themselves + all MGAs under this RGA
+      // Note: mgaSet already includes the RGA themselves, so we don't need to add them separately
+      mgaSet.forEach(mgaName => {
+        const mgaData = mgaGroupedData[mgaName];
+        const mgaPreStartData = preStartData[mgaName];
+        
+        if (mgaData) {
+          // Subtract pre-start at MGA level and apply Math.max(0, ...) before aggregating
+          mgaData.forEach((count, monthIdx) => {
+            const preStart = mgaPreStartData?.[monthIdx] || 0;
+            const validCount = Math.max(0, (count || 0) - preStart);
+            rgaAggregated[rgaName][monthIdx] += validCount;
+          });
+        }
+      });
+      
+      // CRITICAL FIX: Filter aggregated RGA data based on RGA's own start date
+      // Zero out any months that are entirely before the RGA's start date
+      if (rgaStartDate) {
+        rgaAggregated[rgaName] = rgaAggregated[rgaName].map((count, monthIdx) => {
+          const monthEndDate = new Date(selectedYear, monthIdx + 1, 0); // Last day of month
+          if (monthEndDate < rgaStartDate) {
+            return 0;
+          }
+          return count;
+        });
+      }
+    });
+    // Return aggregated data with empty preStart since we've already subtracted it
+    return { grouped: rgaAggregated, preStart: {} };
+  };
+  
+  // Apply RGA aggregation if on RGA breakdown tab
+  const finalVipData = useMemo(() => aggregateRgaData(vipGrouped, vipPreStartData, rgaStartDates), [vipGrouped, vipPreStartData, activeTab, rgaHierarchyMap, rgaStartDates]);
+  const finalAssociatesData = useMemo(() => aggregateRgaData(associatesGrouped, associatesPreStartData, rgaStartDates), [associatesGrouped, associatesPreStartData, activeTab, rgaHierarchyMap, rgaStartDates]);
+  const finalHiresData = useMemo(() => aggregateRgaData(hiresGrouped, hiresPreStartData, rgaStartDates), [hiresGrouped, hiresPreStartData, activeTab, rgaHierarchyMap, rgaStartDates]);
+
+  // Build table rows for each dataset by iterating over filtered MGA/RGA records.
+  // If an MGA/RGA does not have data, default monthly counts to 0.
+  const buildTableRows = (dataResult, isSubagent = false) => {
+    const groupedData = dataResult.grouped || dataResult;
+    const preStartData = dataResult.preStart || {};
+   
     
     return filteredMgaData.map((mgaObj) => {
       const mgaName = mgaObj.lagnname;
@@ -1011,8 +1391,17 @@ const ScorecardSGAData = () => {
         monthlyCounts = groupedData[mgaName] || Array(12).fill(0);
         preStartMonthlyCounts = preStartData[mgaName] || Array(12).fill(0);
         
-        // Calculate totals excluding pre-start data
-        const validMonthlyCounts = monthlyCounts.map((total, idx) => total - preStartMonthlyCounts[idx]);
+        // For RGA breakdown, pre-start has already been subtracted during aggregation
+        // For MGA breakdown, we need to subtract it here
+        let validMonthlyCounts;
+        if (activeTab === 'rga') {
+          // Pre-start already subtracted in aggregateRgaData
+          validMonthlyCounts = monthlyCounts;
+        } else {
+          // Calculate totals excluding pre-start data, ensuring no negative values
+          validMonthlyCounts = monthlyCounts.map((total, idx) => Math.max(0, total - preStartMonthlyCounts[idx]));
+        }
+        
         const totals = calculateQuarterTotals(validMonthlyCounts, selectedYear === new Date().getFullYear());
         Q1 = totals.Q1;
         Q2 = totals.Q2;
@@ -1039,8 +1428,6 @@ const ScorecardSGAData = () => {
   // Build inactive MGAs row
   const buildInactiveMgaRow = (groupedData, isSubagent = false) => {
     if (inactiveMgaData.length === 0) return null;
-    
-    console.log(`Building inactive MGAs row for ${inactiveMgaData.length} MGAs`);
     
     // Sum up data from all inactive MGAs
     const inactiveMonthlyCounts = Array(12).fill(0);
@@ -1104,7 +1491,7 @@ const ScorecardSGAData = () => {
       const startDate = new Date(endDate);
       startDate.setDate(startDate.getDate() - 6);
       const month = startDate.getMonth();
-      const mga = row["MGA_NAME"];
+      const mga = normalizeName(row["MGA_NAME"]);
       if (!mga) return;
       if (!groupedByMGA[mga]) {
         groupedByMGA[mga] = {};
@@ -1170,7 +1557,7 @@ const ScorecardSGAData = () => {
       if (year !== selectedYear) return;
       
       const month = parseInt(monthStr, 10) - 1; // Convert to 0-indexed
-      const mga = row.MGA;
+      const mga = normalizeName(row.MGA);
       if (!mga) return;
       
       if (!groupedByMGA[mga]) {
@@ -1242,7 +1629,7 @@ const ScorecardSGAData = () => {
       const year = parseInt(parts[1], 10);
       if (year !== selectedYear) return;
       const adjustedMonth = month - 1;
-      const mga = row["MGA_NAME"];
+      const mga = normalizeName(row["MGA_NAME"]);
       if (!mga) return;
       if (!result[mga]) {
         result[mga] = Array.from({ length: 12 }, () => new Set());
@@ -1289,21 +1676,259 @@ const ScorecardSGAData = () => {
 
   // Process ALP data separately since it has a different structure
   useEffect(() => {
-    const alpGrouped = processAlpDataForMGA(alpData, selectedYear);
+    let alpGrouped = processAlpDataForMGA(alpData, selectedYear);
+    
+    // Process ALP data for RGAs if on RGA breakdown tab
+    // For ALP: ONLY show RGA's personal production (blank CL_Name rows), NOT their team's ALP
+    if (activeTab === 'rga' && rgaHierarchyMap.size > 0) {
+      
+      // Process raw ALP data for RGAs only (not their MGAs)
+      const rgaAlpProcessed = {};
+      
+      rgaHierarchyMap.forEach((mgaSet, rgaName) => {
+        rgaAlpProcessed[rgaName] = Array(12).fill(0);
+        
+        // Get RGA start date for filtering
+        const rgaStartDate = parseMgaStartDate(rgaStartDates[rgaName]);
+        
+        // Only process data for the RGA themselves, not their MGAs
+        const valueTracker = {};
+        
+        alpData.forEach((item) => {
+          if (!item.month || typeof item.month !== "string") return;
+          const parts = item.month.split("/");
+          if (parts.length < 2) return;
+          const monthIndex = parseInt(parts[0], 10) - 1;
+          const year = parseInt(parts[1], 10);
+          if (year !== selectedYear) return;
+          const agentName = normalizeName(item.LagnName);
+          
+          // ONLY process data for this RGA, skip their MGAs
+          if (agentName !== rgaName) return;
+          
+          const rawValue = item.LVL_3_NET;
+          const cleanedValue = parseFloat(rawValue.replace(/[$,()]/g, (match) => (match === "(" ? "-" : ""))) || 0;
+          
+          const trackerKey = `${agentName}-${year}-${monthIndex}`;
+          if (!valueTracker[trackerKey]) {
+            valueTracker[trackerKey] = new Set();
+          }
+          
+          // Skip duplicate values
+          if (valueTracker[trackerKey].has(cleanedValue)) return;
+          
+          const isMga = (item.CL_Name || "").toUpperCase() === "MGA";
+          
+          // For RGA: only count blank rows (personal production as RGA)
+          if (!isMga) {
+            rgaAlpProcessed[rgaName][monthIndex] += cleanedValue;
+            valueTracker[trackerKey].add(cleanedValue);
+          }
+        });
+        
+        // CRITICAL FIX: Filter ALP data based on RGA's start date
+        // Zero out any months that are entirely before the RGA's start date
+        if (rgaStartDate) {
+          rgaAlpProcessed[rgaName] = rgaAlpProcessed[rgaName].map((value, monthIdx) => {
+            const monthEndDate = new Date(selectedYear, monthIdx + 1, 0); // Last day of month
+            if (monthEndDate < rgaStartDate) {
+              return 0;
+            }
+            return value;
+          });
+        }
+        
+        const rgaTotal = rgaAlpProcessed[rgaName].reduce((sum, val) => sum + (val || 0), 0);
+      });
+      
+      alpGrouped = rgaAlpProcessed;
+    }
+    
     setFinalAlpData(buildAlpTableRows(alpGrouped, filteredMgaData));
-  }, [alpData, selectedYear, filteredMgaData]);
+  }, [alpData, selectedYear, filteredMgaData, activeTab, rgaHierarchyMap, rgaStartDates]);
 
-  const vipRows = buildTableRows(vipGrouped, false, vipPreStartData);
-  const associatesRows = buildTableRows(associatesGrouped, false, associatesPreStartData);
-  const hiresRows = buildTableRows(hiresGrouped, false, hiresPreStartData);
-  const subagentGrouped = processSubAgentDataFromDatabase(subagentData, selectedYear);
+  // Build commits rows when showing commits
+  const buildCommitsRows = useCallback((commitType) => {
+    console.log('\n🔷 buildCommitsRows called:', {
+      commitType,
+      showCommits,
+      commitsDataKeys: Object.keys(commitsData),
+      commitsDataLength: Object.keys(commitsData).length,
+      filteredMgaDataLength: filteredMgaData.length,
+      selectedYear
+    });
+
+    if (!showCommits || Object.keys(commitsData).length === 0) {
+      console.log('❌ Returning empty array - showCommits:', showCommits, 'commitsData length:', Object.keys(commitsData).length);
+      return [];
+    }
+
+    const rows = filteredMgaData.map((mgaObj, index) => {
+      const mgaName = mgaObj.lagnname;
+      const mgaCommits = commitsData[mgaName];
+      
+      console.log(`\n  📊 MGA ${index + 1}/${filteredMgaData.length}: ${mgaName}`);
+      console.log(`    - Has commits data:`, !!mgaCommits);
+      
+      let monthlyCounts = Array(12).fill(0);
+      
+      if (mgaCommits && mgaCommits[selectedYear] && mgaCommits[selectedYear][commitType]) {
+        monthlyCounts = mgaCommits[selectedYear][commitType].map(val => val || 0);
+        console.log(`    - Year ${selectedYear} ${commitType} commits:`, monthlyCounts);
+      } else {
+        console.log(`    - No commits found for ${selectedYear} ${commitType}`);
+        if (mgaCommits) {
+          console.log(`    - Available years:`, Object.keys(mgaCommits));
+          if (mgaCommits[selectedYear]) {
+            console.log(`    - Available types for ${selectedYear}:`, Object.keys(mgaCommits[selectedYear]));
+          }
+        }
+      }
+      
+      // Calculate quarters and YTD from monthly commits
+      const Q1 = monthlyCounts[0] + monthlyCounts[1] + monthlyCounts[2];
+      const Q2 = monthlyCounts[3] + monthlyCounts[4] + monthlyCounts[5];
+      const Q3 = monthlyCounts[6] + monthlyCounts[7] + monthlyCounts[8];
+      const Q4 = monthlyCounts[9] + monthlyCounts[10] + monthlyCounts[11];
+      
+      // YTD: sum up to last completed month
+      const today = new Date();
+      const currentMonth = today.getMonth();
+      const lastMonthIndex = currentMonth === 0 ? 0 : currentMonth - 1;
+      let YTD = 0;
+      for (let i = 0; i <= lastMonthIndex; i++) {
+        YTD += monthlyCounts[i] || 0;
+      }
+      
+      const row = {
+        mga: mgaName,
+        monthlyCounts,
+        Q1,
+        Q2,
+        Q3,
+        Q4,
+        YTD,
+        preStartMonthlyCounts: Array(12).fill(0), // No pre-start data for commits
+        Jan: monthlyCounts[0],
+        Feb: monthlyCounts[1],
+        Mar: monthlyCounts[2],
+        Apr: monthlyCounts[3],
+        May: monthlyCounts[4],
+        Jun: monthlyCounts[5],
+        Jul: monthlyCounts[6],
+        Aug: monthlyCounts[7],
+        Sep: monthlyCounts[8],
+        Oct: monthlyCounts[9],
+        Nov: monthlyCounts[10],
+        Dec: monthlyCounts[11],
+      };
+      
+      console.log(`    ✅ Row created:`, { mga: mgaName, Jan: row.Jan, Feb: row.Feb, Mar: row.Mar, YTD: row.YTD });
+      
+      return row;
+    });
+
+    console.log(`\n✅ buildCommitsRows returning ${rows.length} rows for ${commitType}`);
+    console.log('Sample row:', rows[0]);
+    
+    return rows;
+  }, [showCommits, commitsData, filteredMgaData, selectedYear]);
+
+  console.log('\n🔹 Building table rows:', {
+    showCommits,
+    activeTab,
+    selectedYear,
+    commitsDataAvailable: Object.keys(commitsData).length > 0,
+    filteredMgaDataCount: filteredMgaData.length
+  });
+
+  // Build ALP rows with commits if showing commits
+  const alpRowsForCommits = showCommits ? buildCommitsRows('alp') : [];
+  const vipRows = showCommits ? buildCommitsRows('vips') : buildTableRows(finalVipData, false);
+  const associatesRows = showCommits ? buildCommitsRows('codes') : buildTableRows(finalAssociatesData, false);
+  const hiresRows = showCommits ? buildCommitsRows('hires') : buildTableRows(finalHiresData, false);
+  
+  console.log('📋 Rows built:', {
+    showCommits,
+    alpRowsCount: alpRowsForCommits.length,
+    vipRowsCount: vipRows.length,
+    associatesRowsCount: associatesRows.length,
+    hiresRowsCount: hiresRows.length,
+    sampleVipRow: vipRows[0],
+    sampleAlpRow: alpRowsForCommits[0]
+  });
+  
+  // Process and aggregate subagent data
+  let subagentGrouped = processSubAgentDataFromDatabase(subagentData, selectedYear);
+  
+  // Aggregate subagent data for RGAs if on RGA breakdown tab
+  if (activeTab === 'rga' && rgaHierarchyMap.size > 0) {
+    const rgaSubagentAggregated = {};
+    
+    rgaHierarchyMap.forEach((mgaSet, rgaName) => {
+      const monthlyTotals = Array(12).fill(0);
+      let q1Count = 0, q2Count = 0, q3Count = 0, q4Count = 0, ytdCount = 0;
+      let q1Months = 0, q2Months = 0, q3Months = 0, q4Months = 0, ytdMonths = 0;
+      
+      // Get RGA start date for filtering
+      const rgaStartDate = parseMgaStartDate(rgaStartDates[rgaName]);
+      
+      // Aggregate from the RGA themselves + all MGAs under this RGA
+      // Note: mgaSet already includes the RGA themselves, so we don't need to add them separately
+      mgaSet.forEach(mgaName => {
+        const mgaSubagentData = subagentGrouped[mgaName];
+        const isSelf = mgaName === rgaName;
+        
+        if (mgaSubagentData) {
+          // Sum monthly averages
+          mgaSubagentData.monthly.forEach((avg, monthIdx) => {
+            if (avg > 0) {
+              monthlyTotals[monthIdx] += avg;
+            }
+          });
+          
+          // Aggregate quarters (sum, we'll average later)
+          if (mgaSubagentData.Q1 > 0) { q1Count += mgaSubagentData.Q1; q1Months++; }
+          if (mgaSubagentData.Q2 > 0) { q2Count += mgaSubagentData.Q2; q2Months++; }
+          if (mgaSubagentData.Q3 > 0) { q3Count += mgaSubagentData.Q3; q3Months++; }
+          if (mgaSubagentData.Q4 > 0) { q4Count += mgaSubagentData.Q4; q4Months++; }
+          if (mgaSubagentData.YTD > 0) { ytdCount += mgaSubagentData.YTD; ytdMonths++; }
+        }
+      });
+      
+      // CRITICAL FIX: Filter Subagent data based on RGA's start date
+      // Zero out any months that are entirely before the RGA's start date
+      if (rgaStartDate) {
+        for (let monthIdx = 0; monthIdx < 12; monthIdx++) {
+          const monthEndDate = new Date(selectedYear, monthIdx + 1, 0); // Last day of month
+          if (monthEndDate < rgaStartDate) {
+            monthlyTotals[monthIdx] = 0;
+          }
+        }
+      }
+      
+      // Average the quarterly data
+      const Q1 = q1Months > 0 ? q1Count / q1Months : 0;
+      const Q2 = q2Months > 0 ? q2Count / q2Months : 0;
+      const Q3 = q3Months > 0 ? q3Count / q3Months : 0;
+      const Q4 = q4Months > 0 ? q4Count / q4Months : 0;
+      const YTD = ytdMonths > 0 ? ytdCount / ytdMonths : 0;
+      
+      rgaSubagentAggregated[rgaName] = {
+        monthly: monthlyTotals,
+        Q1, Q2, Q3, Q4, YTD
+      };
+    });
+    subagentGrouped = rgaSubagentAggregated;
+  }
+  
   const subagentRows = buildTableRows(subagentGrouped, true);
 
-  // Build inactive MGAs rows
-  const vipInactiveRow = buildInactiveMgaRow(vipGrouped);
-  const associatesInactiveRow = buildInactiveMgaRow(associatesGrouped);
-  const hiresInactiveRow = buildInactiveMgaRow(hiresGrouped);
-  const subagentInactiveRow = buildInactiveMgaRow(subagentGrouped, true);
+  // Build inactive MGAs rows (skip when showing commits)
+  const vipInactiveRow = showCommits ? null : buildInactiveMgaRow(vipGrouped);
+  const associatesInactiveRow = showCommits ? null : buildInactiveMgaRow(associatesGrouped);
+  const hiresInactiveRow = showCommits ? null : buildInactiveMgaRow(hiresGrouped);
+  const subagentInactiveRow = showCommits ? null : buildInactiveMgaRow(subagentGrouped, true);
 
   // Sorting logic – sorts rows based on the selected sort column and order.
   const sortRows = (rows) => {
@@ -1315,7 +1940,14 @@ const ScorecardSGAData = () => {
       if (key === "Q4") return row.Q4;
       if (key === "YTD") return row.YTD;
       if (monthOrder.hasOwnProperty(key)) {
-        return row.monthlyCounts[monthOrder[key]];
+        // For RGA breakdown, pre-start already subtracted during aggregation
+        const monthValue = row.monthlyCounts[monthOrder[key]];
+        if (activeTab === 'rga') {
+          return monthValue;
+        }
+        // For MGA breakdown, subtract pre-start data to match displayed values
+        const preStartValue = row.preStartMonthlyCounts?.[monthOrder[key]] || 0;
+        return Math.max(0, monthValue - preStartValue);
       }
       return null;
     };
@@ -1332,23 +1964,42 @@ const ScorecardSGAData = () => {
     });
   };
 
-  // Apply tree filter.
-  const filterRowsByTree = (rows) => {
-    if (selectedTreeFilter === "All") return rows;
-    return rows.filter((row) => row.treeValue === selectedTreeFilter);
+  // Apply tree filter for agency tab, or agency filter for breakdown tabs
+  const filterRows = (rows) => {
+    if (activeTab === 'agency') {
+      // On agency tab, apply tree filter
+      if (selectedTreeFilter === "All") return rows;
+      return rows.filter((row) => row.treeValue === selectedTreeFilter);
+    } else {
+      // On breakdown tabs, filter by selected agency or show all
+      if (propSelectedAgency && propSelectedAgency !== 'All') {
+        return rows.filter((row) => row.mga === propSelectedAgency);
+      }
+      return rows;
+    }
   };
 
   // Final sorted and filtered rows for each dataset.
-  const finalVipRows = sortRows(filterRowsByTree([...vipRows]));
-  const finalAlpRows = sortRows(filterRowsByTree([...finalAlpData]));
-  const finalAssociatesRows = sortRows(filterRowsByTree([...associatesRows]));
-  const finalHiresRows = sortRows(filterRowsByTree([...hiresRows]));
-  const finalSubagentRows = sortRows(filterRowsByTree([...subagentRows]));
+  const finalVipRows = sortRows(filterRows([...vipRows]));
+  // Use commits rows for ALP when showing commits (ALP goals from production_goals table)
+  const finalAlpRows = showCommits ? sortRows(filterRows([...alpRowsForCommits])) : sortRows(filterRows([...finalAlpData]));
+  const finalAssociatesRows = sortRows(filterRows([...associatesRows]));
+  const finalHiresRows = sortRows(filterRows([...hiresRows]));
+  const finalSubagentRows = sortRows(filterRows([...subagentRows]));
+  
+  console.log('📦 Final rows prepared:', {
+    showCommits,
+    finalVipRowsCount: finalVipRows.length,
+    finalAssociatesRowsCount: finalAssociatesRows.length,
+    finalHiresRowsCount: finalHiresRows.length,
+    sampleFinalVipRow: finalVipRows[0],
+    sampleFinalAssociatesRow: finalAssociatesRows[0],
+    sampleFinalHiresRow: finalHiresRows[0]
+  });
   const finalHireToCodeRows = useMemo(
-    () => sortRows(buildHireToCodeRows(finalAssociatesRows, finalHiresRows)),
-    [finalAssociatesRows, finalHiresRows, sortColumn, sortOrder]
+    () => sortRows(buildHireToCodeRows(finalAssociatesRows, finalHiresRows, hireToCodeMode)),
+    [finalAssociatesRows, finalHiresRows, sortColumn, sortOrder, hireToCodeMode]
   );
-  const hireToCodeTotals = useMemo(() => computeRatioTotals(finalHireToCodeRows), [finalHireToCodeRows]);
 
   // Add inactive rows to the final rows if they exist and inactive MGAs are not being shown
   const addInactiveRows = (rows, inactiveRow) => {
@@ -1362,6 +2013,14 @@ const ScorecardSGAData = () => {
   const finalAssociatesRowsWithInactive = addInactiveRows(finalAssociatesRows, associatesInactiveRow);
   const finalHiresRowsWithInactive = addInactiveRows(finalHiresRows, hiresInactiveRow);
   const finalSubagentRowsWithInactive = addInactiveRows(finalSubagentRows, subagentInactiveRow);
+  
+  // Calculate hire to code totals by summing all MGAs' hires and codes
+  // Uses the same rows as displayed in the table (respects MGA start dates and filtering)
+  const hireToCodeTotals = useMemo(
+    () => computeHireToCodeTotals(finalHiresRowsWithInactive, finalAssociatesRowsWithInactive),
+    [finalHiresRowsWithInactive, finalAssociatesRowsWithInactive]
+  );
+  
   const finalVipCodeRows = useMemo(
     () => sortRows(buildVipCodeRows(finalVipRowsWithInactive, finalAssociatesRowsWithInactive)),
     [finalVipRowsWithInactive, finalAssociatesRowsWithInactive, sortColumn, sortOrder]
@@ -1392,7 +2051,6 @@ const ScorecardSGAData = () => {
 
   // Build table rows using all MGA data (including hidden)
   const buildAllTableRows = (groupedData, isSubagent = false) => {
-    console.log(`Building ALL table rows for ${allMgaData.length} MGAs`);
     
     return allMgaData.map((mgaObj) => {
       const mgaName = mgaObj.lagnname;
@@ -1547,6 +2205,130 @@ const ScorecardSGAData = () => {
 
   // Helper function to check if a month is in the future
 
+  // Handle cell click to show breakdown (only for RGA breakdown tab)
+  const handleCellClick = (metricType, period, clickedRow) => {
+    // Only show breakdown for RGA tab
+    if (activeTab !== 'rga') {
+      return;
+    }
+    
+    // Don't show breakdown for ALP table
+    if (metricType === 'Net ALP') {
+      return;
+    }
+    
+    // For RGA breakdown, we need to use the underlying MGA-level data (before aggregation)
+    let sourceGroupedData = {};
+    let sourcePreStartData = {};
+    
+    if (metricType === 'VIPs') {
+      sourceGroupedData = vipGrouped;
+      sourcePreStartData = vipPreStartData;
+    } else if (metricType === 'Codes') {
+      sourceGroupedData = associatesGrouped;
+      sourcePreStartData = associatesPreStartData;
+    } else if (metricType === 'Hires') {
+      sourceGroupedData = hiresGrouped;
+      sourcePreStartData = hiresPreStartData;
+    } else if (metricType === 'Net ALP') {
+      // For ALP, we need to process the raw data
+      sourceGroupedData = processAlpDataForMGA(alpData, selectedYear);
+      sourcePreStartData = {};
+    }
+    
+    // Show which MGAs contribute to the clicked RGA
+    if (activeTab === 'rga') {
+      const breakdown = [];
+      const rgaName = clickedRow.mga;
+      
+      // Get the hierarchy for this specific RGA
+      const mgaSet = rgaHierarchyMap.get(rgaName);
+      const mgaMetadata = rgaHierarchyMetadata.get(rgaName);
+      
+      if (!mgaSet) {
+        return;
+      }
+      
+      // Get contributions from the RGA themselves and their MGAs
+      mgaSet.forEach(mgaName => {
+        // Get the MGA-level data (not aggregated)
+        const mgaMonthlyData = sourceGroupedData[mgaName];
+        const mgaPreStartData = sourcePreStartData[mgaName];
+        
+        if (!mgaMonthlyData) {
+          return;
+        }
+        
+        let value = 0;
+        
+        // Get value for the specific period, ensuring no negative values
+        if (monthOrder.hasOwnProperty(period)) {
+          const monthIdx = monthOrder[period];
+          value = Math.max(0, (mgaMonthlyData[monthIdx] || 0) - (mgaPreStartData?.[monthIdx] || 0));
+        } else if (period === 'Q1') {
+          for (let i = 0; i < 3; i++) {
+            value += Math.max(0, (mgaMonthlyData[i] || 0) - (mgaPreStartData?.[i] || 0));
+          }
+        } else if (period === 'Q2') {
+          for (let i = 3; i < 6; i++) {
+            value += Math.max(0, (mgaMonthlyData[i] || 0) - (mgaPreStartData?.[i] || 0));
+          }
+        } else if (period === 'Q3') {
+          for (let i = 6; i < 9; i++) {
+            value += Math.max(0, (mgaMonthlyData[i] || 0) - (mgaPreStartData?.[i] || 0));
+          }
+        } else if (period === 'Q4') {
+          for (let i = 9; i < 12; i++) {
+            value += Math.max(0, (mgaMonthlyData[i] || 0) - (mgaPreStartData?.[i] || 0));
+          }
+        } else if (period === 'YTD') {
+          const today = new Date();
+          const currentMonth = today.getMonth(); // 0-indexed
+          const isCurrentYear = today.getFullYear() === selectedYear;
+          
+          if (isCurrentYear) {
+            // Sum from January through the last completed month (exclude current month)
+            const lastMonthIndex = currentMonth === 0 ? 0 : currentMonth - 1;
+            for (let i = 0; i <= lastMonthIndex; i++) {
+              value += Math.max(0, (mgaMonthlyData[i] || 0) - (mgaPreStartData?.[i] || 0));
+            }
+          } else {
+            // Sum all 12 months for past years
+            for (let i = 0; i < 12; i++) {
+              value += Math.max(0, (mgaMonthlyData[i] || 0) - (mgaPreStartData?.[i] || 0));
+            }
+          }
+        }
+        
+        // Get metadata for this MGA (if not the RGA themselves)
+        const metadata = mgaMetadata?.get(mgaName);
+        
+        breakdown.push({
+          lagnname: mgaName,
+          value,
+          isSelf: mgaName === rgaName,
+          isFirstYearRollup: metadata?.isFirstYear || false,
+          uplineMGA: metadata?.uplineMGA || null
+        });
+      });
+      
+      // Sort: self first, then by value descending
+      breakdown.sort((a, b) => {
+        if (a.isSelf !== b.isSelf) {
+          return a.isSelf ? -1 : 1;
+        }
+        return b.value - a.value;
+      });
+      
+      setBreakdownData({
+        metric: metricType,
+        period: period,
+        data: breakdown,
+        rgaName: rgaName  // Add RGA name for modal title
+      });
+      setShowBreakdownModal(true);
+    }
+  };
 
   if (loading) return (
     <div className="atlas-scorecard-loading">
@@ -1561,6 +2343,68 @@ const ScorecardSGAData = () => {
     </div>
   );
 
+  // Function to copy table data to clipboard
+  const copyTableData = (title, rows, totals, filteredHeaders) => {
+    // Build header row
+    const headerRow = filteredHeaders.map(h => h.label).join('\t');
+    
+    // Build data rows
+    const dataRows = rows.map(row => {
+      return filteredHeaders.map(header => {
+        const isFutureCell = monthOrder.hasOwnProperty(header.key) && 
+          isMonthInFuture(selectedYear, monthOrder[header.key]);
+        const isGreyedOut = shouldGreyOutCell(row, header.key);
+        
+        if (isFutureCell || isGreyedOut) {
+          return '—';
+        }
+        
+        if (monthOrder.hasOwnProperty(header.key)) {
+          // For RGA breakdown, pre-start already subtracted during aggregation
+          const value = activeTab === 'rga' 
+            ? row.monthlyCounts[monthOrder[header.key]]
+            : Math.max(0, row.monthlyCounts[monthOrder[header.key]] - (row.preStartMonthlyCounts?.[monthOrder[header.key]] || 0));
+          return formatCellValue(title, header.key, value).toString().replace(/[$,]/g, '');
+        }
+        
+        return formatCellValue(title, header.key, row[header.key]).toString().replace(/[$,]/g, '');
+      }).join('\t');
+    }).join('\n');
+    
+    // Build totals row
+    const totalsRow = filteredHeaders.map((header, idx) => {
+      if (idx === 0) return 'Totals';
+      
+      const isFutureCell = monthOrder.hasOwnProperty(header.key) && 
+        isMonthInFuture(selectedYear, monthOrder[header.key]);
+      
+      if (isFutureCell) return '—';
+      
+      let totalValue = 0;
+      if (monthOrder.hasOwnProperty(header.key)) {
+        totalValue = totals.monthly[monthOrder[header.key]];
+      } else if (["Q1", "Q2", "Q3", "Q4", "YTD"].includes(header.key)) {
+        totalValue = totals[header.key];
+      }
+      
+      if (title === "Net ALP") {
+        return totalValue.toString();
+      } else if (title === "Hire to Code") {
+        return Number(totalValue).toFixed(2);
+      }
+      return totalValue.toString();
+    }).join('\t');
+    
+    // Combine all parts
+    const fullData = `${title} ${selectedYear}\n${headerRow}\n${dataRows}\n${totalsRow}`;
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(fullData).then(() => {
+      // Optional: Show a brief success message
+    }).catch(err => {
+    });
+  };
+
   const renderTable = (title, rows, totals) => {
     // Filter headers based on quarters mode and future months
     let filteredHeaders = headers.filter((header, index) => {
@@ -1571,16 +2415,38 @@ const ScorecardSGAData = () => {
       return shouldShowColumn(index, isQuarter, isFuture, header.key);
     });
 
-    // If toggled and sorting by a month or quarter, show only MGA and that column
-    if (onlySortedColumn && (isMonthKey(sortColumn) || isQuarterKey(sortColumn))) {
+    // If toggled and sorting by a month, quarter, or YTD, show only MGA and that column
+    if (onlySortedColumn && (isMonthKey(sortColumn) || isQuarterKey(sortColumn) || sortColumn === 'YTD')) {
       filteredHeaders = headers.filter(h => h.key === 'mga' || h.key === sortColumn);
     }
 
     return (
       <div className="atlas-scorecard-section">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h4>
           {title} {selectedYear}
         </h4>
+        <button
+          onClick={() => copyTableData(title, rows, totals, filteredHeaders)}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '4px 8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            color: '#666',
+            fontSize: '14px'
+          }}
+          title="Copy table data"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        </div>
         <div className="atlas-scorecard-custom-table-container">
           <table className="atlas-scorecard-custom-table">
             <thead>
@@ -1591,6 +2457,19 @@ const ScorecardSGAData = () => {
                     ? { position: 'sticky', left: 0, zIndex: 3, background: '#ffffff' }
                     : {};
                   const highlightStyle = isSortedCol ? { background: '#FFE5CC' } : {};
+                  
+                  // Change first column label based on active tab
+                  let displayLabel = header.label;
+                  if (header.key === 'mga') {
+                    if (activeTab === 'agency') {
+                      displayLabel = 'Agency';
+                    } else if (activeTab === 'mga') {
+                      displayLabel = 'MGA';
+                    } else if (activeTab === 'rga') {
+                      displayLabel = 'RGA';
+                    }
+                  }
+                  
                   return (
                     <th
                       key={header.key}
@@ -1604,7 +2483,7 @@ const ScorecardSGAData = () => {
                       onClick={() => handleSort(header.key)}
                       style={{ ...baseHeaderStyle, ...highlightStyle }}
                     >
-                      {header.label}
+                      {displayLabel}
                       {getSortIndicator(header.key)}
                     </th>
                   );
@@ -1612,7 +2491,8 @@ const ScorecardSGAData = () => {
               </tr>
             </thead>
           <tbody>
-            {rows.map((row, index) => (
+            {/* On agency tab, hide individual rows - only show totals */}
+            {activeTab !== 'agency' && rows.map((row, index) => (
               <tr
                 key={row.mga}
                 className={row.isInactiveRow ? "atlas-scorecard-inactive-row" : ""}
@@ -1634,6 +2514,8 @@ const ScorecardSGAData = () => {
                     : index % 2 === 0 ? "white" : "#f9fafb";
                   const isSortedCol = sortColumn === header.key;
                   
+                  const isClickable = activeTab === 'rga' && title !== 'Net ALP' && header.key !== 'mga' && !isFutureCell && !isGreyedOut;
+                  
                   return (
                     <td 
                       key={header.key} 
@@ -1643,17 +2525,23 @@ const ScorecardSGAData = () => {
                           : header.key === "YTD" 
                             ? "atlas-scorecard-ytd-cell" 
                             : ""
-                      } ${isGreyedOut ? "atlas-scorecard-pre-start-cell" : ""}`}
-                      style={header.key === 'mga'
-                        ? { position: 'sticky', left: 0, zIndex: 2, background: isSortedCol ? '#FFEFE0' : rowBg }
-                        : (isSortedCol ? { background: '#FFF2E6' } : undefined)}
+                      } ${isGreyedOut ? "atlas-scorecard-pre-start-cell" : ""} ${isClickable ? "has-data" : ""}`}
+                      style={{
+                        ...(header.key === 'mga'
+                          ? { position: 'sticky', left: 0, zIndex: 2, background: isSortedCol ? '#FFEFE0' : rowBg }
+                          : (isSortedCol ? { background: '#FFF2E6' } : undefined)),
+                        cursor: isClickable ? 'pointer' : 'default'
+                      }}
+                      onClick={isClickable ? () => handleCellClick(title, header.key, row) : undefined}
+                      title={isClickable ? "Click to view breakdown" : ""}
                     >
                       {isFutureCell ? 
                         "—" : // Display dash for future months
                         isGreyedOut ?
                           "—" : // Display dash for entire months before start date
                           (monthOrder.hasOwnProperty(header.key) ?
-                            formatCellValue(title, header.key, row.monthlyCounts[monthOrder[header.key]] - (row.preStartMonthlyCounts?.[monthOrder[header.key]] || 0)) :
+                            // For RGA breakdown, pre-start already subtracted during aggregation
+                            formatCellValue(title, header.key, activeTab === 'rga' ? row.monthlyCounts[monthOrder[header.key]] : Math.max(0, row.monthlyCounts[monthOrder[header.key]] - (row.preStartMonthlyCounts?.[monthOrder[header.key]] || 0))) :
                             formatCellValue(title, header.key, row[header.key]))
                       }
                     </td>
@@ -1661,10 +2549,11 @@ const ScorecardSGAData = () => {
                 })}
               </tr>
             ))}
-            {/* Totals Row */}
+            {/* Totals Row - hide for RGA breakdown, ALP, and ALP/Code tables */}
+            {activeTab !== 'rga' && title !== 'Net ALP' && title !== 'ALP / Code' && (
             <tr className="atlas-scorecard-totals-row">
               <td className="atlas-scorecard-metric-cell" style={{ position: 'sticky', left: 0, zIndex: 2, background: '#ffffff' }}>
-                <strong>Totals</strong>
+                <strong>{activeTab === 'agency' ? 'Agency Total' : 'Totals'}</strong>
               </td>
               {filteredHeaders.slice(1).map((header) => {
                 // Check if this is a future month for all tables
@@ -1700,7 +2589,7 @@ const ScorecardSGAData = () => {
                         "—" : // Display dash for future months
                         (title === "Net ALP" ?
                           currencyFormatter.format(totalValue) :
-                          title === "Hire to Code" ?
+                          (title === "Hire to Code" || title === "Code / VIP") ?
                             Number(totalValue).toFixed(2) :
                             totalValue)
                     }
@@ -1709,6 +2598,7 @@ const ScorecardSGAData = () => {
                 );
               })}
             </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -1721,33 +2611,117 @@ const ScorecardSGAData = () => {
     "All",
     ...Array.from(new Set(filteredMgaData.map(getTreeValue).filter(val => val && val !== "Unknown"))),
   ];
-  
-  console.log(`Tree filter options:`, uniqueTreeValues);
-  console.log(`Sample MGA tree values:`, filteredMgaData.slice(0, 5).map(m => ({ 
-    lagnname: m.lagnname, 
-    treeValue: getTreeValue(m)
-  })));
 
   return (
     <div className="atlas-scorecard-sga-view">
       {/* Controls section with left and right alignment */}
       <div className="atlas-scorecard-controls">
-        {/* Left side - tree filter dropdown */}
+        {/* Left side - tree filter dropdown or agency selector */}
         <div className="atlas-scorecard-controls-left">
-          <div className="atlas-scorecard-mga-dropdown">
-            <label htmlFor="treeFilter">Filter by Tree: </label>
-            <select
-              id="treeFilter"
-              value={selectedTreeFilter}
-              onChange={(e) => setSelectedTreeFilter(e.target.value)}
-            >
-              {uniqueTreeValues.map((treeVal) => (
-                <option key={treeVal} value={treeVal}>
-                  {treeVal}
-                </option>
-              ))}
-            </select>
-          </div>
+          {activeTab === 'agency' ? (
+            // On Agency tab, show tree filter
+            <div className="atlas-scorecard-mga-dropdown">
+              <label htmlFor="treeFilter">Filter by Tree: </label>
+              <select
+                id="treeFilter"
+                value={selectedTreeFilter}
+                onChange={(e) => setSelectedTreeFilter(e.target.value)}
+              >
+                {uniqueTreeValues.map((treeVal) => (
+                  <option key={treeVal} value={treeVal}>
+                    {treeVal}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            // On breakdown tabs, show individual MGA/RGA selector
+            <>
+              <div className="atlas-scorecard-mga-dropdown">
+                <label htmlFor="agencySelector">
+                  {activeTab === 'mga' ? 'Select MGA: ' : 'Select RGA: '}
+                </label>
+                <select
+                  id="agencySelector"
+                  value={propSelectedAgency || 'All'}
+                  onChange={(e) => {
+                    if (onSelectAgency) {
+                      onSelectAgency(e.target.value);
+                    }
+                  }}
+                >
+                  <option value="All">All</option>
+                  {filteredMgaData.map((item, index) => (
+                    <option key={`agency-${index}`} value={item.lagnname}>
+                      {item.lagnname}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Year selector with navigation arrows */}
+              <div className="atlas-scorecard-year-selector" style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                marginLeft: '16px'
+              }}>
+                <button
+                  onClick={() => setSelectedYear(selectedYear - 1)}
+                  style={{
+                    background: '#f0f0f0',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    padding: '4px 8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: '32px',
+                    height: '32px'
+                  }}
+                  title="Previous year"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                
+                <span style={{
+                  fontWeight: '600',
+                  fontSize: '16px',
+                  minWidth: '60px',
+                  textAlign: 'center',
+                  color: '#333'
+                }}>
+                  {selectedYear}
+                </span>
+                
+                <button
+                  onClick={() => setSelectedYear(selectedYear + 1)}
+                  disabled={selectedYear >= new Date().getFullYear()}
+                  style={{
+                    background: selectedYear >= new Date().getFullYear() ? '#e0e0e0' : '#f0f0f0',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    padding: '4px 8px',
+                    cursor: selectedYear >= new Date().getFullYear() ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: '32px',
+                    height: '32px',
+                    opacity: selectedYear >= new Date().getFullYear() ? 0.5 : 1
+                  }}
+                  title={selectedYear >= new Date().getFullYear() ? "Cannot go beyond current year" : "Next year"}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Right side - toggle buttons */}
@@ -1831,7 +2805,36 @@ const ScorecardSGAData = () => {
               )}
             </button>
           </div>
-          {(isMonthKey(sortColumn) || isQuarterKey(sortColumn)) && (
+
+          {/* Toggle between Actuals and Commits - Only show on MGA breakdown tab */}
+          {activeTab === 'mga' && (
+            <div className="atlas-scorecard-commits-toggle">
+              <button 
+                className={`commits-toggle-btn ${showCommits ? 'active' : ''}`}
+                onClick={() => {
+                  console.log('🔘 Commits toggle clicked! Current:', showCommits, '-> New:', !showCommits);
+                  setShowCommits(!showCommits);
+                }}
+                title={showCommits ? 'Show Actuals' : 'Show Commits'}
+              >
+                {showCommits ? (
+                  // Showing commits - display "C" icon
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none"/>
+                    <text x="12" y="16" textAnchor="middle" fill="currentColor" fontSize="12" fontWeight="bold">C</text>
+                  </svg>
+                ) : (
+                  // Showing actuals - display "A" icon
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none"/>
+                    <text x="12" y="16" textAnchor="middle" fill="currentColor" fontSize="12" fontWeight="bold">A</text>
+                  </svg>
+                )}
+              </button>
+            </div>
+          )}
+
+          {(isMonthKey(sortColumn) || isQuarterKey(sortColumn) || sortColumn === 'YTD') && (
             <div className="atlas-scorecard-only-sorted-toggle" style={{ marginLeft: '8px' }}>
               <button 
                 className={`only-sorted-toggle-btn ${onlySortedColumn ? 'active' : ''}`}
@@ -1846,19 +2849,211 @@ const ScorecardSGAData = () => {
       </div>
       
       <div className="atlas-scorecard-tables">
-        {renderTable("Net ALP", finalAlpRows, computeTotals(finalAlpRows))}
-        {renderTable("Hires", finalHiresRowsWithInactive, computeTotals(finalHiresRowsWithInactive))}
+        {/* ALP goals from production_goals table */}
         {renderTable(
-          "Codes",
+          showCommits ? "Net ALP (Goals)" : "Net ALP", 
+          finalAlpRows, 
+          computeTotals(finalAlpRows)
+        )}
+        {renderTable(
+          showCommits ? "Hires (Commits)" : "Hires", 
+          finalHiresRowsWithInactive, 
+          computeTotals(finalHiresRowsWithInactive)
+        )}
+        {renderTable(
+          showCommits ? "Codes (Commits)" : "Codes",
           finalAssociatesRowsWithInactive,
           computeTotals(finalAssociatesRowsWithInactive)
         )}
-        {renderTable("VIPs", finalVipRowsWithInactive, computeTotals(finalVipRowsWithInactive))}
-        {renderTable("Hire to Code", finalHireToCodeRows, hireToCodeTotals)}
-        {renderTable("Code / VIP", finalVipCodeRows, computeTotals(finalVipCodeRows))}
-        {renderTable("ALP / Code", finalAlpCodeRows.map(r=>({ ...r, monthlyCounts: Array(12).fill(0) })), computeTotals(finalAlpCodeRows))}
+        {renderTable(
+          showCommits ? "VIPs (Commits)" : "VIPs", 
+          finalVipRowsWithInactive, 
+          computeTotals(finalVipRowsWithInactive)
+        )}
+        {/* Hide ratio tables when showing commits */}
+        {!showCommits && renderTable("Hire to Code", finalHireToCodeRows, hireToCodeTotals)}
+        {!showCommits && renderTable("Code / VIP", finalVipCodeRows, computeTotals(finalVipCodeRows))}
+        {!showCommits && renderTable("ALP / Code", finalAlpCodeRows.map(r=>({ ...r, monthlyCounts: Array(12).fill(0) })), computeTotals(finalAlpCodeRows))}
         {/* Submitting Agent Count hidden in SGA view */}
       </div>
+
+      {/* Breakdown Modal */}
+      {showBreakdownModal && (
+        <div 
+          className="oo-modal-overlay" 
+          onClick={() => setShowBreakdownModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+        >
+          <div 
+            className="oo-modal-content" 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              padding: '24px',
+              maxWidth: '800px',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0 }}>
+                {breakdownData.rgaName && `${breakdownData.rgaName} - `}
+                {breakdownData.metric} - {breakdownData.period} Breakdown
+              </h3>
+              <button 
+                onClick={() => setShowBreakdownModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#666'
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <table className="hierarchyTable" style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#ecf0f1', borderBottom: '2px solid #95a5a6' }}>
+                  <th style={{ textAlign: 'left', padding: '8px', border: '1px solid #ddd' }}>MGA</th>
+                  <th style={{ textAlign: 'right', padding: '8px', border: '1px solid #ddd' }}>
+                    {breakdownData.metric === 'Net ALP' ? 'ALP' : breakdownData.metric}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  // Group data: self first, then direct MGAs, then rollups
+                  const selfRows = breakdownData.data.filter(agent => agent.isSelf);
+                  const directMGAs = breakdownData.data.filter(agent => !agent.isSelf && !agent.isFirstYearRollup);
+                  const rollups = breakdownData.data.filter(agent => agent.isFirstYearRollup);
+                  
+                  // Group rollups by their upline
+                  const grouped = {};
+                  rollups.forEach(rollup => {
+                    if (rollup.uplineMGA) {
+                      if (!grouped[rollup.uplineMGA]) {
+                        grouped[rollup.uplineMGA] = [];
+                      }
+                      grouped[rollup.uplineMGA].push(rollup);
+                    }
+                  });
+                  
+                  // Sort direct MGAs by value descending
+                  directMGAs.sort((a, b) => b.value - a.value);
+                  
+                  let rowIndex = 0;
+                  let rows = [];
+                  
+                  // Self first
+                  selfRows.forEach(agent => {
+                    const bgColor = rowIndex % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                    rows.push(
+                      <tr 
+                        key={`self-${rowIndex}`}
+                        style={{ background: bgColor, borderBottom: '1px solid #eee' }}
+                      >
+                        <td style={{ padding: '8px', border: '1px solid #ddd', fontWeight: 600 }}>
+                          {agent.lagnname} (You)
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'right', border: '1px solid #ddd' }}>
+                          {breakdownData.metric === 'Net ALP' 
+                            ? currencyFormatter.format(agent.value)
+                            : breakdownData.metric === 'Hire to Code' || breakdownData.metric === 'Code / VIP' || breakdownData.metric === 'ALP / Code'
+                            ? Number(agent.value).toFixed(2)
+                            : agent.value}
+                        </td>
+                      </tr>
+                    );
+                    rowIndex++;
+                  });
+                  
+                  // Direct MGAs and their rollups
+                  directMGAs.forEach(mga => {
+                    const bgColor = rowIndex % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                    rows.push(
+                      <tr 
+                        key={`mga-${mga.lagnname}-${rowIndex}`}
+                        style={{ background: bgColor, borderBottom: '1px solid #eee' }}
+                      >
+                        <td style={{ padding: '8px', border: '1px solid #ddd', fontWeight: 500 }}>
+                          {mga.lagnname}
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'right', border: '1px solid #ddd' }}>
+                          {breakdownData.metric === 'Net ALP' 
+                            ? currencyFormatter.format(mga.value)
+                            : breakdownData.metric === 'Hire to Code' || breakdownData.metric === 'Code / VIP' || breakdownData.metric === 'ALP / Code'
+                            ? Number(mga.value).toFixed(2)
+                            : mga.value}
+                        </td>
+                      </tr>
+                    );
+                    rowIndex++;
+                    
+                    // Add rollups under this MGA
+                    const mgaRollups = grouped[mga.lagnname] || [];
+                    mgaRollups.forEach(rollup => {
+                      const bgColor = rowIndex % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                      rows.push(
+                        <tr 
+                          key={`rollup-${rollup.lagnname}-${rowIndex}`}
+                          style={{ background: bgColor, borderBottom: '1px solid #eee' }}
+                        >
+                          <td style={{ padding: '8px 8px 8px 24px', border: '1px solid #ddd', fontStyle: 'italic', color: '#666' }}>
+                            ↳ {rollup.lagnname}*
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', border: '1px solid #ddd', color: '#666' }}>
+                            {breakdownData.metric === 'Net ALP' 
+                              ? currencyFormatter.format(rollup.value)
+                              : breakdownData.metric === 'Hire to Code' || breakdownData.metric === 'Code / VIP' || breakdownData.metric === 'ALP / Code'
+                              ? Number(rollup.value).toFixed(2)
+                              : rollup.value}
+                          </td>
+                        </tr>
+                      );
+                      rowIndex++;
+                    });
+                  });
+                  
+                  return rows;
+                })()}
+              </tbody>
+              <tfoot>
+                <tr style={{ background: '#e8f5e9', borderTop: '2px solid #4caf50', fontWeight: 'bold' }}>
+                  <td style={{ padding: '8px', border: '1px solid #ddd' }}>TOTAL</td>
+                  <td style={{ padding: '8px', textAlign: 'right', border: '1px solid #ddd' }}>
+                    {breakdownData.metric === 'Net ALP' 
+                      ? currencyFormatter.format(breakdownData.data.reduce((sum, agent) => sum + agent.value, 0))
+                      : breakdownData.metric === 'Hire to Code' || breakdownData.metric === 'Code / VIP' || breakdownData.metric === 'ALP / Code'
+                      ? Number(breakdownData.data.reduce((sum, agent) => sum + agent.value, 0)).toFixed(2)
+                      : breakdownData.data.reduce((sum, agent) => sum + agent.value, 0)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+            {breakdownData.data.some(agent => agent.isFirstYearRollup) && (
+              <p style={{ marginTop: '10px', fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
+                * First-year MGA rolling up to their upline
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

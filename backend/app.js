@@ -3,13 +3,19 @@ const http = require("http");
 const WebSocket = require("ws");
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
+const path = require("path");
+const url = require("url");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const { initNotificationScheduler } = require('./schedulers/notificationScheduler');
 const { initPipelineLinkingScheduler } = require('./schedulers/pipelineLinkingScheduler');
 const { initDiscordBot } = require('./bot');
+const { initVoiceWebSocket, isPremiumAvailable } = require('./wsVoice');
 
 dotenv.config();
+// Also attempt to load env from backend/.env when the process is started from repo root.
+// (dotenv won't override already-set env vars by default.)
+dotenv.config({ path: path.join(__dirname, '.env') });
 const app = express();
 
 app.use(cors({
@@ -24,6 +30,7 @@ app.use(cors({
       "https://127.0.0.1:3000",
       "https://agents.ariaslife.com",
       "https://ariaslife.com",
+      "https://salebase.ai",
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
@@ -67,6 +74,10 @@ app.use("/api/schema", schemaRoutes);
 const dailyActivityRoutes = require("./routes/dailyActivity");
 app.use("/api/dailyActivity", dailyActivityRoutes);
 
+// Presentation routes
+const presentationsRoutes = require("./routes/presentations");
+app.use("/api/presentations", presentationsRoutes);
+
 // Production Reports routes
 const productionReportsRoutes = require("./routes/productionReports");
 app.use("/api/production-reports", productionReportsRoutes);
@@ -78,6 +89,18 @@ app.use("/api/goals", goalsRoutes);
 // Recruitment routes
 const recruitmentRoutes = require("./routes/recruitment");
 app.use("/api/recruitment", recruitmentRoutes);
+
+// AIL Appointments Sync routes
+const ailSyncRoutes = require("./routes/ail-sync");
+app.use("/api/ail-sync", ailSyncRoutes);
+
+// SMS Template Variables routes
+const smsTemplateVariablesRoutes = require("./routes/smsTemplateVariables");
+app.use("/api/sms-template-variables", smsTemplateVariablesRoutes);
+
+// Check-In Texts routes
+const checkInTextsRoutes = require("./routes/checkInTexts");
+app.use("/api/check-in-texts", checkInTextsRoutes);
 
 // Pipeline Attachments routes
 const pipelineAttachmentsRoutes = require("./routes/pipeline-attachments");
@@ -136,6 +159,8 @@ const uploadRoutes = require("./routes/upload");
 const notificationsRoutes = require("./routes/notifications");
 const dataRoutes = require("./routes/dataRoutes");
 const trainingRoutes = require("./routes/training");
+const codePotentialRoutes = require("./routes/codePotential");
+const analyticsRoutes = require("./routes/analytics");
 
 app.use("/api/alp", alpRoutes);
 app.use("/api/codes", codesRoutes);
@@ -144,6 +169,7 @@ app.use("/api/more", moreRoutes);
 app.use("/api/account", accountRoutes);
 app.use("/api/refs", refsRoutes);
 app.use("/api/date-overrides", dateOverridesRoutes);
+app.use("/api/code-potential", codePotentialRoutes);
 const refvalidationRoutes = require("./routes/refvalidation");
 const adminDashboardRoutes = require("./routes/adminDashboard");
 const adminLicensingRoutes = require("./routes/adminLicensing");
@@ -157,6 +183,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/dataroutes", dataRoutes);
 app.use("/api/training", trainingRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 // PnP routes
 const pnpRoutes = require("./routes/pnp");
@@ -173,6 +200,18 @@ app.use("/api/mga-hierarchy", mgaHierarchyRoutes);
 // Email Campaigns routes
 const emailCampaignsRoutes = require("./routes/emailCampaigns");
 app.use("/api/email-campaigns", emailCampaignsRoutes);
+
+// Feedback routes (bug reports & feature requests)
+const feedbackRoutes = require("./routes/feedback");
+app.use("/api/feedback", feedbackRoutes);
+
+// Navigation tracking routes (for personalized search)
+const navigationRoutes = require("./routes/navigation");
+app.use("/api/navigation", navigationRoutes);
+
+// Medication reference routes
+const medicationsRoutes = require("./routes/medications");
+app.use("/api/medications", medicationsRoutes);
 
 // Create HTTP server for both Express and WebSocket
 const server = http.createServer(app);
@@ -247,14 +286,54 @@ class NotificationManager {
 // Global notification manager instance
 const notificationManager = new NotificationManager();
 
-// Create WebSocket server
-const wss = new WebSocket.Server({ 
-  server,
-  path: '/ws/notifications'
+// Create WebSocket servers (noServer) and route upgrades manually.
+// This avoids WS path conflicts and prevents 400 "Bad Request" during upgrade.
+const notificationsWss = new WebSocket.Server({
+  noServer: true,
+  perMessageDeflate: false
+});
+
+// Voice WebSocket server for premium voice mode
+const voiceWss = new WebSocket.Server({
+  noServer: true,
+  perMessageDeflate: false
+});
+
+// Initialize voice WebSocket handler
+initVoiceWebSocket(voiceWss);
+
+server.on('upgrade', (req, socket, head) => {
+  try {
+    const pathname = url.parse(req.url).pathname;
+    console.log('[UPGRADE] WebSocket upgrade request received for:', pathname);
+
+    if (pathname === '/ws/notifications') {
+      console.log('[UPGRADE] Routing to notifications WebSocket');
+      notificationsWss.handleUpgrade(req, socket, head, (ws) => {
+        notificationsWss.emit('connection', ws, req);
+      });
+      return;
+    }
+
+    if (pathname === '/ws/voice') {
+      console.log('[UPGRADE] *** ROUTING TO VOICE WEBSOCKET ***');
+      voiceWss.handleUpgrade(req, socket, head, (ws) => {
+        console.log('[UPGRADE] Voice WebSocket upgrade complete, emitting connection');
+        voiceWss.emit('connection', ws, req);
+      });
+      return;
+    }
+
+    console.log('[UPGRADE] Unknown path, destroying socket:', pathname);
+    socket.destroy();
+  } catch (e) {
+    console.error('[UPGRADE] Error during upgrade:', e);
+    try { socket.destroy(); } catch (_) {}
+  }
 });
 
 // WebSocket authentication and connection handling
-wss.on('connection', (ws, req) => {
+notificationsWss.on('connection', (ws, req) => {
   console.log('New WebSocket connection attempt');
   let userId = null;
   let isAuthenticated = false;
@@ -333,6 +412,7 @@ const PORT = process.env.PORT || 5001;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`WebSocket server running on ws://localhost:${PORT}/ws/notifications`);
+  console.log(`Voice WebSocket running on ws://localhost:${PORT}/ws/voice (Premium: ${isPremiumAvailable()})`);
 
   initDiscordBot();
   console.log('Discord bot initialized');

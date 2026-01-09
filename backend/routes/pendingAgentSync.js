@@ -181,6 +181,7 @@ router.get('/sync-all', optionalAuth, async (req, res) => {
     for (const agent of pendingAgents) {
       try {
         let pipelineId = null;
+        let itemsToComplete = [];
         
         // Check if already linked to a pipeline record
         if (agent.pipeline_id) {
@@ -264,7 +265,7 @@ router.get('/sync-all', optionalAuth, async (req, res) => {
           console.log(`✨ Created new pipeline ${pipelineId} for agent ${agent.lagnname} at step: ${step}`);
           
           // Auto-complete checklist items based on status
-          const itemsToComplete = await getItemsToComplete(agent, pipelineId);
+          itemsToComplete = await getItemsToComplete(agent, pipelineId);
           await autoCompleteChecklistItems(pipelineId, itemsToComplete, agent.id);
         }
         
@@ -272,7 +273,7 @@ router.get('/sync-all', optionalAuth, async (req, res) => {
           activeuser_id: agent.id,
           lagnname: agent.lagnname,
           pipeline_id: pipelineId,
-          status: existingPipeline.length > 0 ? 'linked' : 'created',
+          status: existingPipeline.length > 0 ? 'skipped' : 'created',
           items_completed: itemsToComplete.length
         });
         

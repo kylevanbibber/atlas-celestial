@@ -224,6 +224,26 @@
     color: #0891b2;
 }
 
+/* Danger action menu item styling */
+.menu-item.danger-action {
+    color: #dc2626;
+}
+
+.menu-item.danger-action:hover {
+    background-color: rgba(220, 38, 38, 0.1);
+    color: #b91c1c;
+}
+
+/* Remove action menu item styling */
+.menu-item.remove-action {
+    color: #ef4444;
+}
+
+.menu-item.remove-action:hover {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
+}
+
 /* Submenu Styles */
 .menu-item.has-submenu {
     position: relative;
@@ -249,8 +269,7 @@
     min-width: 180px;
     overflow: hidden;
     border: 1px solid var(--border-color);
-    /* Add smooth transition for better UX */
-    transition: opacity 0.2s ease-in-out;
+    /* No transition - instant appearance */
 }
 
 .context-submenu .context-menu-items {

@@ -7,10 +7,13 @@ import Tabs from "../../utils/Tabs";
 import DataTable from "../../utils/DataTable";
 import ActionBar from "../../utils/ActionBar";
 import { formatUTCForDisplay, formatUTCForInput, localToUTC } from "../../../utils/dateUtils";
+import { toast } from 'react-hot-toast';
 import "./AgentProgressTable.css";
 
 const AgentProgressTable = () => {
+  const DEBUG_LOGS = false;
   const { user } = useAuth();
+  const lastDiagSignatureRef = useState({ current: '' })[0];
   const [agents, setAgents] = useState([]);
   const [progressData, setProgressData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,6 +36,7 @@ const AgentProgressTable = () => {
     direction: "asc",
   });
   const [isHiddenView, setIsHiddenView] = useState(false);
+  const [hierarchyUserIds, setHierarchyUserIds] = useState(null);
 
   // Cell editing state
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -131,8 +135,28 @@ const AgentProgressTable = () => {
   // into yyyy-mm-dd format so it can be used by the native date input.
   const convertMDYToYMD = (dateStr) => {
     if (!dateStr) return '';
-    const [month, day, year] = dateStr.split('/');
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    
+    // Handle both mm/dd/yyyy and yyyy-mm-dd formats
+    const parts = String(dateStr).split('/');
+    
+    if (parts.length === 3) {
+      // mm/dd/yyyy format
+      const [month, day, year] = parts;
+      
+      // Validate all parts exist and are valid
+      if (!month || !day || !year || year.length < 4) {
+        console.warn('Invalid date format:', dateStr);
+        return '';
+      }
+      
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    } else if (dateStr.includes('-')) {
+      // Already in yyyy-mm-dd format
+      return dateStr;
+    }
+    
+    console.warn('Unrecognized date format:', dateStr);
+    return '';
   };
 
   // Memoize filtered data for each tab to avoid recalculating on every render
@@ -146,7 +170,25 @@ const AgentProgressTable = () => {
     }
     
     // Apply search filter to this tab's data
-    return filterData(filtered);
+    const result = filterData(filtered);
+    
+    // Deduplicate by userId (keep first occurrence)
+    const seen = new Set();
+    const deduplicated = result.filter(agent => {
+      const key = agent.userId || agent.id;
+      if (seen.has(key)) {
+        if (DEBUG_LOGS) console.log('⚠️ Duplicate found in upcomingReleasesData:', agent.agentName, key);
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+    
+    if (DEBUG_LOGS && deduplicated.length !== result.length) {
+      console.log(`🔍 Removed ${result.length - deduplicated.length} duplicates from upcomingReleasesData`);
+    }
+    
+    return deduplicated;
   }, [progressData, userRole, isManager, isAdmin, userId, user?.lagnname, filterData]);
 
   const pendingSchedulingData = useMemo(() => {
@@ -202,35 +244,62 @@ const AgentProgressTable = () => {
   }, [progressData, filterData]);
 
   // Memoize combined passed data calculation
+  const leadsByUserId = useMemo(() => {
+    const map = new Map();
+    (leadsReleased || []).forEach((lead) => {
+      if (lead && (lead.type === '2nd Pack' || lead.type === 'Second Pack')) {
+        map.set(String(lead.userId), lead);
+      }
+    });
+    return map;
+  }, [leadsReleased]);
+
   const combinedPassedData = useMemo(() => {
+    if (DEBUG_LOGS) {
     console.log('🔄 Recalculating combinedPassedData with:', {
       passedReleasesData: passedReleasesData.length,
       leadsReleased: leadsReleased.length,
       licensedStates: licensedStates.length
     });
-    
-    // Debug: Check what archive data we have
     const archivedLeads = leadsReleased.filter(lead => lead.archive == 1 || lead.archive === '1');
-    console.log('🗃️ Archive debug - Total leads with archive=1:', archivedLeads.length, archivedLeads.map(l => ({ id: l.id, userId: l.userId, archive: l.archive, reason_archive: l.reason_archive })));
+      console.log('🗃️ Archive debug - Total leads with archive=1:', archivedLeads.length);
+    }
     
     return passedReleasesData.map((agent) => {
       // Attach 2nd Pack info if present; otherwise leave as not sent
-      const leadInfo = leadsReleased.find(
-        (lead) => lead.userId == agent.userId && (lead.type === '2nd Pack' || lead.type === 'Second Pack')
-      );
-
-      console.log(`🔍 Agent ${agent.userId} (${agent.agentName}):`, {
-        leadInfo: leadInfo ? { id: leadInfo.id, notes: leadInfo.notes, sent_date: leadInfo.sent_date } : null
-      });
+      const leadInfo = leadsByUserId.get(String(agent.userId)) || null;
 
       // Filter licensedStates for entries matching this agent (by userId) 
       // and with expiry_date strictly in the future.
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
       const validLicenses = licensedStates.filter((license) => {
+        // Must match this agent's userId
+        if (license.userId != agent.userId) return false;
+        
+        // Must have an expiry date
         if (!license.expiry_date) return false;
-        const expiryDate = new Date(convertMDYToYMD(license.expiry_date));
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return license.userId == agent.userId && expiryDate > today;
+        
+        // Convert and validate the date
+        const convertedDate = convertMDYToYMD(license.expiry_date);
+        if (!convertedDate) {
+          if (DEBUG_LOGS) {
+            console.warn(`Invalid expiry date for userId ${license.userId}, state ${license.state}:`, license.expiry_date);
+          }
+          return false;
+        }
+        
+        const expiryDate = new Date(convertedDate);
+        
+        // Check if date is valid
+        if (isNaN(expiryDate.getTime())) {
+          if (DEBUG_LOGS) {
+            console.warn(`Invalid date created for userId ${license.userId}, state ${license.state}:`, convertedDate);
+          }
+          return false;
+        }
+        
+        return expiryDate > today;
       });
 
       const statesLicensed = validLicenses.map((license) => license.state).join(", ") || "N/A";
@@ -245,12 +314,13 @@ const AgentProgressTable = () => {
         statesLicensed,
       };
       
+      if (DEBUG_LOGS) {
       console.log(`✅ Combined agent ${agent.userId}:`, {
         leadId: combinedAgent.leadId,
         notes: combinedAgent.notes,
-        packReleasedDate: combinedAgent.packReleasedDate,
-        leadEntry: combinedAgent.leadEntry ? { id: combinedAgent.leadEntry.id, archive: combinedAgent.leadEntry.archive, reason_archive: combinedAgent.leadEntry.reason_archive } : null
+          packReleasedDate: combinedAgent.packReleasedDate
       });
+      }
 
       return combinedAgent;
     });
@@ -302,12 +372,12 @@ const AgentProgressTable = () => {
           return true;
         });
         
-        // Log final filtering results
+        if (DEBUG_LOGS) {
         filtered.forEach(agent => {
           console.log(`✅ Agent ${agent.userId} (${agent.agentName}) PASSED all filters for ${archivedView ? 'ARCHIVE' : 'NORMAL'} view`);
         });
-        
         console.log(`📊 AgentProgressTable Final filtered results for ${archivedView ? 'ARCHIVE' : 'NORMAL'} view: ${filtered.length} agents`);
+        }
         
         return filtered; // filterData already applied in combinedPassedData (via passedReleasesData)
       default:
@@ -317,16 +387,16 @@ const AgentProgressTable = () => {
 
   // Selection change handlers for DataTable's built-in selection
   const handleUpcomingReleasesSelectionChange = useCallback((selectedRowIds) => {
-    console.log('🔄 handleUpcomingReleasesSelectionChange called with row IDs:', selectedRowIds);
+    if (DEBUG_LOGS) console.log('🔄 handleUpcomingReleasesSelectionChange called with row IDs:', selectedRowIds);
     
     // Convert row IDs to agent names
     const selectedAgentNames = selectedRowIds.map(rowId => {
       const agent = currentTabData.find(a => String(a.id) === String(rowId) || String(a.userId) === String(rowId));
-      console.log('🔍 Converting rowId', rowId, 'to agent:', agent?.agentName);
+      if (DEBUG_LOGS) console.log('🔍 Converting rowId', rowId, 'to agent:', agent?.agentName);
       return agent?.agentName;
     }).filter(Boolean);
     
-    console.log('📝 Upcoming releases selection updated to agent names:', selectedAgentNames);
+    if (DEBUG_LOGS) console.log('📝 Upcoming releases selection updated to agent names:', selectedAgentNames);
     setSelectedAgents(selectedAgentNames);
   }, [currentTabData]);
 
@@ -529,12 +599,15 @@ const AgentProgressTable = () => {
 
   const handleSendEmail = useCallback(async () => {
     if (selectedAgents.length === 0) {
-      alert("Please select agents to send email to.");
+      toast.error("Please select agents to send email to.");
       return;
     }
     
     const confirmed = window.confirm(`Are you sure you want to send an email to ${selectedAgents.length} selected agent(s)? Their MGAs will be CC'd.`);
     if (!confirmed) return;
+
+    // Show loading toast
+    const toastId = toast.loading(`Sending emails to ${selectedAgents.length} agent(s)...`);
 
     try {
       const userIds = selectedAgents.map(agentName => {
@@ -546,14 +619,23 @@ const AgentProgressTable = () => {
       const response = await api.post("/release/send-release-email", { userIds });
       
       if (response.data.success) {
-        alert(`Successfully sent email to ${selectedAgents.length} agent(s).`);
+        toast.success(`Successfully sent email to ${selectedAgents.length} agent(s)! 📧`, {
+          id: toastId,
+          duration: 4000
+        });
         setSelectedAgents([]);
       } else {
-        alert(`Failed to send some emails: ${response.data.message}`);
+        toast.error(`Failed to send some emails: ${response.data.message}`, {
+          id: toastId,
+          duration: 5000
+        });
       }
     } catch (error) {
       console.error('Error sending emails:', error);
-      alert("Failed to send emails. Please try again.");
+      toast.error("Failed to send emails. Please try again.", {
+        id: toastId,
+        duration: 5000
+      });
     }
   }, [selectedAgents, progressData]);
 
@@ -1589,8 +1671,23 @@ const AgentProgressTable = () => {
 
 
 
+  // Helper to fetch manager hierarchy once
+  const ensureHierarchyIds = async () => {
+    if (!isManager) return null;
+    if (hierarchyUserIds && Array.isArray(hierarchyUserIds)) return hierarchyUserIds;
+    try {
+      const hierarchyResponse = await api.post('/auth/searchByUserId', { userId });
+      if (hierarchyResponse.data.success) {
+        const ids = hierarchyResponse.data.data.map(user => user.id);
+        setHierarchyUserIds(ids);
+        return ids;
+      }
+    } catch (_) {}
+    return null;
+  };
+
   // Load functions that are used in the handler functions above
-  loadUnscheduledReleases = async () => {
+  loadUnscheduledReleases = async (idsOverride = null) => {
     try {
       let unscheduledData = [];
 
@@ -1602,23 +1699,12 @@ const AgentProgressTable = () => {
         }
       } else if (isManager) {
         // Managers: first get hierarchy, then get all data and filter
-        
-        
-        // Get hierarchy IDs
-        const hierarchyResponse = await api.post('/auth/searchByUserId', { userId });
-        if (hierarchyResponse.data.success) {
-          const hierarchyUserIds = hierarchyResponse.data.data.map(user => user.id);
-          
-          
-          // Get all unscheduled releases using admin endpoint
+        const ids = idsOverride || await ensureHierarchyIds();
           const allDataResponse = await api.get('/release/get-unscheduled-releases');
           if (allDataResponse.data.success) {
-            // Filter by hierarchy IDs
-            unscheduledData = allDataResponse.data.data.filter(release => 
-              hierarchyUserIds.includes(release.user_id)
-            );
-            
-          }
+          unscheduledData = Array.isArray(ids)
+            ? allDataResponse.data.data.filter(release => ids.includes(release.user_id))
+            : allDataResponse.data.data;
         }
       } else {
         // Regular users shouldn't see this, but just in case
@@ -1644,7 +1730,7 @@ const AgentProgressTable = () => {
 
 
 
-  loadLeadsReleased = async () => {
+  loadLeadsReleased = async (idsOverride = null) => {
     try {
       let leadsReleasedData = [];
 
@@ -1656,23 +1742,12 @@ const AgentProgressTable = () => {
         }
       } else if (isManager) {
         // Managers: first get hierarchy, then get all data and filter
-        
-        
-        // Get hierarchy IDs
-        const hierarchyResponse = await api.post('/auth/searchByUserId', { userId });
-        if (hierarchyResponse.data.success) {
-          const hierarchyUserIds = hierarchyResponse.data.data.map(user => user.id);
-          
-          
-          // Get all leads released using admin endpoint
+        const ids = idsOverride || await ensureHierarchyIds();
           const allDataResponse = await api.get('/release/leads-released');
           if (allDataResponse.data.success) {
-            // Filter by hierarchy IDs (assuming leads_released has userId field)
-            leadsReleasedData = allDataResponse.data.data.filter(lead => 
-              hierarchyUserIds.includes(lead.userId)
-            );
-            
-          }
+          leadsReleasedData = Array.isArray(ids)
+            ? allDataResponse.data.data.filter(lead => ids.includes(lead.userId))
+            : allDataResponse.data.data;
         }
       } else {
         // Regular users shouldn't see this, but just in case
@@ -1934,7 +2009,7 @@ const AgentProgressTable = () => {
     return calculateProgress(agentChecklist);
   };
 
-  loadProgressData = async () => {
+  loadProgressData = async (idsOverride = null) => {
     setLoading(true);
 
     try {
@@ -1948,23 +2023,12 @@ const AgentProgressTable = () => {
         }
       } else if (isManager) {
         // Managers: first get hierarchy, then get all data and filter
-        
-        
-        // Get hierarchy IDs
-        const hierarchyResponse = await api.post('/auth/searchByUserId', { userId });
-        if (hierarchyResponse.data.success) {
-          const hierarchyUserIds = hierarchyResponse.data.data.map(user => user.id);
-          
-          
-          // Get all data using admin endpoint
+        const ids = idsOverride || await ensureHierarchyIds();
           const allDataResponse = await api.get('/release/get-unreleased-users-checklist');
           if (allDataResponse.data.success) {
-            // Filter by hierarchy IDs
-            agentsData = allDataResponse.data.data.filter(agent => 
-              hierarchyUserIds.includes(agent.id)
-            );
-            
-          }
+          agentsData = Array.isArray(ids)
+            ? allDataResponse.data.data.filter(agent => ids.includes(agent.id))
+            : allDataResponse.data.data;
         }
       } else {
         // Regular users shouldn't see this table, but just in case
@@ -2050,22 +2114,19 @@ const AgentProgressTable = () => {
 
 
   useEffect(() => {
-    loadUnscheduledReleases();
-    loadProgressData();
-    loadLeadsReleased();
-    loadLicensedStates();
-    // Load Weekly Recap for current tab (pending request)
     (async () => {
+      setLoading(true);
       try {
-        const names = (checklistInProgressData || []).map(a => a.agentName).filter(Boolean);
-        if (names.length) {
-          const resp = await api.post('/dataroutes/weekly-alp/latest-weekly-recap', { names });
-          if (resp.data?.success) {
-            const map = new Map(resp.data.data.map(r => [r.LagnName, r]));
-            setProgressData(prev => prev.map(a => ({ ...a, __weeklyRecap: map.get(a.agentName) || null })));
-          }
-        }
-      } catch (_) {}
+        const ids = await ensureHierarchyIds();
+        await Promise.all([
+          loadUnscheduledReleases(ids),
+          loadProgressData(ids),
+          loadLeadsReleased(ids),
+          loadLicensedStates()
+        ]);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
@@ -2091,15 +2152,15 @@ const AgentProgressTable = () => {
 
   // Debug logging for selection state changes
   useEffect(() => {
-    console.log('🔍 Selection state changed - selectedAgents:', selectedAgents);
+    if (DEBUG_LOGS) console.log('🔍 Selection state changed - selectedAgents:', selectedAgents);
   }, [selectedAgents]);
 
   useEffect(() => {
-    console.log('🔍 Selection state changed - selectedUnscheduled:', selectedUnscheduled);
+    if (DEBUG_LOGS) console.log('🔍 Selection state changed - selectedUnscheduled:', selectedUnscheduled);
   }, [selectedUnscheduled]);
 
   useEffect(() => {
-    console.log('🔍 Active tab changed to:', activeTab);
+    if (DEBUG_LOGS) console.log('🔍 Active tab changed to:', activeTab);
   }, [activeTab]);
 
 
@@ -2109,6 +2170,7 @@ const AgentProgressTable = () => {
   }
 
   // Debug log on every render
+  if (DEBUG_LOGS) {
   console.log('🔄 AgentProgressTable render:', {
     activeTab,
     selectedAgents: selectedAgents.length,
@@ -2116,6 +2178,7 @@ const AgentProgressTable = () => {
     isAdmin,
     currentTabDataLength: currentTabData?.length
   });
+  }
 
   return (
     <div className="agent-progress-table-container">
@@ -2138,7 +2201,7 @@ const AgentProgressTable = () => {
       >
         {activeTab === "upcomingReleases" && (
           <>
-            {(() => {
+            {DEBUG_LOGS && (() => {
               console.log('🎯 Upcoming Releases ActionBar Render:');
               console.log('  - selectedAgents.length:', selectedAgents.length);
               console.log('  - selectedAgents:', selectedAgents);
@@ -2158,7 +2221,7 @@ const AgentProgressTable = () => {
               onRefresh={handleRefresh}
             >
               {/* Mass Action Buttons - Only render when admin and items selected */}
-              {(() => {
+              {DEBUG_LOGS && (() => {
                 console.log('📋 Inside ActionBar children render - Upcoming Releases');
                 console.log('  - isAdmin:', isAdmin);
                 console.log('  - selectedAgents.length:', selectedAgents.length);
@@ -2167,7 +2230,7 @@ const AgentProgressTable = () => {
               })()}
               {isAdmin && selectedAgents.length > 0 && (
                 <>
-                  {(() => {
+                  {DEBUG_LOGS && (() => {
                     console.log('🎯 Rendering mass action buttons for Upcoming Releases');
                     return null;
                   })()}
@@ -2260,9 +2323,30 @@ const AgentProgressTable = () => {
   data={currentTabData}
   defaultSortBy="releaseScheduled"
   defaultSortOrder="desc"
+  disablePagination={true}
   showActionBar={false}
   entityName="release"
   disableCellEditing={true}
+  onRowsRendered={DEBUG_LOGS ? ((rows) => {
+    try {
+      if (activeTab === 'upcomingReleases') {
+        const expectedNames = (currentTabData || []).map(r => r.agentName);
+        const renderedNames = (rows || []).map(r => r.agentName || r.lagnname).filter(Boolean);
+        const missing = expectedNames.filter(name => !renderedNames.includes(name));
+        const extra = renderedNames.filter(name => !expectedNames.includes(name));
+        const sig = `${expectedNames.length}:${renderedNames.length}:${missing.join('|')}::${extra.join('|')}`;
+        if (lastDiagSignatureRef.current !== sig) {
+          lastDiagSignatureRef.current = sig;
+          console.log('[UpcomingReleases] expected vs rendered', {
+            expectedCount: expectedNames.length,
+            renderedCount: renderedNames.length,
+            missing,
+            extra
+          });
+        }
+      }
+    } catch (_) {}
+  }) : undefined}
   customRowStyles={(row) => {
     if (!row.releaseScheduled) return {};
     const releaseDate = new Date(row.releaseScheduled);
@@ -2274,7 +2358,7 @@ const AgentProgressTable = () => {
   }}
   onSortChange={handleSort}
               onSelectionChange={(selectedRowIds) => {
-                console.log('🎯 DataTable onSelectionChange called for Upcoming Releases:', selectedRowIds);
+                if (DEBUG_LOGS) console.log('🎯 DataTable onSelectionChange called for Upcoming Releases:', selectedRowIds);
                 handleUpcomingReleasesSelectionChange(selectedRowIds);
               }}
 />

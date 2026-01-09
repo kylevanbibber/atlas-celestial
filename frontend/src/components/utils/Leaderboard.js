@@ -6,18 +6,41 @@ import './Leaderboard.css';
 import './ProfilePicture.css';
 
 // Profile Picture Component
-const ProfilePicture = ({ src, name, size = "60px", mobileSize = "40px", className = "" }) => {
+const ProfilePicture = ({ src, name, size = "60px", mobileSize = "40px", className = "", onClick = null }) => {
   const [imageError, setImageError] = useState(false);
   const firstInitial = getFirstInitial(name);
+
+  const handleClick = (e) => {
+    if (onClick) {
+      e.stopPropagation(); // Prevent row click event
+      onClick();
+    }
+  };
+
+  const commonProps = {
+    onClick: handleClick,
+    className: `${className} ${onClick ? 'clickable-profile' : ''}`,
+    style: { 
+      '--desktop-size': size,
+      '--mobile-size': mobileSize,
+      width: size,
+      height: size,
+      minWidth: size,
+      minHeight: size,
+      maxWidth: size,
+      maxHeight: size,
+      borderRadius: '50%',
+      cursor: onClick ? 'pointer' : 'default'
+    }
+  };
 
   if (!src || imageError) {
     return (
       <div 
-        className={`profile-picture-fallback ${className}`}
-        style={{ 
-          '--desktop-size': size,
-          '--mobile-size': mobileSize,
-          borderRadius: '50%',
+        {...commonProps}
+        className={`profile-picture-fallback ${commonProps.className}`}
+        style={{
+          ...commonProps.style,
           backgroundColor: '#6b7280',
           color: 'white',
           display: 'flex',
@@ -33,13 +56,11 @@ const ProfilePicture = ({ src, name, size = "60px", mobileSize = "40px", classNa
 
   return (
     <img
+      {...commonProps}
       src={src}
       alt={`${name} profile`}
-      className={`profile-picture ${className}`}
-      style={{ 
-        '--desktop-size': size,
-        '--mobile-size': mobileSize,
-        borderRadius: '50%',
+      style={{
+        ...commonProps.style,
         objectFit: 'cover'
       }}
       onError={() => setImageError(true)}
@@ -139,7 +160,11 @@ const Leaderboard = ({
   rawNameField = null,
   // PNG Export functionality
   enablePngExport = true, // Show PNG export button
-  exportFileName = null // Custom filename for export, defaults to title
+  exportFileName = null, // Custom filename for export, defaults to title
+  // Profile click functionality
+  onProfileClick = null, // Callback when profile picture is clicked: (item) => void
+  // Row click functionality
+  onRowClick = null // Callback when row is clicked: (item) => void
 }) => {
 
   const [expandedItems, setExpandedItems] = useState(new Set());
@@ -511,11 +536,76 @@ const Leaderboard = ({
           // Ensure fonts are loaded in the cloned document
           const clonedBody = clonedDoc.body;
           clonedBody.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+          
+          // ULTRA AGGRESSIVE FIX: Override ALL CSS properties that could have modern color functions
+          const allElements = clonedDoc.querySelectorAll('*');
+          allElements.forEach(element => {
+            // Set all shadow properties to safe values using !important
+            element.style.setProperty('box-shadow', 'none', 'important');
+            element.style.setProperty('text-shadow', 'none', 'important');
+            element.style.setProperty('filter', 'none', 'important');
+            element.style.setProperty('border-image', 'none', 'important');
+            
+            // Override backgrounds if they contain gradients with color functions
+            try {
+              const computedBg = window.getComputedStyle(element).backgroundImage;
+              if (computedBg && computedBg !== 'none' && computedBg.includes('gradient')) {
+                const bgStr = computedBg.toString();
+                if (bgStr.includes('color(') || bgStr.includes('color-mix(')) {
+                  element.style.setProperty('background-image', 'none', 'important');
+                  const bgColor = window.getComputedStyle(element).backgroundColor;
+                  if (bgColor && bgColor !== 'transparent') {
+                    element.style.setProperty('background', bgColor, 'important');
+                  }
+                }
+              }
+            } catch (e) {
+              // Ignore errors
+            }
+          });
+          
+          // Re-add safe shadows only to specific elements
+          const leaderboard = clonedDoc.querySelector('.leaderboard');
+          if (leaderboard) {
+            leaderboard.style.setProperty('box-shadow', '0 2px 8px rgba(0, 0, 0, 0.1)', 'important');
+          }
+          
+          const leaderboardItems = clonedDoc.querySelectorAll('.leaderboard-item');
+          leaderboardItems.forEach(item => {
+            item.style.setProperty('box-shadow', '0 1px 3px rgba(0, 0, 0, 0.08)', 'important');
+          });
         }
       };
       
       // Capture the screenshot of the clone
-      const canvas = await html2canvas(clonedElement, options);
+      let canvas;
+      try {
+        canvas = await html2canvas(clonedElement, options);
+      } catch (canvasError) {
+        console.error('html2canvas error:', canvasError);
+        
+        // Try again with more aggressive style sanitization
+        console.log('Retrying with simplified styles...');
+        
+        // Remove all background images and gradients from the clone
+        const allElements = clonedElement.querySelectorAll('*');
+        allElements.forEach(element => {
+          element.style.backgroundImage = 'none';
+          element.style.borderImage = 'none';
+        });
+        
+        // Retry with simplified options
+        const fallbackOptions = {
+          ...options,
+          backgroundColor: '#ffffff',
+          ignoreElements: (element) => {
+            // Skip any elements that might cause issues
+            return element.tagName === 'IFRAME' || element.tagName === 'VIDEO';
+          }
+        };
+        
+        canvas = await html2canvas(clonedElement, fallbackOptions);
+      }
       
       // Remove the clone from DOM
       document.body.removeChild(clonedElement);
@@ -1120,13 +1210,15 @@ const Leaderboard = ({
                   <div
                     ref={isUser ? currentUserRef : null}
                     className={`leaderboard-item ${getRankClass(rank)} ${
-                      (onItemClick || isExpandable) ? 'clickable' : ''
+                      (onItemClick || isExpandable || onRowClick) ? 'clickable' : ''
                     } ${isUser ? 'current-user' : ''}`}
                     onClick={() => {
                       if (isExpandable) {
                         handleToggleExpansion(item, index);
                       } else if (onItemClick) {
                         onItemClick(item);
+                      } else if (onRowClick) {
+                        onRowClick(item);
                       }
                     }}
                   >
@@ -1159,6 +1251,7 @@ const Leaderboard = ({
                               size="60px"
                               mobileSize="40px"
                               className="item-profile-picture"
+                              onClick={onProfileClick ? () => onProfileClick(item) : null}
                             />
                           )}
                           <div className="name-info">
@@ -1271,6 +1364,7 @@ const Leaderboard = ({
                                     size="48px"
                                     mobileSize="32px"
                                     className="sub-item-profile-picture"
+                                    onClick={onProfileClick ? () => onProfileClick(subItem) : null}
                                   />
                                 )}
                                 <div className="sub-name-info">
@@ -1328,28 +1422,6 @@ const Leaderboard = ({
         )}
       </div>
 
-      {variant === "detailed" && displayData.length > 0 && (
-        <div className="leaderboard-footer">
-          <div className="leaderboard-stats">
-            <div className="stat">
-              <span className="stat-label">Total Participants:</span>
-              <span className="stat-value">{reRankedData.length}</span>
-            </div>
-            {reRankedData.length > 0 && (
-              <div className="stat">
-                <span className="stat-label">Average:</span>
-                <span className="stat-value">
-                  {formatValue(
-                    Math.round(
-                      reRankedData.reduce((sum, item) => sum + (item[valueField] || 0), 0) / reRankedData.length
-                    )
-                  )}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

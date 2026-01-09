@@ -248,6 +248,117 @@ const MoreReport = ({ onBack }) => {
       Header: 'PR Hires',
       accessor: 'PR_Hires',
       Cell: ({ value }) => <span className="pr-hire-count">{value || 0}</span>
+    },
+    // New recruiting breakdown fields
+    {
+      Header: 'PR Final Set',
+      accessor: 'PR_Final_Set',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'PR Final Show',
+      accessor: 'PR_Final_Show',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Happenstance PR Hires',
+      accessor: 'Happenstance_PR_Hires',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'PPR Hires',
+      accessor: 'PPR_Hires',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Social Media Hires',
+      accessor: 'Social_Media_Hires',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Webinar Sets Purchased',
+      accessor: 'Webinar_Sets_Purchased',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Webinar Finals Set',
+      accessor: 'Webinar_Finals_Set',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Webinar Final Show',
+      accessor: 'Webinar_Final_Show',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Webinar Hires',
+      accessor: 'Webinar_Hires',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Surveys Purchased',
+      accessor: 'Surveys_Purchased',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Survey Finals Set',
+      accessor: 'Survey_Finals_Set',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Survey Finals Show',
+      accessor: 'Survey_Finals_Show',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Survey Hires',
+      accessor: 'Survey_Hires',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Vendor Finals Purchased',
+      accessor: 'Vendor_Finals_Purchased',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Vendor Final Show',
+      accessor: 'Vendor_Final_Show',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Vendor Final Hires',
+      accessor: 'Vendor_Final_Hires',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Vendor Hires Purchased',
+      accessor: 'Vendor_Hires_Purchased',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Total Vendor Hires',
+      accessor: 'Total_Vendor_Hires',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Internal Webinar Sets',
+      accessor: 'Internal_Webinar_Sets',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Internal Finals Set',
+      accessor: 'Internal_Finals_Set',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Internal Final Show',
+      accessor: 'Internal_Final_Show',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
+    },
+    {
+      Header: 'Total Internal Hires',
+      accessor: 'Total_Internal_Hires',
+      Cell: ({ value }) => <span className="metric-value">{value || 0}</span>
     }
   ];
 

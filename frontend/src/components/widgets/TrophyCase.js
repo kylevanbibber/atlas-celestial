@@ -23,7 +23,7 @@ import goldImage from '../../img/gold.png';
 import platinumImage from '../../img/platinum.png';
 import diamondImage from '../../img/diamond.png';
 
-const TrophyCase = ({ view, trophyView = 'personal' }) => {
+const TrophyCase = ({ view, trophyView = 'personal', targetLagnname = null }) => {
     const { user } = useContext(AuthContext);
     const { theme } = useContext(ThemeContext);
     const [trophyCaseData, setTrophyCaseData] = useState([]);
@@ -34,6 +34,7 @@ const TrophyCase = ({ view, trophyView = 'personal' }) => {
     const [userWeeklyRaw, setUserWeeklyRaw] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showInfoModal, setShowInfoModal] = useState(false);
+    const [selectedYear, setSelectedYear] = useState('all');
     const [expandedClubs, setExpandedClubs] = useState({
         Bronze: true,
         Silver: true,
@@ -44,14 +45,18 @@ const TrophyCase = ({ view, trophyView = 'personal' }) => {
     });
 
     useEffect(() => {
-        if (user) {
+        if (user || targetLagnname) {
             fetchTrophyCaseData();
         }
-    }, [user, trophyView]);
+    }, [user, trophyView, targetLagnname]);
 
     // Normalize current user's agent name across varying shapes/cases
+    // If viewing another user's profile, use targetLagnname instead
     const getCurrentUserLagnName = () => {
         try {
+            if (targetLagnname) {
+                return targetLagnname;
+            }
             return (user && (user.LagnName || user.lagnname)) || null;
         } catch {
             return null;
@@ -305,8 +310,12 @@ const TrophyCase = ({ view, trophyView = 'personal' }) => {
         try {
             setLoading(true);
             
-            // Fetch individual agent's trophy data (now uses authenticated user context)
-            const trophyResponse = await api.get('/trophy/trophy-case');
+            // Fetch individual agent's trophy data
+            // Use targetLagnname if provided, otherwise use authenticated user context
+            const trophyEndpoint = targetLagnname 
+                ? `/trophy/trophy-case/${encodeURIComponent(targetLagnname)}`
+                : '/trophy/trophy-case';
+            const trophyResponse = await api.get(trophyEndpoint);
             
             if (trophyResponse.data.success && trophyResponse.data.data.length > 0) {
                 // Store RAW data with duplicates intact - deduplication will happen in categorizeData
@@ -333,8 +342,12 @@ const TrophyCase = ({ view, trophyView = 'personal' }) => {
                 setAllTrophyData(sortedAllData);
             }
 
-            // Fetch weekly trophy data (now uses authenticated user context)
-            const weeklyResponse = await api.get('/trophy/weekly-trophy-case');
+            // Fetch weekly trophy data
+            // Use targetLagnname if provided, otherwise use authenticated user context
+            const weeklyEndpoint = targetLagnname
+                ? `/trophy/weekly-trophy-case/${encodeURIComponent(targetLagnname)}`
+                : '/trophy/weekly-trophy-case';
+            const weeklyResponse = await api.get(weeklyEndpoint);
             
             if (weeklyResponse.data.success && weeklyResponse.data.data.length > 0) {
                 // Deduplicate weekly data before finding the highest week
@@ -378,7 +391,11 @@ const TrophyCase = ({ view, trophyView = 'personal' }) => {
             }
 
             // Fetch Wall of Fame data (weeks with $8,000+ net ALP)
-            const wallOfFameResponse = await api.get('/trophy/wall-of-fame');
+            // Use targetLagnname if provided, otherwise use authenticated user context
+            const wallOfFameEndpoint = targetLagnname
+                ? `/trophy/wall-of-fame/${encodeURIComponent(targetLagnname)}`
+                : '/trophy/wall-of-fame';
+            const wallOfFameResponse = await api.get(wallOfFameEndpoint);
             
             if (wallOfFameResponse.data.success && wallOfFameResponse.data.data.length > 0) {
                 // Deduplicate Wall of Fame entries by week (reportdate), keeping highest Net ALP value
@@ -762,7 +779,117 @@ const TrophyCase = ({ view, trophyView = 'personal' }) => {
         return rankings;
     };
 
-    const categorizedData = categorizeData(trophyCaseData);
+    // Extract unique years from trophy data
+    const availableYears = React.useMemo(() => {
+        const years = new Set();
+        
+        // Get years from monthly trophy data
+        trophyCaseData.forEach(row => {
+            if (row.month) {
+                try {
+                    let year;
+                    if (row.month.includes('/')) {
+                        // Handle mm/yyyy format
+                        const parts = row.month.split('/');
+                        year = parts[1];
+                    } else {
+                        // Handle "March 2024" format
+                        const parts = row.month.split(' ');
+                        year = parts[1];
+                    }
+                    if (year) years.add(year);
+                } catch (error) {
+                    console.warn('Error parsing year from month:', row.month);
+                }
+            }
+        });
+        
+        // Get years from weekly data
+        if (recordWeekData?.reportdate) {
+            try {
+                const weekYear = new Date(recordWeekData.reportdate).getFullYear().toString();
+                years.add(weekYear);
+            } catch (error) {
+                console.warn('Error parsing year from weekly data');
+            }
+        }
+        
+        // Get years from wall of fame data
+        wallOfFameData.forEach(row => {
+            if (row.reportdate) {
+                try {
+                    const wofYear = new Date(row.reportdate).getFullYear().toString();
+                    years.add(wofYear);
+                } catch (error) {
+                    console.warn('Error parsing year from wall of fame data');
+                }
+            }
+        });
+        
+        // Sort years in descending order (newest first)
+        return Array.from(years).sort((a, b) => parseInt(b) - parseInt(a));
+    }, [trophyCaseData, recordWeekData, wallOfFameData]);
+    
+    // Filter trophy data by selected year
+    const filteredTrophyData = React.useMemo(() => {
+        if (selectedYear === 'all') {
+            return trophyCaseData;
+        }
+        
+        return trophyCaseData.filter(row => {
+            if (!row.month) return false;
+            
+            try {
+                let year;
+                if (row.month.includes('/')) {
+                    // Handle mm/yyyy format
+                    const parts = row.month.split('/');
+                    year = parts[1];
+                } else {
+                    // Handle "March 2024" format
+                    const parts = row.month.split(' ');
+                    year = parts[1];
+                }
+                return year === selectedYear;
+            } catch (error) {
+                return false;
+            }
+        });
+    }, [trophyCaseData, selectedYear]);
+    
+    // Filter weekly record data by selected year
+    const filteredRecordWeek = React.useMemo(() => {
+        if (selectedYear === 'all' || !recordWeekData) {
+            return recordWeekData;
+        }
+        
+        try {
+            const weekYear = new Date(recordWeekData.reportdate).getFullYear().toString();
+            return weekYear === selectedYear ? recordWeekData : null;
+        } catch (error) {
+            return null;
+        }
+    }, [recordWeekData, selectedYear]);
+    
+    // Filter wall of fame data by selected year
+    const filteredWallOfFame = React.useMemo(() => {
+        if (selectedYear === 'all') {
+            return wallOfFameData;
+        }
+        
+        return wallOfFameData.filter(row => {
+            if (!row.reportdate) return false;
+            
+            try {
+                const wofYear = new Date(row.reportdate).getFullYear().toString();
+                return wofYear === selectedYear;
+            } catch (error) {
+                return false;
+            }
+        });
+    }, [wallOfFameData, selectedYear]);
+
+    const categorizedData = categorizeData(filteredTrophyData);
     const rankings = calculateRankings(allTrophyData);
     const mostRecentClubEntry = getMostRecentClubEntry(categorizedData);
 
@@ -795,21 +922,86 @@ const TrophyCase = ({ view, trophyView = 'personal' }) => {
                 />
             </div>
 
+            {/* Year Filter */}
+            {availableYears.length > 0 && (
+                <div className="year-filter-container" style={{
+                    padding: '12px 16px',
+                    backgroundColor: theme === 'dark' ? '#2d3748' : '#f8f9fa',
+                    borderRadius: '8px',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    flexWrap: 'wrap'
+                }}>
+                    <span style={{
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        color: theme === 'dark' ? '#e2e8f0' : '#495057'
+                    }}>
+                        Filter by Year:
+                    </span>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <button
+                            onClick={() => setSelectedYear('all')}
+                            style={{
+                                padding: '6px 16px',
+                                border: selectedYear === 'all' ? '2px solid #00558c' : '1px solid #dee2e6',
+                                borderRadius: '20px',
+                                backgroundColor: selectedYear === 'all' ? '#00558c' : (theme === 'dark' ? '#1a202c' : 'white'),
+                                color: selectedYear === 'all' ? 'white' : (theme === 'dark' ? '#e2e8f0' : '#495057'),
+                                fontSize: '13px',
+                                fontWeight: selectedYear === 'all' ? '600' : '500',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                boxShadow: selectedYear === 'all' ? '0 2px 4px rgba(0,85,140,0.2)' : 'none'
+                            }}
+                        >
+                            All Years
+                        </button>
+                        {availableYears.map(year => (
+                            <button
+                                key={year}
+                                onClick={() => setSelectedYear(year)}
+                                style={{
+                                    padding: '6px 16px',
+                                    border: selectedYear === year ? '2px solid #00558c' : '1px solid #dee2e6',
+                                    borderRadius: '20px',
+                                    backgroundColor: selectedYear === year ? '#00558c' : (theme === 'dark' ? '#1a202c' : 'white'),
+                                    color: selectedYear === year ? 'white' : (theme === 'dark' ? '#e2e8f0' : '#495057'),
+                                    fontSize: '13px',
+                                    fontWeight: selectedYear === year ? '600' : '500',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    boxShadow: selectedYear === year ? '0 2px 4px rgba(0,85,140,0.2)' : 'none'
+                                }}
+                            >
+                                {year}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Time Since Cards */}
             <div className={`time-cards-container ${theme}`}>
                 {categorizedData['Record Month'].length > 0 && (
                     <div className="time-card">
-                        <div className="time-card-label">Time Since Record Month</div>
+                        <div className="time-card-label">
+                            Time Since Record Month{selectedYear !== 'all' ? ` (${selectedYear})` : ''}
+                        </div>
                         <div className="time-card-value">
                             {getTimeSince(categorizedData['Record Month'][0].month, false)}
                         </div>
                     </div>
                 )}
-                {recordWeekData && (
+                {filteredRecordWeek && (
                     <div className="time-card">
-                        <div className="time-card-label">Time Since Record Week</div>
+                        <div className="time-card-label">
+                            Time Since Record Week{selectedYear !== 'all' ? ` (${selectedYear})` : ''}
+                        </div>
                         <div className="time-card-value">
-                            {getTimeSince(recordWeekData.reportdate, true)}
+                            {getTimeSince(filteredRecordWeek.reportdate, true)}
                         </div>
                     </div>
                 )}
@@ -817,7 +1009,9 @@ const TrophyCase = ({ view, trophyView = 'personal' }) => {
                     const contract = trophyView === 'team' && mostRecentClubEntry.contractType ? mostRecentClubEntry.contractType : null;
                     return (
                         <div className="time-card">
-                            <div className="time-card-label">Time Since Last Club Entry</div>
+                            <div className="time-card-label">
+                                Time Since Last Club Entry{selectedYear !== 'all' ? ` (${selectedYear})` : ''}
+                            </div>
                             <div className="time-card-value">
                                 {getTimeSince(mostRecentClubEntry.month, false)}
                             </div>
@@ -848,14 +1042,14 @@ const TrophyCase = ({ view, trophyView = 'personal' }) => {
                         );
                     })}
                     
-                    {recordWeekData && (() => {
-                        const sameWeekRows = userWeeklyRaw.filter(r => r.reportdate === recordWeekData.reportdate);
-                        const contract = trophyView === 'team' ? classifyContract(recordWeekData, sameWeekRows) : null;
-                        const sub = contract ? `${formatDateRange(recordWeekData.reportdate)} • ${contract}` : formatDateRange(recordWeekData.reportdate);
+                    {filteredRecordWeek && (() => {
+                        const sameWeekRows = userWeeklyRaw.filter(r => r.reportdate === filteredRecordWeek.reportdate);
+                        const contract = trophyView === 'team' ? classifyContract(filteredRecordWeek, sameWeekRows) : null;
+                        const sub = contract ? `${formatDateRange(filteredRecordWeek.reportdate)} • ${contract}` : formatDateRange(filteredRecordWeek.reportdate);
                         return (
                         <Card
                                 title={`Record Week ${trophyView === 'team' ? '(Team)' : ''}`}
-                                value={formatCurrency((recordWeekData.calculatedNetValue || recordWeekData.netValue || 0).toString())}
+                                value={formatCurrency((filteredRecordWeek.calculatedNetValue || filteredRecordWeek.netValue || 0).toString())}
                                 subText={sub}
                             backgroundImage={getBackgroundImage('RecordWeek')}
                             backgroundSize="auto 80%"
@@ -941,7 +1135,7 @@ const TrophyCase = ({ view, trophyView = 'personal' }) => {
                                         })
                                     ) : (
                                         <div className="empty-club-message">
-                                            <p>No achievements yet. Keep working towards your first {club} Club entry!</p>
+                                            <p>No achievements {selectedYear !== 'all' ? `in ${selectedYear}` : 'yet'}. Keep working towards your {selectedYear !== 'all' ? `${selectedYear}` : 'first'} {club} Club entry!</p>
                                         </div>
                                     )}
                                 </div>
@@ -961,11 +1155,11 @@ const TrophyCase = ({ view, trophyView = 'personal' }) => {
                             🌟 Wall of Fame ($8,000+ Weekly {trophyView === 'team' ? 'Team ' : ''}Net ALP)
                             </h5>
                             <div className="club-icons">
-                                {wallOfFameData.slice(0, 10).map((_, idx) => (
+                                {filteredWallOfFame.slice(0, 10).map((_, idx) => (
                                     <FontAwesomeIcon key={idx} icon={faMedal} className="club-icon wall-of-fame-icon" />
                                 ))}
                                 <span className="entry-count wall-of-fame-count">
-                                    {wallOfFameData.length}
+                                    {filteredWallOfFame.length}
                                 </span>
                             </div>
                             <div style={{marginLeft: '5px'}}>
@@ -978,8 +1172,8 @@ const TrophyCase = ({ view, trophyView = 'personal' }) => {
                         
                         {expandedClubs.WallOfFame && (
                             <div className="trophy-card-container">
-                            {wallOfFameData.length > 0 ? (
-                                wallOfFameData.map((row, idx) => {
+                            {filteredWallOfFame.length > 0 ? (
+                                filteredWallOfFame.map((row, idx) => {
                                     const subText = `${formatDateRange(row.reportdate)} • Weekly Achievement`;
                                     
                                     return (
@@ -993,7 +1187,7 @@ const TrophyCase = ({ view, trophyView = 'personal' }) => {
                                 })
                             ) : (
                                 <div className="empty-club-message">
-                                    <p>No Wall of Fame achievements yet. Reach $8,000+ weekly {trophyView === 'team' ? 'team ' : ''}net ALP to earn your spot!</p>
+                                    <p>No Wall of Fame achievements {selectedYear !== 'all' ? `in ${selectedYear}` : 'yet'}. Reach $8,000+ weekly {trophyView === 'team' ? 'team ' : ''}net ALP to earn your spot!</p>
                             </div>
                         )}
                     </div>

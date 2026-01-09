@@ -7,35 +7,11 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus } = require('@discordjs/voice');
 const cron = require('node-cron');
 const axios = require('axios');
-const play = require('play-dl');
 const ytdl = require('ytdl-core');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const db = require('../db');
-
-// Initialize play-dl for YouTube streaming
-(async () => {
-  try {
-    await play.setToken({
-      soundcloud: {
-        client_id: null  // We're only using YouTube
-      },
-      spotify: {
-        client_id: null,
-        client_secret: null,
-        refresh_token: null,
-        market: 'US'
-      },
-      useragent: [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
-      ]
-    });
-    console.log('[Discord] play-dl initialized for YouTube streaming');
-  } catch (error) {
-    console.error('[Discord] Failed to initialize play-dl:', error);
-  }
-})();
 
 // Imgur API client ID (same as in upload.js)
 const IMGUR_CLIENT_ID = 'd08c81e700c9978';
@@ -53,7 +29,8 @@ const client = new Client({
 const scheduledJobs = {
   reminders: {},
   leaderboards: {},
-  motivationCalls: {}
+  motivationCalls: {},
+  moreReminders: {}
 };
 
 const commands = [
@@ -106,6 +83,14 @@ const commands = [
          .setRequired(false)
     ),
   new SlashCommandBuilder()
+    .setName('more')
+    .setDescription('Report aMORE hires (DM only)')
+    .addStringOption(opt =>
+      opt.setName('values')
+         .setDescription('total,pr (e.g., 5,3)')
+         .setRequired(true)
+    ),
+  new SlashCommandBuilder()
     .setName('ask')
     .setDescription('Ask questions about your data, performance, or app information')
     .addStringOption(opt =>
@@ -126,14 +111,12 @@ async function registerCommands() {
         Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.TEST_GUILD_ID),
         { body: commands }
       );
-      console.log('Discord slash commands registered for test guild');
     } else {
       // Register commands globally
       await rest.put(
         Routes.applicationCommands(process.env.CLIENT_ID),
         { body: commands }
       );
-      console.log('Discord slash commands registered globally');
     }
   } catch (error) {
     console.error('Error registering Discord commands:', error);
@@ -146,10 +129,12 @@ async function loadScheduledJobs() {
     Object.values(scheduledJobs.reminders).forEach(job => job.stop());
     Object.values(scheduledJobs.leaderboards).forEach(job => job.stop());
     Object.values(scheduledJobs.motivationCalls).forEach(job => job.stop());
+    Object.values(scheduledJobs.moreReminders).forEach(job => job.stop());
     
     scheduledJobs.reminders = {};
     scheduledJobs.leaderboards = {};
     scheduledJobs.motivationCalls = {};
+    scheduledJobs.moreReminders = {};
 
     // Load reminders
     const reminders = await db.query('SELECT * FROM discord_reminders WHERE is_active = TRUE');
@@ -164,7 +149,6 @@ async function loadScheduledJobs() {
           console.error(`Error sending reminder to channel ${reminder.channel_id}:`, error);
         }
       });
-      console.log(`Scheduled reminder: ${reminder.cron_expr} -> ${reminder.channel_id}`);
     });
 
     // Load leaderboards
@@ -177,13 +161,15 @@ async function loadScheduledJobs() {
           console.error(`Error sending leaderboard to channel ${leaderboard.channel_id}:`, error);
         }
       });
-      console.log(`Scheduled leaderboard: ${leaderboard.cron_expr} -> ${leaderboard.channel_id}`);
     });
 
     // Load motivation calls (disabled)
     // const motivationCalls = await db.query('SELECT * FROM discord_motivation_calls WHERE is_active = TRUE');
     // motivationCalls.forEach(motivationCall => { /* disabled */ });
     // console.log('Motivation call scheduling disabled');
+
+    // Schedule aMORE DM reminders (EST timezone)
+    scheduleMoreDmReminders();
   } catch (error) {
     console.error('Error loading scheduled jobs:', error);
   }
@@ -198,6 +184,107 @@ async function reloadScheduledJobs() {
 // Function to get the Discord client for sending messages directly
 function getClient() {
   return client;
+}
+
+// Helper: get current week's Friday date in YYYY-MM-DD (Eastern Time), assuming week Sat–Fri
+function getCurrentFridayEST() {
+  const now = new Date();
+  const estNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const currentDay = estNow.getDay(); // 0=Sun..6=Sat
+  const startOfWeek = new Date(estNow);
+  startOfWeek.setHours(0, 0, 0, 0);
+  startOfWeek.setDate(estNow.getDate() - currentDay - 1); // Saturday
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6); // Friday
+  const yyyy = endOfWeek.getFullYear();
+  const mm = String(endOfWeek.getMonth() + 1).padStart(2, '0');
+  const dd = String(endOfWeek.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+// Helper: returns MGA lookup key for hierarchy and reporting (we use user.lagnname for reporting)
+function deriveMgaLookupKey(user) {
+  const role = (user.clname || '').toUpperCase();
+  if (role === 'MGA' || role === 'RGA') return user.lagnname || user.mga || user.lagnname;
+  return user.mga || user.lagnname;
+}
+
+// Core: find Discord-linked users who have NOT reported aMORE for this week
+async function findUsersMissingMoreForWeek(fridayDate) {
+  // Get all discord-linked, active users
+  const users = await db.query(
+    `SELECT id, lagnname, clname, mga, discord_id
+     FROM activeusers
+     WHERE Active = 'y'
+       AND clname IN ('MGA','RGA')
+       AND discord_id IS NOT NULL
+       AND discord_id <> ''`
+  );
+  if (!users || users.length === 0) return [];
+
+  // Build checks per user (reporting key is their own lagnname)
+  const missing = [];
+  for (const u of users) {
+    try {
+      const mgaKeyForReport = u.lagnname; // reporting uses user's lagnname as MGA
+      const rows = await db.query(
+        `SELECT 1 FROM amore_data WHERE MGA = ? AND MORE_Date = ? LIMIT 1`,
+        [mgaKeyForReport, fridayDate]
+      );
+      if (!rows || rows.length === 0) {
+        missing.push(u);
+      }
+    } catch (e) {
+      // continue
+    }
+  }
+  return missing;
+}
+
+// Schedule cron jobs to DM users who haven't reported aMORE by certain EST times
+function scheduleMoreDmReminders() {
+  const tz = 'America/New_York';
+  const schedules = [
+    { cron: '0 13 * * 5', label: 'Fri 1:00 PM ET' },
+    { cron: '0 16 * * 5', label: 'Fri 4:00 PM ET' },
+    { cron: '45 18 * * 5', label: 'Fri 6:45 PM ET' },
+    { cron: '0 19 * * 5', label: 'Fri 7:00 PM ET' },
+    { cron: '15 19 * * 5', label: 'Fri 7:15 PM ET' },
+    { cron: '30 19 * * 5', label: 'Fri 7:30 PM ET' },
+    { cron: '45 19 * * 5', label: 'Fri 7:45 PM ET' }
+  ];
+
+  schedules.forEach((entry, idx) => {
+    const job = cron.schedule(entry.cron, async () => {
+      try {
+        if (!client || !client.isReady()) return;
+        const friday = getCurrentFridayEST();
+        const missing = await findUsersMissingMoreForWeek(friday);
+        if (!missing || missing.length === 0) return;
+
+        for (const u of missing) {
+          try {
+            const userObj = await client.users.fetch(u.discord_id);
+            if (!userObj) continue;
+
+            const friendlyFriday = new Date(friday + 'T12:00:00Z').toLocaleDateString('en-US', { timeZone: tz });
+            const message = `Hi ${u.lagnname}, quick reminder to report your MORE numbers for the week ending ${friendlyFriday}.
+You can DM me: \`/more values: total,pr\` (example: \`/more values: 5,3\`).`;
+
+            await userObj.send(message);
+            // small spacing to avoid burst
+            await new Promise(res => setTimeout(res, 250));
+          } catch (dmErr) {
+            // Skip user on DM failure
+          }
+        }
+      } catch (err) {
+        console.error('[BOT] MORE reminder error:', err);
+      }
+    }, { timezone: tz });
+
+    scheduledJobs.moreReminders[`more_${idx}`] = job;
+  });
 }
 
 async function sendLeaderboard(leaderboard) {
@@ -297,8 +384,6 @@ async function crossPostSale(saleData, originalChannelId) {
 // Synchronize bot presence with database
 async function syncBotPresenceWithDatabase() {
   try {
-    console.log('Starting bot presence synchronization...');
-    
     // Get all servers the bot is currently in
     const botGuilds = client.guilds.cache.map(guild => ({
       id: guild.id,
@@ -306,11 +391,8 @@ async function syncBotPresenceWithDatabase() {
     }));
     
     if (botGuilds.length === 0) {
-      console.log('Bot is not in any servers.');
       return;
     }
-    
-    console.log(`Bot is in ${botGuilds.length} servers.`);
     
     // Get all guild_configs entries
     const guildConfigs = await db.query('SELECT * FROM guild_configs');
@@ -320,15 +402,11 @@ async function syncBotPresenceWithDatabase() {
       const matchingConfigs = guildConfigs.filter(config => config.guild_id === botGuild.id && !config.bot_added);
       
       if (matchingConfigs.length > 0) {
-        console.log(`Found ${matchingConfigs.length} configs for guild ${botGuild.id} (${botGuild.name}) with bot_added = 0`);
-        
         // Update the database
         await db.query(
           'UPDATE guild_configs SET bot_added = 1 WHERE guild_id = ?',
           [botGuild.id]
         );
-        
-        console.log(`Updated bot_added to 1 for guild ${botGuild.id} (${botGuild.name})`);
       }
     }
     
@@ -339,18 +417,12 @@ async function syncBotPresenceWithDatabase() {
     );
     
     for (const config of configsWithBotAdded) {
-      console.log(`Bot is not in guild ${config.guild_id} (${config.guild_name}) but bot_added = 1`);
-      
       // Update the database
       await db.query(
         'UPDATE guild_configs SET bot_added = 0 WHERE guild_id = ?',
         [config.guild_id]
       );
-      
-      console.log(`Updated bot_added to 0 for guild ${config.guild_id} (${config.guild_name})`);
     }
-    
-    console.log('Bot presence synchronization completed.');
   } catch (error) {
     console.error('Error synchronizing bot presence with database:', error);
   }
@@ -830,24 +902,17 @@ const qaHelpers = {
 };
 
 client.once('ready', async () => {
-  console.log(`Discord bot logged in as ${client.user.tag} and is ready!`);
-  console.log(`Bot is ready: ${client.isReady()}`);
-  console.log(`Bot ready timestamp: ${client.readyAt}`);
+  console.log(`Discord bot ready as ${client.user.tag}`);
   
   try {
     await registerCommands();
-    console.log('Bot commands registered successfully');
-    
     await loadScheduledJobs();
-    console.log('Scheduled jobs loaded successfully');
     
     // Run initial synchronization
     await syncBotPresenceWithDatabase();
-    console.log('Initial bot synchronization completed');
     
     // Schedule periodic synchronization (every hour)
     setInterval(syncBotPresenceWithDatabase, 60 * 60 * 1000);
-    console.log('Periodic synchronization scheduled');
     
   } catch (error) {
     console.error('Error during bot ready initialization:', error);
@@ -867,6 +932,8 @@ client.on('interactionCreate', async (interaction) => {
       await handleLeaderboardCommand(interaction);
     } else if (commandName === 'ask') {
       await handleAskCommand(interaction);
+    } else if (commandName === 'more') {
+      await handleMoreCommand(interaction);
     }
   } catch (error) {
     console.error(`Error handling command ${commandName}:`, error);
@@ -1268,6 +1335,190 @@ async function handleCloseCommand(interaction) {
   console.log(`[BOT] 🎯 === COMPLETED handleCloseCommand ===`);
 }
 
+// Handle the /more command (DM-only)
+async function handleMoreCommand(interaction) {
+  console.log(`[BOT] 📈 === STARTING handleMoreCommand ===`);
+
+  const values = interaction.options.getString('values');
+  const discordUserId = interaction.user.id;
+
+  // Enforce DM usage
+  if (interaction.guildId) {
+    try {
+      await interaction.reply({ content: 'ℹ️ Please DM me and use `/more values: 5,3` to report your MORE hires.', ephemeral: true });
+    } catch (err) {
+      console.warn('[BOT] 📈 Could not send guild ephemeral reply:', err.message);
+    }
+    return;
+  }
+
+  // Defer a normal DM reply (ephemeral not supported in DMs)
+  let canReply = true;
+  try {
+    await interaction.deferReply();
+  } catch (err) {
+    console.warn('[BOT] 📈 Could not defer DM reply:', err.message);
+    canReply = false;
+  }
+
+  try {
+    if (!values) {
+      if (canReply) {
+        await interaction.editReply('❌ Please provide values as `total,pr` (e.g., `5,3`).');
+      }
+      return;
+    }
+
+    // Parse "total,pr" accepting comma or space separator
+    const parts = values.replace(/\s+/g, '').split(/[ ,]+/);
+    const totalHires = parseInt(parts[0], 10);
+    const prHires = parseInt(parts[1] || '0', 10);
+
+    if (Number.isNaN(totalHires) || Number.isNaN(prHires) || totalHires < 0 || prHires < 0) {
+      if (canReply) {
+        await interaction.editReply('❌ Invalid values. Use `total,pr` with non-negative integers (e.g., `5,3`).');
+      }
+      return;
+    }
+    if (prHires > totalHires) {
+      if (canReply) {
+        await interaction.editReply('❌ PR Hires cannot be greater than Total Hires.');
+      }
+      return;
+    }
+
+    // Lookup linked user by Discord ID
+    const userQuery = `
+      SELECT id, lagnname, clname, mga
+      FROM activeusers
+      WHERE discord_id = ? AND Active = 'y'
+      LIMIT 1
+    `;
+    const userRows = await db.query(userQuery, [discordUserId]);
+    if (!userRows || userRows.length === 0) {
+      if (canReply) {
+        await interaction.editReply('❌ Your Discord is not linked. Log in to agents.ariaslife.com and link your Discord in Settings.');
+      }
+      return;
+    }
+
+    const user = userRows[0];
+    const MGA = user.lagnname; // Per requirement: use lagnname as MGA
+    const userRole = user.clname || 'MGA';
+
+    // Compute Eastern current time and this week's Friday date (Saturday–Friday week)
+    const now = new Date();
+    const estNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const currentDay = estNow.getDay(); // 0=Sun ... 6=Sat
+    const startOfWeek = new Date(estNow);
+    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setDate(estNow.getDate() - currentDay - 1); // Move to Saturday
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6); // Friday
+
+    // Format YYYY-MM-DD for MORE_Date
+    const yyyy = endOfWeek.getFullYear();
+    const mm = String(endOfWeek.getMonth() + 1).padStart(2, '0');
+    const dd = String(endOfWeek.getDate()).padStart(2, '0');
+    const MORE_Date = `${yyyy}-${mm}-${dd}`;
+
+    // On-time if before or at Friday 3:15 PM EST
+    const deadline = new Date(endOfWeek);
+    deadline.setHours(15, 15, 0, 0);
+    const on_time = estNow.getTime() <= deadline.getTime();
+
+    // Fetch MGA hierarchy (fallback to MGA if not found)
+    // If user is MGA or RGA, use their lagnname as the lookup key; otherwise, use their MGA field
+    const lookupKey = (userRole === 'MGA' || userRole === 'RGA') ? (user.lagnname || MGA) : (user.mga || MGA);
+    const hierarchyRows = await db.query(`
+      SELECT rga, legacy, tree
+      FROM MGAs
+      WHERE lagnname = ?
+        AND (active = 'y' OR active IS NULL)
+        AND (hide = 'n' OR hide IS NULL)
+      LIMIT 1
+    `, [lookupKey]);
+    const rga = (hierarchyRows[0] && hierarchyRows[0].rga) ? hierarchyRows[0].rga : MGA;
+    const legacy = (hierarchyRows[0] && hierarchyRows[0].legacy) ? hierarchyRows[0].legacy : MGA;
+    const tree = (hierarchyRows[0] && hierarchyRows[0].tree) ? hierarchyRows[0].tree : MGA;
+
+    const nonPr = totalHires - prHires;
+
+    // Upsert into amore_data
+    const existsRows = await db.query(
+      'SELECT 1 FROM amore_data WHERE MGA = ? AND MORE_Date = ? LIMIT 1',
+      [MGA, MORE_Date]
+    );
+
+    if (!existsRows || existsRows.length === 0) {
+      const defaults = {
+        MGA,
+        MORE_Date,
+        userRole,
+        on_time,
+        External_Sets: 0,
+        External_Shows: 0,
+        Internal_Sets: 0,
+        Internal_Shows: 0,
+        Personal_Sets: 0,
+        Personal_Shows: 0,
+        Total_Set: 0,
+        Total_Show: 0,
+        Group_Invite: 0,
+        Finals_Set: 0,
+        Finals_Show: 0,
+        Non_PR_Hires: nonPr,
+        PR_Hires: prHires,
+        Total_Hires: totalHires,
+        RGA: rga,
+        Legacy: legacy,
+        Tree: tree,
+        Office: null,
+        first_reported: new Date()
+      };
+
+      const columns = Object.keys(defaults);
+      const placeholders = columns.map(() => '?').join(', ');
+      const insertSql = `INSERT INTO amore_data (${columns.join(', ')}) VALUES (${placeholders})`;
+      await db.query(insertSql, Object.values(defaults));
+    } else {
+      const updateSql = `
+        UPDATE amore_data
+        SET Total_Hires = ?, PR_Hires = ?, Non_PR_Hires = ?,
+            RGA = ?, Legacy = ?, Tree = ?, on_time = ?,
+            last_updated = CURRENT_TIMESTAMP
+        WHERE MGA = ? AND MORE_Date = ?
+      `;
+      await db.query(updateSql, [
+        totalHires, prHires, nonPr,
+        rga, legacy, tree, on_time,
+        MGA, MORE_Date
+      ]);
+    }
+
+    // Prepare human display for Friday date in EST
+    const displayFriday = endOfWeek.toLocaleDateString('en-US', { timeZone: 'America/New_York' });
+    const status = on_time ? 'on time' : 'late';
+
+    if (canReply) {
+      await interaction.editReply(`✅ MORE recorded for **${MGA}** (week ending ${displayFriday}).\nTotal Hires: **${totalHires}**, PR Hires: **${prHires}** (${status}).`);
+    }
+
+    console.log(`[BOT] 📈 ✅ MORE recorded: MGA=${MGA}, Date=${MORE_Date}, Total=${totalHires}, PR=${prHires}, on_time=${on_time}`);
+  } catch (error) {
+    console.error('[BOT] 📈 ❌ Error handling /more:', error);
+    if (canReply) {
+      try {
+        await interaction.editReply('❌ There was an error recording your MORE. Please try again later.');
+      } catch (e) {
+        console.warn('[BOT] 📈 Could not send error reply:', e.message);
+      }
+    }
+  }
+
+  console.log(`[BOT] 📈 === COMPLETED handleMoreCommand ===`);
+}
+
 // Placeholder handler for existing commands (to be implemented if needed)
 async function handleLeaderboardCommand(interaction) {
   await interaction.reply({ 
@@ -1481,9 +1732,7 @@ function initDiscordBot() {
     return;
   }
   
-  console.log('Attempting to login to Discord...');
   client.login(process.env.DISCORD_TOKEN)
-    .then(() => console.log('Discord bot login successful'))
     .catch(err => console.error('Discord login error:', err));
 }
 

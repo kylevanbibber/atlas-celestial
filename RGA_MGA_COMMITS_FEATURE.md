@@ -227,3 +227,4 @@ Both can exist simultaneously.
 3. **No Confusion**: Clear separation between MGA and RGA commitments
 4. **Flexible**: System works for MGA-only users and RGA users seamlessly
 
+

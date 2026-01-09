@@ -208,10 +208,28 @@ const CodePackTab = () => {
 
   const convertMDYToYMD = (dateStr) => {
     if (!dateStr) return '';
+    
+    // Handle both mm/dd/yyyy and yyyy-mm-dd formats
     const parts = String(dateStr).split('/');
-    if (parts.length < 3) return '';
-    const [month, day, year] = parts;
-    return `${year.padStart(2, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    
+    if (parts.length === 3) {
+      // mm/dd/yyyy format
+      const [month, day, year] = parts;
+      
+      // Validate all parts exist and are valid
+      if (!month || !day || !year || year.length < 4) {
+        console.warn('Invalid date format:', dateStr);
+        return '';
+      }
+      
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    } else if (dateStr.includes('-')) {
+      // Already in yyyy-mm-dd format
+      return dateStr;
+    }
+    
+    console.warn('Unrecognized date format:', dateStr);
+    return '';
   };
 
   const handleRequest = async (userId, lagnname) => {
@@ -538,18 +556,52 @@ const CodePackTab = () => {
 
   
 
+  // Calculate the maximum active date (esid) from all rows, then add 1 day
+  const maxActiveDate = useMemo(() => {
+    if (!rows || rows.length === 0) return null;
+    
+    const validDates = rows
+      .map(r => r.esid)
+      .filter(esid => esid);
+    
+    if (validDates.length === 0) return null;
+    
+    // Sort dates as strings (they're in YYYY-MM-DD format)
+    const sortedDates = validDates.sort((a, b) => b.localeCompare(a));
+    const maxDateStr = sortedDates[0]; // e.g., "2025-11-24"
+    
+    // Parse as local date and add 1 day (report shows previous day's data)
+    const [year, month, day] = maxDateStr.split('-');
+    const dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    dateObj.setDate(dateObj.getDate() + 1); // Add 1 day
+    
+    const m = dateObj.getMonth() + 1;
+    const d = dateObj.getDate();
+    const y = dateObj.getFullYear().toString().slice(-2);
+    
+    return `${m}/${d}/${y}`;
+  }, [rows]);
+
   const columns = useMemo(() => [
     { 
       Header: 'Agent Name', 
       accessor: 'lagnname',
       Cell: ({ row }) => {
         const name = row.original.lagnname || '';
-        const isPending = row.original.pending == 1;
-        return isPending ? `* ${name}` : name;
+        return name;
       }
     },
     { Header: 'Active Date', accessor: 'esid' },
     { Header: 'MGA', accessor: 'mga' },
+    { 
+      Header: 'SGA', 
+      accessor: 'sga',
+      width: 35,
+      Cell: ({ row }) => {
+        const mgaReptName = row.original.mga_rept_name || '';
+        return mgaReptName === 'LOCKER-ROTOLO' ? 'E4' : 'A$';
+      }
+    },
     {
       Header: 'Notes',
       accessor: 'notes',
@@ -629,6 +681,7 @@ const CodePackTab = () => {
       accessor: 'created_at',
       Cell: ({ row }) => {
         const { created_at, lr_type, lr_sent } = row.original;
+        
         if (created_at && (lr_type === '1st Pack' || lr_type === 'First Pack') && (lr_sent == 0)) {
           return new Date(created_at).toLocaleString();
         }
@@ -655,6 +708,7 @@ const CodePackTab = () => {
       Header: 'Reasoning',
       accessor: 'reasoning',
       Cell: ({ row, value, isEditing, updateCell }) => {
+        
         const reasoningVal = (typeof value === 'string' && value !== undefined ? value : (row.original.reasoning ?? row.original.leadEntry?.reasoning ?? '')) || '';
         const leadId = row.original.leadEntry?.id;
         const canEdit = hasElevatedPermissions && !!leadId;
@@ -769,9 +823,57 @@ const CodePackTab = () => {
       Header: 'Action',
       accessor: 'action',
       id: 'action',
+      width: 160,
       Cell: ({ row }) => {
         const { id, lagnname, created_at, lr_type, lr_sent, pending, licensed_states } = row.original;
         const imageUrl = row.original.lr_img || row.original.img || (row.original.leadEntry && row.original.leadEntry.img) || '';
+        const isPending = String(row.original.pending) === '1';
+        const isManagerInactive = String(row.original.managerActive) === 'n' || row.original.managerActive === 'n';
+        
+        // Show status message for pending agents in notSent tab
+        if (isPending && statusTab === 'notSent') {
+          return (
+            <div 
+              style={{ 
+                fontSize: '11px', 
+                color: '#92400e',
+                fontWeight: '600',
+                backgroundColor: '#fef3c7',
+                padding: '6px 10px',
+                borderRadius: '4px',
+                border: '1px solid #fbbf24',
+                textAlign: 'center',
+                whiteSpace: 'nowrap'
+              }}
+              title="Agent is pending - cannot request code pack until cleared"
+            >
+              {maxActiveDate ? `PENDING as of ${maxActiveDate}` : 'PENDING'}
+            </div>
+          );
+        }
+        
+        // Show status message for manager inactive in notSent tab
+        if (isManagerInactive && statusTab === 'notSent') {
+          return (
+            <div 
+              style={{ 
+                fontSize: '11px', 
+                color: '#991b1b',
+                fontWeight: '600',
+                backgroundColor: '#fee2e2',
+                padding: '6px 10px',
+                borderRadius: '4px',
+                border: '1px solid #fca5a5',
+                textAlign: 'center',
+                whiteSpace: 'nowrap'
+              }}
+              title="Update agent in your hierarchy page to active"
+            >
+              Agent Inactive
+            </div>
+          );
+        }
+        
         if (created_at && (lr_type === '1st Pack' || lr_type === 'First Pack') && (lr_sent == 0)) {
           // Check if user can mark as sent
           if (canMarkSent) {
@@ -895,8 +997,12 @@ const CodePackTab = () => {
 
   const filteredRows = useMemo(() => {
     let filtered = [...rows];
-    // Always exclude pending = 1
-    filtered = filtered.filter(r => String(r.pending) !== '1');
+    
+    // Only exclude pending = 1 from tabs OTHER than notSent
+    // In notSent tab, we want to show them greyed out
+    if (statusTab !== 'notSent') {
+      filtered = filtered.filter(r => String(r.pending) !== '1');
+    }
     
     // Apply search filter
     const term = searchQuery.trim().toLowerCase();
@@ -926,9 +1032,18 @@ const CodePackTab = () => {
 
     if (statusTab === 'notSent') {
       filtered = filtered.filter(r => {
-        const respectsActive = (typeof r.Active === 'undefined') ? true : r.Active === 'y';
+        // Include rows that are:
+        // 1. Active = 'y' OR pending = 1 OR managerActive = 'n' (we want to show these greyed out)
+        // 2. released = 0
+        // 3. Not sent yet
+        const isActive = (typeof r.Active === 'undefined') ? true : r.Active === 'y';
+        const isPending = String(r.pending) === '1';
+        const isManagerInactive = String(r.managerActive) === 'n' || r.managerActive === 'n';
+        
+        // Show if active, OR if pending = 1, OR if managerActive = 'n'
+        const respectsActive = isActive || isPending || isManagerInactive;
+        
         const respectsReleased = (typeof r.released === 'undefined') ? true : r.released == 0;
-        const isPending = (typeof r.pending === 'undefined') ? true : (r.pending == 0 || r.pending == 1);
 
         // Not Sent definition:
         // - No leads_released entry for 1st Pack OR
@@ -937,13 +1052,11 @@ const CodePackTab = () => {
         const qualifiesNotSent = !hasFirstPackLead || (r.leadEntry && r.leadEntry.sent == 0);
 
         // Apply time restriction for notSent based on selected filter
-        // Non-elevated users always get 30-day restriction, elevated users can control it
+        // Non-elevated users default to 30-day restriction, but can opt to see all
         let withinTimeWindow = true;
         if (r.esid) {
           const timeAgo = new Date();
-          let days = hasElevatedPermissions ? 
-            (activeFilters.timeFilter === 'all' ? null : parseInt(activeFilters.timeFilter)) : 
-            30; // Non-elevated users always get 30-day filter
+          let days = activeFilters.timeFilter === 'all' ? null : parseInt(activeFilters.timeFilter);
             
           if (days !== null) {
             timeAgo.setDate(timeAgo.getDate() - days);
@@ -951,11 +1064,10 @@ const CodePackTab = () => {
           }
         }
 
-        return respectsActive && respectsReleased && isPending && qualifiesNotSent && withinTimeWindow;
+        return respectsActive && respectsReleased && qualifiesNotSent && withinTimeWindow;
       });
       
-      const effectiveTimeFilter = hasElevatedPermissions ? activeFilters.timeFilter : '30';
-      console.log(`Not sent filtered results (${effectiveTimeFilter}d window):`, filtered.length);
+      console.log(`Not sent filtered results (${activeFilters.timeFilter}d window):`, filtered.length);
     }
 
     // License tri-state filter
@@ -1012,6 +1124,7 @@ const CodePackTab = () => {
         { key: 'lagnname', header: 'Agent Name' },
         { key: 'esid', header: 'Active Date' },
         { key: 'mga', header: 'MGA' },
+        { key: 'sga', header: 'SGA' },
         { key: 'notes', header: 'Notes' },
         { key: 'licensed_states', header: 'States Licensed' },
         { key: 'created_at', header: 'Requested' },
@@ -1076,6 +1189,9 @@ const CodePackTab = () => {
               break;
             case 'days_to_code':
               value = row.days_to_code ?? '—';
+              break;
+            case 'sga':
+              value = (row.mga_rept_name === 'LOCKER-ROTOLO') ? 'E4' : 'A$';
               break;
             default:
               value = row[col.key] || '';
@@ -1172,9 +1288,15 @@ const CodePackTab = () => {
     const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
     rows.forEach((r) => {
       const packSent = r.lr_sent == 1 || (r.leadEntry && r.leadEntry.sent == 1);
+      const isPending = String(r.pending) === '1';
+      const isManagerInactive = String(r.managerActive) === 'n' || r.managerActive === 'n';
       
+      // In "Not Sent" tab, grey out pending = 1 or managerActive = 'n' rows
+      if (statusTab === 'notSent' && (isPending || isManagerInactive)) {
+        classes[r.id] = 'row-greyed-out';
+      }
       // In "All" tab, highlight sent rows with light green
-      if (statusTab === 'all' && packSent) {
+      else if (statusTab === 'all' && packSent) {
         classes[r.id] = 'row-pack-sent';
       }
       // Don't apply red styling if pack was sent
@@ -1201,9 +1323,39 @@ const CodePackTab = () => {
     <div>
       {/* CSS for row styling */}
       <style>{`
-        .row-pack-sent td { background-color: #d9f2d9 !important; }
+        .row-pack-sent td { 
+          background-color: #d9f2d9 !important; 
+        }
+        .row-greyed-out td { 
+          background-color: #f5f5f5 !important;
+          color: #999 !important;
+          opacity: 0.6;
+        }
+        .row-greyed-out td button {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
       `}</style>
-      
+
+      {/* Data freshness indicator */}
+      {maxActiveDate && (
+        <div style={{
+          backgroundColor: '#f0f9ff',
+          border: '1px solid #bfdbfe',
+          borderRadius: '6px',
+          padding: '10px 14px',
+          marginBottom: '12px',
+          fontSize: '13px',
+          color: '#1e40af',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <span style={{ fontSize: '16px' }}>📅</span>
+          <span>Data current as of <strong>{maxActiveDate}</strong></span>
+        </div>
+      )}
+
       <div className="search-bar mb-4" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
         <input
           type="text"
@@ -1264,6 +1416,30 @@ const CodePackTab = () => {
           position="bottom-right"
         />
       </div>
+
+      {/* Show older than 30 days toggle for non-elevated users in Not Sent tab */}
+      {statusTab === 'notSent' && !hasElevatedPermissions && (
+        <div style={{ marginBottom: 12 }}>
+          <button
+            className="action-button"
+            style={{
+              backgroundColor: activeFilters.timeFilter === 'all' ? '#00558c' : '#f0f0f0',
+              color: activeFilters.timeFilter === 'all' ? 'white' : '#666',
+              border: '1px solid #ddd',
+              padding: '6px 12px',
+              fontSize: '13px',
+              fontWeight: '500',
+              cursor: 'pointer'
+            }}
+            onClick={() => setActiveFilters(prev => ({ 
+              ...prev, 
+              timeFilter: prev.timeFilter === 'all' ? '30' : 'all' 
+            }))}
+          >
+            {activeFilters.timeFilter === 'all' ? '✓ Showing all agents' : 'Show older than 30 days'}
+          </button>
+        </div>
+      )}
 
       <DataTable
         columns={columns}

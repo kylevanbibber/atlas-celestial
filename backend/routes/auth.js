@@ -816,42 +816,46 @@ router.post("/adminlogin", async (req, res) => {
    Check User Info Route
 ------------------------- */
 router.post("/checkUserInfo", async (req, res) => {
-  const { email, phone, esid, lagnname } = req.body;
-  const checkEsidLagnnameQuery = `
-      SELECT id, email, phone, screen_name, esid, lagnname 
-      FROM activeusers 
-      WHERE esid = ? AND lagnname = ?
-      LIMIT 1;
-  `;
+  const { email, phone, esid, lagnname, id } = req.body;
   try {
-    let results = await query(checkEsidLagnnameQuery, [esid, lagnname]);
-    if (results.length > 0) {
+    // 1) If an exact ESID + LagnName match exists and is redeemed, block
+    const redeemedByIdentity = await query(
+      `SELECT id, email, phone, screen_name, esid, lagnname, redeemed
+      FROM activeusers 
+       WHERE esid = ? AND lagnname = ? AND redeemed = 1
+       LIMIT 1`,
+      [esid, lagnname]
+    );
+    if (redeemedByIdentity.length > 0) {
       return res.json({
         success: false,
         message: "Account already redeemed.",
-        data: results[0],
+        data: redeemedByIdentity[0],
       });
-    } else {
-      const checkEmailPhoneQuery = `
-          SELECT id, email, phone, screen_name, esid, lagnname 
+    }
+
+    // 2) If email/phone already exist on a different user, block
+    const emailPhoneConflict = await query(
+      `SELECT id, email, phone, screen_name, esid, lagnname, redeemed 
           FROM activeusers 
-          WHERE email = ? OR phone = ?
-          LIMIT 1;
-      `;
-      results = await query(checkEmailPhoneQuery, [email, phone]);
-      if (results.length > 0) {
+       WHERE (email = ? OR phone = ?)
+         ${id ? 'AND id <> ?' : ''}
+       LIMIT 1`,
+      id ? [email, phone, id] : [email, phone]
+    );
+    if (emailPhoneConflict.length > 0) {
         return res.json({
           success: false,
           message: "Existing user information found.",
-          data: results[0],
+        data: emailPhoneConflict[0],
         });
-      } else {
+    }
+
+    // Otherwise, no conflict
         return res.json({
           success: true,
           message: "No existing user found with the provided information.",
         });
-      }
-    }
   } catch (error) {
     console.error('Error checking user information:', error);
     return res.status(500).send({ success: false, message: "An error occurred while checking user information." });
@@ -1139,6 +1143,57 @@ router.post("/userHierarchy", verifyToken, async (req, res) => {
       }
     }
 
+    // Special hierarchy logic for MAUGHANEVANSON BRODY W
+    if (agnName === 'MAUGHANEVANSON BRODY W') {
+      console.log('🔍 BRODY HIERARCHY - Normal hierarchy results:', results.length, 'users');
+      console.log('   Normal hierarchy users:', results.map(r => r.lagnname).join(', '));
+      
+      try {
+        // Fetch all users with rept_name = 'LOCKER-ROTOLO'
+        const lockerRotoloQuery = `
+          SELECT 
+              au.id,
+              au.lagnname, 
+              au.rept_name, 
+              au.clname,
+              au.Active,
+              au.managerActive,
+              au.redeemed,
+              au.released,
+              au.profpic,
+              au.phone,
+              au.esid,
+              COALESCE(main_ui.email, au.email, '') AS email, 
+              au.sa, 
+              au.ga, 
+              au.mga, 
+              au.rga
+          FROM activeusers au
+          LEFT JOIN usersinfo main_ui ON au.lagnname = main_ui.lagnname AND au.esid = main_ui.esid
+          WHERE au.Active = 'y' AND au.rept_name = 'LOCKER-ROTOLO'
+          ORDER BY au.lagnname
+        `;
+        
+        const lockerRotoloResults = await query(lockerRotoloQuery);
+        console.log('🔍 BRODY HIERARCHY - LOCKER-ROTOLO results:', lockerRotoloResults.length, 'users');
+        console.log('   LOCKER-ROTOLO users:', lockerRotoloResults.map(r => r.lagnname).join(', '));
+        
+        // Merge the results, avoiding duplicates
+        const existingLagnnames = new Set(results.map(r => r.lagnname));
+        const additionalUsers = lockerRotoloResults.filter(r => !existingLagnnames.has(r.lagnname));
+        
+        console.log('🔍 BRODY HIERARCHY - Additional users to add:', additionalUsers.length);
+        console.log('   Additional users:', additionalUsers.map(r => r.lagnname).join(', '));
+        
+        results = [...results, ...additionalUsers];
+        
+        console.log('🔍 BRODY HIERARCHY - Final combined results:', results.length, 'total users');
+        console.log('   All users:', results.map(r => r.lagnname).join(', '));
+      } catch (lockerErr) {
+        console.error('❌ Error fetching LOCKER-ROTOLO users:', lockerErr);
+        // Continue with existing results even if LOCKER-ROTOLO query fails
+      }
+    }
 
     if (results.length > 0) {
 
@@ -1159,6 +1214,7 @@ router.post("/userHierarchy", verifyToken, async (req, res) => {
 router.post("/searchByUserId", async (req, res) => {
   const { userId } = req.body;
 
+  const perfStart = Date.now();
   
   try {
     const userResult = await query(
@@ -1188,11 +1244,7 @@ router.post("/searchByUserId", async (req, res) => {
 
     const placeholders = lagnnameList.map(() => "?").join(", ");
     
-    // Try to use JSON_ARRAYAGG for efficiency, but be prepared for fallback
-    let queryText;
-    try {
-      // Modified query to include license data using JSON_ARRAYAGG (MySQL 5.7.22+ or 8.0+)
-      queryText = `
+    let queryText = `
         SELECT 
             au.id,
             au.lagnname, 
@@ -1215,93 +1267,17 @@ router.post("/searchByUserId", async (req, res) => {
             au.mga, 
             COALESCE(mga_ui.email, '') AS mga_email, 
             au.rga, 
-            COALESCE(rga_ui.email, '') AS rga_email,
-            (
-              SELECT JSON_ARRAYAGG(
-                JSON_OBJECT(
-                  'id', ls.id,
-                  'state', ls.state,
-                  'license_number', ls.license_number,
-                  'expiry_date', ls.expiry_date,
-                  'resident_state', ls.resident_state
-                )
-              )
-              FROM licensed_states ls
-              WHERE ls.userId = au.id
-            ) AS licenses,
-            (
-              SELECT JSON_OBJECT(
-                'curr_mo_4mo_rate', pnp.curr_mo_4mo_rate,
-                'proj_plus_1', pnp.proj_plus_1,
-                'pnp_date', pnp.date,
-                'agent_num', pnp.agent_num
-              )
-              FROM pnp
-              WHERE (pnp.name_line = au.lagnname OR au.lagnname LIKE CONCAT(pnp.name_line, ' %'))
-                AND ABS(DATEDIFF(STR_TO_DATE(pnp.esid, '%m/%d/%y'), STR_TO_DATE(au.esid, '%Y-%m-%d'))) <= 7
-              ORDER BY STR_TO_DATE(pnp.date, '%m/%d/%y') DESC
-              LIMIT 1
-            ) AS pnp_data
-        FROM activeusers au
-        LEFT JOIN usersinfo main_ui ON au.lagnname = main_ui.lagnname AND au.esid = main_ui.esid
-        LEFT JOIN usersinfo sa_ui ON au.sa = sa_ui.lagnname AND sa_ui.esid = (SELECT esid FROM activeusers WHERE lagnname = au.sa LIMIT 1)
-        LEFT JOIN usersinfo ga_ui ON au.ga = ga_ui.lagnname AND ga_ui.esid = (SELECT esid FROM activeusers WHERE lagnname = au.ga LIMIT 1)
-        LEFT JOIN usersinfo mga_ui ON au.mga = mga_ui.lagnname AND mga_ui.esid = (SELECT esid FROM activeusers WHERE lagnname = au.mga LIMIT 1)
-        LEFT JOIN usersinfo rga_ui ON au.rga = rga_ui.lagnname AND rga_ui.esid = (SELECT esid FROM activeusers WHERE lagnname = au.rga LIMIT 1)
-        WHERE au.Active = 'y'
-            AND (
-                au.lagnname = ?
-                OR (au.clname = 'RGA' AND au.lagnname = ?)
-                OR au.sa IN (${placeholders})
-                OR au.ga IN (${placeholders})
-                OR au.mga IN (${placeholders})
-                OR au.rga IN (${placeholders})
-            )
-        ORDER BY au.lagnname;
-      `;
-      
-      // Add a diagnostic query to check directly on the PNP table
-      try {
-        const pnpDiagnosticQuery = `
-          SELECT name_line, esid, date, curr_mo_4mo_rate, proj_plus_1 
-          FROM pnp 
-          LIMIT 5
-        `;
-        const pnpSample = await query(pnpDiagnosticQuery);
-      } catch (diagErr) {
-      }
-    } catch (err) {
-      // Fallback query without JSON functions (for MySQL < 5.7.22)
-
-      queryText = `
-        SELECT 
-            au.id,
-            au.lagnname, 
-            au.rept_name, 
-            au.clname,
-            au.Active,
-            au.managerActive,
-            au.redeemed,
-            au.released,
-            au.profpic,
-            au.phone,
-            au.esid,
-            au.teamRole,
-            COALESCE(main_ui.email, au.email, '') AS email, 
-            au.sa, 
-            COALESCE(sa_ui.email, '') AS sa_email, 
-            au.ga, 
-            COALESCE(ga_ui.email, '') AS ga_email, 
-            au.mga, 
-            COALESCE(mga_ui.email, '') AS mga_email, 
-            au.rga, 
             COALESCE(rga_ui.email, '') AS rga_email
         FROM activeusers au
         LEFT JOIN usersinfo main_ui ON au.lagnname = main_ui.lagnname AND au.esid = main_ui.esid
-        LEFT JOIN usersinfo sa_ui ON au.sa = sa_ui.lagnname AND sa_ui.esid = (SELECT esid FROM activeusers WHERE lagnname = au.sa LIMIT 1)
-        LEFT JOIN usersinfo ga_ui ON au.ga = ga_ui.lagnname AND ga_ui.esid = (SELECT esid FROM activeusers WHERE lagnname = au.ga LIMIT 1)
-        LEFT JOIN usersinfo mga_ui ON au.mga = mga_ui.lagnname AND mga_ui.esid = (SELECT esid FROM activeusers WHERE lagnname = au.mga LIMIT 1)
-        LEFT JOIN usersinfo rga_ui ON au.rga = rga_ui.lagnname AND rga_ui.esid = (SELECT esid FROM activeusers WHERE lagnname = au.rga LIMIT 1)
+      LEFT JOIN activeusers sa_lookup ON au.sa = sa_lookup.lagnname
+      LEFT JOIN usersinfo sa_ui ON au.sa = sa_ui.lagnname AND sa_ui.esid = sa_lookup.esid
+      LEFT JOIN activeusers ga_lookup ON au.ga = ga_lookup.lagnname
+      LEFT JOIN usersinfo ga_ui ON au.ga = ga_ui.lagnname AND ga_ui.esid = ga_lookup.esid
+      LEFT JOIN activeusers mga_lookup ON au.mga = mga_lookup.lagnname
+      LEFT JOIN usersinfo mga_ui ON au.mga = mga_ui.lagnname AND mga_ui.esid = mga_lookup.esid
+      LEFT JOIN activeusers rga_lookup ON au.rga = rga_lookup.lagnname
+      LEFT JOIN usersinfo rga_ui ON au.rga = rga_ui.lagnname AND rga_ui.esid = rga_lookup.esid
         WHERE au.Active = 'y'
             AND (
                 au.lagnname = ?
@@ -1313,7 +1289,6 @@ router.post("/searchByUserId", async (req, res) => {
             )
         ORDER BY au.lagnname;
       `;
-    }
     
     const queryParams = [
       agnName, // au.lagnname = ? (include self)
@@ -1567,14 +1542,248 @@ router.post("/searchByUserId", async (req, res) => {
 
       }
       
-      // Log just the first result as a sample and the count
-      res.json({ success: true, data: results, agnName });
+      const totalTime = Date.now() - perfStart;
+      
+      res.json({ success: true, data: results, agnName, _timing: { backendMs: totalTime, stage: 'structure' } });
     } else {
+      const totalTime = Date.now() - perfStart;
+      console.log(`❌ [Stage 1: Structure] No data found - ${totalTime}ms total\n`);
       res.json({ success: false, message: "No data found" });
     }
   } catch (err) {
-
+    const totalTime = Date.now() - perfStart;
+    console.error(`❌ [Stage 1: Structure] Error after ${totalTime}ms:`, err);
     res.status(500).json({ success: false, message: "Error retrieving data" });
+  }
+});
+
+/* ----------------------
+   Hierarchy Licenses - Progressive Loading
+   - Batch fetch licenses for multiple users
+   - Called after initial hierarchy load
+------------------------- */
+router.post("/hierarchy/licenses", async (req, res) => {
+  // ⏱️ PERFORMANCE TIMING START
+  const perfStart = Date.now();
+  console.log(`\n🚀 [Stage 2: Licenses] Starting license fetch for ${req.body.userIds?.length || 0} users`);
+  
+  try {
+    const { userIds } = req.body;
+    
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      console.log(`   ℹ️  No userIds provided, returning empty`);
+      return res.json({ success: true, data: {}, _timing: { backendMs: Date.now() - perfStart, stage: 'licenses' } });
+    }
+
+    // Fetch licenses for all users in one query
+    const placeholders = userIds.map(() => "?").join(",");
+    
+    try {
+      // Try with JSON_ARRAYAGG first (MySQL 5.7.22+)
+      const licenseQuery = `
+        SELECT 
+          userId,
+          JSON_ARRAYAGG(
+            JSON_OBJECT(
+              'id', id,
+              'state', state,
+              'license_number', license_number,
+              'expiry_date', expiry_date,
+              'resident_state', resident_state
+            )
+          ) AS licenses
+        FROM licensed_states
+        WHERE userId IN (${placeholders})
+        GROUP BY userId
+      `;
+      
+      const results = await query(licenseQuery, userIds);
+      
+      // Convert to map: userId -> licenses array
+      const licenseMap = {};
+      results.forEach(row => {
+        licenseMap[row.userId] = row.licenses ? JSON.parse(row.licenses) : [];
+      });
+      
+      const queryTime = Date.now() - perfStart;
+      
+      return res.json({ success: true, data: licenseMap, _timing: { backendMs: queryTime, stage: 'licenses' } });
+      
+    } catch (jsonError) {
+      // Fallback without JSON functions
+      const fallbackStart = Date.now();
+      
+      const licenseQuery = `
+        SELECT 
+          userId, id, state, license_number, expiry_date, resident_state
+        FROM licensed_states
+        WHERE userId IN (${placeholders})
+        ORDER BY userId, state
+      `;
+      
+      const results = await query(licenseQuery, userIds);
+      
+      // Group by userId
+      const licenseMap = {};
+      results.forEach(row => {
+        if (!licenseMap[row.userId]) {
+          licenseMap[row.userId] = [];
+        }
+        licenseMap[row.userId].push({
+          id: row.id,
+          state: row.state,
+          license_number: row.license_number,
+          expiry_date: row.expiry_date,
+          resident_state: row.resident_state
+        });
+      });
+      
+      const fallbackTime = Date.now() - fallbackStart;
+      const totalTime = Date.now() - perfStart;
+      
+      return res.json({ success: true, data: licenseMap, _timing: { backendMs: totalTime, stage: 'licenses', fallback: true } });
+    }
+    
+  } catch (error) {
+    const totalTime = Date.now() - perfStart;
+    console.error(`❌ [Stage 2: Licenses] Error after ${totalTime}ms:`, error);
+    res.status(500).json({ success: false, message: "Error fetching licenses", _timing: { backendMs: totalTime, stage: 'licenses', error: true } });
+  }
+});
+
+/* ----------------------
+   Hierarchy PNP - Progressive Loading
+   - Batch fetch PNP data for multiple users
+   - Called after licenses load
+------------------------- */
+router.post("/hierarchy/pnp", async (req, res) => {
+  // ⏱️ PERFORMANCE TIMING START
+  const perfStart = Date.now();
+  console.log(`\n🚀 [Stage 3: PNP] Starting PNP fetch for ${req.body.users?.length || 0} users`);
+  
+  try {
+    const { users } = req.body; // Array of { id, lagnname, esid }
+    
+    if (!users || !Array.isArray(users) || users.length === 0) {
+      console.log(`   ℹ️  No users provided, returning empty`);
+      return res.json({ success: true, data: {}, _timing: { backendMs: Date.now() - perfStart, stage: 'pnp' } });
+    }
+
+    try {
+      // Use window function for efficient PNP lookup
+      const pnpQuery = `
+        SELECT 
+          au.id as userId,
+          pnp_latest.curr_mo_4mo_rate,
+          pnp_latest.proj_plus_1,
+          pnp_latest.pnp_date,
+          pnp_latest.agent_num
+        FROM activeusers au
+        LEFT JOIN (
+          SELECT 
+            pnp.name_line,
+            pnp.esid,
+            pnp.curr_mo_4mo_rate,
+            pnp.proj_plus_1,
+            pnp.date as pnp_date,
+            pnp.agent_num,
+            ROW_NUMBER() OVER (
+              PARTITION BY pnp.name_line, pnp.esid 
+              ORDER BY STR_TO_DATE(pnp.date, '%m/%d/%y') DESC
+            ) as rn
+          FROM pnp
+        ) pnp_latest ON (
+          (pnp_latest.name_line = au.lagnname OR au.lagnname LIKE CONCAT(pnp_latest.name_line, ' %'))
+          AND ABS(DATEDIFF(STR_TO_DATE(pnp_latest.esid, '%m/%d/%y'), STR_TO_DATE(au.esid, '%Y-%m-%d'))) <= 7
+          AND pnp_latest.rn = 1
+        )
+        WHERE au.id IN (${users.map(() => '?').join(',')})
+      `;
+      
+      const userIds = users.map(u => u.id);
+      const results = await query(pnpQuery, userIds);
+      
+      // Convert to map: userId -> pnp_data
+      const pnpMap = {};
+      results.forEach(row => {
+        if (row.curr_mo_4mo_rate !== null) {
+          pnpMap[row.userId] = {
+            curr_mo_4mo_rate: row.curr_mo_4mo_rate,
+            proj_plus_1: row.proj_plus_1,
+            pnp_date: row.pnp_date,
+            agent_num: row.agent_num
+          };
+        }
+      });
+      
+      const queryTime = Date.now() - perfStart;
+      
+      return res.json({ success: true, data: pnpMap, _timing: { backendMs: queryTime, stage: 'pnp' } });
+      
+    } catch (windowError) {
+      // Fallback without window functions
+      console.log('   ⚠️  Using fallback method (no window functions)');
+      const fallbackStart = Date.now();
+      
+      // Get all PNP records that might match
+      const pnpRecords = await query(`SELECT * FROM pnp`);
+      
+      const latestPnpByUser = {};
+      
+      users.forEach(user => {
+        if (!user.esid || !user.lagnname) return;
+        
+        pnpRecords.forEach(pnpRecord => {
+          if (!pnpRecord.name_line || !pnpRecord.esid) return;
+          
+          // Check name match
+          const nameMatch = pnpRecord.name_line === user.lagnname || 
+                           user.lagnname.startsWith(pnpRecord.name_line + ' ');
+          
+          if (nameMatch) {
+            try {
+              // Parse dates
+              const userEsidDate = new Date(user.esid);
+              const pnpEsidParts = pnpRecord.esid.split('/');
+              
+              if (pnpEsidParts.length === 3) {
+                const pnpMonth = parseInt(pnpEsidParts[0]);
+                const pnpDay = parseInt(pnpEsidParts[1]);
+                const pnpYear = parseInt(pnpEsidParts[2]) + 2000;
+                const pnpEsidDate = new Date(pnpYear, pnpMonth - 1, pnpDay);
+                
+                // Calculate day difference
+                const dayDiff = Math.abs((userEsidDate - pnpEsidDate) / (1000 * 60 * 60 * 24));
+                
+                if (dayDiff <= 7) {
+                  if (!latestPnpByUser[user.id] || 
+                      new Date(pnpRecord.date) > new Date(latestPnpByUser[user.id].date)) {
+                    latestPnpByUser[user.id] = {
+                      curr_mo_4mo_rate: pnpRecord.curr_mo_4mo_rate,
+                      proj_plus_1: pnpRecord.proj_plus_1,
+                      pnp_date: pnpRecord.date,
+                      agent_num: pnpRecord.agent_num
+                    };
+                  }
+                }
+              }
+            } catch (dateError) {
+              // Skip invalid dates
+            }
+          }
+        });
+      });
+      
+      const fallbackTime = Date.now() - fallbackStart;
+      const totalTime = Date.now() - perfStart;
+      
+      return res.json({ success: true, data: latestPnpByUser, _timing: { backendMs: totalTime, stage: 'pnp', fallback: true } });
+    }
+    
+  } catch (error) {
+    const totalTime = Date.now() - perfStart;
+    console.error(`❌ [Stage 3: PNP] Error after ${totalTime}ms:`, error);
+    res.status(500).json({ success: false, message: "Error fetching PNP data", _timing: { backendMs: totalTime, stage: 'pnp', error: true } });
   }
 });
 
@@ -1739,6 +1948,112 @@ router.post("/searchByUserIdLite", async (req, res) => {
       }
     } catch (e) {
 
+    }
+
+    // Special hierarchy logic for MAUGHANEVANSON BRODY W
+    if (agnName === 'MAUGHANEVANSON BRODY W') {
+      console.log('🔍 BRODY HIERARCHY (Lite) - Normal hierarchy results:', results.length, 'users');
+      console.log('   Normal hierarchy users:', results.map(r => r.lagnname).join(', '));
+      
+      try {
+        // Fetch all users with rept_name = 'LOCKER-ROTOLO'
+        const lockerRotoloQuery = `
+          SELECT 
+            au.id,
+            au.lagnname,
+            au.clname,
+            au.Active,
+            au.managerActive,
+            au.esid,
+            au.sa,
+            au.ga,
+            au.mga,
+            au.rga
+          FROM activeusers au
+          WHERE au.Active = 'y' AND au.managerActive = 'y' AND au.rept_name = 'LOCKER-ROTOLO'
+          ORDER BY au.lagnname
+        `;
+        
+        const lockerRotoloResults = await query(lockerRotoloQuery);
+        console.log('🔍 BRODY HIERARCHY (Lite) - LOCKER-ROTOLO results:', lockerRotoloResults.length, 'users');
+        console.log('   LOCKER-ROTOLO users:', lockerRotoloResults.map(r => r.lagnname).join(', '));
+        
+        // Identify LOCKER-ROTOLO MGAs
+        const lockerRotoloMgas = lockerRotoloResults
+          .filter(r => r.clname === 'MGA')
+          .map(r => r.lagnname);
+        
+        console.log('🔍 BRODY HIERARCHY (Lite) - LOCKER-ROTOLO MGAs:', lockerRotoloMgas.join(', '));
+        
+        // For each LOCKER-ROTOLO MGA, fetch their entire hierarchy (subordinates)
+        let allLockerRotoloHierarchy = [...lockerRotoloResults];
+        
+        if (lockerRotoloMgas.length > 0) {
+          const mgaPlaceholders = lockerRotoloMgas.map(() => '?').join(',');
+          
+          // Fetch all users whose mga, ga, or sa is one of the LOCKER-ROTOLO MGAs
+          const hierarchyQuery = `
+            SELECT 
+              au.id,
+              au.lagnname,
+              au.clname,
+              au.Active,
+              au.managerActive,
+              au.esid,
+              au.sa,
+              au.ga,
+              au.mga,
+              au.rga
+            FROM activeusers au
+            WHERE au.Active = 'y' AND au.managerActive = 'y'
+              AND (au.mga IN (${mgaPlaceholders}) 
+                   OR au.ga IN (${mgaPlaceholders})
+                   OR au.sa IN (${mgaPlaceholders}))
+            ORDER BY au.lagnname
+          `;
+          
+          const hierarchyResults = await query(hierarchyQuery, [...lockerRotoloMgas, ...lockerRotoloMgas, ...lockerRotoloMgas]);
+          console.log('🔍 BRODY HIERARCHY (Lite) - Subordinates under LOCKER-ROTOLO MGAs:', hierarchyResults.length, 'users');
+          console.log('   Subordinates:', hierarchyResults.map(r => r.lagnname).join(', '));
+          
+          // Combine LOCKER-ROTOLO users and their subordinates
+          const lockerRotoloNames = new Set(allLockerRotoloHierarchy.map(r => r.lagnname));
+          hierarchyResults.forEach(r => {
+            if (!lockerRotoloNames.has(r.lagnname)) {
+              allLockerRotoloHierarchy.push(r);
+              lockerRotoloNames.add(r.lagnname);
+            }
+          });
+        }
+        
+        // Merge with existing results, avoiding duplicates
+        const existingLagnnames = new Set(results.map(r => r.lagnname));
+        const additionalUsers = allLockerRotoloHierarchy.filter(r => !existingLagnnames.has(r.lagnname));
+        
+        console.log('🔍 BRODY HIERARCHY (Lite) - Additional users to add (including subordinates):', additionalUsers.length);
+        console.log('   Additional users:', additionalUsers.map(r => r.lagnname).join(', '));
+        
+        results = [...results, ...additionalUsers];
+        
+        // Add LOCKER-ROTOLO MGAs to the allowedMgasGlobal list so they bypass frontend filtering
+        if (lockerRotoloMgas.length > 0) {
+          console.log('🔍 BRODY HIERARCHY (Lite) - Adding LOCKER-ROTOLO MGAs to allowedMgasGlobal:', lockerRotoloMgas.join(', '));
+          // Add to allowedMgasGlobal array (avoiding duplicates)
+          const existingGlobal = new Set(allowedMgasGlobal);
+          lockerRotoloMgas.forEach(mga => {
+            if (!existingGlobal.has(mga)) {
+              allowedMgasGlobal.push(mga);
+            }
+          });
+        }
+        
+        console.log('🔍 BRODY HIERARCHY (Lite) - Final combined results:', results.length, 'total users');
+        console.log('   All users:', results.map(r => r.lagnname).join(', '));
+        console.log('🔍 BRODY HIERARCHY (Lite) - Final allowedMgas:', allowedMgas.join(', '));
+      } catch (lockerErr) {
+        console.error('❌ Error fetching LOCKER-ROTOLO users (Lite):', lockerErr);
+        // Continue with existing results even if LOCKER-ROTOLO query fails
+      }
     }
 
     return res.json({ success: true, data: results, agnName, allowedMgas, allowedMgasGlobal });
@@ -2734,6 +3049,220 @@ router.get("/debug/pnp/:name", async (req, res) => {
     return res.status(500).json({
       success: false,
       error: error.message
+    });
+  }
+});
+
+/* ----------------------
+   Password Reset Routes
+------------------------- */
+
+// Generate a random 6-character alphanumeric code
+function generateResetCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+// Send password reset code by email
+router.post("/send-reset-code-by-email", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ success: false, message: "Email is required" });
+  }
+
+  try {
+    // Find user by email (check both activeusers and usersinfo)
+    let userQuery = await query(
+      'SELECT id, lagnname, email FROM activeusers WHERE email = ? AND Active = "y" LIMIT 1',
+      [email]
+    );
+
+    // If not found in activeusers, check usersinfo
+    if (userQuery.length === 0) {
+      const userinfoQuery = await query(
+        'SELECT au.id, au.lagnname, ui.email FROM usersinfo ui JOIN activeusers au ON ui.lagnname = au.lagnname AND ui.esid = au.esid WHERE ui.email = ? AND au.Active = "y" LIMIT 1',
+        [email]
+      );
+      
+      if (userinfoQuery.length === 0) {
+        // Don't reveal if email exists or not for security
+        return res.json({ 
+          success: true, 
+          message: "If an account with that email exists, a reset code has been sent." 
+        });
+      }
+      
+      userQuery = userinfoQuery;
+    }
+
+    const user = userQuery[0];
+    const resetCode = generateResetCode();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
+
+    // Delete any existing unused reset codes for this user
+    await query(
+      'DELETE FROM password_reset_codes WHERE userId = ? AND used = FALSE',
+      [user.id]
+    );
+
+    // Insert new reset code
+    await query(
+      'INSERT INTO password_reset_codes (userId, reset_code, expires_at) VALUES (?, ?, ?)',
+      [user.id, resetCode, expiresAt]
+    );
+
+    // Send email with reset code
+    const transporter = require('nodemailer').createTransport({
+      host: 'mail.ariaslife.com',
+      port: 465,
+      secure: true,
+      auth: { user: 'noreply@ariaslife.com', pass: 'Ariaslife123!' },
+      tls: { rejectUnauthorized: false }
+    });
+
+    const html = `
+      <div style="background:#f6f9fc;padding:32px;font-family:Arial,Helvetica,sans-serif;color:#0f172a">
+        <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+          <div style="background:linear-gradient(135deg,#e2e8f0,#93c5fd);padding:24px 20px;">
+            <h2 style="margin:0;font-size:20px;color:#0f172a">Password Reset Request</h2>
+            <p style="margin:8px 0 0 0;font-size:13px;color:#334155">You requested to reset your password.</p>
+          </div>
+          <div style="padding:18px 20px 8px 20px;">
+            <p style="margin:0 0 16px 0;font-size:14px;color:#334155">Hello ${user.lagnname},</p>
+            <p style="margin:0 0 16px 0;font-size:14px;color:#334155">Use the following code to reset your password. This code will expire in 15 minutes.</p>
+            <div style="background:#f1f5f9;border:2px solid #cbd5e1;border-radius:8px;padding:16px;margin:16px 0;text-align:center;">
+              <div style="font-size:32px;font-weight:bold;letter-spacing:4px;color:#0f172a">${resetCode}</div>
+            </div>
+            <p style="margin:16px 0 0 0;font-size:13px;color:#64748b">If you didn't request a password reset, you can safely ignore this email.</p>
+          </div>
+          <div style="padding:0 20px 18px 20px;color:#64748b;font-size:12px">
+            <p style="margin:0">This code was sent to ${email}.</p>
+          </div>
+        </div>
+      </div>`;
+
+    await transporter.sendMail({
+      from: 'noreply@ariaslife.com',
+      to: email,
+      subject: 'Password Reset Code - Arias Life',
+      html
+    });
+
+    return res.json({ 
+      success: true, 
+      message: "Reset code sent to your email",
+      userId: user.id 
+    });
+
+  } catch (error) {
+    console.error('Error sending reset code:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: "An error occurred while sending the reset code" 
+    });
+  }
+});
+
+// Verify password reset code
+router.post("/verify-reset-code", async (req, res) => {
+  const { userId, code } = req.body;
+
+  if (!userId || !code) {
+    return res.status(400).json({ 
+      success: false, 
+      message: "User ID and reset code are required" 
+    });
+  }
+
+  try {
+    // Check if code exists and is valid
+    const codeQuery = await query(
+      'SELECT * FROM password_reset_codes WHERE userId = ? AND reset_code = ? AND used = FALSE AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
+      [userId, code.trim().toUpperCase()]
+    );
+
+    if (codeQuery.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid or expired reset code" 
+      });
+    }
+
+    return res.json({ 
+      success: true, 
+      message: "Reset code verified successfully" 
+    });
+
+  } catch (error) {
+    console.error('Error verifying reset code:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: "An error occurred while verifying the reset code" 
+    });
+  }
+});
+
+// Update password with reset code
+router.put("/update-password", async (req, res) => {
+  const { userId, emailCode, newPassword } = req.body;
+
+  if (!userId || !emailCode || !newPassword) {
+    return res.status(400).json({ 
+      success: false, 
+      message: "User ID, reset code, and new password are required" 
+    });
+  }
+
+  try {
+    // Verify the code again
+    const codeQuery = await query(
+      'SELECT * FROM password_reset_codes WHERE userId = ? AND reset_code = ? AND used = FALSE AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
+      [userId, emailCode.trim().toUpperCase()]
+    );
+
+    if (codeQuery.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid or expired reset code" 
+      });
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update the user's password
+    await query(
+      'UPDATE activeusers SET Password = ? WHERE id = ?',
+      [hashedPassword, userId]
+    );
+
+    // Mark the reset code as used
+    await query(
+      'UPDATE password_reset_codes SET used = TRUE WHERE id = ?',
+      [codeQuery[0].id]
+    );
+
+    // Invalidate all existing tokens for this user (force re-login)
+    await query(
+      "UPDATE user_tokens SET valid = 'n' WHERE userId = ?",
+      [userId]
+    );
+
+    return res.json({ 
+      success: true, 
+      message: "Password reset successfully" 
+    });
+
+  } catch (error) {
+    console.error('Error updating password:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: "An error occurred while resetting the password" 
     });
   }
 });

@@ -239,7 +239,9 @@ const calculateCodesAndHiresMetrics = (vipsData, associatesData, hiresData, repo
   const previousYearCodes = previousYearVips.map((vips, index) => vips + previousYearAssociates[index]);
 
   const ytdCodes = currentYearCodes.slice(0, reportingMonthIndex + 1).reduce((sum, val) => sum + val, 0);
+  const ytdVips = currentYearVips.slice(0, reportingMonthIndex + 1).reduce((sum, val) => sum + val, 0);
   const currentMonthCodes = currentYearCodes[reportingMonthIndex] || 0;
+  const currentMonthVips = currentYearVips[reportingMonthIndex] || 0;
   const currentMonthHires = currentYearHires[reportingMonthIndex] || 0;
   
   // Find the most recent month with actual codes data
@@ -247,23 +249,34 @@ const calculateCodesAndHiresMetrics = (vipsData, associatesData, hiresData, repo
   const previousMonthCodes = codesComparison.value;
   const codesComparisonMonth = codesComparison.month;
   
+  // Find the most recent month with actual VIPs data
+  const vipsComparison = findMostRecentMonthWithData(currentYearVips, reportingMonthIndex, "VIPs");
+  const previousMonthVips = vipsComparison.value;
+  const vipsComparisonMonth = vipsComparison.month;
+  
   // Find the most recent month with actual hires data  
   const hiresComparison = findMostRecentMonthWithData(currentYearHires, reportingMonthIndex, "Hires");
   const previousMonthHires = hiresComparison.value;
   const hiresComparisonMonth = hiresComparison.month;
   
   const previousYearYtdCodes = previousYearCodes.slice(0, reportingMonthIndex + 1).reduce((sum, val) => sum + val, 0);
+  const previousYearYtdVips = previousYearVips.slice(0, reportingMonthIndex + 1).reduce((sum, val) => sum + val, 0);
 
   return {
     ytdCodes,
+    ytdVips,
     ytdHires: currentYearHires.slice(0, reportingMonthIndex + 1).reduce((sum, val) => sum + val, 0),
     previousYearYtdCodes,
+    previousYearYtdVips,
     previousYearYtdHires: previousYearHires.slice(0, reportingMonthIndex + 1).reduce((sum, val) => sum + val, 0),
     currentMonthCodes,
+    currentMonthVips,
     currentMonthHires,
     previousMonthCodes,
+    previousMonthVips,
     previousMonthHires,
     codesComparisonMonth,
+    vipsComparisonMonth,
     hiresComparisonMonth
   };
 };
@@ -318,24 +331,15 @@ const calculateCodesAndHiresMetrics = (vipsData, associatesData, hiresData, repo
     const currentYearData = sgaData[currentYear] || Array(12).fill(0);
     const previousYearData = sgaData[previousYear] || Array(12).fill(0);
     
-    // Determine the "reporting month" based on 5th-of-month rule
+    // Determine the "reporting month" - always use last month (no delay)
     let reportingMonthIndex;
     let usesPreviousYear = false;
     
-    if (currentDay < 5) {
-      // Before 5th: use 2 months ago
-      reportingMonthIndex = currentCalendarMonth - 2;
-      if (reportingMonthIndex < 0) {
-        reportingMonthIndex = 12 + reportingMonthIndex;
-        usesPreviousYear = true;
-      }
-    } else {
-      // On/after 5th: use last month
+    // Always use last month (previous month from current calendar month)
       reportingMonthIndex = currentCalendarMonth - 1;
       if (reportingMonthIndex < 0) {
         reportingMonthIndex = 11;
         usesPreviousYear = true;
-      }
     }
     
     // Get the month before the reporting month for comparison
@@ -1224,6 +1228,31 @@ export const useDashboardData = (userRole, user, saViewMode = 'team', gaViewMode
         hasLagnNameFilter: userRole !== 'SGA',
         timestamp: new Date().toISOString()
       });
+      
+      // DETAILED SGA LOGGING FOR THIS MONTH NUMBER DEBUG
+      if (userRole === 'SGA') {
+        console.log('🔍🔍🔍 [SGA THIS MONTH DEBUG] Detailed Monthly ALP data:', {
+          '1_ENDPOINT_CALLED': url,
+          '2_RAW_API_RESPONSE': JSON.stringify(monthlyAlpResponse.data, null, 2),
+          '3_MONTHLY_ALP_VALUE': receivedData.monthlyAlp,
+          '4_COMPARISON_ALP_VALUE': receivedData.comparisonAlp,
+          '5_MAX_REPORT_DATE': receivedData.maxReportDate,
+          '6_MONTH_START': receivedData.monthStart,
+          '7_MONTH_END': receivedData.monthEnd,
+          '8_DATA_SOURCE': 'Weekly_ALP table with REPORT=MTD Recap',
+          '9_EXPECTED_SQL_QUERY': 'SELECT LVL_1_NET FROM Weekly_ALP WHERE REPORT="MTD Recap" AND reportdate is the most recent date',
+          '10_CHECK_IN_DATABASE': 'Run: SELECT * FROM Weekly_ALP WHERE REPORT="MTD Recap" ORDER BY reportdate DESC LIMIT 10',
+          '11_FULL_RESPONSE_OBJECT': monthlyAlpResponse
+        });
+        
+        if (receivedData.monthlyAlp < 100000 && receivedData.monthlyAlp !== 0) {
+          console.warn('⚠️⚠️⚠️ [SGA THIS MONTH] Monthly ALP seems unusually low! Value:', receivedData.monthlyAlp, 'Expected value should be closer to weekly value. Possible issues:');
+          console.warn('  - Backend might be querying wrong table or column');
+          console.warn('  - REPORT filter might not match (should be "MTD Recap")');
+          console.warn('  - reportdate might not be the most recent date');
+          console.warn('  - LVL_1_NET column might be NULL or wrong');
+        }
+      }
       
       if (receivedData.monthlyAlp === 0) {
         console.warn('⚠️ [fetchMonthlyAlpData] Monthly ALP is 0 - check if data exists for:', {

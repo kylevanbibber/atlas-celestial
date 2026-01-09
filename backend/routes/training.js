@@ -4,6 +4,10 @@ const mysql = require('mysql2/promise');
 const verifyToken = require('../middleware/verifyToken');
 const { query } = require('../db');
 
+// Mount roleplay sub-routes
+const roleplayRoutes = require('./roleplay');
+router.use('/roleplay', roleplayRoutes);
+
 // GET /api/training/updates - Get all updates
 // Helper to normalize a URL or path to just a path starting with '/'
 function normalizeToPathOnly(input) {

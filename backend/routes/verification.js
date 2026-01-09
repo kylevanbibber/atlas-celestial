@@ -8,6 +8,7 @@ router.get("/counts", async (req, res) => {
     // This endpoint should be called by the verification component
     // to provide the current counts of applications in each status
     
+  
     // For now, we'll return placeholder data
     // The verification component should call this endpoint and provide the actual counts
     res.json({

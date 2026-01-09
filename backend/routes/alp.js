@@ -983,6 +983,7 @@ router.get('/getweeklyall', async (req, res) => {
                 wa.MGA_NAME, 
                 au.profpic, 
                 au.esid,
+                au.id AS userId,
                 m.rga, 
                 m.legacy, 
                 m.tree 
@@ -2421,12 +2422,42 @@ router.get("/sa/team-daily-activity", async (req, res) => {
         const results = await dbQuery(query, params);
         const result = results[0] || {};
         
-        const responseData = {
+        let responseData = {
             totalAlp: parseFloat(result.totalAlp) || 0,
             totalRefAlp: parseFloat(result.totalRefAlp) || 0,
             totalRefs: parseInt(result.totalRefs) || 0,
             agentCount: parseInt(result.agentCount) || 0
         };
+        
+        // Special case: For MAUGHANEVANSON BRODY W, also include all LOCKER-ROTOLO users
+        if (lagnName === 'MAUGHANEVANSON BRODY W') {
+            let lockerRotoloQuery = `
+                SELECT 
+                    SUM(da.alp) AS totalAlp,
+                    SUM(da.refAlp) AS totalRefAlp, 
+                    SUM(da.refs) AS totalRefs,
+                    COUNT(DISTINCT da.agent) AS agentCount
+                FROM Daily_Activity da
+                JOIN activeusers au ON da.agent = au.lagnname
+                WHERE au.rept_name = 'LOCKER-ROTOLO'
+                  AND au.Active = 'y'
+            `;
+            
+            let lockerRotoloParams = [];
+            if (startDate && endDate) {
+                lockerRotoloQuery += ` AND da.reportDate >= ? AND da.reportDate <= ?`;
+                lockerRotoloParams = [startDate, endDate];
+            }
+            
+            const lockerRotoloResults = await dbQuery(lockerRotoloQuery, lockerRotoloParams);
+            const lockerRotoloResult = lockerRotoloResults[0] || {};
+            
+            // Add LOCKER-ROTOLO results to the main results
+            responseData.totalAlp += parseFloat(lockerRotoloResult.totalAlp) || 0;
+            responseData.totalRefAlp += parseFloat(lockerRotoloResult.totalRefAlp) || 0;
+            responseData.totalRefs += parseInt(lockerRotoloResult.totalRefs) || 0;
+            responseData.agentCount += parseInt(lockerRotoloResult.agentCount) || 0;
+        }
         
         console.log('📊 [SA Team Daily Activity] Response:', {
             lagnName,
@@ -2495,12 +2526,42 @@ router.get("/ga/team-daily-activity", async (req, res) => {
         const results = await dbQuery(query, params);
         const result = results[0] || {};
         
-        const responseData = {
+        let responseData = {
             totalAlp: parseFloat(result.totalAlp) || 0,
             totalRefAlp: parseFloat(result.totalRefAlp) || 0,
             totalRefs: parseInt(result.totalRefs) || 0,
             agentCount: parseInt(result.agentCount) || 0
         };
+        
+        // Special case: For MAUGHANEVANSON BRODY W, also include all LOCKER-ROTOLO users
+        if (lagnName === 'MAUGHANEVANSON BRODY W') {
+            let lockerRotoloQuery = `
+                SELECT 
+                    SUM(da.alp) AS totalAlp,
+                    SUM(da.refAlp) AS totalRefAlp, 
+                    SUM(da.refs) AS totalRefs,
+                    COUNT(DISTINCT da.agent) AS agentCount
+                FROM Daily_Activity da
+                JOIN activeusers au ON da.agent = au.lagnname
+                WHERE au.rept_name = 'LOCKER-ROTOLO'
+                  AND au.Active = 'y'
+            `;
+            
+            let lockerRotoloParams = [];
+            if (startDate && endDate) {
+                lockerRotoloQuery += ` AND da.reportDate >= ? AND da.reportDate <= ?`;
+                lockerRotoloParams = [startDate, endDate];
+            }
+            
+            const lockerRotoloResults = await dbQuery(lockerRotoloQuery, lockerRotoloParams);
+            const lockerRotoloResult = lockerRotoloResults[0] || {};
+            
+            // Add LOCKER-ROTOLO results to the main results
+            responseData.totalAlp += parseFloat(lockerRotoloResult.totalAlp) || 0;
+            responseData.totalRefAlp += parseFloat(lockerRotoloResult.totalRefAlp) || 0;
+            responseData.totalRefs += parseInt(lockerRotoloResult.totalRefs) || 0;
+            responseData.agentCount += parseInt(lockerRotoloResult.agentCount) || 0;
+        }
         
         console.log('📊 [GA Team Daily Activity] Response:', {
             lagnName,
@@ -2669,12 +2730,42 @@ router.get("/mga/team-daily-activity", async (req, res) => {
         const results = await dbQuery(query, params);
         const result = results[0] || {};
         
-        const responseData = {
+        let responseData = {
             totalAlp: parseFloat(result.totalAlp) || 0,
             totalRefAlp: parseFloat(result.totalRefAlp) || 0,
             totalRefs: parseInt(result.totalRefs) || 0,
             agentCount: parseInt(result.agentCount) || 0
         };
+        
+        // Special case: For MAUGHANEVANSON BRODY W, also include all LOCKER-ROTOLO users
+        if (lagnName === 'MAUGHANEVANSON BRODY W') {
+            let lockerRotoloQuery = `
+                SELECT 
+                    SUM(da.alp) AS totalAlp,
+                    SUM(da.refAlp) AS totalRefAlp, 
+                    SUM(da.refs) AS totalRefs,
+                    COUNT(DISTINCT da.agent) AS agentCount
+                FROM Daily_Activity da
+                JOIN activeusers au ON da.agent = au.lagnname
+                WHERE au.rept_name = 'LOCKER-ROTOLO'
+                  AND au.Active = 'y'
+            `;
+            
+            let lockerRotoloParams = [];
+            if (startDate && endDate) {
+                lockerRotoloQuery += ` AND da.reportDate >= ? AND da.reportDate <= ?`;
+                lockerRotoloParams = [startDate, endDate];
+            }
+            
+            const lockerRotoloResults = await dbQuery(lockerRotoloQuery, lockerRotoloParams);
+            const lockerRotoloResult = lockerRotoloResults[0] || {};
+            
+            // Add LOCKER-ROTOLO results to the main results
+            responseData.totalAlp += parseFloat(lockerRotoloResult.totalAlp) || 0;
+            responseData.totalRefAlp += parseFloat(lockerRotoloResult.totalRefAlp) || 0;
+            responseData.totalRefs += parseInt(lockerRotoloResult.totalRefs) || 0;
+            responseData.agentCount += parseInt(lockerRotoloResult.agentCount) || 0;
+        }
         
         console.log('📊 [MGA Team Daily Activity] Response:', {
             lagnName,
@@ -2762,12 +2853,43 @@ router.get("/rga/team-daily-activity", async (req, res) => {
         const results = await dbQuery(query, params);
         const result = results[0] || {};
         
-        const responseData = {
+        let responseData = {
             totalAlp: parseFloat(result.totalAlp) || 0,
             totalRefAlp: parseFloat(result.totalRefAlp) || 0,
             totalRefs: parseInt(result.totalRefs) || 0,
             agentCount: parseInt(result.agentCount) || 0
         };
+        
+        // Special case: For MAUGHANEVANSON BRODY W, also include all LOCKER-ROTOLO users
+        if (lagnName === 'MAUGHANEVANSON BRODY W') {
+            let lockerRotoloQuery = `
+                SELECT 
+                    SUM(da.alp) AS totalAlp,
+                    SUM(da.refAlp) AS totalRefAlp, 
+                    SUM(da.refs) AS totalRefs,
+                    COUNT(DISTINCT da.agent) AS agentCount
+                FROM Daily_Activity da
+                JOIN activeusers au ON da.agent = au.lagnname
+                WHERE au.rept_name = 'LOCKER-ROTOLO'
+                  AND au.Active = 'y'
+            `;
+            
+            let lockerRotoloParams = [];
+            if (startDate && endDate) {
+                lockerRotoloQuery += ` AND da.reportDate >= ? AND da.reportDate <= ?`;
+                lockerRotoloParams = [startDate, endDate];
+            }
+            
+            const lockerRotoloResults = await dbQuery(lockerRotoloQuery, lockerRotoloParams);
+            const lockerRotoloResult = lockerRotoloResults[0] || {};
+            
+            // Add LOCKER-ROTOLO results to the main results
+            responseData.totalAlp += parseFloat(lockerRotoloResult.totalAlp) || 0;
+            responseData.totalRefAlp += parseFloat(lockerRotoloResult.totalRefAlp) || 0;
+            responseData.totalRefs += parseInt(lockerRotoloResult.totalRefs) || 0;
+            // Note: agentCount might have duplicates, but that's okay for this use case
+            responseData.agentCount += parseInt(lockerRotoloResult.agentCount) || 0;
+        }
         
         console.log('📊 [RGA Team Daily Activity] Response:', {
             lagnName,
@@ -3530,7 +3652,60 @@ router.get('/monthly-alp-sum', async (req, res) => {
 
         console.log('📊 [Monthly ALP Sum] Max MTD Recap date found:', { maxReportDate });
         
-        // Get Monthly ALP data from Weekly_ALP where REPORT = 'MTD Recap' for max date
+        // For SGA users (no lagnName), look for additional report dates within 3 days
+        // SGA gets 2 reports per week, so we need to sum both
+        let reportDatesToInclude = [maxReportDate];
+        
+        if (!lagnName) {
+            // Parse the maxReportDate (format: MM/DD/YYYY)
+            const [month, day, year] = maxReportDate.split('/').map(Number);
+            const maxDate = new Date(year, month - 1, day);
+            
+            // Calculate date 3 days before maxReportDate
+            const threeDaysBeforeMax = new Date(maxDate);
+            threeDaysBeforeMax.setDate(threeDaysBeforeMax.getDate() - 3);
+            
+            console.log('📊 [Monthly ALP Sum - SGA] Looking for additional report dates within 3 days:', {
+                maxReportDate,
+                maxDateParsed: maxDate.toISOString(),
+                threeDaysBeforeParsed: threeDaysBeforeMax.toISOString(),
+                lookingBetween: `${threeDaysBeforeMax.toLocaleDateString('en-US')} and ${maxDate.toLocaleDateString('en-US')}`
+            });
+            
+            // Find all report dates within 3 days before the max date
+            const additionalDatesQuery = `
+                SELECT DISTINCT reportdate
+                FROM Weekly_ALP
+                WHERE REPORT = 'MTD Recap'
+                AND STR_TO_DATE(reportdate, '%m/%d/%Y') >= ?
+                AND STR_TO_DATE(reportdate, '%m/%d/%Y') < ?
+                AND YEAR(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+                AND MONTH(STR_TO_DATE(reportdate, '%m/%d/%Y')) = ?
+                ORDER BY STR_TO_DATE(reportdate, '%m/%d/%Y') DESC
+            `;
+            
+            const additionalDatesResult = await dbQuery(additionalDatesQuery, [
+                threeDaysBeforeMax.toISOString().split('T')[0],
+                maxDate.toISOString().split('T')[0],
+                currentYear,
+                currentMonth
+            ]);
+            
+            // Add any additional dates found
+            additionalDatesResult.forEach(row => {
+                if (row.reportdate && row.reportdate !== maxReportDate) {
+                    reportDatesToInclude.push(row.reportdate);
+                }
+            });
+            
+            console.log('📊 [Monthly ALP Sum - SGA] Report dates to include:', {
+                count: reportDatesToInclude.length,
+                dates: reportDatesToInclude,
+                note: 'Will sum LVL_1_NET from all these dates'
+            });
+        }
+        
+        // Get Monthly ALP data from Weekly_ALP where REPORT = 'MTD Recap' for all report dates
         // Apply same lagnName filtering as the max date query
         // Use different ALP columns based on user role and view mode
         let alpColumn;
@@ -3556,11 +3731,15 @@ router.get('/monthly-alp-sum', async (req, res) => {
         } else {
           alpColumn = 'LVL_1_NET'; // All roles use LVL_1_NET for personal mode
         }
+        
+        // Build IN clause for all report dates
+        const reportDatePlaceholders = reportDatesToInclude.map(() => '?').join(', ');
+        
         let monthlyAlpQuery = `
             SELECT SUM(${alpColumn}) as totalMonthlyAlp
             FROM Weekly_ALP 
             WHERE REPORT = 'MTD Recap'
-            AND reportdate = ?
+            AND reportdate IN (${reportDatePlaceholders})
             ${clNameCondition}
         `;
         
@@ -3568,10 +3747,11 @@ router.get('/monthly-alp-sum', async (req, res) => {
             lagnName,
             viewMode,
             alpColumn,
-            maxReportDate
+            reportDatesCount: reportDatesToInclude.length,
+            reportDates: reportDatesToInclude
         });
         
-        let monthlyAlpParams = [maxReportDate];
+        let monthlyAlpParams = [...reportDatesToInclude];
         
         // Add lagnName filtering for non-SGA users
         if (lagnName) {
@@ -3582,10 +3762,51 @@ router.get('/monthly-alp-sum', async (req, res) => {
         const monthlyAlpResult = await dbQuery(monthlyAlpQuery, monthlyAlpParams);
         const monthlyAlp = monthlyAlpResult[0]?.totalMonthlyAlp || 0;
         
+        // DETAILED SGA LOGGING FOR THIS MONTH NUMBER DEBUG
+        if (!lagnName) {
+            console.log('🔍🔍🔍 [SGA THIS MONTH BACKEND DEBUG] Detailed Monthly ALP query results:', {
+                '1_SQL_QUERY': monthlyAlpQuery.replace(/\s+/g, ' ').trim(),
+                '2_QUERY_PARAMS': monthlyAlpParams,
+                '3_REPORT_DATES_INCLUDED': {
+                    count: reportDatesToInclude.length,
+                    dates: reportDatesToInclude,
+                    note: 'SGA gets 2 reports per week - summing all dates within 3-day window'
+                },
+                '4_RAW_DATABASE_RESULT': monthlyAlpResult,
+                '5_EXTRACTED_MONTHLY_ALP': monthlyAlp,
+                '6_DATABASE_TABLE': 'Weekly_ALP',
+                '7_FILTER_CONDITIONS': {
+                    REPORT: 'MTD Recap',
+                    reportdates: reportDatesToInclude,
+                    column_summed: alpColumn || 'LVL_1_NET'
+                },
+                '8_EXPECTED_QUERY': `SELECT SUM(${alpColumn || 'LVL_1_NET'}) FROM Weekly_ALP WHERE REPORT='MTD Recap' AND reportdate IN (${reportDatesToInclude.map(d => `'${d}'`).join(', ')})`,
+                '9_CHECK_IN_DATABASE': `Run this query: SELECT reportdate, LagnName, LVL_1_NET FROM Weekly_ALP WHERE REPORT='MTD Recap' AND reportdate IN (${reportDatesToInclude.map(d => `'${d}'`).join(', ')}) ORDER BY reportdate DESC, LagnName LIMIT 50`,
+                '10_ALL_MTD_DATES': `Run this query: SELECT DISTINCT reportdate, COUNT(*) as count, SUM(LVL_1_NET) as total FROM Weekly_ALP WHERE REPORT='MTD Recap' GROUP BY reportdate ORDER BY reportdate DESC LIMIT 10`
+            });
+            
+            if (monthlyAlp < 100000 && monthlyAlp !== 0) {
+                console.warn('⚠️⚠️⚠️ [SGA BACKEND] Monthly ALP unusually low!', {
+                    value: monthlyAlp,
+                    reportDatesIncluded: reportDatesToInclude,
+                    possibleIssues: [
+                        'Weekly_ALP table might not have data for these reportdates',
+                        'LVL_1_NET column might be NULL or have low values',
+                        'REPORT filter might not match exactly (check for extra spaces)',
+                        'reportdate format might not match (should be MM/DD/YYYY)',
+                        'Data might be in a different column (check LVL_2_NET, LVL_3_NET)',
+                        'Sum might be including negative values that cancel out',
+                        'Not all report dates within 3-day window were found'
+                    ]
+                });
+            }
+        }
+        
         // Get Daily_Activity data for comparison (current month)
         // Apply same lagnName filtering if provided - need to join with activeusers since Daily_Activity uses userId
-        const monthStart = new Date(currentYear, currentMonth - 1, 1);
-        const monthEnd = new Date(currentYear, currentMonth, 0);
+        // Use Date.UTC to avoid timezone issues
+        const monthStart = new Date(Date.UTC(currentYear, currentMonth - 1, 1));
+        const monthEnd = new Date(Date.UTC(currentYear, currentMonth, 0));
         
         let dailyActivityQuery = `
             SELECT SUM(da.alp) as totalDailyAlp
@@ -3815,6 +4036,172 @@ router.get('/monthly-ref-sales-sum', async (req, res) => {
         res.status(500).json({
             success: false,
             error: error.message,
+        });
+    }
+});
+
+/* =========================
+   Daily Production Tracker (daily_sga_alp table)
+   ========================= */
+
+// GET /api/alp/daily-tracker - Fetch daily production data from daily_sga_alp table
+router.get("/daily-tracker", async (req, res) => {
+    console.log('📊 [Daily Tracker] GET request received');
+    
+    try {
+        const { startDate, endDate } = req.query;
+        
+        if (!startDate || !endDate) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide both startDate and endDate parameters'
+            });
+        }
+        
+        console.log('📊 [Daily Tracker] Fetching data from', startDate, 'to', endDate);
+        
+        const query = `
+            SELECT 
+                date,
+                arias,
+                ny
+            FROM daily_sga_alp
+            WHERE date >= ?
+            AND date <= ?
+            ORDER BY date DESC
+        `;
+        
+        const results = await dbQuery(query, [startDate, endDate]);
+        
+        console.log('📊 [Daily Tracker] Fetched', results.length, 'days');
+        
+        res.json({
+            success: true,
+            data: results
+        });
+        
+    } catch (error) {
+        console.error('❌ [Daily Tracker] Error fetching daily data:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// POST /api/alp/daily-tracker - Update daily production data in daily_sga_alp table
+router.post("/daily-tracker", async (req, res) => {
+    console.log('📊 [Daily Tracker] POST request received');
+    console.log('📊 [Daily Tracker] Request body:', req.body);
+    
+    try {
+        const { updates } = req.body;
+        
+        if (!updates || typeof updates !== 'object') {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid request body. Expected { updates: { "YYYY-MM-DD": { arias, ny }, ... } }'
+            });
+        }
+        
+        let successCount = 0;
+        let errorCount = 0;
+        
+        // Process each date update
+        for (const [date, data] of Object.entries(updates)) {
+            try {
+                const { arias, ny } = data;
+                
+                console.log(`📊 [Daily Tracker] Updating date ${date}:`, { arias, ny });
+                
+                // Use INSERT ... ON DUPLICATE KEY UPDATE to handle both insert and update
+                const query = `
+                    INSERT INTO daily_sga_alp (date, arias, ny)
+                    VALUES (?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                        arias = VALUES(arias),
+                        ny = VALUES(ny)
+                `;
+                
+                await dbQuery(query, [
+                    date,
+                    arias !== undefined && arias !== '' ? parseFloat(arias) : null,
+                    ny !== undefined && ny !== '' ? parseFloat(ny) : null
+                ]);
+                
+                successCount++;
+                console.log(`✅ [Daily Tracker] Successfully updated date ${date}`);
+                
+            } catch (error) {
+                errorCount++;
+                console.error(`❌ [Daily Tracker] Error updating date ${date}:`, error);
+            }
+        }
+        
+        console.log(`📊 [Daily Tracker] Update complete: ${successCount} success, ${errorCount} errors`);
+        
+        res.json({
+            success: true,
+            message: `Successfully updated ${successCount} day(s)`,
+            successCount,
+            errorCount
+        });
+        
+    } catch (error) {
+        console.error('❌ [Daily Tracker] Error updating daily data:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/* =========================
+   Yearly Production Tracker (calculated from sga_alp table)
+   ========================= */
+
+// GET /api/alp/yearly-tracker - Calculate yearly totals from sga_alp monthly data
+router.get("/yearly-tracker", async (req, res) => {
+    console.log('📊 [Yearly Tracker] GET request received');
+    
+    try {
+        console.log('📊 [Yearly Tracker] Calculating yearly totals from sga_alp');
+        
+        // Sum monthly net values grouped by year
+        // month field is in MM/YYYY format, so we extract the year part
+        // Show all years from 2008 onwards
+        const query = `
+            SELECT 
+                SUBSTRING(month, 4, 4) as year,
+                SUM(net) as net
+            FROM sga_alp
+            WHERE month IS NOT NULL 
+            AND month != ''
+            AND SUBSTRING(month, 4, 4) >= '2008'
+            GROUP BY SUBSTRING(month, 4, 4)
+            ORDER BY year DESC
+        `;
+        
+        const results = await dbQuery(query);
+        
+        console.log('📊 [Yearly Tracker] Calculated', results.length, 'years from monthly data');
+        if (results.length > 0) {
+            console.log('📊 [Yearly Tracker] Sample:', results[0]);
+        }
+        
+        res.json({
+            success: true,
+            data: results.map(row => ({
+                year: parseInt(row.year),
+                net: parseFloat(row.net || 0)
+            }))
+        });
+        
+    } catch (error) {
+        console.error('❌ [Yearly Tracker] Error calculating yearly data:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 });

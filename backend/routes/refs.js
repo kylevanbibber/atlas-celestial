@@ -133,6 +133,7 @@ const allowedFields = [
   "archive",
   "company_id",
   "created_by",
+  "referred_by",
   "type",
   "scheduled",
   "resstate"

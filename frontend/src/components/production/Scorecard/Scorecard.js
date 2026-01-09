@@ -17,16 +17,9 @@ const Scorecard = () => {
   const allowedRoles = ["MGA", "RGA", "SGA"];
   const showTabs = allowedRoles.includes(userRole);
   
-  // Top-level tabs: Individual/Agency vs Breakdown
-  const [topView, setTopView] = useState('individual'); // 'individual' or 'breakdown'
-  // Sub-tabs for Individual/Agency view (only for RGA and SGA)
-  const [view, setView] = useState('mga'); // 'mga' or 'rga'
-  
-  // Determine top-level tab labels based on role
-  const individualLabel = userRole === 'SGA' ? 'Agency' : 'Individual';
-  
-  // Show MGA/RGA sub-tabs only for RGA and SGA users (not MGA)
-  const showSubTabs = userRole === 'RGA' || userRole === 'SGA';
+  // Top-level tabs: Agency, MGA Breakdown, RGA Breakdown
+  const [activeTab, setActiveTab] = useState('agency'); // 'agency', 'mga', 'rga'
+  const [selectedAgency, setSelectedAgency] = useState('All'); // Track selected MGA/RGA in breakdown tabs
   
   return (
     <div className="scorecard">
@@ -36,66 +29,69 @@ const Scorecard = () => {
           <div className="tabs" style={{ marginBottom: '10px' }}>
             <input
               type="radio"
-              id="individual"
-              name="top_view_type"
-              value="individual"
-              checked={topView === 'individual'}
-              onChange={() => setTopView('individual')}
+              id="agency"
+              name="scorecard_view_type"
+              value="agency"
+              checked={activeTab === 'agency'}
+              onChange={() => {
+                setActiveTab('agency');
+                setSelectedAgency('All');
+              }}
             />
-            <label htmlFor="individual">{individualLabel}</label>
+            <label htmlFor="agency">Agency</label>
 
             <input
               type="radio"
-              id="breakdown"
-              name="top_view_type"
-              value="breakdown"
-              checked={topView === 'breakdown'}
-              onChange={() => setTopView('breakdown')}
+              id="mga"
+              name="scorecard_view_type"
+              value="mga"
+              checked={activeTab === 'mga'}
+              onChange={() => {
+                setActiveTab('mga');
+                setSelectedAgency('All');
+              }}
             />
-            <label htmlFor="breakdown">Breakdown</label>
-          </div>
-          
-          {/* Sub-tabs for Individual/Agency view - only show for RGA and SGA */}
-          {topView === 'individual' && showSubTabs && (
-            <div className="tabs">
-              <input
-                type="radio"
-                id="mga"
-                name="sub_view_type"
-                value="mga"
-                checked={view === 'mga'}
-                onChange={() => setView('mga')}
-              />
-              <label htmlFor="mga">MGA</label>
+            <label htmlFor="mga">MGA Breakdown</label>
 
-              <input
-                type="radio"
-                id="rga"
-                name="sub_view_type"
-                value="rga"
-                checked={view === 'rga'}
-                onChange={() => setView('rga')}
-              />
-              <label htmlFor="rga">RGA</label>
-            </div>
-          )}
+            <input
+              type="radio"
+              id="rga"
+              name="scorecard_view_type"
+              value="rga"
+              checked={activeTab === 'rga'}
+              onChange={() => {
+                setActiveTab('rga');
+                setSelectedAgency('All');
+              }}
+            />
+            <label htmlFor="rga">RGA Breakdown</label>
+          </div>
         </>
       )}
       
       {showTabs ? (
-        topView === 'individual' ? (
-          // For MGA users, always show MGA table (no sub-tabs)
-          // For RGA/SGA users, respect the sub-tab selection
-          (userRole === 'MGA' || view === 'mga') ? (
-            <ScorecardTable filterMode="mga" />
-          ) : (
-            <ScorecardTable filterMode="rga" />
-          )
+        activeTab === 'agency' ? (
+          <ScorecardTable userRole={userRole} activeTab="agency" />
+        ) : selectedAgency !== 'All' ? (
+          // Show ScorecardTable for specific MGA/RGA with dropdown still visible
+          <ScorecardTable 
+            key={`${activeTab}-${selectedAgency}`}
+            userRole={userRole} 
+            activeTab={activeTab}
+            selectedAgency={selectedAgency}
+            onSelectAgency={setSelectedAgency}
+          />
         ) : (
-          <ScorecardSGAView />
+          // Show ScorecardSGAView for "All" view
+          <ScorecardSGAView 
+            key={`${activeTab}-all`}
+            activeTab={activeTab}
+            selectedAgency={selectedAgency}
+            onSelectAgency={setSelectedAgency}
+          />
         )
       ) : (
-        <ScorecardTable filterMode="mga" />
+        <ScorecardTable userRole={userRole} activeTab="agency" />
       )}
     </div>
   );

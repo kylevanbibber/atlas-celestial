@@ -103,38 +103,26 @@ const [modalContent, setModalContent] = useState({
     const fullPhoneNumber = `1(${phoneNumber.areaCode})${phoneNumber.prefix}-${phoneNumber.lineNumber}`;
   
     try {
-      // Step 1: Check for existing user
-      const response = await fetch('https://ariaslogin-4a95935f6093.herokuapp.com/api/checkUserInfo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // Step 1: Check for existing user via Atlas backend
+      const { data } = await api.post('/auth/checkUserInfo', {
+        email: formData.email,
+        phone: fullPhoneNumber,
+        esid: formData.esid,
+        lagnname: lagnname,
+        id: id, // Include ID here
+      });
+  
+      if (data.success) {
+        // No conflict, proceed with account update/creation
+        const { data: createData } = await api.post('/auth/handleUserInfo', {
+          id: id, // Include ID here
+          screenName: formData.screenName,
           email: formData.email,
           phone: fullPhoneNumber,
           esid: formData.esid,
           lagnname: lagnname,
-          id: id, // Include ID here
-        }),
-      });
-  
-      const data = await response.json();
-  
-      if (data.success) {
-        // No conflict, proceed with account update/creation
-        const createResponse = await fetch('https://ariaslogin-4a95935f6093.herokuapp.com/api/handleUserInfo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: id, // Include ID here
-            screenName: formData.screenName,
-            email: formData.email,
-            phone: fullPhoneNumber,
-            esid: formData.esid,
-            lagnname: lagnname,
-            decision: 'new',
-          }),
+          decision: 'new',
         });
-  
-        const createData = await createResponse.json();
   
         if (createData.success) {
           // Add resident license immediately if provided (skip when bypassing and not selected)

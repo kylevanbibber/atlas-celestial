@@ -411,7 +411,10 @@ const loadDateOptions = async () => {
 
 // 2️⃣ updateDateRangeFromCurrentDate
 const updateDateRangeFromCurrentDate = () => {
-  const iso = currentDate.toISOString().split('T')[0];
+  const y = currentDate.getFullYear();
+  const m = String(currentDate.getMonth() + 1).padStart(2, '0');
+  const d = String(currentDate.getDate()).padStart(2, '0');
+  const iso = `${y}-${m}-${d}`; // Local date ISO (no UTC shift)
   setDateRange(calculateDateRange(iso, rangeType));
 };
 
@@ -435,8 +438,8 @@ const updateDateRangeFromCurrentDate = () => {
   };
 
   const navigateBackward = () => {
-    const currentISOString = currentDate.toISOString();
-    const currentIndex = dateOptions.findIndex(option => option.value === currentISOString.split('T')[0]);
+    const currentISOString = `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'0')}-${String(currentDate.getDate()).padStart(2,'0')}`;
+    const currentIndex = dateOptions.findIndex(option => option.value === currentISOString);
     
     let newDate;
     if (currentIndex === -1) {
@@ -476,8 +479,8 @@ const updateDateRangeFromCurrentDate = () => {
   };
 
   const navigateForward = () => {
-    const currentISOString = currentDate.toISOString();
-    const currentIndex = dateOptions.findIndex(option => option.value === currentISOString.split('T')[0]);
+    const currentISOString = `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'0')}-${String(currentDate.getDate()).padStart(2,'0')}`;
+    const currentIndex = dateOptions.findIndex(option => option.value === currentISOString);
     
     let newDate;
     if (currentIndex === -1) {
@@ -641,6 +644,39 @@ const updateDateRangeFromCurrentDate = () => {
 
       const response = await api.get('/ref-report/dashboard', { params });
       const data = response.data.data;
+      try {
+        console.log('[RefReport] Dashboard response', {
+          params,
+          summary: data?.summary,
+          leaderboardCount: data?.leaderboard?.length,
+          sampleLeaderboard: Array.isArray(data?.leaderboard) ? data.leaderboard.slice(0, 5) : [],
+          meta: data?.meta
+        });
+        // Full leaderboard payload
+        console.log('[RefReport] Leaderboard full data', data?.leaderboard);
+        // MGA diagnostics if viewing MGA level
+        if (hierarchyLevel === 'mga' && Array.isArray(data?.leaderboard)) {
+          const names = data.leaderboard.map(r => r?.name).filter(Boolean);
+          const uniqueNames = Array.from(new Set(names));
+          const byName = data.leaderboard.reduce((acc, r) => {
+            const k = r?.name || 'UNKNOWN';
+            (acc[k] = acc[k] || []).push({ true_refs: r?.true_refs || 0, total_refs: r?.total_refs || 0, clname: r?.clname });
+            return acc;
+          }, {});
+          console.log('[RefReport] MGA view diagnostics', {
+            start_date: params.start_date,
+            end_date: params.end_date,
+            totalRows: data.leaderboard.length,
+            uniqueMgasCount: uniqueNames.length,
+            uniqueMgas: uniqueNames,
+            perMgaBreakdown: byName,
+          });
+          const nonTeamRows = data.leaderboard.filter(r => r?.clname !== 'MGA' && r?.clname !== 'RGA');
+          if (nonTeamRows.length > 0) {
+            console.warn('[RefReport] MGA view contains non-MGA/RGA rows (possible grouping/mapping mismatch):', nonTeamRows);
+          }
+        }
+      } catch (e) {}
 
       if (!data || !data.leaderboard || data.leaderboard.length === 0) {
         return null;
@@ -688,9 +724,21 @@ const updateDateRangeFromCurrentDate = () => {
       const params = {
         hierarchy_level: hierarchyLevel,
         start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0],
-        person_name: name // Filter for specific person
+        end_date: endDate.toISOString().split('T')[0]
       };
+      
+      // When viewing team aggregations (MGA/GA/SA level without specific team selected),
+      // fetch aggregated team historical data instead of individual person data
+      if (hierarchyLevel !== 'all' && selectedTeam === 'all') {
+        // Fetch team-level aggregated historical data
+        params.team_name = name;
+        params.aggregate_team = true; // Tell backend to aggregate all agents under this team
+        console.log(`[Record Check] Fetching team historical data for ${name} at ${hierarchyLevel} level`);
+      } else {
+        // Fetch individual person historical data
+        params.person_name = name;
+        console.log(`[Record Check] Fetching individual historical data for ${name}`);
+      }
 
       // Add team filter if applicable
       if (selectedTeam !== 'all') {
@@ -703,11 +751,22 @@ const updateDateRangeFromCurrentDate = () => {
       
       if (response.data.success && response.data.data) {
         // Filter out current period data
-        const currentStartDate = new Date(dateRange.start_date);
-        const currentEndDate = new Date(dateRange.end_date);
+        // Fix timezone issues by parsing date string manually
+        const parseLocalDate = (dateString) => {
+          const [year, month, day] = dateString.split('-').map(Number);
+          return new Date(year, month - 1, day);
+        };
+        
+        const currentStartDate = parseLocalDate(dateRange.start_date);
+        const currentEndDate = parseLocalDate(dateRange.end_date);
+        
+        console.log(`[Record Check] Fetched ${response.data.data.length} historical records for ${name}`);
+        console.log(`[Record Check] Current period: ${dateRange.start_date} to ${dateRange.end_date}`);
+        console.log(`[Record Check] Period type: ${periodType}`);
         
         historicalData = response.data.data.filter(item => {
-          const itemDate = new Date(item.date);
+          // Parse item date with timezone fix
+          const itemDate = parseLocalDate(item.date);
           
           // Exclude current period
           if (periodType === 'week') {
@@ -715,14 +774,20 @@ const updateDateRangeFromCurrentDate = () => {
             const currentWeekStart = getWeekStart(currentStartDate);
             return itemWeekStart.getTime() !== currentWeekStart.getTime();
           } else if (periodType === 'month') {
-            return !(itemDate.getFullYear() === currentStartDate.getFullYear() && 
+            const exclude = (itemDate.getFullYear() === currentStartDate.getFullYear() && 
                     itemDate.getMonth() === currentStartDate.getMonth());
+            return !exclude;
           } else if (periodType === 'year') {
             return itemDate.getFullYear() !== currentStartDate.getFullYear();
           }
           
           return itemDate < currentStartDate || itemDate > currentEndDate;
         });
+        
+        console.log(`[Record Check] After filtering: ${historicalData.length} historical records remain`);
+        if (historicalData.length > 0) {
+          console.log(`[Record Check] Sample historical data:`, historicalData.slice(0, 5));
+        }
       }
       
       // Cache the result
@@ -746,10 +811,13 @@ const updateDateRangeFromCurrentDate = () => {
         return false;
       }
 
-      // Get historical data for this person
+      // Get historical data for this person/team
       const historicalData = await fetchHistoricalDataForPerson(name, periodType);
       
+      console.log(`[Record Check] ${name} - Current value: ${currentValue}, Period: ${periodType}`);
+      
       if (!historicalData || historicalData.length === 0) {
+        console.log(`[Record Check] ${name} - No historical data available`);
         return false; // No historical data to compare against
       }
 
@@ -760,71 +828,69 @@ const updateDateRangeFromCurrentDate = () => {
         // Group by individual weeks (exclude current week)
         const weeklyData = {};
         historicalData.forEach(item => {
-          const weekStart = getWeekStart(new Date(item.date));
+          // Fix timezone issues by parsing date string manually
+          const [year, month, day] = item.date.split('-').map(Number);
+          const itemDate = new Date(year, month - 1, day);
+          const weekStart = getWeekStart(itemDate);
           const weekKey = weekStart.toISOString().split('T')[0];
           if (!weeklyData[weekKey]) {
             weeklyData[weekKey] = 0;
           }
           weeklyData[weekKey] += item.true_refs || 0;
         });
+        console.log(`[Record Check] ${name} - Weekly grouped data:`, weeklyData);
         historicalPerformance.push(...Object.values(weeklyData));
       } else if (periodType === 'month') {
         // Group by months (exclude current month)
         const monthlyData = {};
         historicalData.forEach(item => {
-          const itemDate = new Date(item.date);
+          // Fix timezone issues by parsing date string manually
+          const [year, month, day] = item.date.split('-').map(Number);
+          const itemDate = new Date(year, month - 1, day);
           const monthKey = `${itemDate.getFullYear()}-${(itemDate.getMonth() + 1).toString().padStart(2, '0')}`;
           if (!monthlyData[monthKey]) {
             monthlyData[monthKey] = 0;
           }
           monthlyData[monthKey] += item.true_refs || 0;
         });
+        console.log(`[Record Check] ${name} - Monthly grouped data:`, monthlyData);
         historicalPerformance.push(...Object.values(monthlyData));
       } else if (periodType === 'year') {
         // Group by years (exclude current year)
         const yearlyData = {};
         historicalData.forEach(item => {
-          const itemDate = new Date(item.date);
+          // Fix timezone issues by parsing date string manually
+          const [year, month, day] = item.date.split('-').map(Number);
+          const itemDate = new Date(year, month - 1, day);
           const yearKey = itemDate.getFullYear().toString();
           if (!yearlyData[yearKey]) {
             yearlyData[yearKey] = 0;
           }
           yearlyData[yearKey] += item.true_refs || 0;
         });
+        console.log(`[Record Check] ${name} - Yearly grouped data:`, yearlyData);
         historicalPerformance.push(...Object.values(yearlyData));
       }
 
       // Need at least one historical period to compare against
       if (historicalPerformance.length === 0) {
-        // Fallback to threshold-based record check if no historical data
-        const recordThresholds = {
-          week: 5,   // 5+ refs in a week is exceptional
-          month: 20, // 20+ refs in a month is exceptional
-          year: 80   // 80+ refs in a year is exceptional
-        };
-        
-        const threshold = recordThresholds[periodType] || recordThresholds.month;
-        const isThresholdRecord = currentValue >= threshold;
-        
-        return isThresholdRecord;
+        console.log(`[Record Check] ${name} - No historical performance periods found`);
+        // No historical data - cannot determine if this is a record
+        return false;
       }
 
       // Check if current value is better than all historical values
       const maxHistorical = Math.max(...historicalPerformance, 0);
       const isPersonalRecord = currentValue > maxHistorical;
       
+      console.log(`[Record Check] ${name} - Max historical: ${maxHistorical}, Current: ${currentValue}, Is Record: ${isPersonalRecord}`);
+      
       return isPersonalRecord;
 
     } catch (error) {
-      // Fallback to threshold-based record check on error
-      const recordThresholds = {
-        week: 5,   // 5+ refs in a week is exceptional
-        month: 20, // 20+ refs in a month is exceptional
-        year: 80   // 80+ refs in a year is exceptional
-      };
-      
-      const threshold = recordThresholds[periodType] || recordThresholds.month;
-      return currentValue >= threshold;
+      // On error, don't show record indicator
+      console.error('Error checking personal record:', error);
+      return false;
     }
   };
 
@@ -1068,7 +1134,7 @@ const updateDateRangeFromCurrentDate = () => {
 
           <select
             className="date-dropdown"
-            value={currentDate.toISOString().split('T')[0]}
+            value={`${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2,'0')}-${String(currentDate.getDate()).padStart(2,'0')}`}
             onChange={e => {
               const [y, m, d] = e.target.value.split('-').map(Number);
               const newDate = new Date(y, m - 1, d);

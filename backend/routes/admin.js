@@ -21,7 +21,7 @@ router.get('/getAllUsers', verifyToken, verifyAdmin, async (req, res) => {
   try {
     
     const users = await query(`
-      SELECT id, lagnname, clname, email, managerActive, Active 
+      SELECT id, lagnname, clname, email, managerActive, Active, mga, rept_name, profpic
       FROM activeusers 
       ORDER BY clname, lagnname
     `);
@@ -180,6 +180,22 @@ router.get('/getUserHierarchy/:userId', verifyToken, verifyAdmin, async (req, re
       hierarchyData = [...agentData, ...uplineData];
     }
     
+    // Special case: For MAUGHANEVANSON BRODY W, also include all LOCKER-ROTOLO users
+    if (user.lagnname === 'MAUGHANEVANSON BRODY W') {
+      const lockerRotoloUsers = await query(`
+        SELECT a.*, GROUP_CONCAT(l.state) AS license_states
+        FROM activeusers a
+        LEFT JOIN licenses l ON a.lagnname = l.lagnname
+        WHERE a.rept_name = 'LOCKER-ROTOLO'
+        GROUP BY a.lagnname
+      `);
+      
+      // Merge LOCKER-ROTOLO users with existing hierarchy, avoiding duplicates
+      const existingIds = new Set(hierarchyData.map(u => u.id));
+      const newUsers = lockerRotoloUsers.filter(u => !existingIds.has(u.id));
+      hierarchyData = [...hierarchyData, ...newUsers];
+    }
+    
     // Process license data
     hierarchyData = hierarchyData.map(user => {
       // Process license states if available
@@ -260,57 +276,106 @@ router.get("/check-admin", verifyToken, async (req, res) => {
    Get All RGAs Hierarchy Route (Admin)
 ------------------------- */
 router.get("/getAllRGAsHierarchy", verifyToken, verifyAdmin, async (req, res) => {
+  // ⏱️ PERFORMANCE TIMING START
+  const perfStart = Date.now();
+  console.log(`\n🚀 [Admin: All RGAs Hierarchy] Starting fetch for all RGAs...`);
   
   try {
-    // Step 1: Get all RGAs from the activeusers table
+    // Step 1: Get ONLY TOP-LEVEL RGAs (those who don't report to another active RGA)
+    // Nested RGAs (like BENNETT BRANDON -> CRIVELLI -> EVANSON) will be pulled in via recursive CTE
+    const rgaLookupStart = Date.now();
     const rgaResults = await query(
-      `SELECT id, lagnname FROM activeusers WHERE clname = 'RGA' AND Active = 'y' ORDER BY lagnname`
+      `SELECT id, lagnname, rga 
+       FROM activeusers 
+       WHERE clname = 'RGA' 
+         AND Active = 'y' 
+         AND (
+           rga IS NULL 
+           OR rga = '' 
+           OR rga NOT IN (SELECT lagnname FROM activeusers WHERE Active = 'y' AND clname = 'RGA')
+         )
+       ORDER BY lagnname`
     );
+    const rgaLookupTime = Date.now() - rgaLookupStart;
+    console.log(`   ⏱️  Top-level RGA lookup: ${rgaLookupTime}ms (found ${rgaResults.length} top-level RGAs)`);
+    console.log(`   📋 Top-level RGAs:`, rgaResults.map(r => r.lagnname));
     
     if (rgaResults.length === 0) {
       return res.json({ success: true, data: [], rgaCount: 0 });
     }
 
-    // Optimization 1: Get all MGAs in a single query instead of per RGA
+    // Optimization 1: Get all MGAs recursively using CTE for each top-level RGA
     const allRgaNames = rgaResults.map(rga => rga.lagnname);
-    const rgaNamesPlaceholders = allRgaNames.map(() => "?").join(", ");
     
-    const allMgasQuery = `SELECT lagnname, rga, legacy, tree 
-                         FROM MGAs 
-                         WHERE (rga IN (${rgaNamesPlaceholders}) 
-                            OR legacy IN (${rgaNamesPlaceholders}) 
-                            OR tree IN (${rgaNamesPlaceholders}))
-                           AND (active = 'y' OR active IS NULL)
-                           AND (hide = 'n' OR hide IS NULL)`;
-    
-    const allMgaResults = await query(allMgasQuery, [
-      ...allRgaNames,
-      ...allRgaNames,
-      ...allRgaNames
-    ]);
-    
-    // Create a map for quick lookups of MGAs by RGA
+    const mgaLookupStart = Date.now();
     const mgasByRga = {};
-    allRgaNames.forEach(rgaName => {
-      mgasByRga[rgaName] = [];
-    });
     
-    allMgaResults.forEach(mga => {
-      if (mga.rga && allRgaNames.includes(mga.rga)) {
-        mgasByRga[mga.rga].push(mga.lagnname);
+    // For each top-level RGA, recursively fetch ALL MGAs in their tree
+    for (const rgaName of allRgaNames) {
+      const recursiveMgasQuery = `
+        WITH RECURSIVE mga_tree AS (
+          -- Level 0: Start with this RGA's direct MGAs
+          SELECT lagnname, rga, legacy, tree, 0 as level
+          FROM MGAs
+          WHERE (rga = ? OR legacy = ? OR tree = ?)
+            AND (active = 'y' OR active IS NULL)
+            AND (hide = 'n' OR hide IS NULL)
+          
+          UNION ALL
+          
+          -- Recursive: Find MGAs whose rga/legacy/tree points to anyone in our tree
+          SELECT m.lagnname, m.rga, m.legacy, m.tree, mt.level + 1
+          FROM MGAs m
+          INNER JOIN mga_tree mt ON (
+            m.rga = mt.lagnname 
+            OR m.legacy = mt.lagnname 
+            OR m.tree = mt.lagnname
+          )
+          WHERE (m.active = 'y' OR m.active IS NULL)
+            AND (m.hide = 'n' OR m.hide IS NULL)
+            AND mt.level < 10
+        )
+        SELECT DISTINCT lagnname FROM mga_tree
+      `;
+      
+      const mgaResults = await query(recursiveMgasQuery, [rgaName, rgaName, rgaName]);
+      const mgaNames = mgaResults.map(m => m.lagnname);
+      mgasByRga[rgaName] = mgaNames;
+      
+      // CRITICAL: Check if any of these MGAs are ALSO RGAs in activeusers table
+      // (e.g., BENNETT BRANDON is in MGAs table but is also an RGA with his own team)
+      if (mgaNames.length > 0) {
+        const placeholders = mgaNames.map(() => '?').join(',');
+        const mgasWhoAreRgas = await query(`
+          SELECT lagnname 
+          FROM activeusers 
+          WHERE lagnname IN (${placeholders}) 
+            AND clname IN ('RGA', 'MGA') 
+            AND Active = 'y'
+        `, mgaNames);
+        
+        const mgasWhoAreRgaNames = mgasWhoAreRgas.map(r => r.lagnname);
+        
+        if (mgasWhoAreRgaNames.length > 0 && rgaName === 'MAUGHANEVANSON BRODY W') {
+          console.log(`   🔍 Found ${mgasWhoAreRgaNames.length} MGAs who are also RGAs/MGAs in activeusers:`, mgasWhoAreRgaNames);
+        }
+        
+        // Add these MGA-RGAs to the main list
+        mgasByRga[rgaName] = [...mgaNames, ...mgasWhoAreRgaNames];
       }
-      if (mga.legacy && allRgaNames.includes(mga.legacy)) {
-        mgasByRga[mga.legacy].push(mga.lagnname);
-      }
-      if (mga.tree && allRgaNames.includes(mga.tree)) {
-        mgasByRga[mga.tree].push(mga.lagnname);
-      }
-    });
+    }
+    
+    const mgaLookupTime = Date.now() - mgaLookupStart;
+    const totalMgas = Object.values(mgasByRga).reduce((sum, list) => sum + list.length, 0);
+    console.log(`   ⏱️  Recursive MGA lookup: ${mgaLookupTime}ms (found ${totalMgas} MGAs total across all RGAs)`);
     
     // Step 2: Prepare and execute the main query for all hierarchies at once
     // Optimization 2: Increase batch size
+    console.log(`   ⏱️  Starting batch processing for ${rgaResults.length} RGAs...`);
+    const batchProcessStart = Date.now();
     const batchSize = 10;
     const allHierarchyData = [];
+    let totalUsersFound = 0;
     
     for (let i = 0; i < rgaResults.length; i += batchSize) {
       const batch = rgaResults.slice(i, i + batchSize);
@@ -319,13 +384,69 @@ router.get("/getAllRGAsHierarchy", verifyToken, verifyAdmin, async (req, res) =>
           const rgaName = rga.lagnname;
           let lagnnameList = [rgaName, ...mgasByRga[rgaName]];
           
+          // ⚡ NEW: Recursively fetch nested RGAs
+          // Some RGAs have other RGAs as their upline (e.g., CRIVELLI -> EVANSON -> MAUGHANEVANSON)
+          // We need to include ALL nested RGAs in the tree
+          const nestedRGAs = await query(`
+            WITH RECURSIVE rga_tree AS (
+              -- Base case: Start with the current RGA
+              SELECT lagnname, rga, clname, 0 as level
+              FROM activeusers
+              WHERE lagnname = ? AND Active = 'y'
+              
+              UNION ALL
+              
+              -- Recursive case: Find RGAs whose rga field points to anyone in our tree
+              SELECT au.lagnname, au.rga, au.clname, rt.level + 1
+              FROM activeusers au
+              INNER JOIN rga_tree rt ON au.rga = rt.lagnname
+              WHERE au.Active = 'y' AND au.clname = 'RGA' AND rt.level < 10
+            )
+            SELECT DISTINCT lagnname, rga, level FROM rga_tree WHERE clname = 'RGA'
+          `, [rgaName]);
+          
+          // Debug logging for nested RGAs
+          if (rgaName === 'MAUGHANEVANSON BRODY W') {
+            console.log(`\n🔍 [DEBUG] Nested RGAs for ${rgaName}:`, nestedRGAs);
+            
+            // Check if BENNETT BRANDON exists and is an RGA
+            const bennettCheck = await query(`
+              SELECT lagnname, clname, rga, mga 
+              FROM activeusers 
+              WHERE lagnname LIKE '%BENNETT BRANDON%' AND Active = 'y'
+            `);
+            console.log(`\n🔍 [DEBUG] BENNETT BRANDON check:`, bennettCheck);
+            
+            // Check if CRIVELLI exists
+            const crivelliCheck = await query(`
+              SELECT lagnname, clname, rga, mga 
+              FROM activeusers 
+              WHERE lagnname LIKE '%CRIVELLI%' AND Active = 'y'
+            `);
+            console.log(`\n🔍 [DEBUG] CRIVELLI check:`, crivelliCheck);
+            
+            // Check if EVANSON BRODY J exists
+            const evansonCheck = await query(`
+              SELECT lagnname, clname, rga, mga 
+              FROM activeusers 
+              WHERE lagnname LIKE '%EVANSON BRODY J%' AND Active = 'y'
+            `);
+            console.log(`\n🔍 [DEBUG] EVANSON BRODY J check:`, evansonCheck);
+          }
+          
+          // Add nested RGAs to the list
+          const nestedRGANames = nestedRGAs.map(r => r.lagnname);
+          lagnnameList = [...lagnnameList, ...nestedRGANames];
+          
           // Deduplicate the list
           lagnnameList = [...new Set(lagnnameList)];
           
           // Prepare query
           const placeholders = lagnnameList.map(() => "?").join(", ");
           
-          // Optimization 3: Simplify and optimize the query
+          // ⚡ PROGRESSIVE LOADING OPTIMIZATION: 
+          // Removed licenses and PNP joins - these were causing 9-12 second queries!
+          // Frontend can fetch these separately if needed
           const queryText = `
             SELECT 
                 au.id,
@@ -349,56 +470,23 @@ router.get("/getAllRGAsHierarchy", verifyToken, verifyAdmin, async (req, res) =>
                 mga_data.legacy AS legacy_link,
                 mga_data.tree AS tree_link,
                 mga_data.rga AS mga_rga_link,
+                mga_data.active AS mga_active,
+                mga_data.hide AS mga_hide,
                 JSON_OBJECT(
                   'rga', au.rga,
                   'mga_lagnname', au.mga,
                   'mga_rga', mga_rel.rga,
                   'mga_legacy', mga_rel.legacy,
                   'mga_tree', mga_rel.tree
-                ) AS relationship_data,
-                lic.licenses,
-                pnp_ranked.pnp_data
+                ) AS relationship_data
             FROM activeusers au
             LEFT JOIN usersinfo main_ui ON au.lagnname = main_ui.lagnname AND au.esid = main_ui.esid
             LEFT JOIN MGAs mga_data ON au.lagnname = mga_data.lagnname
             LEFT JOIN MGAs mga_rel ON au.mga = mga_rel.lagnname
             
-            /* Optimization 4: Use subqueries for licenses and pnp data to improve join performance */
-            LEFT JOIN (
-              SELECT 
-                userId,
-                JSON_ARRAYAGG(
-                  JSON_OBJECT(
-                    'id', id,
-                    'state', state,
-                    'license_number', license_number,
-                    'expiry_date', expiry_date,
-                    'resident_state', resident_state
-                  )
-                ) AS licenses
-              FROM licensed_states
-              GROUP BY userId
-            ) AS lic ON lic.userId = au.id
-            
-            LEFT JOIN (
-              SELECT 
-                name_line,
-                esid,
-                JSON_OBJECT(
-                  'curr_mo_4mo_rate', curr_mo_4mo_rate,
-                  'proj_plus_1', proj_plus_1,
-                  'pnp_date', date,
-                  'agent_num', agent_num
-                ) as pnp_data,
-                ROW_NUMBER() OVER (PARTITION BY name_line, esid ORDER BY STR_TO_DATE(date, '%m/%d/%y') DESC) as rn
-              FROM pnp
-            ) AS pnp_ranked ON (pnp_ranked.name_line = au.lagnname OR au.lagnname LIKE CONCAT(pnp_ranked.name_line, ' %'))
-              AND pnp_ranked.rn = 1
-              AND ABS(DATEDIFF(STR_TO_DATE(pnp_ranked.esid, '%m/%d/%y'), STR_TO_DATE(au.esid, '%Y-%m-%d'))) <= 7
-            
             WHERE au.Active = 'y'
             AND (
-              (au.clname = 'RGA' AND au.lagnname = ?)
+              au.lagnname IN (${placeholders})
               OR au.sa IN (${placeholders}) 
               OR au.ga IN (${placeholders}) 
               OR au.mga IN (${placeholders}) 
@@ -408,11 +496,11 @@ router.get("/getAllRGAsHierarchy", verifyToken, verifyAdmin, async (req, res) =>
           `;
           
           const queryParams = [
-            rgaName,
-            ...lagnnameList,
-            ...lagnnameList,
-            ...lagnnameList,
-            ...lagnnameList
+            ...lagnnameList,  // For au.lagnname IN (...)
+            ...lagnnameList,  // For au.sa IN (...)
+            ...lagnnameList,  // For au.ga IN (...)
+            ...lagnnameList,  // For au.mga IN (...)
+            ...lagnnameList   // For au.rga IN (...)
           ];
           
           const results = await query(queryText, queryParams);
@@ -463,20 +551,30 @@ router.get("/getAllRGAsHierarchy", verifyToken, verifyAdmin, async (req, res) =>
       batchResults.forEach(result => {
         if (result) {
           allHierarchyData.push(result);
+          totalUsersFound += result.users ? result.users.length : 0;
         }
       });
     }
+    
+    const batchProcessTime = Date.now() - batchProcessStart;
+    const totalTime = Date.now() - perfStart;
+    
+    console.log(`   ⏱️  Batch processing complete: ${batchProcessTime}ms`);
+    console.log(`✅ [Admin: All RGAs Hierarchy] Complete - ${totalTime}ms total`);
+    console.log(`   📊 Returned ${allHierarchyData.length} RGAs with ${totalUsersFound} total users\n`);
     
     res.json({ 
       success: true, 
       data: allHierarchyData,
       rgaCount: allHierarchyData.length,
-      totalRgaCount: rgaResults.length
+      totalRgaCount: rgaResults.length,
+      _timing: { backendMs: totalTime, stage: 'admin_all_rgas' }
     });
     
   } catch (err) {
-
-    res.status(500).json({ success: false, message: "Error retrieving hierarchy data" });
+    const totalTime = Date.now() - perfStart;
+    console.error(`❌ [Admin: All RGAs Hierarchy] Error after ${totalTime}ms:`, err);
+    res.status(500).json({ success: false, message: "Error retrieving hierarchy data", _timing: { backendMs: totalTime, error: true } });
   }
 });
 

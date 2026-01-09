@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FiChevronRight, FiLoader, FiUser, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import { useAuth } from '../../../context/AuthContext';
+import RightDetails from '../../utils/RightDetails';
 import api from '../../../api';
 import './HierarchyActivity.css';
 
@@ -11,6 +12,8 @@ const HierarchyActivity = ({ currentUserOnly = false }) => {
   const [expandedRGAs, setExpandedRGAs] = useState({});
   const [expandedNodes, setExpandedNodes] = useState({});
   const [error, setError] = useState('');
+  const [showRightDetails, setShowRightDetails] = useState(false);
+  const [rightDetailsData, setRightDetailsData] = useState(null);
 
   // Check if user is admin or regular user
   useEffect(() => {
@@ -22,6 +25,30 @@ const HierarchyActivity = ({ currentUserOnly = false }) => {
       fetchAllRGAsHierarchy();
     }
   }, [currentUserOnly, hasPermission('admin'), user?.userId]);
+
+  // Handle profile click - open agent profile in RightDetails
+  const handleProfileClick = (node) => {
+    const agentData = {
+      __isAgentProfile: true,
+      id: node.id,
+      lagnname: node.lagnname,
+      displayName: node.lagnname,
+      clname: node.clname,
+      profpic: node.profpic,
+      email: node.email,
+      phone: node.phone,
+      managerActive: node.managerActive || 'y',
+      esid: node.esid,
+      licenses: node.licenses || [],
+      sa: node.sa,
+      ga: node.ga,
+      mga: node.mga,
+      rga: node.rga
+    };
+    
+    setRightDetailsData(agentData);
+    setShowRightDetails(true);
+  };
 
   // Fetch data for non-admin users using simplified userHierarchy endpoint
   const fetchUserHierarchyData = async () => {
@@ -477,7 +504,14 @@ const HierarchyActivity = ({ currentUserOnly = false }) => {
                                   style={{ marginLeft: `${indentation}px` }}
                                 >
                                   <div className="user-cell">
-                                    <div className="user-icon">
+                                    <div 
+                                      className="user-icon clickable-profile-icon"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleProfileClick(node);
+                                      }}
+                                      title="View profile"
+                                    >
                                       {node.profpic ? (
                                         <img 
                                           src={node.profpic} 
@@ -518,6 +552,17 @@ const HierarchyActivity = ({ currentUserOnly = false }) => {
           );
         })}
       </div>
+      
+      {/* Agent Profile RightDetails */}
+      {showRightDetails && rightDetailsData && (
+        <RightDetails
+          data={rightDetailsData}
+          onClose={() => {
+            setShowRightDetails(false);
+            setRightDetailsData(null);
+          }}
+        />
+      )}
     </div>
   );
 };

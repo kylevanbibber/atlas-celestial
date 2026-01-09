@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { pool, query } = require("../db");
+const { verifyToken } = require("../middleware/authMiddleware");
 
 // POST /api/dailyActivity/submit - Submit daily activity data
 router.post("/submit", async (req, res) => {
@@ -215,7 +216,29 @@ router.get("/team-summary", async (req, res) => {
         const params = (String(roleScope || '').toLowerCase() === 'rga')
             ? [lagnParam, lagnParam, lagnParam, lagnParam, userIdParam, startDate, endDate]
             : [lagnParam, lagnParam, lagnParam, userIdParam, startDate, endDate];
-        const result = await query(queryStr, params);
+        let result = await query(queryStr, params);
+        
+        // Special case: For MAUGHANEVANSON BRODY W, also include all LOCKER-ROTOLO users
+        if (currentUserLagn === 'MAUGHANEVANSON BRODY W') {
+            const lockerRotoloQuery = `
+                SELECT 
+                    da.reportDate, da.calls, da.appts, da.sits, da.sales, da.alp, da.refs,
+                    da.refAppt, da.refSit, da.refSale, da.refAlp,
+                    da.agent, da.userId
+                FROM Daily_Activity da
+                JOIN activeusers au ON da.userId = au.id
+                WHERE au.rept_name = 'LOCKER-ROTOLO'
+                  AND au.Active = 'y'
+                  AND da.reportDate BETWEEN STR_TO_DATE(?, '%Y-%m-%d') AND STR_TO_DATE(?, '%Y-%m-%d')
+                ORDER BY da.reportDate ASC
+            `;
+            const lockerRotoloResult = await query(lockerRotoloQuery, [startDate, endDate]);
+            
+            // Merge results, avoiding duplicates by userId + reportDate
+            const existingKeys = new Set(result.map(r => `${r.userId}_${r.reportDate}`));
+            const newRecords = lockerRotoloResult.filter(r => !existingKeys.has(`${r.userId}_${r.reportDate}`));
+            result = [...result, ...newRecords];
+        }
 
         res.status(200).json({ success: true, data: result || [] });
     } catch (err) {
@@ -225,8 +248,9 @@ router.get("/team-summary", async (req, res) => {
 });
 
 // POST /api/dailyActivity/update - Update multiple daily activity records
-router.post("/update", async (req, res) => {
-    const { userId, updates } = req.body;
+router.post("/update", verifyToken, async (req, res) => {
+    const userId = req.user?.id || req.body.userId;
+    const { updates } = req.body;
 
     if (!userId || !updates || Object.keys(updates).length === 0) {
         return res.status(400).json({ success: false, message: 'Missing userId or updates' });

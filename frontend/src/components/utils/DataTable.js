@@ -21,6 +21,7 @@ const DataTable = ({
   onCellBlur,
   onMassStatusChange,
   onSelectionChange,
+  onRowsRendered = null,
   enableRowContextMenu = false,
   getRowContextMenuOptions, 
   onCreateCompany,
@@ -327,8 +328,8 @@ const DataTable = ({
   const handleKeyDown = (e, rowIndex, columnIndex, totalRows, totalCols) => {
     const moveToCell = (newRow, newCol) => {
       // Use the currently rendered page rows and their visible cells to determine targets
-      const safeRowIndex = Math.max(0, Math.min(newRow, (page?.length || 0) - 1));
-      const targetRow = page?.[safeRowIndex];
+      const safeRowIndex = Math.max(0, Math.min(newRow, (renderedRows?.length || 0) - 1));
+      const targetRow = renderedRows?.[safeRowIndex];
       if (!targetRow) return;
 
       const visibleColsCount = targetRow.cells?.length || 0;
@@ -506,14 +507,29 @@ const DataTable = ({
         // Handle null/undefined values
         if (cellValue === null || cellValue === undefined) return false;
         
+        // Find the column config to check if it has filterSplitBy
+        const column = columns.find(col => col.accessor === columnId || col.id === columnId);
+        const filterSplitBy = column?.filterSplitBy;
+        
         // Check if filterValue is an array (checkbox filter)
         if (Array.isArray(filterValue)) {
-          // For array filters, check if the cell value is in the selected values
-          return filterValue.some(val => {
-            const cellStr = String(cellValue).toLowerCase();
-            const filterStr = String(val).toLowerCase();
-            return cellStr === filterStr;
-          });
+          const cellStr = String(cellValue).toLowerCase();
+          
+          // If column has filterSplitBy, check if any selected value is contained in the cell
+          if (filterSplitBy) {
+            // Split the cell value by the delimiter and check if any match
+            const cellParts = cellStr.split(filterSplitBy).map(part => part.trim());
+            return filterValue.some(val => {
+              const filterStr = String(val).toLowerCase().trim();
+              return cellParts.includes(filterStr);
+            });
+          } else {
+            // For non-split columns, check exact match
+            return filterValue.some(val => {
+              const filterStr = String(val).toLowerCase();
+              return cellStr === filterStr;
+            });
+          }
         } else {
           // For text filters, check if cell value includes the filter value
           const cellStr = String(cellValue).toLowerCase();
@@ -529,7 +545,9 @@ const DataTable = ({
   if (!disableSorting) {
     tableHooks.push(useSortBy);
   }
+  if (!disablePagination) {
   tableHooks.push(usePagination);
+  }
 
   // Build initial sort state
   const initialSort = (!disableSorting && defaultSortBy)
@@ -541,6 +559,7 @@ const DataTable = ({
     getTableBodyProps,
     headerGroups,
     page,
+    rows,
     prepareRow,
     pageOptions,
     pageCount,
@@ -555,7 +574,12 @@ const DataTable = ({
     { 
       columns, 
       data: filteredData,
-      getRowId: (row, index) => row.id || row.userId || index, // Ensure proper row identification
+      getRowId: (row, index) => {
+        // Use id or userId as unique identifier, fallback to index
+        if (row && (row.id !== undefined && row.id !== null)) return String(row.id);
+        if (row && (row.userId !== undefined && row.userId !== null)) return String(row.userId);
+        return String(index);
+      },
       initialState: { 
         pageIndex: 0, 
         pageSize: disablePagination ? filteredData.length || 1000 : 25,
@@ -566,6 +590,25 @@ const DataTable = ({
     },
     ...tableHooks
   );
+  
+  // Choose rows to render: all rows when pagination is disabled
+  const renderedRows = disablePagination ? rows : page;
+
+  // Notify parent of currently rendered rows (for diagnostics)
+  // Use a ref to avoid infinite loops from inline function props
+  const onRowsRenderedRef = React.useRef(onRowsRendered);
+  React.useEffect(() => {
+    onRowsRenderedRef.current = onRowsRendered;
+  }, [onRowsRendered]);
+
+  React.useEffect(() => {
+    try {
+      if (typeof onRowsRenderedRef.current === 'function') {
+        const originals = (renderedRows || []).map(r => r.original || r);
+        onRowsRenderedRef.current(originals);
+      }
+    } catch (_) {}
+  }, [renderedRows]);
   
   // Update page size when data changes and pagination is disabled
   useEffect(() => {
@@ -704,7 +747,7 @@ const DataTable = ({
           e,
           row.index,
           cell.column.index,
-          page.length,
+          (disablePagination ? rows.length : page.length),
           row.cells.length
         ),
       type: columnType,
@@ -767,7 +810,7 @@ const DataTable = ({
     });
 
     // Define stats columns that should be calculated, not summed
-    const statsColumns = ['showRatio', 'closeRatio', 'alpPerSale', 'alpPerRefSale', 'alpPerRefCollected', 'daysRep'];
+    const statsColumns = ['showRatio', 'closeRatio', 'alpPerSale', 'alpPerRefSale', 'alpPerRefCollected', 'refCloseRatio', 'refCollectedPerSit', 'callsToSitRatio', 'daysRep'];
     
     // Sum the specified columns (exclude weekly total rows, excluded rows, and stats columns)
     filteredData.forEach(row => {
@@ -796,6 +839,7 @@ const DataTable = ({
       const refs = totals.refs || 0;
       const refAlp = totals.refAlp || 0;
       const refSale = totals.refSale || 0;
+      const refSit = totals.refSit || 0;
       
       // Calculate each stat if it's included in totalsColumns
       if (totalsColumns.includes('showRatio')) {
@@ -812,6 +856,15 @@ const DataTable = ({
       }
       if (totalsColumns.includes('alpPerRefCollected')) {
         totals.alpPerRefCollected = refs > 0 ? '$' + (refAlp / refs).toFixed(0) : '$0';
+      }
+      if (totalsColumns.includes('refCloseRatio')) {
+        totals.refCloseRatio = refSit > 0 ? ((refSale / refSit) * 100).toFixed(1) + '%' : '0.0%';
+      }
+      if (totalsColumns.includes('refCollectedPerSit')) {
+        totals.refCollectedPerSit = sits > 0 ? (refs / sits).toFixed(2) : '0.00';
+      }
+      if (totalsColumns.includes('callsToSitRatio')) {
+        totals.callsToSitRatio = sits > 0 ? (calls / sits).toFixed(2) : '0.00';
       }
       
       // Days Rep doesn't make sense to calculate at organization level, leave blank
@@ -1244,11 +1297,28 @@ const DataTable = ({
                                   >
                                     {(() => {
                                       // Get unique values from the column
-                                      const uniqueValues = [...new Set(
-                                        localData
+                                      let uniqueValues;
+                                      const filterSplitBy = column.filterSplitBy;
+                                      
+                                      if (filterSplitBy) {
+                                        // For columns with filterSplitBy (e.g., comma-separated values), split and flatten
+                                        const allValues = localData
                                           .map(row => row[column.id])
-                                          .filter(val => val !== null && val !== undefined && val !== '')
-                                      )].sort();
+                                          .filter(val => val !== null && val !== undefined && val !== '');
+                                        
+                                        const splitValues = allValues
+                                          .flatMap(val => String(val).split(filterSplitBy).map(v => v.trim()))
+                                          .filter(v => v !== '');
+                                        
+                                        uniqueValues = [...new Set(splitValues)].sort();
+                                      } else {
+                                        // For regular columns, get unique cell values as before
+                                        uniqueValues = [...new Set(
+                                          localData
+                                            .map(row => row[column.id])
+                                            .filter(val => val !== null && val !== undefined && val !== '')
+                                        )].sort();
+                                      }
                                       
                                       // Initialize temp selections if not already set
                                       if (!tempFilterSelections[column.id]) {
@@ -1598,7 +1668,7 @@ const DataTable = ({
                 {showTotals && (totalsPosition === 'top' || totalsPosition === 'both') && renderTotalsRow('top')}
                 
                 {/* No data message */}
-                {(!page || page.length === 0) && (
+                {(!renderedRows || renderedRows.length === 0) && (
                   <tr className="no-data-row">
                     <td colSpan={flattenColumns(columns).length} className="no-data-cell">
                       <div className="no-data-container">
@@ -1612,7 +1682,7 @@ const DataTable = ({
                   </tr>
                 )}
                 
-                {page.map((row, rowIndex) => {
+                {renderedRows.map((row, rowIndex) => {
                   prepareRow(row);
                   const isEditingRow =
                     highlightRowOnEdit && editingCell?.id === row.original.id;
@@ -1787,7 +1857,7 @@ const DataTable = ({
                                 e,
                                 rowIndex,
                                 columnIndex,
-                                page.length,
+                                (disablePagination ? rows.length : page.length),
                                 row.cells.length
                               )
                             }

@@ -65,7 +65,8 @@ const LicenseOnboardingModal = () => {
     }
   };
   // Do not show on Licensing page
-  const isLicensingPage = location.pathname === '/utilities' && (new URLSearchParams(location.search).get('section') === 'licensing');
+  const isLicensingPage = (location.pathname === '/utilities' && (new URLSearchParams(location.search).get('section') === 'licensing')) ||
+                          (location.pathname === '/resources' && (new URLSearchParams(location.search).get('active') === 'licensing'));
   if (!isOpen || !isAuthenticated || licensesLoading || isLicensingPage) return null;
 
   return (
@@ -159,7 +160,7 @@ const LicenseOnboardingModal = () => {
             </button>
             <a 
               className="insured-button"
-              href="/utilities?section=licensing"
+              href="/resources?active=licensing"
               style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
             >
               Go to Licensing

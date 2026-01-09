@@ -2,6 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    
+    <!-- Cache control headers to prevent stale JS bundles -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <link
     href="https://fonts.googleapis.com/icon?family=Material+Icons"
@@ -11,13 +17,30 @@
     <meta name="theme-color" content="#000000" />
     <meta
       name="description"
-      content="Atlas"
+      content="Join our team and build a rewarding career in life insurance sales. Flexible schedule, unlimited earning potential, and comprehensive training provided."
     />
+    
+    <!-- Open Graph / Social Media Preview Tags -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Arias Agencies" />
+    <meta property="og:title" content="Career Opportunities | Arias Agencies" />
+    <meta property="og:description" content="Join our team and build a rewarding career in life insurance sales. Flexible schedule, unlimited earning potential, and comprehensive training provided." />
+    <meta property="og:image" content="https://ariaslife.com/uploads/uploads/pipeline/careers-preview.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:url" content="https://atlas.ariaslife.com/careers" />
+    
+    <!-- Twitter Card Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Career Opportunities | Arias Agencies" />
+    <meta name="twitter:description" content="Join our team and build a rewarding career in life insurance sales. Flexible schedule, unlimited earning potential, and comprehensive training provided." />
+    <meta name="twitter:image" content="https://ariaslife.com/uploads/uploads/pipeline/careers-preview.png" />
+    
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     
     <!-- iOS specific meta tags -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Atlas" />
     
     <!-- Additional mobile optimizations -->
@@ -63,6 +86,66 @@
         });
       }
 
+      // Handle chunk loading failures - auto-reload once if we get a syntax error
+      window.addEventListener('error', function(event) {
+        const isChunkError = event.message && (
+          event.message.includes('Unexpected token') ||
+          event.message.includes('Loading chunk') ||
+          event.message.includes('Failed to fetch')
+        );
+        
+        if (isChunkError) {
+          const hasReloaded = sessionStorage.getItem('chunk-error-reload');
+          
+          if (!hasReloaded) {
+            console.log('🔄 Detected chunk loading error, attempting reload...');
+            sessionStorage.setItem('chunk-error-reload', 'true');
+            
+            // Clear caches before reload
+            if ('caches' in window) {
+              caches.keys().then(function(names) {
+                names.forEach(function(name) {
+                  caches.delete(name);
+                });
+              }).then(function() {
+                window.location.reload(true);
+              });
+            } else {
+              window.location.reload(true);
+            }
+          } else {
+            // Already tried reloading, show user-friendly error
+            console.error('❌ Chunk loading error persists after reload');
+            document.body.innerHTML = `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 100px auto; padding: 20px; text-align: center;">
+                <h1 style="color: #e53e3e;">⚠️ Loading Error</h1>
+                <p style="color: #4a5568; margin: 20px 0;">
+                  We're having trouble loading the application. This usually happens when there's a cached version mismatch.
+                </p>
+                <p style="color: #4a5568; margin: 20px 0;">
+                  <strong>Please try:</strong>
+                </p>
+                <ol style="text-align: left; color: #4a5568; margin: 20px auto; max-width: 400px;">
+                  <li>Press <kbd>Ctrl+Shift+R</kbd> (Windows) or <kbd>Cmd+Shift+R</kbd> (Mac) to hard refresh</li>
+                  <li>Clear your browser cache</li>
+                  <li>Try an incognito/private window</li>
+                </ol>
+                <button onclick="sessionStorage.clear(); window.location.reload(true);" 
+                  style="background: #3182ce; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; margin-top: 20px;">
+                  Try Again
+                </button>
+              </div>
+            `;
+            sessionStorage.removeItem('chunk-error-reload');
+          }
+        }
+      }, true);
+
+      // Clear the reload flag on successful load
+      window.addEventListener('load', function() {
+        sessionStorage.removeItem('chunk-error-reload');
+      });
+
       // Prevent all zoom behaviors with JavaScript
       document.addEventListener('gesturestart', function (e) {
         e.preventDefault();
@@ -97,7 +180,7 @@
       }, { passive: false });
     </script>
     
-    <title>Atlas</title>
+    <title>Career Opportunities | Arias Agencies</title>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

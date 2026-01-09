@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useCallback } from "react";
 import DataTable from "../../utils/DataTable";
 import ActionBar from "../../utils/ActionBar";
 import DiscordSalesExpanded from "./DiscordSalesExpanded";
 import HierarchyActivity from "./HierarchyActivity";
 import MGADataTable from "./MGADataTable";
+import ActivitySummaryCards from "./ActivitySummaryCards";
 import api from "../../../api";
 import { AuthContext } from "../../../context/AuthContext";
 import "./DailyActivityForm.css";
@@ -368,6 +369,23 @@ const DailyActivityForm = () => {
       console.error('Error saving schedule type to localStorage:', error);
     }
   }, [scheduleType]);
+
+  // Warn user before leaving page with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (Object.keys(editedRows).length > 0) {
+        e.preventDefault();
+        e.returnValue = ''; // Chrome requires returnValue to be set
+        return ''; // Some browsers use the return value
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [editedRows]);
 
   useEffect(() => {
     generateDateRows();
@@ -1197,8 +1215,9 @@ const DailyActivityForm = () => {
 
 
     try {
-        // Remove userId from body since AuthContext interceptor adds it automatically
         const response = await api.post("/dailyActivity/update", {
+            // Send userId explicitly (backend will also use token-based req.user.id when available)
+            userId: user?.userId || user?.id,
             updates: updatesWithDates
         });
 
@@ -1628,6 +1647,24 @@ const DailyActivityForm = () => {
                   onClick={handleSubmit} 
                   disabled={loading}
                   title={loading ? "Submitting..." : "Submit Changes"}
+                  style={{
+                    backgroundColor: 'var(--success-color, #27ae60)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '8px 12px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    opacity: loading ? 0.6 : 1,
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!loading) {
+                      e.currentTarget.style.backgroundColor = '#229954';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--success-color, #27ae60)';
+                  }}
                 >
                   <svg 
                     width="16" 
@@ -1649,6 +1686,21 @@ const DailyActivityForm = () => {
                   className="cancel-button icon-only" 
                   onClick={handleCancel} 
                   title="Cancel Changes"
+                  style={{
+                    backgroundColor: 'var(--danger-color, #e74c3c)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '8px 12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#c0392b';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--danger-color, #e74c3c)';
+                  }}
                 >
                   <svg 
                     width="16" 
@@ -1844,32 +1896,37 @@ const DailyActivityForm = () => {
           ) : (
             (() => {
               return (
-                <DataTable
-                  key={`datatable-${showMissingDataWarnings}`}
-                  columns={columns}
-                  data={tableData}
-                  onCellUpdate={handleCellUpdate}
-                  onCellBlur={handleCellBlur}
-                  autoSave={false}
-                  disablePagination={true}
-                  highlightRowOnEdit={true}
-                  showActionBar={false}
-                  disableCellEditing={false}
-                  showTotals={true}
-                  totalsPosition="top"
-                  totalsColumns={['calls', 'appts', 'sits', 'sales', 'alp', 'refs', 'refAppt', 'refSit', 'refSale', 'refAlp', 'showRatio', 'closeRatio', 'alpPerSale', 'alpPerRefSale', 'alpPerRefCollected', 'refCloseRatio', 'refCollectedPerSit', 'callsToSitRatio']}
-                  totalsLabel="Totals"
-                  totalsLabelColumn="displayDate"
-                  rowClassNames={rowClassNames}
-                  stickyHeader={true}
-                  stickyTop={0}
-                  pageScrollSticky={true}
-                  onRowHover={handleWeeklyTotalHover}
-                  enableRowExpansion={true}
-                  expandableRows={{}} // Allow all rows to be expandable
-                  renderExpandedRow={renderExpandedRow}
-                  expandedRowsInitial={{}}
-                />
+                <>
+                  <DataTable
+                    key={`datatable-${showMissingDataWarnings}`}
+                    columns={columns}
+                    data={tableData}
+                    onCellUpdate={handleCellUpdate}
+                    onCellBlur={handleCellBlur}
+                    autoSave={false}
+                    disablePagination={true}
+                    highlightRowOnEdit={true}
+                    showActionBar={false}
+                    disableCellEditing={false}
+                    showTotals={true}
+                    totalsPosition="top"
+                    totalsColumns={['calls', 'appts', 'sits', 'sales', 'alp', 'refs', 'refAppt', 'refSit', 'refSale', 'refAlp', 'showRatio', 'closeRatio', 'alpPerSale', 'alpPerRefSale', 'alpPerRefCollected', 'refCloseRatio', 'refCollectedPerSit', 'callsToSitRatio']}
+                    totalsLabel="Totals"
+                    totalsLabelColumn="displayDate"
+                    rowClassNames={rowClassNames}
+                    stickyHeader={true}
+                    stickyTop={0}
+                    pageScrollSticky={true}
+                    onRowHover={handleWeeklyTotalHover}
+                    enableRowExpansion={true}
+                    expandableRows={{}} // Allow all rows to be expandable
+                    renderExpandedRow={renderExpandedRow}
+                    expandedRowsInitial={{}}
+                  />
+                  
+                  {/* Activity Summary Cards for individual view */}
+                  <ActivitySummaryCards data={tableData} />
+                </>
               );
             })()
           )

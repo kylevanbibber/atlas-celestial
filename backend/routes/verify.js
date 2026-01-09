@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const twilioService = require('../services/twilio');
 const { v4: uuidv4 } = require('uuid');
 
 // Route to handle verification form submission
@@ -601,23 +602,12 @@ router.post('/send-queued', async (req, res) => {
 
                 // Send SMS if phone number exists
                 if (row.client_phoneNumber) {
-                    const cleanedPhoneNumber = row.client_phoneNumber.replace(/\D/g, '');
-                    const formattedPhoneNumber = `1${cleanedPhoneNumber}`;
-
-                    const smsPayload = {
-                        phones: formattedPhoneNumber,
-                        text: `Please review your American Income Life application survey: ${row.url}`
-                    };
-
-                    const smsOptions = {
-                        headers: {
-                            'Authorization': 'Basic ' + Buffer.from('kylevanbibber:KhOgOwCHQVhUMXR2h37tV3HTZym2pb').toString('base64'),
-                            'Content-Type': 'application/json'
-                        }
-                    };
-
                     try {
-                        await axios.post('https://rest.textmagic.com/api/v2/messages', smsPayload, smsOptions);
+                        await twilioService.sendSMS({
+                            toNumber: row.client_phoneNumber,
+                            message: `Please review your American Income Life application survey: ${row.url}`,
+                            userId: null
+                        });
                     } catch (smsError) {
                         console.error(`SMS failed for ${row.application_id}:`, smsError.message);
                     }
@@ -726,23 +716,12 @@ router.post('/resend', async (req, res) => {
 
         // Send SMS if phone number exists
         if (client_phoneNumber) {
-            const cleanedPhoneNumber = client_phoneNumber.replace(/\D/g, '');
-            const formattedPhoneNumber = `1${cleanedPhoneNumber}`;
-
-            const smsPayload = {
-                phones: formattedPhoneNumber,
-                text: `Please review your American Income Life application survey: ${url}`
-            };
-
-            const smsOptions = {
-                headers: {
-                    'Authorization': 'Basic ' + Buffer.from('kylevanbibber:KhOgOwCHQVhUMXR2h37tV3HTZym2pb').toString('base64'),
-                    'Content-Type': 'application/json'
-                }
-            };
-
             try {
-                await axios.post('https://rest.textmagic.com/api/v2/messages', smsPayload, smsOptions);
+                await twilioService.sendSMS({
+                    toNumber: client_phoneNumber,
+                    message: `Please review your American Income Life application survey: ${url}`,
+                    userId: null
+                });
             } catch (smsError) {
                 console.error('SMS error:', smsError.message);
             }
@@ -855,23 +834,12 @@ router.post('/send-early/:applicationId', async (req, res) => {
 
             // Send SMS if phone number exists
             if (application.client_phoneNumber) {
-                const cleanedPhoneNumber = application.client_phoneNumber.replace(/\D/g, '');
-                const formattedPhoneNumber = `1${cleanedPhoneNumber}`;
-
-                const smsPayload = {
-                    phones: formattedPhoneNumber,
-                    text: `Please review your American Income Life application survey: ${application.url}`
-                };
-
-                const smsOptions = {
-                    headers: {
-                        'Authorization': 'Basic ' + Buffer.from('kylevanbibber:KhOgOwCHQVhUMXR2h37tV3HTZym2pb').toString('base64'),
-                        'Content-Type': 'application/json'
-                    }
-                };
-
                 try {
-                    await axios.post('https://rest.textmagic.com/api/v2/messages', smsPayload, smsOptions);
+                    await twilioService.sendSMS({
+                        toNumber: application.client_phoneNumber,
+                        message: `Please review your American Income Life application survey: ${application.url}`,
+                        userId: null
+                    });
                 } catch (smsError) {
                     console.error(`SMS failed for ${application.application_id}:`, smsError.message);
                 }

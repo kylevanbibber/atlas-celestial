@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import api from '../../../api';
 import Modal from '../../utils/Modal';
-import { FiCheck, FiX, FiChevronDown, FiChevronRight, FiUpload, FiPaperclip, FiDownload, FiTrash2 } from 'react-icons/fi';
+import toast from 'react-hot-toast';
+import { FiCheck, FiX, FiChevronDown, FiChevronRight, FiUpload, FiPaperclip, FiDownload, FiTrash2, FiMessageSquare, FiUser, FiSend } from 'react-icons/fi';
 import './PipelineChecklist.css';
 
 const PipelineChecklist = ({ recruit, stages, onClose }) => {
   const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('checklist');
   const [checklistItems, setChecklistItems] = useState([]);
   const [progress, setProgress] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,11 +16,67 @@ const PipelineChecklist = ({ recruit, stages, onClose }) => {
   const [saving, setSaving] = useState(false);
   const [attachments, setAttachments] = useState([]);
   const [uploadingItems, setUploadingItems] = useState({});
+  const [smsHistory, setSmsHistory] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState('');
   const fileInputRefs = useRef({});
 
   useEffect(() => {
     fetchChecklistData();
   }, [recruit.id]);
+
+  // Fetch SMS history when switching to Texts tab
+  useEffect(() => {
+    if (activeTab === 'texts') {
+      fetchSmsHistory();
+      fetchTemplates();
+    }
+  }, [activeTab, recruit.id]);
+
+  const fetchSmsHistory = async () => {
+    try {
+      console.log('[PipelineChecklist] Fetching SMS history for recruit:', recruit.id);
+      const smsResponse = await api.get(`/recruitment/recruits/${recruit.id}/sms-history`);
+      console.log('[PipelineChecklist] SMS history response:', smsResponse.data);
+      
+      if (smsResponse.data.success) {
+        const messages = smsResponse.data.data || [];
+        console.log('[PipelineChecklist] Setting SMS history:', messages.length, 'messages');
+        setSmsHistory(messages);
+      } else {
+        console.error('[PipelineChecklist] Failed to fetch SMS history:', smsResponse.data.message);
+        setSmsHistory([]);
+      }
+    } catch (error) {
+      console.error('[PipelineChecklist] Error fetching SMS history:', error);
+      setSmsHistory([]);
+    }
+  };
+
+  const fetchTemplates = async () => {
+    try {
+      const response = await api.get('/recruitment/sms/templates');
+      if (response.data.success) {
+        setTemplates(response.data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching SMS templates:', error);
+    }
+  };
+
+  const handleTemplateSelect = (e) => {
+    const templateId = e.target.value;
+    setSelectedTemplate(templateId);
+    
+    if (templateId) {
+      const template = templates.find(t => t.id === parseInt(templateId));
+      if (template) {
+        setNewMessage(template.message);
+      }
+    }
+  };
 
   const fetchChecklistData = async () => {
     try {
@@ -258,7 +316,6 @@ const PipelineChecklist = ({ recruit, stages, onClose }) => {
             onClick={() => handleToggleItem(item)}
             className={`checklist-checkbox ${itemProgress?.completed ? 'checked' : ''}`}
           >
-            {itemProgress?.completed && <FiCheck />}
           </button>
         );
         
@@ -337,6 +394,40 @@ const PipelineChecklist = ({ recruit, stages, onClose }) => {
     return Math.round((completed / checklistItems.length) * 100);
   };
 
+  // Handle sending a new text message
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !recruit.phone) return;
+
+    setSendingMessage(true);
+    const toastId = toast.loading('Sending text message...');
+
+    try {
+      const response = await api.post(`/recruitment/recruits/${recruit.id}/send-onboarding-text`, {
+        phone: recruit.phone,
+        message: newMessage
+      });
+
+      if (response.data.success) {
+        toast.success('Text message sent successfully!', { id: toastId });
+        setNewMessage('');
+        setSelectedTemplate('');
+        
+        // Refresh SMS history
+        const smsResponse = await api.get(`/recruitment/recruits/${recruit.id}/sms-history`);
+        if (smsResponse.data.success) {
+          setSmsHistory(smsResponse.data.data || []);
+        }
+      } else {
+        toast.error(response.data.message || 'Failed to send text message', { id: toastId });
+      }
+    } catch (error) {
+      console.error('Error sending text:', error);
+      toast.error(error.response?.data?.message || 'Failed to send text message', { id: toastId });
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
   return (
     <Modal
       isOpen={true}
@@ -383,10 +474,33 @@ const PipelineChecklist = ({ recruit, stages, onClose }) => {
           </div>
         </div>
 
-        {/* Checklist by stages */}
-        {loading ? (
-          <div className="checklist-loading">
-            <div className="pipeline-loading-spinner"></div>
+        {/* Tabs */}
+        <div className="pipeline-detail-tabs">
+          <button
+            className={`pipeline-detail-tab ${activeTab === 'checklist' ? 'active' : ''}`}
+            onClick={() => setActiveTab('checklist')}
+          >
+            <FiCheck />
+            Checklist
+          </button>
+          <button
+            className={`pipeline-detail-tab ${activeTab === 'texts' ? 'active' : ''}`}
+            onClick={() => setActiveTab('texts')}
+          >
+            <FiMessageSquare />
+            Texts
+            {smsHistory.length > 0 && (
+              <span className="tab-badge">{smsHistory.length}</span>
+            )}
+          </button>
+        </div>
+
+        {/* Checklist Tab Content */}
+        {activeTab === 'checklist' && (
+          <>
+            {loading ? (
+              <div className="checklist-loading">
+                <div className="pipeline-loading-spinner"></div>
             <span>Loading checklist...</span>
           </div>
         ) : (
@@ -541,6 +655,146 @@ const PipelineChecklist = ({ recruit, stages, onClose }) => {
                 </div>
               );
             })}
+          </div>
+        )}
+          </>
+        )}
+
+        {/* Texts Tab Content */}
+        {activeTab === 'texts' && (
+          <div className="texts-tab-content">
+            {/* SMS History Section */}
+            {smsHistory.length > 0 ? (
+          <div className="sms-history-section">
+            <div className="sms-history-header">
+              <FiMessageSquare />
+              <h3>Text Message History</h3>
+              <span className="sms-count">{smsHistory.length}</span>
+            </div>
+            <div className="sms-history-list">
+              {smsHistory.map((msg) => {
+                const senderName = msg.sender_name 
+                  ? msg.sender_name.split(' ').slice(1).join(' ') + ' ' + msg.sender_name.split(' ')[0]
+                  : 'System';
+                
+                return (
+                  <div key={msg.id} className="sms-message">
+                    <div className="sms-message-header">
+                      <div className="sms-sender">
+                        {msg.sender_profpic ? (
+                          <img 
+                            src={msg.sender_profpic} 
+                            alt={senderName}
+                            className="sms-sender-avatar"
+                          />
+                        ) : (
+                          <div className="sms-sender-avatar-placeholder">
+                            <FiUser />
+                          </div>
+                        )}
+                        <span className="sms-sender-name">{senderName}</span>
+                      </div>
+                      <div className="sms-meta">
+                        <span className="sms-timestamp">
+                          {new Date(msg.sent_at).toLocaleString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                          })}
+                        </span>
+                        <span className={`sms-status ${msg.status}`}>
+                          {msg.status === 'sent' ? '✓' : msg.status === 'delivered' ? '✓✓' : '✗'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="sms-message-body">
+                      {msg.message_body}
+                    </div>
+                    <div className="sms-message-footer">
+                      <span className="sms-phone">To: {msg.to_phone}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+            ) : (
+              <div className="no-sms-history">
+                <FiMessageSquare size={48} />
+                <p>No text messages sent yet</p>
+              </div>
+            )}
+
+            {/* Send New Message */}
+            {recruit.phone && (
+              <div className="send-sms-section">
+                <div className="send-sms-header">
+                  <h4>Send New Text Message</h4>
+                  <span className="recipient-phone">To: {recruit.phone}</span>
+                </div>
+                <div className="send-sms-form">
+                  {templates.length > 0 && (
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#374151' }}>
+                        Use Template (Optional)
+                      </label>
+                      <select
+                        value={selectedTemplate}
+                        onChange={handleTemplateSelect}
+                        disabled={sendingMessage}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          fontSize: '14px',
+                          backgroundColor: 'white',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="">-- Select a template --</option>
+                        {templates.map(template => (
+                          <option key={template.id} value={template.id}>
+                            {template.name} {template.category && `(${template.category})`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <textarea
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type your message here or select a template above..."
+                    rows={4}
+                    maxLength={5000}
+                    disabled={sendingMessage}
+                  />
+                  <div className="send-sms-footer">
+                    <span className="char-count">
+                      {newMessage.length} / 5000 characters
+                      {newMessage.length > 160 && <span style={{ color: '#f59e0b', marginLeft: '8px' }}>(multiple segments)</span>}
+                    </span>
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={sendingMessage || !newMessage.trim()}
+                      className="send-sms-btn"
+                    >
+                      {sendingMessage ? (
+                        <>Sending...</>
+                      ) : (
+                        <>
+                          <FiSend />
+                          Send Text
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
         

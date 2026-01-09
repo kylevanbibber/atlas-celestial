@@ -274,6 +274,17 @@
   object-fit: cover;
 }
 
+.clickable-profile-icon {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clickable-profile-icon:hover {
+  transform: scale(1.1);
+  border-color: var(--button-primary-bg);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.2);
+}
+
 .name-with-icon {
   display: flex;
   align-items: center;

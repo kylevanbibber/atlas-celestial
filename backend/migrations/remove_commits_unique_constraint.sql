@@ -10,3 +10,4 @@ ALTER TABLE commits ADD INDEX IF NOT EXISTS idx_user_period_type_created (userId
 -- Verify the change
 SHOW INDEX FROM commits;
 
+

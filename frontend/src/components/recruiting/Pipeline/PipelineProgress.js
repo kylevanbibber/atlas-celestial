@@ -1,17 +1,22 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../../../context/AuthContext';
 import { useUserHierarchy } from '../../../hooks/useUserHierarchy';
 import api from '../../../api';
 import Tabs from '../../utils/Tabs';
 import DataTable from '../../utils/DataTable';
 import RightDetails from '../../utils/RightDetails';
+import ContextMenu from '../../utils/ContextMenu';
 import AddRecruitModal from './AddRecruitModal';
-import { FiSearch, FiPlus, FiFilter } from 'react-icons/fi';
+import SyncAppointmentsModal from './SyncAppointmentsModal';
+import { FiSearch, FiPlus, FiFilter, FiMail, FiMessageSquare, FiChevronDown, FiRefreshCw, FiRepeat } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import './Pipeline.css';
 
-const PipelineProgress = () => {
+const PipelineProgress = ({ kpiFilter }) => {
   const { user } = useAuth();
   const { hierarchyData, hierarchyLoading, getHierarchyForComponent } = useUserHierarchy();
+  const navigate = useNavigate();
   
   // State
   const [stages, setStages] = useState([]);
@@ -22,17 +27,23 @@ const PipelineProgress = () => {
   const [stageChecklistItems, setStageChecklistItems] = useState([]); // Checklist items for active stage
   const [recruitProgress, setRecruitProgress] = useState({}); // Map of recruitId -> progress array
   const [searchTerm, setSearchTerm] = useState('');
-  const [showTeam, setShowTeam] = useState(false);
+  const [showTeam, setShowTeam] = useState(true); // Default to team view for managers
   const [showRightDetails, setShowRightDetails] = useState(false);
   const [rightDetailsData, setRightDetailsData] = useState(null);
   const [showAddRecruitModal, setShowAddRecruitModal] = useState(false);
   const [stats, setStats] = useState(null);
+  const [selectedRecruitIds, setSelectedRecruitIds] = useState([]); // for mass actions
+  const [smsBalance, setSmsBalance] = useState(0); // SMS balance in cents
+  const [contextMenu, setContextMenu] = useState(null); // { x, y, recruit }
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncRecruitData, setSyncRecruitData] = useState(null);
   
   // Determine user permissions
   const isAgent = user?.clname === 'AGT';
   const isManager = ['SA', 'GA', 'MGA', 'RGA'].includes(user?.clname);
   const isAdmin = user?.Role === 'Admin';
   const canViewTeam = isManager || isAdmin;
+  const canSyncAppointments = ['MGA', 'RGA', 'SGA'].includes(user?.clname);
   
   // Get hierarchy IDs for filtering
   const hierarchyIds = useMemo(() => {
@@ -63,14 +74,45 @@ const PipelineProgress = () => {
   // Fetch stages
   useEffect(() => {
     fetchStages();
+    fetchSmsBalance();
   }, []);
 
   // Fetch recruits and stats when user or view changes
   useEffect(() => {
-    if (!hierarchyLoading) {
-      fetchData();
+    // Don't fetch until user is loaded
+    if (!user?.userId) return;
+    
+    // If hierarchy is still loading, wait
+    if (hierarchyLoading) return;
+    
+    // If we're in team view and need hierarchy data, wait until it's ready
+    if (canViewTeam && showTeam && hierarchyIds.length === 0 && !isAdmin) {
+      console.log('[Pipeline] Waiting for hierarchy data before fetching...');
+      return;
     }
-  }, [user?.userId, showTeam, hierarchyLoading]);
+    
+    fetchData();
+  }, [user?.userId, showTeam, hierarchyLoading, hierarchyIds, canViewTeam, isAdmin]);
+
+  // Fetch SMS balance
+  const fetchSmsBalance = async () => {
+    try {
+      const response = await api.get('/recruitment/sms/credits');
+      if (response.data?.success) {
+        setSmsBalance(response.data.balance || 0);
+        console.log('[Pipeline] SMS Credits Info:', {
+          balance: response.data.balance,
+          mgaUserId: response.data.mgaUserId,
+          isMgaOwner: response.data.isMgaOwner,
+          userMga: user?.mga,
+          userClname: user?.clname
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching SMS balance:', error);
+    }
+  };
+
 
   // Build ordered stages from before/after relationships
   const buildStageOrder = (stageList) => {
@@ -170,19 +212,229 @@ const PipelineProgress = () => {
     }
   };
 
-  // Get recruits for current stage
+  // Apply KPI filter to all recruits first
+  const kpiFilteredRecruits = useMemo(() => {
+    let filtered = recruits;
+    
+    if (kpiFilter === 'needs-aob') {
+      console.log('[PipelineProgress] 🔍 Filtering for "Needs AOB Sent"');
+      console.log('[PipelineProgress] Total recruits before filter:', recruits.length);
+      
+      // Track filter criteria
+      let redeemedCount = 0;
+      let inCorrectStage = 0;
+      let hasAobField = 0;
+      let aobChecklistCompleted = 0;
+      let passedFilter = 0;
+      
+      // Filter for recruits in Licensing or Onboarding without AOB completed and aob is null
+      filtered = filtered.filter(r => {
+        // Check if redeemed (backend only counts unredeemed)
+        if (r.pipeline_redeemed === 1 || r.pipeline_redeemed === '1') {
+          redeemedCount++;
+          return false;
+        }
+        
+        // Check stage
+        if (!['Licensing', 'Onboarding'].includes(r.step)) {
+          return false;
+        }
+        inCorrectStage++;
+        
+        // Check if aob field has value
+        if (r.aob && r.aob !== '') {
+          hasAobField++;
+          return false;
+        }
+        
+        // Check if AOB completed checklist item exists and is completed
+        const progress = recruitProgress[r.id] || [];
+        // Look for AOB item across all stages
+        let aobItem = null;
+        for (const stage of stages) {
+          const items = stage.checklistItems || [];
+          aobItem = items.find(item => 
+            item.item_name.toLowerCase().includes('aob') && item.item_name.toLowerCase().includes('completed')
+          );
+          if (aobItem) break;
+        }
+        
+        if (aobItem) {
+          const aobProgress = progress.find(p => p.checklist_item_id === aobItem.id);
+          if (aobProgress?.completed === 1) {
+            aobChecklistCompleted++;
+            return false;
+          }
+        }
+        
+        passedFilter++;
+        return true;
+      });
+      
+      console.log('[PipelineProgress] 📊 Filter Results:');
+      console.log('  - Excluded (already redeemed):', redeemedCount);
+      console.log('  - In Licensing or Onboarding stage (unredeemed):', inCorrectStage);
+      console.log('  - Excluded (has AOB field value):', hasAobField);
+      console.log('  - Excluded (AOB checklist completed):', aobChecklistCompleted);
+      console.log('  - ✅ PASSED FILTER (Needs AOB):', passedFilter);
+      console.log('[PipelineProgress] Filtered recruits:', filtered.map(r => ({
+        id: r.id,
+        name: `${r.recruit_first} ${r.recruit_last}`,
+        stage: r.step,
+        aob: r.aob,
+        last_checkin: r.last_checkin_sent
+      })));
+      
+    } else if (kpiFilter === 'needs-checkin') {
+      console.log('[PipelineProgress] 🔍 Filtering for "Needs Check-in"');
+      console.log('[PipelineProgress] Total recruits before filter:', recruits.length);
+      
+      // Track filter criteria
+      const threeDaysAgo = new Date();
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+      const twoDaysAgo = new Date();
+      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+      console.log('[PipelineProgress] 📅 Three days ago cutoff:', threeDaysAgo.toLocaleString());
+      console.log('[PipelineProgress] 📅 Two days ago cutoff (for new recruits):', twoDaysAgo.toLocaleString());
+      
+      let redeemedCount = 0;
+      let inActiveStage = 0;
+      let tooNewCount = 0;
+      let noCheckinDate = 0;
+      let checkinTooRecent = 0;
+      let passedFilter = 0;
+      
+      filtered = filtered.filter(r => {
+        // Check if redeemed (backend only counts unredeemed)
+        if (r.pipeline_redeemed === 1 || r.pipeline_redeemed === '1') {
+          redeemedCount++;
+          return false;
+        }
+        
+        // Only consider recruits in active stages
+        if (!['Licensing', 'Onboarding', 'Training'].includes(r.step)) {
+          return false;
+        }
+        inActiveStage++;
+        
+        // Exclude recruits added within the last 2 days
+        if (r.date_added) {
+          const dateAdded = new Date(r.date_added);
+          if (dateAdded > twoDaysAgo) {
+            tooNewCount++;
+            return false;
+          }
+        }
+        
+        // No check-in date = needs check-in
+        if (!r.last_checkin_sent) {
+          noCheckinDate++;
+          passedFilter++;
+          return true;
+        }
+        
+        const lastCheckin = new Date(r.last_checkin_sent);
+        const needsCheckin = lastCheckin < threeDaysAgo;
+        
+        if (needsCheckin) {
+          passedFilter++;
+        } else {
+          checkinTooRecent++;
+        }
+        
+        return needsCheckin;
+      });
+      
+      console.log('[PipelineProgress] 📊 Filter Results:');
+      console.log('  - Excluded (already redeemed):', redeemedCount);
+      console.log('  - In active stages (Licensing/Onboarding/Training, unredeemed):', inActiveStage);
+      console.log('  - Excluded (added within last 2 days):', tooNewCount);
+      console.log('  - No check-in date recorded:', noCheckinDate);
+      console.log('  - Excluded (checked in within 3 days):', checkinTooRecent);
+      console.log('  - ✅ PASSED FILTER (Needs Check-in):', passedFilter);
+      console.log('[PipelineProgress] Filtered recruits:', filtered.map(r => ({
+        id: r.id,
+        name: `${r.recruit_first} ${r.recruit_last}`,
+        stage: r.step,
+        last_checkin: r.last_checkin_sent,
+        days_since_checkin: r.last_checkin_sent 
+          ? Math.floor((new Date() - new Date(r.last_checkin_sent)) / (1000 * 60 * 60 * 24))
+          : 'Never'
+      })));
+      
+    } else if (kpiFilter === 'completed-this-week') {
+      console.log('[PipelineProgress] 🔍 Filtering for "Completed This Week"');
+      console.log('[PipelineProgress] Total recruits before filter:', recruits.length);
+      
+      // Get start of this week (Sunday)
+      const now = new Date();
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay()); // Go back to Sunday
+      startOfWeek.setHours(0, 0, 0, 0);
+      
+      console.log('[PipelineProgress] 📅 Start of week cutoff:', startOfWeek.toLocaleString());
+      
+      let hasProgress = 0;
+      let completedThisWeek = 0;
+      
+      filtered = filtered.filter(r => {
+        const progress = recruitProgress[r.id] || [];
+        
+        if (progress.length === 0) {
+          return false;
+        }
+        hasProgress++;
+        
+        // Check if any checklist item was completed this week
+        const hasCompletedThisWeek = progress.some(p => {
+          if (!p.completed || p.completed !== 1) return false;
+          if (!p.completed_at) return false;
+          
+          const completedDate = new Date(p.completed_at);
+          return completedDate >= startOfWeek;
+        });
+        
+        if (hasCompletedThisWeek) {
+          completedThisWeek++;
+          return true;
+        }
+        
+        return false;
+      });
+      
+      console.log('[PipelineProgress] 📊 Filter Results:');
+      console.log('  - Recruits with progress:', hasProgress);
+      console.log('  - ✅ PASSED FILTER (Completed This Week):', completedThisWeek);
+      console.log('[PipelineProgress] Filtered recruits:', filtered.map(r => {
+        const progress = recruitProgress[r.id] || [];
+        const completedItems = progress.filter(p => {
+          if (!p.completed || p.completed !== 1 || !p.completed_at) return false;
+          const completedDate = new Date(p.completed_at);
+          return completedDate >= startOfWeek;
+        });
+        
+        return {
+          id: r.id,
+          name: `${r.recruit_first} ${r.recruit_last}`,
+          stage: r.step,
+          completedCount: completedItems.length,
+          completedItems: completedItems.map(ci => ({
+            name: ci.item_name,
+            completedAt: ci.completed_at
+          }))
+        };
+      }));
+    }
+    
+    return filtered;
+  }, [recruits, kpiFilter, recruitProgress, stages]);
+
+  // Get recruits for current stage from KPI-filtered data
   const currentStageRecruits = useMemo(() => {
     if (!activeTab) return [];
     
-    let filtered = recruits.filter(r => r.step === activeTab);
-    
-    // For On-boarding stage, only show if linked to activeuser and both Active='y' and managerActive='y'
-    if (activeTab === 'On-boarding') {
-      filtered = filtered.filter(r => 
-        r.activeuser_active === 'y' && 
-        r.activeuser_manager_active === 'y'
-      );
-    }
+    // Start with KPI-filtered recruits in the current stage
+    let filtered = kpiFilteredRecruits.filter(r => r.step === activeTab);
     
     // Apply search filter
     if (searchTerm) {
@@ -196,7 +448,7 @@ const PipelineProgress = () => {
     }
     
     return filtered;
-  }, [recruits, activeTab, searchTerm]);
+  }, [kpiFilteredRecruits, activeTab, searchTerm]);
 
   // Filter recruits by sub-tab (checklist item completion status)
   const filteredBySubTab = useMemo(() => {
@@ -295,13 +547,14 @@ const PipelineProgress = () => {
       // Filter recruits for current stage
       let stageRecruits = recruits.filter(r => r.step === activeTab);
       
-      // For On-boarding stage, only show if linked to activeuser and both Active='y' and managerActive='y'
-      if (activeTab === 'On-boarding') {
-        stageRecruits = stageRecruits.filter(r => 
-          r.activeuser_active === 'y' && 
-          r.activeuser_manager_active === 'y'
-        );
-      }
+      // For On-boarding stage, show all recruits in this stage
+      // (Previously filtered by activeuser status, but that was too restrictive)
+      // if (activeTab === 'On-boarding') {
+      //   stageRecruits = stageRecruits.filter(r => 
+      //     r.activeuser_active === 'y' && 
+      //     r.activeuser_manager_active === 'y'
+      //   );
+      // }
 
       const recruitIds = stageRecruits.map(r => r.id);
       
@@ -340,24 +593,25 @@ const PipelineProgress = () => {
     fetchStageChecklistData();
   }, [activeTab, recruits]);
 
-  // Get count for each stage
+  // Get count for each stage (using KPI-filtered recruits)
   const getStageCounts = useMemo(() => {
     const counts = {};
     stages.forEach(stage => {
-      let stageRecruits = recruits.filter(r => r.step === stage.stage_name);
+      let stageRecruits = kpiFilteredRecruits.filter(r => r.step === stage.stage_name);
       
-      // For On-boarding stage, only count if linked to activeuser and both Active='y' and managerActive='y'
-      if (stage.stage_name === 'On-boarding') {
-        stageRecruits = stageRecruits.filter(r => 
-          r.activeuser_active === 'y' && 
-          r.activeuser_manager_active === 'y'
-        );
-      }
+      // For On-boarding stage, count all recruits in this stage
+      // (Previously filtered by activeuser status, but that was too restrictive)
+      // if (stage.stage_name === 'On-boarding') {
+      //   stageRecruits = stageRecruits.filter(r => 
+      //     r.activeuser_active === 'y' && 
+      //     r.activeuser_manager_active === 'y'
+      //   );
+      // }
       
       counts[stage.stage_name] = stageRecruits.length;
     });
     return counts;
-  }, [stages, recruits]);
+  }, [stages, kpiFilteredRecruits]);
 
   // Handle moving recruit to different stage
   const handleMoveToStage = async (recruitId, newStage) => {
@@ -397,24 +651,254 @@ const PipelineProgress = () => {
     }
   };
 
+  // Send onboarding setup email for a single recruit (when redeemed = 0)
+  const handleSendOnboardingEmail = async (recruit) => {
+    const toastId = toast.loading('Sending email...');
+    try {
+      let emailToUse = (recruit.email || '').trim();
+
+      if (!emailToUse) {
+        toast.dismiss(toastId);
+        const input = window.prompt(
+          'Enter an email address for this recruit to send their onboarding setup:',
+          ''
+        );
+        if (!input) return;
+        emailToUse = input.trim();
+        toast.loading('Sending email...', { id: toastId });
+      }
+
+      const res = await api.post(`/recruitment/recruits/${recruit.id}/send-onboarding-email`, {
+        email: emailToUse
+      });
+
+      const msg = res?.data?.message || 'Onboarding setup email sent successfully.';
+      toast.success(msg, { id: toastId, duration: 4000 });
+      
+      // Refresh to pick up any updated email value
+      fetchData();
+    } catch (error) {
+      console.error('Error sending onboarding setup email:', error);
+      const backendMessage = error?.response?.data?.message;
+      toast.error(
+        backendMessage || 'Failed to send onboarding setup email. Please try again.',
+        { id: toastId, duration: 5000 }
+      );
+    }
+  };
+
+  // Send onboarding setup via text
+  const handleSendOnboardingText = async (recruit) => {
+    const toastId = toast.loading('Sending text message...');
+    try {
+      let phoneToUse = (recruit.phone || '').trim();
+
+      if (!phoneToUse) {
+        toast.dismiss(toastId);
+        const input = window.prompt(
+          'Enter a phone number for this recruit to send their onboarding setup:',
+          ''
+        );
+        if (!input) return;
+        phoneToUse = input.trim();
+        toast.loading('Sending text message...', { id: toastId });
+      }
+
+      const res = await api.post(`/recruitment/recruits/${recruit.id}/send-onboarding-text`, {
+        phone: phoneToUse
+      });
+
+      const msg = res?.data?.message || 'Onboarding setup text sent successfully.';
+      toast.success(msg, { id: toastId, duration: 4000 });
+      
+      fetchData();
+      fetchSmsBalance(); // Refresh balance after sending
+    } catch (error) {
+      console.error('Error sending onboarding setup text:', error);
+      const backendMessage = error?.response?.data?.message;
+      toast.error(
+        backendMessage || 'Failed to send onboarding setup text. Please try again.',
+        { id: toastId, duration: 5000 }
+      );
+    }
+  };
+
+  // Send onboarding setup via both email and text
+  const handleSendOnboardingBoth = async (recruit) => {
+    const toastId = toast.loading('Sending email and text...');
+    try {
+      let emailToUse = (recruit.email || '').trim();
+      let phoneToUse = (recruit.phone || '').trim();
+
+      if (!emailToUse) {
+        toast.dismiss(toastId);
+        const input = window.prompt(
+          'Enter an email address for this recruit:',
+          ''
+        );
+        if (!input) return;
+        emailToUse = input.trim();
+        toast.loading('Sending email and text...', { id: toastId });
+      }
+
+      if (!phoneToUse) {
+        toast.dismiss(toastId);
+        const input = window.prompt(
+          'Enter a phone number for this recruit:',
+          ''
+        );
+        if (!input) return;
+        phoneToUse = input.trim();
+        toast.loading('Sending email and text...', { id: toastId });
+      }
+
+      const res = await api.post(`/recruitment/recruits/${recruit.id}/send-onboarding-both`, {
+        email: emailToUse,
+        phone: phoneToUse
+      });
+
+      const msg = res?.data?.message || 'Onboarding setup sent via email and text successfully.';
+      toast.success(msg, { id: toastId, duration: 4000 });
+      
+      fetchData();
+      fetchSmsBalance(); // Refresh balance after sending
+    } catch (error) {
+      console.error('Error sending onboarding setup:', error);
+      const backendMessage = error?.response?.data?.message;
+      toast.error(
+        backendMessage || 'Failed to send onboarding setup. Please try again.',
+        { id: toastId, duration: 5000 }
+      );
+    }
+  };
+
+  // Mass actions
+  const handleDeleteSelected = async (ids) => {
+    const targetIds = ids && ids.length ? ids : selectedRecruitIds;
+    if (!targetIds || targetIds.length === 0) return;
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete ${targetIds.length} recruit${targetIds.length > 1 ? 's' : ''}?`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      await Promise.all(
+        targetIds.map((id) =>
+          api.delete(`/recruitment/recruits/${id}`).catch((err) => {
+            console.error('Error deleting recruit', id, err);
+          })
+        )
+      );
+      fetchData();
+    } catch (error) {
+      console.error('Error deleting selected recruits:', error);
+    }
+  };
+
+  const handleArchiveSelected = async (ids) => {
+    const targetIds = ids && ids.length ? ids : selectedRecruitIds;
+    if (!targetIds || targetIds.length === 0) return;
+
+    try {
+      await Promise.all(
+        targetIds.map((id) =>
+          api
+            .put(`/recruitment/recruits/${id}`, { archive: 'y' })
+            .catch((err) => console.error('Error archiving recruit', id, err))
+        )
+      );
+      fetchData();
+    } catch (error) {
+      console.error('Error archiving selected recruits:', error);
+    }
+  };
+
+  const handleSyncAilSelected = () => {
+    console.log('[Pipeline] 🔄 AIL Sync button clicked');
+    console.log('[Pipeline] Selected recruit IDs:', selectedRecruitIds);
+    
+    if (!selectedRecruitIds || selectedRecruitIds.length === 0) {
+      console.warn('[Pipeline] ⚠️ No recruits selected for sync');
+      return;
+    }
+    
+    // Get the selected recruit data
+    const idSet = new Set(selectedRecruitIds.map((id) => String(id)));
+    const selectedRecruits = recruits.filter((r) => idSet.has(String(r.id)));
+    
+    console.log('[Pipeline] Found recruits to sync:', {
+      count: selectedRecruits.length,
+      recruits: selectedRecruits.map(r => ({
+        id: r.id,
+        name: `${r.recruit_first} ${r.recruit_last}`,
+        email: r.email
+      }))
+    });
+    
+    if (selectedRecruits.length === 0) {
+      console.warn('[Pipeline] ⚠️ No matching recruits found in data');
+      return;
+    }
+    
+    setSyncRecruitData(selectedRecruits);
+    setShowSyncModal(true);
+    console.log('[Pipeline] ✅ Sync modal opened');
+  };
+
+  const handleSendEmailSelected = () => {
+    if (!selectedRecruitIds || selectedRecruitIds.length === 0) return;
+
+    // Collect unique, non-empty emails for selected recruits
+    const idSet = new Set(selectedRecruitIds.map((id) => String(id)));
+    const emails = recruits
+      .filter((r) => idSet.has(String(r.id)))
+      .map((r) => r.email)
+      .filter((email) => !!email);
+
+    if (emails.length === 0) {
+      window.alert('No email addresses found for the selected recruits.');
+      return;
+    }
+
+    // Open default mail client with BCC list
+    const mailto = `mailto:?bcc=${encodeURIComponent(emails.join(','))}`;
+    window.location.href = mailto;
+  };
+
   // DataTable columns
   const formatDuration = (fromDateStr) => {
     if (!fromDateStr) return '—';
 
-    // Ensure we have an ISO string; backend now returns UTC timestamps with "Z"
+    console.log('🕐 [formatDuration] Raw timestamp from backend:', fromDateStr);
+
+    // Database stores in EST, so treat as local time (no 'Z' suffix)
     let isoString = fromDateStr;
     if (!isoString.includes('T')) {
       isoString = fromDateStr.replace(' ', 'T');
     }
-    if (!isoString.endsWith('Z') && !isoString.includes('+')) {
-      isoString += 'Z';
-    }
+    // Do NOT add 'Z' - the timestamp is in EST, not UTC
+
+    console.log('🕐 [formatDuration] ISO string after processing:', isoString);
 
     const from = new Date(isoString);
+    console.log('🕐 [formatDuration] Parsed Date object:', from.toString());
+    console.log('🕐 [formatDuration] Date in UTC:', from.toUTCString());
+    console.log('🕐 [formatDuration] Date in Local:', from.toLocaleString());
+    
     if (isNaN(from.getTime())) return '—';
 
     const now = new Date();
-    const diffMs = now - from;
+    console.log('🕐 [formatDuration] Current time:', now.toString());
+    
+    let diffMs = now - from;
+    // If the difference is negative (timestamp slightly in the future due to clock / timezone mismatch),
+    // clamp it to zero so we don't show negative time-in-stage.
+    if (diffMs < 0) {
+      console.warn('🕐 [formatDuration] Negative diff detected, clamping to 0. Raw diffMs:', diffMs);
+      diffMs = 0;
+    }
+    console.log('🕐 [formatDuration] Difference in ms (clamped):', diffMs, '(', Math.floor(diffMs / (1000 * 60 * 60)), 'hours )');
+    
     const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diffMs / (1000 * 60 * 60)) % 24);
     if (days > 0) return `${days}d ${hours}h`;
@@ -424,11 +908,20 @@ const PipelineProgress = () => {
     return `${mins}m ${secs}s`;
   };
 
-  const columns = [
+  const columns = useMemo(() => [
+    // Mass select column
+    {
+      id: 'selection',
+      Header: '',
+      accessor: 'id',
+      massSelection: true,
+      width: 40
+    },
     {
       Header: 'Stage',
       accessor: 'step',
       type: 'select',
+      width: 60,
       DropdownOptions: stages.map(s => s.stage_name),
       dropdownBackgroundColor: (value) => {
         const stage = stages.find(s => s.stage_name === value);
@@ -446,12 +939,13 @@ const PipelineProgress = () => {
     },
     {
       Header: 'Phone',
-      accessor: 'phone'
+      accessor: 'phone',
+      width: 60,
     },
     {
-      Header: 'Resident State',
+      Header: 'Res State',
       accessor: 'resident_state',
-      width: 110,
+      width: 45,
       Cell: ({ value }) => value || '—'
     },
     {
@@ -470,11 +964,13 @@ const PipelineProgress = () => {
         const date = new Date(isoString);
         if (isNaN(date.getTime())) return '';
         return date.toLocaleDateString();
-      }
+      },
+      width: 50,
     },
     {
       Header: 'Recruiting Agent',
       accessor: 'lagnname',
+      width: 100,
       Cell: ({ value }) => (
         <div style={{
           backgroundColor: '#e0e0e0',
@@ -491,6 +987,7 @@ const PipelineProgress = () => {
     {
       Header: 'Coded To',
       accessor: 'coded_to_name',
+      width: 100,
       Cell: ({ value }) => (
         <div style={{
           backgroundColor: value ? '#e0e0e0' : 'transparent',
@@ -505,17 +1002,63 @@ const PipelineProgress = () => {
       )
     },
     {
-      Header: 'Redeemed',
-      accessor: 'redeemed',
-      Cell: ({ value }) => (
-        <div style={{
-          color: value ? '#27ae60' : '#95a5a6',
-          fontWeight: 500,
-          fontSize: '14px'
-        }}>
-          {value ? 'Yes' : 'No'}
-        </div>
-      )
+      Header: 'Logged In',
+      accessor: 'pipeline_redeemed',
+      width: 70,
+      isEditable: false,
+      Cell: ({ value, row }) => {
+        const redeemed = !!value;
+        const recruit = row.original;
+        const hasFunds = smsBalance >= 6;
+
+        if (redeemed) {
+          return (
+            <div style={{ color: '#27ae60', fontWeight: 500, fontSize: '14px' }}>
+              Yes
+            </div>
+          );
+        }
+
+        return (
+          <button
+            type="button"
+            onMouseEnter={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setContextMenu({
+                x: rect.left,
+                y: rect.bottom + 4,
+                recruit
+              });
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              const rect = e.currentTarget.getBoundingClientRect();
+              setContextMenu({
+                x: rect.left,
+                y: rect.bottom + 4,
+                recruit
+              });
+            }}
+            style={{
+              padding: '4px 8px',
+              fontSize: '11px',
+              borderRadius: '999px',
+              border: '1px solid #0b5a8f',
+              backgroundColor: '#ffffff',
+              color: '#0b5a8f',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+            title="Send onboarding setup"
+          >
+            No – Send Info
+            <FiChevronDown size={12} />
+          </button>
+        );
+      }
     },
     {
       Header: 'Time in Stage',
@@ -525,8 +1068,82 @@ const PipelineProgress = () => {
           {formatDuration(row.original.current_stage_entered || row.original.date_added_utc || row.original.date_added)}
         </span>
       )
+    },
+    {
+      Header: 'AOB',
+      accessor: 'aob',
+      width: 80,
+      isEditable: false,
+      Cell: ({ row }) => {
+        const recruit = row.original;
+        const hasAob = recruit.aob && recruit.aob !== '';
+        
+        // Helper to convert Excel serial date to JS date
+        const excelSerialToDate = (serial) => {
+          if (!serial || isNaN(serial)) return null;
+          // Excel serial date: days since Jan 1, 1900 (with leap year bug)
+          const excelEpoch = new Date(1899, 11, 30); // Dec 30, 1899
+          const date = new Date(excelEpoch.getTime() + serial * 86400000);
+          return date;
+        };
+        
+        // Format date as m/d/yy
+        const formatImportDate = (serial) => {
+          const date = excelSerialToDate(serial);
+          if (!date || isNaN(date.getTime())) return null;
+          const month = date.getMonth() + 1;
+          const day = date.getDate();
+          const year = String(date.getFullYear()).slice(-2);
+          return `${month}/${day}/${year}`;
+        };
+        
+        if (hasAob) {
+          // Show import date if available
+          const importDate = recruit.aob_import_date ? formatImportDate(recruit.aob_import_date) : null;
+          return (
+            <span 
+              style={{ 
+                fontSize: '12px', 
+                color: 'var(--text-secondary)',
+                whiteSpace: 'nowrap'
+              }}
+              title={`AOB linked (ID: ${recruit.aob})`}
+            >
+              {importDate ? `Sent ${importDate}` : '✓ Sent'}
+            </span>
+          );
+        }
+        
+        // Show sync button if user can sync
+        if (!canSyncAppointments) return null;
+        
+        return (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setSyncRecruitData(recruit);
+              setShowSyncModal(true);
+            }}
+            title="Sync AIL Appointments - Pull AOB data from AIL Portal for this recruit"
+            style={{
+              padding: '6px',
+              backgroundColor: 'transparent',
+              color: '#00558c',
+              border: '1px solid #00558c',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <FiRefreshCw size={14} />
+          </button>
+        );
+      }
     }
-  ];
+  ], [smsBalance, navigate, canSyncAppointments, stages]);
+
 
   // Handle cell update (for DataTable inline editing)
   const handleCellUpdate = async (id, field, value) => {
@@ -596,8 +1213,9 @@ const PipelineProgress = () => {
               <button
                 className={`pipeline-btn ${showTeam ? 'pipeline-btn-primary' : ''}`}
                 onClick={() => setShowTeam(!showTeam)}
+                title={showTeam ? 'Currently viewing team data' : 'Currently viewing personal data'}
               >
-                {showTeam ? 'Team View' : 'Personal View'}
+                {showTeam ? '👥 Team View' : '👤 Personal View'}
               </button>
             )}
           </div>
@@ -685,6 +1303,41 @@ const PipelineProgress = () => {
             onCellUpdate={handleCellUpdate}
             entityName="recruit"
             onRowClick={(row) => handleOpenChecklist(row)}
+            onSelectionChange={(ids) => setSelectedRecruitIds(ids)}
+            onDelete={handleDeleteSelected}
+            onArchive={handleArchiveSelected}
+            onSendEmail={handleSendEmailSelected}
+            actionBarExtras={
+              canSyncAppointments && selectedRecruitIds.length > 0 ? (
+                <button
+                  onClick={handleSyncAilSelected}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 12px',
+                    backgroundColor: '#00558c',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#004070';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = '#00558c';
+                  }}
+                  title={`Sync ${selectedRecruitIds.length} recruit${selectedRecruitIds.length > 1 ? 's' : ''} with AIL`}
+                >
+                  <FiRepeat size={16} />
+                  <span>Sync AIL ({selectedRecruitIds.length})</span>
+                </button>
+              ) : null
+            }
           />
         ) : currentStageRecruits.length > 0 ? (
           <div className="pipeline-empty">
@@ -727,6 +1380,70 @@ const PipelineProgress = () => {
         initialStage={activeTab || 'Careers Form'}
         stages={stages}
       />
+
+      {/* Context Menu for Send Options */}
+      {contextMenu && (() => {
+        const hasFunds = smsBalance >= 6;
+        return (
+          <ContextMenu
+            options={[
+              {
+                label: 'Email',
+                icon: <FiMail size={14} />,
+                onClick: () => handleSendOnboardingEmail(contextMenu.recruit)
+              },
+              {
+                label: hasFunds ? 'Text' : 'Text (Add Funds)',
+                icon: <FiMessageSquare size={14} />,
+                onClick: () => {
+                  if (!hasFunds) {
+                    navigate('/recruiting/pipeline?view=settings');
+                  } else {
+                    handleSendOnboardingText(contextMenu.recruit);
+                  }
+                },
+                disabled: !hasFunds
+              },
+              {
+                label: 'Both',
+                icon: (
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <FiMail size={14} />
+                    <FiMessageSquare size={14} />
+                  </div>
+                ),
+                onClick: () => {
+                  if (!hasFunds) {
+                    navigate('/recruiting/pipeline?view=settings');
+                  } else {
+                    handleSendOnboardingBoth(contextMenu.recruit);
+                  }
+                },
+                disabled: !hasFunds
+              }
+            ]}
+            onClose={() => setContextMenu(null)}
+            style={{
+              position: 'fixed',
+              left: contextMenu.x,
+              top: contextMenu.y,
+              zIndex: 10000
+            }}
+          />
+        );
+      })()}
+
+      {/* Sync Appointments Modal */}
+      {showSyncModal && syncRecruitData && (
+        <SyncAppointmentsModal
+          isOpen={showSyncModal}
+          onClose={() => {
+            setShowSyncModal(false);
+            setSyncRecruitData(null);
+          }}
+          recruit={syncRecruitData}
+        />
+      )}
     </div>
   );
 };

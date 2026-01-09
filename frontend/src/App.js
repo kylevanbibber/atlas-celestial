@@ -7,16 +7,19 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-import Sidebar from "./components/utils/Sidebar";
 import Header from "./components/utils/Header";
 import BottomNav from "./components/utils/BottomNav";
 import Dashboard from "./pages/Dashboard";
 import RefsPage from "./pages/refs/page";
 import Production from "./pages/Production";
+import ProductionOverview from "./pages/ProductionOverview";
 import Reports from "./pages/Reports";
+import ResourcesOverview from "./pages/ResourcesOverview";
 import Training from "./pages/Training";
 import Recruiting from "./pages/Recruiting";
+import RecruitingOverview from "./pages/RecruitingOverview";
 import Utilities from "./pages/utilities/Utilities";
+import UtilitiesOverview from "./pages/UtilitiesOverview";
 import OneOnOne from "./pages/OneOnOne";
 import TeamCustomization from "./pages/utilities/TeamCustomization";
 import NotificationsAdmin from "./pages/admin/Notifications";
@@ -26,7 +29,10 @@ import Login from "./pages/auth/Login";
 import OnboardingLogin from "./pages/onboarding/OnboardingLogin";
 import OnboardingRegister from "./pages/onboarding/OnboardingRegister";
 import OnboardingForgot from "./pages/onboarding/OnboardingForgot";
+import OnboardingResetPassword from "./pages/onboarding/OnboardingResetPassword";
 import OnboardingHome from "./pages/onboarding/OnboardingHome";
+import TermsOfService from "./pages/legal/TermsOfService";
+import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
 // Removed AdminLogin import - admin users now use unified login system
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
@@ -40,6 +46,9 @@ import DocumentSigning from "./components/tools/DocumentSigning";
 import ClientSigning from "./components/tools/ClientSigning";
 import AgentDocumentSigning from "./components/tools/AgentDocumentSigning";
 import AgentSigning from "./components/tools/AgentSigning";
+import PresentationSetup from "./components/tools/PresentationSetup";
+import PresentationSlideshow from "./components/tools/PresentationSlideshow";
+import PresentationScripts from "./components/tools/PresentationScripts";
 import { PromotionTracking } from "./components/promotion-tracking";
 import { Toaster } from 'react-hot-toast';
 import LicenseOnboardingModal from "./components/utilities/LicenseOnboardingModal";
@@ -52,6 +61,7 @@ import RecruitmentSuccess from "./pages/RecruitmentSuccess";
 import AdminHierarchySettings from "./components/admin/AdminHierarchySettings";
 import LoginLogs from "./components/admin/LoginLogs";
 import AdminCheck from "./pages/admin/AdminCheck";
+import AnalyticsDashboard from "./pages/admin/AnalyticsDashboard";
 import { logRedirect, logNavigation } from "./utils/navigationLogger";
 import "./App.css";
 
@@ -69,7 +79,6 @@ function AppContent() {
   const { styles, loading: stylesLoading, teamName } = useTeamStyles();
   const location = useLocation();
   const navigate = useNavigate();
-  const [isExpanded, setIsExpanded] = React.useState(false);
   
   // Track location changes for navigation logging
   React.useEffect(() => {
@@ -141,7 +150,8 @@ function AppContent() {
       },
       resources: {
         'reports': 'Reports',
-        'updates': 'Updates'
+        'updates': 'Updates',
+        'feedback': 'Feedback'
       }
     };
 
@@ -165,11 +175,18 @@ function AppContent() {
 
   // Update document title with page title and team name
   useEffect(() => {
+    // Don't change title on careers page - it has its own SEO-friendly title
+    const isCareersRoute = location.pathname === '/careers' || location.pathname === '/careers-success';
+    if (isCareersRoute) {
+      document.title = 'Career Opportunities | Arias Agencies';
+      return;
+    }
+    
     if (!stylesLoading && teamName) {
       const title = pageTitle === teamName ? `${teamName} - Atlas` : `${pageTitle} | ${teamName} - Atlas`;
       document.title = title;
     }
-  }, [teamName, stylesLoading, pageTitle]);
+  }, [teamName, stylesLoading, pageTitle, location.pathname]);
 
   // Apply team styles to the root element
   useEffect(() => {
@@ -188,15 +205,19 @@ function AppContent() {
   const isAuthPage = authPaths.includes(location.pathname);
   
   // Check if current path is a public route that doesn't require authentication
-  const publicPaths = ["/login", "/register", "/adminlogin", "/onboarding/login", "/onboarding/register", "/onboarding/forgot", "/onboarding"];
+  const publicPaths = ["/login", "/register", "/adminlogin", "/onboarding/login", "/onboarding/register", "/onboarding/forgot", "/onboarding/reset-password", "/onboarding", "/terms-of-service", "/privacy-policy"];
   const isClientSigningPage = location.pathname.startsWith("/client-sign/");
   const isAgentSigningPage = location.pathname.startsWith("/agent-sign/");
   const isAgentDocumentSigningPage = location.pathname === "/agent-document-signing";
+  const isPresentationSetupPage = location.pathname === "/presentation-setup";
+  const isPresentationSlideshowPage = location.pathname === "/presentation-slideshow";
+  const isPresentationScriptsPage = location.pathname === "/presentation-scripts";
   const isCareersPage = location.pathname === "/careers" || location.pathname === "/careers-success";
   const isOnboardingPage = location.pathname.startsWith('/onboarding');
   const isOnboardingHomePath = location.pathname === '/onboarding/home';
   const isOnboardingAuth = isOnboardingPage && !isOnboardingHomePath;
-  const isPublicPage = publicPaths.includes(location.pathname) || isClientSigningPage || isAgentSigningPage || isAgentDocumentSigningPage || isCareersPage || isOnboardingAuth || isOnboardingHomePath;
+  const isLegalPage = location.pathname === '/terms-of-service' || location.pathname === '/privacy-policy';
+  const isPublicPage = publicPaths.includes(location.pathname) || isClientSigningPage || isAgentSigningPage || isAgentDocumentSigningPage || isPresentationSetupPage || isPresentationSlideshowPage || isPresentationScriptsPage || isCareersPage || isOnboardingAuth || isOnboardingHomePath || isLegalPage;
 
   // Handle redirects only once auth is no longer loading
   React.useEffect(() => {
@@ -272,7 +293,7 @@ function AppContent() {
     }
     
     // If we're on a public page (including client/agent signing and careers) and not authenticated, allow it
-    if (!isAuthenticated && (isClientSigningPage || isAgentSigningPage || isAgentDocumentSigningPage || isCareersPage)) {
+    if (!isAuthenticated && (isClientSigningPage || isAgentSigningPage || isAgentDocumentSigningPage || isPresentationSetupPage || isPresentationSlideshowPage || isPresentationScriptsPage || isCareersPage)) {
       console.log(`[App] On public page ${location.pathname}, allowing access without redirect`);
       return;
     }
@@ -326,7 +347,18 @@ function AppContent() {
       });
     }
 
-  }, [isAuthenticated, isAuthPage, location.pathname, location.search, navigate, authLoading, user, hasPermission, isPublicPage, isClientSigningPage, isAgentDocumentSigningPage, isCareersPage]);
+  }, [isAuthenticated, isAuthPage, location.pathname, location.search, navigate, authLoading, user, hasPermission, isPublicPage, isClientSigningPage, isAgentDocumentSigningPage, isPresentationSetupPage, isPresentationSlideshowPage, isPresentationScriptsPage, isCareersPage]);
+
+  // If we're on a legal page, render without header/sidebar (public access)
+  if (isLegalPage) {
+    return (
+      <Routes>
+        <Route path="/terms-of-service" element={<TermsOfService />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
 
   // If we're on an auth page, we render only the auth routes
   if (isAuthPage) {
@@ -351,6 +383,9 @@ function AppContent() {
         <Route path="/onboarding/login" element={<OnboardingLogin />} />
         <Route path="/onboarding/register" element={<OnboardingRegister />} />
         <Route path="/onboarding/forgot" element={<OnboardingForgot />} />
+        <Route path="/onboarding/reset-password" element={<OnboardingResetPassword />} />
+        <Route path="/terms-of-service" element={<TermsOfService />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="*" element={<Navigate to="/onboarding/login" replace />} />
       </Routes>
     );
@@ -362,6 +397,8 @@ function AppContent() {
       <Routes>
         <Route path="/careers" element={<RecruitmentForm />} />
         <Route path="/careers-success" element={<RecruitmentSuccess />} />
+        <Route path="/terms-of-service" element={<TermsOfService />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         {/* Redirect any unknown careers route to dashboard or careers form */}
         <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/careers"} replace />} />
       </Routes>
@@ -403,12 +440,44 @@ function AppContent() {
     );
   }
 
+  // If we're on the presentation setup page, render without header/sidebar
+  if (isPresentationSetupPage) {
+    return (
+      <Routes>
+        <Route path="/presentation-setup" element={<PresentationSetup />} />
+        {/* Redirect any unknown route */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    );
+  }
+
+  // If we're on the presentation slideshow page, render without header/sidebar
+  if (isPresentationSlideshowPage) {
+    return (
+      <Routes>
+        <Route path="/presentation-slideshow" element={<PresentationSlideshow />} />
+        {/* Redirect any unknown route */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    );
+  }
+
+  // If we're on the presentation scripts page, render without header/sidebar
+  if (isPresentationScriptsPage) {
+    return (
+      <Routes>
+        <Route path="/presentation-scripts" element={<PresentationScripts />} />
+        {/* Redirect any unknown route */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    );
+  }
+
   // Otherwise, render the main app layout with header, sidebar, etc.
   const isOnboardingHome = location.pathname.startsWith('/onboarding/home');
   return (
-    <div className={`app-container ${isExpanded ? "expanded" : ""}`}>
-      <Sidebar isExpanded={isExpanded} setIsExpanded={setIsExpanded} onboardingMode={isOnboardingHome} />
-      <Header pageTitle={pageTitle} isExpanded={isExpanded} onboardingMode={isOnboardingHome} />
+    <div className="app-container">
+      <Header pageTitle={pageTitle} onboardingMode={isOnboardingHome} />
       <div className="main-content">
         <div className="page-content">
           <Routes>
@@ -583,6 +652,14 @@ function AppContent() {
               }
             />
             <Route
+              path="/admin/analytics"
+              element={
+                <ProtectedRoute requiredPermission="admin">
+                  <AnalyticsDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/admin/email-campaigns"
               element={
                 <ProtectedRoute requiredPermission="admin">
@@ -626,8 +703,8 @@ function AppContent() {
           </Routes>
         </div>
       </div>
-      {/* Add BottomNav for mobile */}
-      <BottomNav />
+      {/* Add BottomNav for mobile (hide on onboarding pages) */}
+      {!isOnboardingPage && <BottomNav />}
       <InPageNotificationContainer />
       <LicenseOnboardingModal />
       <Toaster 

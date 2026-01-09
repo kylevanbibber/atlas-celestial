@@ -23,6 +23,13 @@ export const ThemeProvider = ({ children }) => {
     
     // Apply theme to body
     document.body.setAttribute('data-theme', theme);
+    
+    // Add/remove dark class for Tailwind
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   }, [theme]);
 
   return (

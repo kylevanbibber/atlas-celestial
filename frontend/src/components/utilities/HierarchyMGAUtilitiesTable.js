@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useContext, useMemo, useRef, useCallback } from 'react';
 import { FiMail, FiCheckCircle, FiXCircle, FiUsers, FiX, FiRefreshCw } from 'react-icons/fi';
 import DataTable from '../utils/DataTable';
 import Modal from '../utils/Modal';
@@ -220,7 +220,23 @@ export default function HierarchyMGAUtilitiesTable({
 				userData: mgaUser || {}
 			});
 		});
-		return result.sort((a,b)=> a.name.localeCompare(b.name));
+		
+		// Sort with inactive/hidden MGAs at the bottom
+		return result.sort((a, b) => {
+			// Only check inactive/hidden status if they're currently an MGA or RGA
+			const aIsMgaOrRga = ['MGA', 'RGA'].includes(String(a.role || '').toUpperCase());
+			const bIsMgaOrRga = ['MGA', 'RGA'].includes(String(b.role || '').toUpperCase());
+			
+			const aInactive = aIsMgaOrRga && (a.userData?.mga_active === 'n' || a.userData?.mga_hide === 'y');
+			const bInactive = bIsMgaOrRga && (b.userData?.mga_active === 'n' || b.userData?.mga_hide === 'y');
+			
+			// If one is inactive and the other isn't, inactive goes to bottom
+			if (aInactive && !bInactive) return 1;
+			if (!aInactive && bInactive) return -1;
+			
+			// Otherwise sort alphabetically
+			return a.name.localeCompare(b.name);
+		});
 	}, [mgaToAgents, users]);
 
 	const topLevelRows = useMemo(() => {
@@ -356,7 +372,7 @@ export default function HierarchyMGAUtilitiesTable({
 		}
 	};
 
-	// Render status badges for a user node
+	// Render status badges for a user node with inline display and +X more tooltip
 	const renderStatusBadges = (node) => {
 		if (!node) return null;
 		const isActive = node.managerActive && node.managerActive.toLowerCase() === 'y';
@@ -365,25 +381,47 @@ export default function HierarchyMGAUtilitiesTable({
 		const isPending = node.pending === 1 || node.pending === '1';
 		const { isF6, isVIPEligible } = calculateCareerStage(node.esid);
 		
+		// Build array of all badges
+		const allBadges = [
+			{ label: isActive ? 'Active' : 'Inactive', className: isActive ? 'active' : 'inactive' },
+			{ label: isRedeemed ? 'Redeemed' : 'Not Redeemed', className: isRedeemed ? 'redeemed' : 'inactive' },
+			{ label: isReleased ? 'Released' : 'Not Released', className: isReleased ? 'released' : 'inactive' },
+		];
+		
+		if (isPending) {
+			allBadges.push({ label: 'RFC', className: 'rfc' });
+		}
+		if (!isPending && isF6) {
+			allBadges.push({ label: 'F6', className: 'f6' });
+		}
+		if (!isPending && isVIPEligible) {
+			allBadges.push({ label: 'VIP Eligible', className: 'vip-eligible' });
+		}
+		
+		// Show first 2 badges inline, rest in tooltip
+		const visibleBadges = allBadges.slice(0, 2);
+		const hiddenBadges = allBadges.slice(2);
+		
 		return (
-			<div className="status-badges">
-				<span className={`status-badge ${isActive ? 'active' : 'inactive'}`}>
-					{isActive ? 'Active' : 'Inactive'}
-				</span>
-				<span className={`status-badge ${isRedeemed ? 'redeemed' : 'inactive'}`}>
-					{isRedeemed ? 'Redeemed' : 'Not Redeemed'}
-				</span>
-				<span className={`status-badge ${isReleased ? 'released' : 'inactive'}`}>
-					{isReleased ? 'Released' : 'Not Released'}
-				</span>
-				{isPending && (
-					<span className="status-badge rfc">RFC</span>
-				)}
-				{!isPending && isF6 && (
-					<span className="status-badge f6">F6</span>
-				)}
-				{!isPending && isVIPEligible && (
-					<span className="status-badge vip-eligible">VIP Eligible</span>
+			<div className="status-badges-inline" style={{ position: 'relative' }}>
+				{visibleBadges.map((badge, idx) => (
+					<span key={idx} className={`status-badge ${badge.className}`}>
+						{badge.label}
+					</span>
+				))}
+				{hiddenBadges.length > 0 && (
+					<div className="status-badge-more-wrapper">
+						<span className="status-badge-more">
+							+{hiddenBadges.length}
+						</span>
+						<div className="status-badge-tooltip">
+							{hiddenBadges.map((badge, idx) => (
+								<span key={idx} className={`status-badge ${badge.className}`}>
+									{badge.label}
+								</span>
+							))}
+						</div>
+					</div>
 				)}
 			</div>
 		);
@@ -786,19 +824,122 @@ export default function HierarchyMGAUtilitiesTable({
 			Header: 'Role', 
 			accessor: 'role', 
 			width: 12,
+			Cell: ({ value, row }) => {
+				const depth = row.original.depth || 0;
+				const isTopLevel = depth === 0;
+				const parentRole = row.original.parentRole;
+				
+				// Get the parent's role badge color for connectors
+				const getParentColor = () => {
+					if (!parentRole) return 'var(--border-color)';
+					const parentRoleUpper = String(parentRole).toUpperCase();
+					switch (parentRoleUpper) {
+						case 'RGA': return '#00558c';
+						case 'MGA': return 'rgb(104, 182, 117)';
+						case 'GA': return 'rgb(237, 114, 47)';
+						case 'SA': return 'rgb(178, 82, 113)';
+						default: return 'var(--border-color)';
+					}
+				};
+				
+				const connectorColor = getParentColor();
+				
+				return (
+					<div style={{ 
+						display: 'flex', 
+						alignItems: 'center', 
+						paddingLeft: `${depth * 28}px`,
+						position: 'relative'
+					}}>
+						{/* Show hierarchy connector for nested items */}
+						{depth > 0 && (
+							<>
+								{/* Vertical line connecting to parent */}
+								<span style={{ 
+									position: 'absolute',
+									left: `${(depth - 1) * 28 + 10}px`,
+									top: 0,
+									bottom: '50%',
+									width: '2px',
+									backgroundColor: connectorColor,
+									opacity: 0.4
+								}} />
+								{/* Horizontal connector */}
+								<span style={{ 
+									position: 'absolute',
+									left: `${(depth - 1) * 28 + 10}px`,
+									top: '50%',
+									width: '14px',
+									height: '2px',
+									backgroundColor: connectorColor,
+									opacity: 0.4
+								}} />
+								{/* Arrow/connector symbol */}
+								<span style={{ 
+									marginRight: '6px',
+									marginLeft: '18px',
+									color: connectorColor, 
+									fontSize: '11px',
+									opacity: 0.5,
+									fontWeight: 'bold'
+								}}>
+									▸
+								</span>
+							</>
+						)}
+						<span 
+							className="user-role-badge" 
+							style={{
+								...getRoleBadgeStyle(value),
+								fontWeight: isTopLevel ? '700' : '600',
+								fontSize: isTopLevel ? '11px' : '10px'
+							}}
+						>
+							{value}
+						</span>
+					</div>
+				);
+			}
+		},
+		{ 
+			Header: 'Name', 
+			accessor: 'name', 
+			autoWidth: true,
 			Cell: ({ value, row }) => (
-				<span 
-					className="user-role-badge" 
-					style={{ 
-						...getRoleBadgeStyle(value), 
-						marginLeft: `${(row.original.depth || 0) * 16}px`
-					}}
-				>
-					{value}
-				</span>
+				<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+					{row.original.userData?.profpic ? (
+						<img 
+							src={row.original.userData.profpic} 
+							alt={value}
+							style={{
+								width: '28px',
+								height: '28px',
+								borderRadius: '50%',
+								objectFit: 'cover',
+								border: '1px solid var(--border-color)'
+							}}
+						/>
+					) : (
+						<div style={{
+							width: '28px',
+							height: '28px',
+							borderRadius: '50%',
+							backgroundColor: 'var(--sidebar-hover)',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							color: 'var(--text-secondary)',
+							fontSize: '14px',
+							fontWeight: '600',
+							border: '1px solid var(--border-color)'
+						}}>
+							{value?.charAt(0) || '?'}
+						</div>
+					)}
+					<span>{value}</span>
+				</div>
 			)
 		},
-		{ Header: 'Name', accessor: 'name', autoWidth: true },
 		{ 
 			Header: 'Agent #', 
 			accessor: 'agtnum', 
@@ -822,10 +963,7 @@ export default function HierarchyMGAUtilitiesTable({
 			accessor: 'status', 
 			width: 125,
 			Cell: ({ row }) => {
-				// Don't show status for parent MGA rows
-				if (row.original.role === 'MGA' && row.original.depth === 0) {
-					return '—';
-				}
+				// Show status for all rows including top-level RGA/MGA
 				return renderStatusBadges(row.original.userData);
 			}
 		},
@@ -836,15 +974,12 @@ export default function HierarchyMGAUtilitiesTable({
 			Cell: ({ value }) => value ? formatDate(value) : '—'
 		},
 		{ 
-			Header: '13mo Ret', 
-			accessor: 'retention13mo', 
+			Header: '4mo Ret', 
+			accessor: 'retention4mo', 
 			width: 10,
 			Cell: ({ row }) => {
-				// Don't show 13mo retention for parent MGA rows
-				if (row.original.role === 'MGA' && row.original.depth === 0) {
-					return '—';
-				}
-				const retentionRate = row.original.userData?.pnp_data?.curr_mo_13mo_rate;
+				// Show 4mo retention for all rows including top-level RGA/MGA
+				const retentionRate = row.original.userData?.pnp_data?.curr_mo_4mo_rate;
 				return retentionRate ? `${retentionRate}%` : '—';
 			}
 		},
@@ -853,8 +988,8 @@ export default function HierarchyMGAUtilitiesTable({
 			accessor: 'licenses', 
 			width: 225,
 			Cell: ({ row }) => {
-				// Show only resident licenses for parent MGA rows
-				if (row.original.role === 'MGA' && row.original.depth === 0) {
+				// Show only resident licenses for parent MGA/RGA rows (depth 0)
+				if ((row.original.role === 'MGA' || row.original.role === 'RGA') && row.original.depth === 0) {
 					return renderResidentLicenseBadges(row.original.userData);
 				}
 				// Show all licenses for child agent rows
@@ -904,23 +1039,74 @@ export default function HierarchyMGAUtilitiesTable({
 
 	const normalizedQuery = (searchQuery || '').trim().toLowerCase();
 
-	// Auto-expand MGAs that have matches when searching
+	// Auto-expand nodes that have matches when searching (multi-level) - with debouncing
 	useEffect(() => {
 		if (!normalizedQuery) return; // don't modify expansion when empty
-		const nextExpanded = {};
-		baseRows.forEach(mgaRow => {
-			const agents = users.filter(u => u.mga === mgaRow.name || u.lagnname === mgaRow.name);
-			// Quick pre-filter
-			const hasAgentMatch = agents.some(a =>
-				(String(a.lagnname || '').toLowerCase().includes(normalizedQuery)) ||
-				(String(a.clname || '').toLowerCase().includes(normalizedQuery)) ||
-				(String(a.mga || '').toLowerCase().includes(normalizedQuery))
-			);
-			if (hasAgentMatch || String(mgaRow.name || '').toLowerCase().includes(normalizedQuery)) {
-				nextExpanded[mgaRow.id] = true;
-			}
-		});
-		setExpandedMga(prev => ({ ...prev, ...nextExpanded }));
+		
+		// Debounce the expansion logic to avoid blocking UI
+		const timeoutId = setTimeout(() => {
+			const nextExpanded = {};
+			
+			// Build a lookup map for faster searching
+			const userMap = new Map();
+			const childrenMap = new Map();
+			
+			users.forEach(u => {
+				userMap.set(u.lagnname, u);
+				
+				// Build children lookup for faster traversal
+				[u.sa, u.ga, u.mga, u.rga].forEach(parent => {
+					if (parent) {
+						if (!childrenMap.has(parent)) {
+							childrenMap.set(parent, []);
+						}
+						childrenMap.get(parent).push(u.lagnname);
+					}
+				});
+			});
+			
+			// Helper function to check if a user or their descendants match the search
+			const hasMatchInSubtree = (userName, visited = new Set()) => {
+				// Prevent infinite loops
+				if (visited.has(userName)) return false;
+				visited.add(userName);
+				
+				const matchesQuery = (str) => String(str || '').toLowerCase().includes(normalizedQuery);
+				
+				// Check if this user matches
+				const user = userMap.get(userName);
+				if (user && (matchesQuery(user.lagnname) || matchesQuery(user.clname))) {
+					return true;
+				}
+				
+				// Check if any descendants match
+				const children = childrenMap.get(userName) || [];
+				return children.some(childName => 
+					matchesQuery(userMap.get(childName)?.lagnname) || 
+					matchesQuery(userMap.get(childName)?.clname) || 
+					hasMatchInSubtree(childName, visited)
+				);
+			};
+			
+			// Expand all nodes that have matches in their subtree
+			baseRows.forEach(mgaRow => {
+				if (hasMatchInSubtree(mgaRow.name)) {
+					nextExpanded[mgaRow.id] = true;
+					
+					// Also expand all managers under this MGA that have matches
+					const agents = users.filter(u => u.mga === mgaRow.name || u.lagnname === mgaRow.name);
+					agents.forEach(agent => {
+						if (hasMatchInSubtree(agent.lagnname)) {
+							nextExpanded[`${mgaRow.id}::${agent.lagnname}`] = true;
+						}
+					});
+				}
+			});
+			
+			setExpandedMga(prev => ({ ...prev, ...nextExpanded }));
+		}, 300); // 300ms debounce
+		
+		return () => clearTimeout(timeoutId);
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [normalizedQuery]);
 
@@ -952,8 +1138,8 @@ export default function HierarchyMGAUtilitiesTable({
 						// Mark the target user as a match
 						matchIds.add(isolatedHeaderId);
 						
-						// Flatten the isolated hierarchy
-						const flattenIsolated = (nodes, depth) => {
+						// Flatten the isolated hierarchy with parent role tracking
+						const flattenIsolated = (nodes, depth, parentRole = null) => {
 							nodes.forEach(node => {
 								const nodeId = `isolated-${isolatedHeaderId}-${node.lagnname}`;
 								
@@ -972,17 +1158,18 @@ export default function HierarchyMGAUtilitiesTable({
 									phone: node.phone || '',
 									esid: node.esid || '',
 									userData: node,
-									isTargetUser: isTargetUser
+									isTargetUser: isTargetUser,
+									parentRole: parentRole || targetUser.clname // Track parent role
 								});
 								
 								if (node.children?.length > 0) {
-									flattenIsolated(node.children, depth + 1);
+									flattenIsolated(node.children, depth + 1, node.clname || parentRole);
 								}
 							});
 						};
 						
 						if (isolatedHierarchy?.length > 0) {
-							flattenIsolated(isolatedHierarchy, 0);
+							flattenIsolated(isolatedHierarchy, 0, targetUser.clname);
 						}
 					});
 				}
@@ -992,10 +1179,24 @@ export default function HierarchyMGAUtilitiesTable({
 			return out;
 		}
 		
-		// Default behavior for full mode
+		// Default behavior for full mode with multi-level collapsing
 		const out = [];
 		const matchIds = new Set();
-		topLevelRows.forEach(mgaRow => {
+		
+		// Separate active and inactive rows (only check if they're currently MGA/RGA)
+		const activeRows = topLevelRows.filter(row => {
+			const isMgaOrRga = ['MGA', 'RGA'].includes(String(row.role || '').toUpperCase());
+			return !(isMgaOrRga && (row.userData?.mga_active === 'n' || row.userData?.mga_hide === 'y'));
+		});
+		const inactiveRows = topLevelRows.filter(row => {
+			const isMgaOrRga = ['MGA', 'RGA'].includes(String(row.role || '').toUpperCase());
+			return isMgaOrRga && (row.userData?.mga_active === 'n' || row.userData?.mga_hide === 'y');
+		});
+		
+		// Process active rows first, then inactive rows
+		const rowsToProcess = [...activeRows, ...inactiveRows];
+		
+		rowsToProcess.forEach(mgaRow => {
 			// If searching, include only MGAs with a match in self or descendants
 			if (normalizedQuery) {
 				const mgaNameMatches = String(mgaRow.name || '').toLowerCase().includes(normalizedQuery);
@@ -1012,12 +1213,22 @@ export default function HierarchyMGAUtilitiesTable({
 					matchIds.add(mgaRow.id);
 				}
 			}
-			out.push(mgaRow);
+			// Check if this top-level MGA/RGA is inactive/hidden (only if currently MGA/RGA)
+			const isMgaOrRga = ['MGA', 'RGA'].includes(String(mgaRow.role || '').toUpperCase());
+			const topLevelInactive = isMgaOrRga && (mgaRow.userData?.mga_active === 'n' || mgaRow.userData?.mga_hide === 'y');
+			
+			out.push({
+				...mgaRow,
+				isParentInactive: topLevelInactive
+			});
+			
 			if (expandedMga[mgaRow.id]) {
 				const agents = users.filter(u => u.mga === mgaRow.name || u.lagnname === mgaRow.name);
 				const tree = buildHierarchy(agents);
 				const flat = [];
-				const traverse = (nodes, depth) => {
+				
+				// Updated traverse function to respect expansion state at each level and track parent role
+				const traverse = (nodes, depth, parentId = mgaRow.id, parentRole = mgaRow.role, parentInactive = false) => {
 					nodes.forEach(n => {
 						if (normalizedQuery) {
 							const isMatch =
@@ -1028,30 +1239,55 @@ export default function HierarchyMGAUtilitiesTable({
 								matchIds.add(`${mgaRow.id}::${n.lagnname}`);
 							}
 						}
-						// Skip pushing the parent MGA node itself; only show its children
-						const isParentMgaNode =
+						
+						// Skip pushing the parent MGA/RGA node itself; only show its children
+						const isParentNode =
 							String(n.lagnname || '').toUpperCase() === String(mgaRow.name || '').toUpperCase() &&
-							String(n.clname || '').toUpperCase() === 'MGA';
-						if (!isParentMgaNode) {
+							(['MGA', 'RGA'].includes(String(n.clname || '').toUpperCase()));
+							
+						if (!isParentNode) {
+							const nodeId = `${mgaRow.id}::${n.lagnname}`;
+							const nodeRole = String(n.clname || '').toUpperCase();
+							const isManager = ['RGA', 'MGA', 'GA', 'SA'].includes(nodeRole);
+							
+							// Check if this node itself is inactive/hidden, but ONLY if they're currently an MGA/RGA
+							const isMgaOrRga = ['MGA', 'RGA'].includes(nodeRole);
+							const nodeInactive = isMgaOrRga && (n.mga_active === 'n' || n.mga_hide === 'y');
+							
 							flat.push({ 
-								id: `${mgaRow.id}::${n.lagnname}`, 
+								id: nodeId,
 								role: n.clname || '', 
 								name: n.lagnname, 
 								depth,
 								email: n.email || '',
 								phone: n.phone || '',
 								esid: n.esid || '',
-								userData: n
+								userData: n,
+								parentRole: parentRole, // Track the parent's role for styling
+								isParentInactive: parentInactive || nodeInactive // Track if parent chain is inactive
 							});
-						}
-						// Continue traversing children; if we skipped parent, keep same depth for first-generation children
-						if (n.children && n.children.length) {
-							const nextDepth = isParentMgaNode ? depth : depth + 1;
-							traverse(n.children, nextDepth);
+							
+							// Only traverse children if this node is expanded (or if it's not a manager)
+							if (n.children && n.children.length) {
+								const isExpanded = expandedMga[nodeId];
+								// If it's a manager, only show children if expanded
+								// If it's not a manager (AGT), always show children
+								if (!isManager || isExpanded) {
+									// Pass this node's role as the parent role for its children
+									traverse(n.children, depth + 1, nodeId, n.clname || parentRole, parentInactive || nodeInactive);
+								}
+							}
+						} else {
+							// For parent MGA/RGA node, continue traversing children at same depth
+							if (n.children && n.children.length) {
+								traverse(n.children, depth, parentId, parentRole, parentInactive);
+							}
 						}
 					});
 				};
-				traverse(tree, 0);
+				
+				// Start at depth 1 so direct children of RGA/MGA get the left border
+				traverse(tree, 1, mgaRow.id, mgaRow.role, topLevelInactive);
 				out.push(...flat);
 			}
 		});
@@ -1135,37 +1371,56 @@ export default function HierarchyMGAUtilitiesTable({
 		];
 	}, [user?.clname, user?.Role, user?.teamRole]);
 
-	// Update expandableRows to only allow expansion on top-level MGA rows
+	// Update expandableRows to allow expansion on ALL manager rows (RGA, MGA, GA, SA) that have children
 	const expandableRows = (() => {
 		if (searchMode === 'isolated') {
 			// In isolated mode, no rows are expandable since we show the full hierarchy
 			return {};
 		}
 		const map = {};
-		// Only rows with role MGA or RGA are expandable
+		// Check if each row has children in the hierarchy
 		(displayRows || []).forEach(row => {
 			const role = String(row.role || row?.userData?.clname || '').toUpperCase();
-			map[row.id] = role === 'MGA' || role === 'RGA';
-			// Debug logging of expandability map entries
-			try {
-				console.log('[HierarchyMGAUtilitiesTable] expandableRows entry', {
-					id: row.id,
-					name: row.name,
-					role,
-					depth: row.depth,
-					isExpandable: map[row.id]
-				});
-			} catch (_) {}
+			// Manager roles that can have children
+			const isManager = ['RGA', 'MGA', 'GA', 'SA'].includes(role);
+			
+			// Check if this manager actually has children
+			let hasChildren = false;
+			if (isManager && row.userData) {
+				const userName = row.userData.lagnname;
+				// Check if any user in the table has this user as their upline
+				hasChildren = users.some(u => 
+					u.mga === userName || 
+					u.ga === userName || 
+					u.sa === userName || 
+					u.rga === userName
+				);
+			}
+			
+			map[row.id] = isManager && hasChildren;
 		});
-		try {
-			const totals = Object.values(map).reduce((acc, v) => {
-				acc[v ? 'expandable' : 'nonExpandable'] += 1; return acc;
-			}, { expandable: 0, nonExpandable: 0 });
-		} catch (_) {}
 		return map;
 	})();
 
-	const handleRowExpansionChange = (rowId, isExpanded) => setExpandedMga(prev => ({ ...prev, [rowId]: isExpanded }));
+	const handleRowExpansionChange = (rowId, isExpanded) => {
+		setExpandedMga(prev => {
+			const newState = { ...prev, [rowId]: isExpanded };
+			
+			// If expanding a top-level row, also auto-expand the first nested version of that same person
+			if (isExpanded) {
+				// Extract the base name from the rowId (top-level rows are just the name)
+				const baseName = rowId.includes('::') ? rowId.split('::')[1] : rowId;
+				
+				// Find and auto-expand the first nested occurrence of this person
+				const nestedRowId = `${rowId}::${baseName}`;
+				if (displayRows.some(r => r.id === nestedRowId)) {
+					newState[nestedRowId] = true;
+				}
+			}
+			
+			return newState;
+		});
+	};
 
 	// Build row class names to highlight matches and target users
 	const rowClassNames = (() => {
@@ -1189,6 +1444,24 @@ export default function HierarchyMGAUtilitiesTable({
 				}
 			});
 		}
+		
+		// Add hierarchy depth classes, parent role classes, and inactive/hidden classes
+		displayRows.forEach(row => {
+			const existingClass = classes[row.id] || '';
+			const depthClass = `hierarchy-depth-${row.depth || 0}`;
+			const roleClass = `hierarchy-role-${(row.role || '').toLowerCase()}`;
+			const parentRoleClass = row.parentRole ? `parent-role-${(row.parentRole || '').toLowerCase()}` : '';
+			
+			// Only apply inactive styling if currently an MGA/RGA with inactive/hidden status
+			const isMgaOrRga = ['MGA', 'RGA'].includes(String(row.role || '').toUpperCase());
+			const isInactiveOrHidden = isMgaOrRga && 
+									   (row.userData?.mga_active === 'n' || 
+									    row.userData?.mga_hide === 'y' || 
+									    row.isParentInactive);
+			const inactiveClass = isInactiveOrHidden ? 'mga-inactive-hidden' : '';
+			
+			classes[row.id] = `${existingClass} ${depthClass} ${roleClass} ${parentRoleClass} ${inactiveClass}`.trim();
+		});
 		
 		return classes;
 	})();
@@ -1312,11 +1585,12 @@ export default function HierarchyMGAUtilitiesTable({
 				getRowContextMenuOptions={getRowContextMenuOptions}
 				enableRowExpansion={true}
 				expandableRows={expandableRows}
+				expandedRows={expandedMga}
 				expandableDefault={false}
 				isRowExpandable={(row) => {
 					const role = String(row.role || row?.userData?.clname || '').toUpperCase();
-					const allowed = role === 'MGA' || role === 'RGA';
-					return allowed;
+					// Allow RGA, MGA, GA, and SA to be expandable if they have children
+					return expandableRows[row.id] === true;
 				}}
 				expandOnRowClick={true}
 				showExpandButton={false}

@@ -4,6 +4,7 @@ import PotentialVIPs from '../../components/production/vips/PotentialVIPs';
 import PendingUsers from '../../components/production/vips/PendingUsers';
 import Codes from '../../components/production/vips/Codes';
 import SAGACodes from '../../components/production/vips/SAGACodes';
+import CodePotential from '../../components/production/vips/CodePotential';
 import { FiSearch, FiFilter } from 'react-icons/fi';
 import FilterMenu from '../../components/common/FilterMenu';
 import '../../components/production/ProductionReports.css';
@@ -49,6 +50,10 @@ const VIPsPage = () => {
     {
       id: 'sagacodes',
       name: 'SAGA Codes'
+    },
+    {
+      id: 'codepotential',
+      name: 'Code Potential'
     }
     // Future tabs can be added here
   ];
@@ -487,6 +492,17 @@ const VIPsPage = () => {
               rga: selectedRGA
             }}
             onFilterOptions={handleFilterOptions}
+          />
+        )}
+        {activeTab === 'codepotential' && (
+          <CodePotential 
+            searchQuery={searchQuery}
+            filters={{
+              sa: selectedSA,
+              ga: selectedGA,
+              mga: selectedMGA,
+              rga: selectedRGA
+            }}
           />
         )}
         {/* Future tab components can be added here and receive searchQuery similarly */}

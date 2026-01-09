@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext, useMemo } from 'react';
 import api from '../../../api';
 import { AuthContext } from '../../../context/AuthContext';
 import DataTable from '../../utils/DataTable';
+import ActivitySummaryCards from './ActivitySummaryCards';
 
 // Builds MGA -> [agents] mapping from /auth/searchByUserId results
 function groupAgentsByMGA(users) {
@@ -116,6 +117,7 @@ export default function MGADataTable({ startDate, endDate }) {
   const [weeks, setWeeks] = useState([]);
   const [selectedWeek, setSelectedWeek] = useState('');
   const [expandedMga, setExpandedMga] = useState({}); // { [mgaName]: true }
+  const [allowedMgasGlobal, setAllowedMgasGlobal] = useState([]); // Store global allowed MGAs
 
   useEffect(() => {
     let mounted = true;
@@ -156,11 +158,26 @@ export default function MGADataTable({ startDate, endDate }) {
         }));
 
         if (mounted) {
+          console.log('🔍 [MGADataTable] Raw hierarchy response:', {
+            totalUsers: (hierRes.data.data || []).length,
+            allowedMgas: hierRes.data.allowedMgas || [],
+            allowedMgasGlobal: hierRes.data.allowedMgasGlobal || [],
+            agnName: hierRes.data.agnName
+          });
+          
           // Filter MGA grouping by allowedMgas when provided
           const rawUsers = hierRes.data.data || [];
+          console.log('🔍 [MGADataTable] Raw users:', rawUsers.map(u => `${u.lagnname} (${u.clname})`).join(', '));
+          
           // Component-level allowlists
           const allowByRga = new Set((hierRes.data.allowedMgas || []).map(s => (s || '').trim().toUpperCase()));
           const allowGlobal = new Set((hierRes.data.allowedMgasGlobal || []).map(s => (s || '').trim().toUpperCase()));
+          
+          console.log('🔍 [MGADataTable] Allowlists:', {
+            allowByRga: Array.from(allowByRga),
+            allowGlobal: Array.from(allowGlobal)
+          });
+          
           const hasAnyAllow = allowByRga.size > 0 || allowGlobal.size > 0;
           const isAllowed = (name) => {
             const key = (name || '').trim().toUpperCase();
@@ -173,7 +190,13 @@ export default function MGADataTable({ startDate, endDate }) {
             ? rawUsers.filter(u => !u.mga || isAllowed(u.mga) || isAllowed(u.lagnname))
             : rawUsers;
 
+          console.log('🔍 [MGADataTable] Cleaned users after filtering:', {
+            total: cleanedUsers.length,
+            users: cleanedUsers.map(u => `${u.lagnname} (${u.clname})`).join(', ')
+          });
 
+          // Store allowedMgasGlobal for use in topLevelRows filtering
+          setAllowedMgasGlobal(hierRes.data.allowedMgasGlobal || []);
 
           setUsers(cleanedUsers);
           setActivity(activityData);
@@ -202,7 +225,14 @@ export default function MGADataTable({ startDate, endDate }) {
     return () => { mounted = false; };
   }, [user?.userId]);
 
-  const mgaToAgents = useMemo(() => groupAgentsByMGA(users), [users]);
+  const mgaToAgents = useMemo(() => {
+    const grouped = groupAgentsByMGA(users);
+    console.log('🔍 [MGADataTable] MGA to Agents grouping:', {
+      totalMGAs: grouped.size,
+      mgas: Array.from(grouped.keys())
+    });
+    return grouped;
+  }, [users]);
 
   const filteredActivity = useMemo(() => {
     // If parent provides explicit range, honor it; else derive from selectedWeek
@@ -447,7 +477,14 @@ export default function MGADataTable({ startDate, endDate }) {
     });
     
     // Sort alphabetically for stability
-    return result.sort((a,b)=> a.name.localeCompare(b.name));
+    const sorted = result.sort((a,b)=> a.name.localeCompare(b.name));
+    
+    console.log('🔍 [MGADataTable] Base rows (all MGAs):', {
+      total: sorted.length,
+      mgas: sorted.map(r => r.name).join(', ')
+    });
+    
+    return sorted;
   }, [mgaToAgents, filteredActivity, weeklyBreakdown, viewType]);
 
   // Filter top-level MGA rows based on logged-in user's role/hierarchy
@@ -455,6 +492,13 @@ export default function MGADataTable({ startDate, endDate }) {
     const normalize = (s) => (s || '').trim().toUpperCase();
     const role = (user?.clname || '').toUpperCase();
     const selfName = user?.lagnname || '';
+
+    console.log('🔍 [MGADataTable] Filtering topLevelRows:', {
+      role,
+      selfName,
+      totalBaseRows: baseRows.length,
+      allowedMgasGlobal: allowedMgasGlobal
+    });
 
     const allowed = new Set();
 
@@ -480,6 +524,22 @@ export default function MGADataTable({ startDate, endDate }) {
       });
       // If none found by rga match, keep all present
       if (allowed.size === 0) presentMgas.forEach(n => allowed.add(n));
+      
+      console.log('🔍 [MGADataTable] RGA filtering - before global list:', {
+        allowedMGAs: Array.from(allowed)
+      });
+      
+      // Also allow any MGAs in the global allow list (e.g., LOCKER-ROTOLO MGAs for Brody)
+      if (allowedMgasGlobal && allowedMgasGlobal.length > 0) {
+        console.log('🔍 [MGADataTable] Adding global allowed MGAs to RGA:', allowedMgasGlobal);
+        allowedMgasGlobal.forEach(mgaName => {
+          allowed.add(normalize(mgaName));
+        });
+      }
+      
+      console.log('🔍 [MGADataTable] RGA filtering - after global list:', {
+        allowedMGAs: Array.from(allowed)
+      });
     } else if (role === 'MGA') {
       // Allow self MGA and recursively include any MGA whose immediate mga is in the allowed set
       const queue = [normalize(selfName)];
@@ -497,6 +557,22 @@ export default function MGADataTable({ startDate, endDate }) {
           }
         });
       }
+
+      console.log('🔍 [MGADataTable] MGA filtering - before global list:', {
+        allowedMGAs: Array.from(allowed)
+      });
+      
+      // Also allow any MGAs in the global allow list (e.g., LOCKER-ROTOLO MGAs for Brody)
+      if (allowedMgasGlobal && allowedMgasGlobal.length > 0) {
+        console.log('🔍 [MGADataTable] Adding global allowed MGAs:', allowedMgasGlobal);
+        allowedMgasGlobal.forEach(mgaName => {
+          allowed.add(normalize(mgaName));
+        });
+      }
+      
+      console.log('🔍 [MGADataTable] MGA filtering - after global list:', {
+        allowedMGAs: Array.from(allowed)
+      });
     } else {
       // For GA/SA/AGT: show only their reporting MGA
       let myMga = '';
@@ -509,11 +585,29 @@ export default function MGADataTable({ startDate, endDate }) {
         });
       }
       if (myMga) allowed.add(normalize(myMga));
+      
+      console.log('🔍 [MGADataTable] GA/SA/AGT filtering result:', {
+        myMga,
+        allowedMGAs: Array.from(allowed)
+      });
     }
 
-    if (allowed.size === 0) return baseRows; // Fallback: no restriction
-    return baseRows.filter(r => allowed.has(normalize(r.name)));
-  }, [baseRows, users, user?.clname, user?.lagnname]);
+    if (allowed.size === 0) {
+      console.log('🔍 [MGADataTable] No filtering restrictions, showing all base rows');
+      return baseRows; // Fallback: no restriction
+    }
+    
+    const filtered = baseRows.filter(r => allowed.has(normalize(r.name)));
+    
+    console.log('🔍 [MGADataTable] Final topLevelRows result:', {
+      totalAllowed: allowed.size,
+      allowedMGAs: Array.from(allowed),
+      totalFiltered: filtered.length,
+      displayedMGAs: filtered.map(r => r.name).join(', ')
+    });
+    
+    return filtered;
+  }, [baseRows, users, user?.clname, user?.lagnname, allowedMgasGlobal]);
 
   const getRoleBadgeStyle = (cl) => {
     const clname = String(cl || '').toUpperCase();
@@ -577,6 +671,7 @@ export default function MGADataTable({ startDate, endDate }) {
         accessor: 'role', 
         width: 70,
         minWidth: 70,
+        filterable: false,
         Cell: ({ value, row }) => (
           <span 
             className="user-role-badge" 
@@ -589,7 +684,7 @@ export default function MGADataTable({ startDate, endDate }) {
           </span>
         )
       },
-      { Header: 'Name', accessor: 'name', width: 200, minWidth: 150 }
+      { Header: 'Name', accessor: 'name', width: 200, minWidth: 150, filterable: true }
     ];
 
     if (viewType === 'weekly') {
@@ -602,6 +697,7 @@ export default function MGADataTable({ startDate, endDate }) {
           minWidth: metric.weeklyWidth,
           type: 'number',
           className: index === 0 ? 'group-first-column' : '',
+          filterable: false,
           Cell: ({ value }) => metric.formatter.format(value ?? 0)
         })),
         {
@@ -611,6 +707,7 @@ export default function MGADataTable({ startDate, endDate }) {
           minWidth: 80,
           type: 'string',
           className: '',
+          filterable: false,
           Cell: ({ value }) => value || '0/0'
         }
       ];
@@ -637,6 +734,7 @@ export default function MGADataTable({ startDate, endDate }) {
             minWidth: 100,
             type: 'string',
             className: 'group-first-column',
+            filterable: false,
             Cell: ({ value }) => value || '0.0%'
           },
           {
@@ -646,6 +744,7 @@ export default function MGADataTable({ startDate, endDate }) {
             minWidth: 100,
             type: 'string',
             className: '',
+            filterable: false,
             Cell: ({ value }) => value || '0.0%'
           },
           {
@@ -655,6 +754,7 @@ export default function MGADataTable({ startDate, endDate }) {
             minWidth: 100,
             type: 'string',
             className: '',
+            filterable: false,
             Cell: ({ value }) => currencyFormatter.format(value || 0)
           },
           {
@@ -664,6 +764,7 @@ export default function MGADataTable({ startDate, endDate }) {
             minWidth: 100,
             type: 'string',
             className: '',
+            filterable: false,
             Cell: ({ value }) => currencyFormatter.format(value || 0)
           },
           {
@@ -673,6 +774,7 @@ export default function MGADataTable({ startDate, endDate }) {
             minWidth: 100,
             type: 'string',
             className: '',
+            filterable: false,
             Cell: ({ value }) => currencyFormatter.format(value || 0)
           },
           {
@@ -682,6 +784,7 @@ export default function MGADataTable({ startDate, endDate }) {
             minWidth: 100,
             type: 'string',
             className: '',
+            filterable: false,
             Cell: ({ value }) => value || '0.0%'
           },
           {
@@ -691,6 +794,7 @@ export default function MGADataTable({ startDate, endDate }) {
             minWidth: 100,
             type: 'string',
             className: '',
+            filterable: false,
             Cell: ({ value }) => value || '0.00'
           },
           {
@@ -700,6 +804,7 @@ export default function MGADataTable({ startDate, endDate }) {
             minWidth: 100,
             type: 'string',
             className: '',
+            filterable: false,
             Cell: ({ value }) => value || '0.00'
           }
         ]
@@ -723,6 +828,7 @@ export default function MGADataTable({ startDate, endDate }) {
               minWidth: metric.dailyWidth,
               type: 'number',
               className: index === 0 ? 'group-first-column day-separator' : '',
+              filterable: false,
               Cell: ({ value }) => (value === undefined || value === null) ? '' : metric.formatter.format(value)
             }))
           });
@@ -747,6 +853,7 @@ export default function MGADataTable({ startDate, endDate }) {
           minWidth: metric.weeklyWidth,
           type: 'number',
           className: index === 0 ? 'group-first-column' : '',
+          filterable: false,
           Cell: ({ value }) => metric.formatter.format(value ?? 0)
         }))
       });
@@ -765,6 +872,7 @@ export default function MGADataTable({ startDate, endDate }) {
             minWidth: metric.weeklyWidth,
             type: 'number',
             className: index === 0 ? 'group-first-column' : '',
+            filterable: false,
             Cell: ({ value }) => metric.formatter.format(value ?? 0)
           }))
         });
@@ -788,6 +896,7 @@ export default function MGADataTable({ startDate, endDate }) {
           minWidth: metric.weeklyWidth,
           type: 'number',
           className: index === 0 ? 'group-first-column' : '',
+          filterable: false,
           Cell: ({ value }) => metric.formatter.format(value ?? 0)
         }))
       });
@@ -1075,6 +1184,8 @@ export default function MGADataTable({ startDate, endDate }) {
         showTotals={true}
         totalsPosition="bottom"
         bandedRows={true}
+        enableColumnFilters={true}
+        tableId="mga-daily-activity-table"
         totalsColumns={(() => {
           const allTotalsColumns = [];
           const metrics = ['calls','appts','sits','sales','alp','refs','refAppt','refSit','refSale','refAlp'];
@@ -1114,6 +1225,9 @@ export default function MGADataTable({ startDate, endDate }) {
         onRowExpansionChange={handleRowExpansionChange}
         rowClassNames={rowClassNames}
       />
+      
+      {/* Activity Summary Cards */}
+      <ActivitySummaryCards data={displayRows} />
     </div>
   );
 }

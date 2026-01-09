@@ -284,15 +284,15 @@
 }
 
 .view-toggle-button.active {
-  background-color: var(--card-bg);
-  color: var(--hover-color);
-  box-shadow: 0 1px 3px var(--shadow-color);
+  background-color: var(--button-primary-bg);
+  color: white;
+  box-shadow: 0 2px 4px var(--shadow-color);
   font-weight: 500;
 }
 
-.view-toggle-button:hover:not(.active) {
-  background-color: var(--sidebar-hover);
-  color: var(--hover-color);
+.view-toggle-button:hover {
+  /* No color change on hover */
+  cursor: pointer;
 }
 
 @media (max-width: 768px) {
@@ -716,10 +716,83 @@
   align-items: flex-start;
   position: relative;
   margin-bottom: 4px;
+  /* margin-left is set via inline style based on level */
 }
 
 .hierarchy-node-container.collapsible {
   cursor: pointer;
+}
+
+/* Level 0: RGA card itself - no border, no padding */
+.hierarchy-node-container.level-0 {
+  border-left: none;
+  padding-left: 0;
+}
+
+/* Add visual hierarchy depth indicators for all other levels */
+.hierarchy-node-container.level-1,
+.hierarchy-node-container.level-2,
+.hierarchy-node-container.level-3,
+.hierarchy-node-container.level-4,
+.hierarchy-node-container.level-5 {
+  border-left: 2px solid var(--border-color);
+  padding-left: 10px;
+}
+
+/* Adjust border color opacity for deeper levels */
+.hierarchy-node-container.level-1 {
+  border-left-color: rgba(204, 204, 204, 0.8);
+}
+
+.hierarchy-node-container.level-2 {
+  border-left-color: rgba(204, 204, 204, 0.6);
+}
+
+.hierarchy-node-container.level-3 {
+  border-left-color: rgba(204, 204, 204, 0.5);
+}
+
+.hierarchy-node-container.level-4 {
+  border-left-color: rgba(204, 204, 204, 0.4);
+}
+
+.hierarchy-node-container.level-5 {
+  border-left-color: rgba(204, 204, 204, 0.3);
+}
+
+/* Mobile: reduce indentation and padding */
+@media (max-width: 768px) {
+  .hierarchy-node-container.level-0 {
+    margin-left: 0 !important;
+  }
+  
+  .hierarchy-node-container.level-1 {
+    margin-left: 20px !important;
+  }
+  
+  .hierarchy-node-container.level-2 {
+    margin-left: 40px !important;
+  }
+  
+  .hierarchy-node-container.level-3 {
+    margin-left: 60px !important;
+  }
+  
+  .hierarchy-node-container.level-4 {
+    margin-left: 80px !important;
+  }
+  
+  .hierarchy-node-container.level-5 {
+    margin-left: 100px !important;
+  }
+  
+  .hierarchy-node-container.level-1,
+  .hierarchy-node-container.level-2,
+  .hierarchy-node-container.level-3,
+  .hierarchy-node-container.level-4,
+  .hierarchy-node-container.level-5 {
+    padding-left: 8px;
+  }
 }
 
 .hierarchy-collapse-toggle {
@@ -746,9 +819,8 @@
 
 .hierarchy-children-container {
   position: relative;
-  margin-left: 15px;
-  padding-left: 15px;
-  border-left: 1px solid var(--border-color);
+  margin-left: 0;
+  padding-left: 0;
 }
 
 /* Improve the visual hierarchy for card levels */
@@ -890,15 +962,7 @@
 }
 
 /* Style for branch connectors */
-.hierarchy-node-container::before {
-  content: '';
-  position: absolute;
-  left: -15px;
-  top: 20px;
-  width: 15px;
-  height: 1px;
-  background-color: var(--border-color);
-}
+/* Removed ::before pseudo-element - using left border instead for clearer hierarchy */
 
 /* Improve styling for different role levels */
 .admin-hierarchy-card[data-role="RGA"] {
@@ -1353,5 +1417,87 @@
 .target-user-row td {
   background-color: rgba(0, 85, 140, 0.15) !important;
   border-color: var(--button-primary-bg) !important;
+}
+
+/* Role Counts in Header (Compact) */
+.admin-rga-role-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.role-count-item-compact {
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.role-count-item-compact .role-count-label {
+  padding: 3px 6px;
+  font-size: 0.7rem;
+  color: white;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  border: 1px solid;
+  border-radius: 4px 0 0 4px;
+}
+
+.role-count-item-compact .role-count-value {
+  padding: 3px 8px;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  background-color: var(--card-bg);
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  border-radius: 0 4px 4px 0;
+}
+
+.role-count-item-compact.total {
+  font-weight: 600;
+}
+
+.role-count-item-compact.total .role-count-label-total {
+  padding: 3px 6px;
+  font-size: 0.7rem;
+  color: white;
+  font-weight: 600;
+  background-color: var(--button-primary-bg);
+  border: 1px solid var(--button-primary-bg);
+  display: flex;
+  align-items: center;
+  border-radius: 4px 0 0 4px;
+}
+
+.role-count-item-compact.total .role-count-value {
+  padding: 3px 8px;
+  color: var(--text-primary);
+  font-weight: 700;
+  border-radius: 0 4px 4px 0;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .admin-rga-role-counts {
+    gap: 6px;
+  }
+  
+  .role-count-item-compact .role-count-label,
+  .role-count-item-compact .role-count-label-total {
+    padding: 2px 5px;
+    font-size: 0.65rem;
+  }
+  
+  .role-count-item-compact .role-count-value {
+    padding: 2px 6px;
+    font-size: 0.75rem;
+  }
 }
 

@@ -3,6 +3,71 @@ const router = express.Router();
 const db = require('../db');
 const verifyToken = require('../middleware/verifyToken');
 
+// Log agent profile view
+router.post('/log-profile-view', verifyToken, async (req, res) => {
+  const { viewerId, viewerName, viewedAgentId, viewedAgentName, viewedAgentClname, searchQuery, searchSource } = req.body;
+  
+  if (!viewerId || !viewedAgentId) {
+    return res.status(400).json({ success: false, message: 'Missing required fields' });
+  }
+  
+  try {
+    await db.query(
+      `INSERT INTO agent_search_history 
+       (viewer_user_id, viewer_name, viewed_agent_id, viewed_agent_name, viewed_agent_clname, search_query, search_source)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [viewerId, viewerName, viewedAgentId, viewedAgentName, viewedAgentClname, searchQuery, searchSource || 'global_search']
+    );
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error logging agent profile view:', error);
+    // Don't fail the request if logging fails
+    res.json({ success: true });
+  }
+});
+
+// Helper function to parse lagnname (Last, First Middle Suffix) and return formatted name (First Middle Last Suffix)
+function parseAndFormatName(lagnname) {
+  if (!lagnname) return { formatted: '', parts: {} };
+  
+  // Split on comma to separate last name from rest
+  const parts = lagnname.split(',').map(p => p.trim());
+  
+  if (parts.length === 0) {
+    return { formatted: lagnname, parts: { last: lagnname } };
+  }
+  
+  const lastName = parts[0] || '';
+  const restOfName = parts[1] || '';
+  
+  // Split the rest into first, middle, suffix
+  const restParts = restOfName.split(/\s+/).filter(p => p.length > 0);
+  
+  const firstName = restParts[0] || '';
+  const middleAndSuffix = restParts.slice(1);
+  
+  // Common suffixes
+  const suffixes = ['Jr', 'Jr.', 'Sr', 'Sr.', 'II', 'III', 'IV', 'V', 'VI'];
+  const suffix = middleAndSuffix.find(part => suffixes.includes(part)) || '';
+  const middle = middleAndSuffix.filter(part => !suffixes.includes(part)).join(' ');
+  
+  // Format as: First Middle Last Suffix
+  const formatted = [firstName, middle, lastName, suffix]
+    .filter(p => p.length > 0)
+    .join(' ');
+  
+  return {
+    formatted,
+    parts: {
+      first: firstName,
+      middle,
+      last: lastName,
+      suffix
+    }
+  };
+}
+
 // Search users by name, email, phone, or agtnum with additional filters
 router.get('/search', verifyToken, async (req, res) => {
   const q = req.query.q ? req.query.q.trim() : '';
@@ -25,24 +90,47 @@ router.get('/search', verifyToken, async (req, res) => {
         u.mga, 
         u.rga,
         u.managerActive,
+        u.profpic,
+        u.header_pic,
+        u.bio,
+        m.rga as mga_rga,
+        m.legacy as mga_legacy,
+        m.tree as mga_tree,
         l.id as license_id,
         l.state,
         l.resident_state
       FROM activeusers u
-      LEFT JOIN licenses l ON u.id = l.user_id
+      LEFT JOIN licensed_states l ON u.id = l.userId
+      LEFT JOIN MGAs m ON u.lagnname = m.lagnname
       WHERE 1=1
     `;
     const params = [];
 
-    // Add search term condition
+    // Add search term condition with flexible name matching
     if (q) {
-      query += ` AND (
-        u.lagnname LIKE ? OR 
-        u.email LIKE ? OR 
-        u.phone LIKE ? OR 
-        u.agtnum LIKE ?
-      )`;
-      params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+      // Parse search query into potential name parts
+      const searchParts = q.toLowerCase().split(/[\s,]+/).filter(p => p.length > 0);
+      
+      if (searchParts.length > 0) {
+        // Build flexible name search conditions
+        // This will match: Last, First Last, Last First, First Middle Last, etc.
+        const nameConditions = searchParts.map(() => 'LOWER(u.lagnname) LIKE ?').join(' AND ');
+        
+        query += ` AND (
+          (${nameConditions}) OR
+          u.email LIKE ? OR 
+          u.phone LIKE ? OR 
+          u.agtnum LIKE ?
+        )`;
+        
+        // Add wildcards for each search part for name matching
+        searchParts.forEach(part => {
+          params.push(`%${part}%`);
+        });
+        
+        // Add wildcards for email, phone, and agtnum (single search term)
+        params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+      }
     }
 
     // Add role filter
@@ -81,9 +169,12 @@ router.get('/search', verifyToken, async (req, res) => {
           });
         }
       } else {
+        const nameInfo = parseAndFormatName(row.lagnname);
         acc.push({
           id: row.id,
           lagnname: row.lagnname,
+          displayName: nameInfo.formatted,
+          nameParts: nameInfo.parts,
           email: row.email,
           phone: row.phone,
           agtnum: row.agtnum,
@@ -93,7 +184,13 @@ router.get('/search', verifyToken, async (req, res) => {
           ga: row.ga,
           mga: row.mga,
           rga: row.rga,
+          mga_rga: row.mga_rga,
+          mga_legacy: row.mga_legacy,
+          mga_tree: row.mga_tree,
           managerActive: row.managerActive,
+          profpic: row.profpic,
+          header_pic: row.header_pic,
+          bio: row.bio,
           licenses: row.license_id ? [{
             id: row.license_id,
             state: row.state,
@@ -176,6 +273,7 @@ router.get('/active', verifyToken, async (req, res) => {
         l.resident_state
       FROM activeusers u
       LEFT JOIN licensed_states l ON u.id = l.userId
+      WHERE u.Active = 'y'
       ORDER BY u.clname ASC
     `;
     

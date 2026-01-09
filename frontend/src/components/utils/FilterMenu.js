@@ -15,7 +15,7 @@ const FilterMenu = ({ options, onFilterChange }) => {
   return (
     <div className="filter-menu">
       <select value={selectedOption} onChange={handleChange}>
-        <option value="">Select Filter</option>
+        <option value="">🔍 Filter</option>
         {options.map((option, index) => (
           <option key={index} value={option}>
             {option}

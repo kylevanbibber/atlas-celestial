@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import logo from "../../img/globe1.png"; // Import the loading animation logo
+import api from "../../api"; // Import our configured API
 
 const ForgotPassword = ({ onBackToLogin }) => {
   const [email, setEmail] = useState("");
@@ -17,30 +18,20 @@ const ForgotPassword = ({ onBackToLogin }) => {
     setSuccessMessage("");
     setIsLoading(true);
     try {
-      const response = await fetch(
-        "https://ariaslogin-4a95935f6093.herokuapp.com/api/send-reset-code-by-email",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email }),
-        }
-      );
-
-      const result = await response.json();
+      const response = await api.post("/auth/send-reset-code-by-email", { email });
+      
       setIsLoading(false);
 
-      if (result.success) {
+      if (response.data.success) {
         setSuccessMessage("Reset code sent to your email.");
         setIsCodeSent(true);
-        localStorage.setItem("userId", result.userId); // Save the userId
+        localStorage.setItem("userId", response.data.userId); // Save the userId
       } else {
-        setErrorMessage(result.message || "Failed to send reset code.");
+        setErrorMessage(response.data.message || "Failed to send reset code.");
       }
     } catch (error) {
       setIsLoading(false);
-      setErrorMessage("An error occurred while sending the reset code.");
+      setErrorMessage(error.response?.data?.message || "An error occurred while sending the reset code.");
     }
   };
 
@@ -52,29 +43,22 @@ const ForgotPassword = ({ onBackToLogin }) => {
     const userId = localStorage.getItem("userId"); // Retrieve userId from localStorage
 
     try {
-      const response = await fetch(
-        "https://ariaslogin-4a95935f6093.herokuapp.com/api/verify-reset-code",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ userId, code: emailCode.trim().toUpperCase() }), // Normalize code to uppercase
-        }
-      );
+      const response = await api.post("/auth/verify-reset-code", { 
+        userId, 
+        code: emailCode.trim().toUpperCase() 
+      });
 
-      const result = await response.json();
       setIsLoading(false);
 
-      if (result.success) {
+      if (response.data.success) {
         setSuccessMessage("Code verified. You can now reset your password.");
         setIsCodeVerified(true);
       } else {
-        setErrorMessage(result.message || "Invalid or expired reset code.");
+        setErrorMessage(response.data.message || "Invalid or expired reset code.");
       }
     } catch (error) {
       setIsLoading(false);
-      setErrorMessage("An error occurred while verifying the reset code.");
+      setErrorMessage(error.response?.data?.message || "An error occurred while verifying the reset code.");
     }
   };
 
@@ -91,29 +75,23 @@ const ForgotPassword = ({ onBackToLogin }) => {
     const userId = localStorage.getItem("userId"); // Retrieve userId from localStorage
 
     try {
-      const response = await fetch(
-        "https://ariaslogin-4a95935f6093.herokuapp.com/api/update-password",
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ userId, emailCode: emailCode.trim().toUpperCase(), newPassword }), // Normalize code to uppercase
-        }
-      );
+      const response = await api.put("/auth/update-password", { 
+        userId, 
+        emailCode: emailCode.trim().toUpperCase(), 
+        newPassword 
+      });
 
-      const result = await response.json();
       setIsLoading(false);
 
-      if (result.success) {
+      if (response.data.success) {
         setSuccessMessage("Password reset successfully. You can now log in.");
         try { localStorage.removeItem("userId"); } catch (_) {}
       } else {
-        setErrorMessage(result.message || "Failed to reset password.");
+        setErrorMessage(response.data.message || "Failed to reset password.");
       }
     } catch (error) {
       setIsLoading(false);
-      setErrorMessage("An error occurred while resetting the password.");
+      setErrorMessage(error.response?.data?.message || "An error occurred while resetting the password.");
     }
   };
 

@@ -13,6 +13,17 @@ export const useUserHierarchy = () => {
   const { user } = useAuth();
   const [hierarchyData, setHierarchyData] = useState(null);
   const [hierarchyLoading, setHierarchyLoading] = useState(false);
+  const [loadingStages, setLoadingStages] = useState({
+    structure: false,
+    licenses: false,
+    pnp: false
+  });
+
+  // 🔧 CLEAR CACHE ON MOUNT (for debugging)
+  useEffect(() => {
+    console.log('🔧 [DEBUG] Clearing hierarchy cache for debugging');
+    sessionStorage.removeItem(HIERARCHY_CACHE_KEY);
+  }, []); // Only run once on mount
   
   // Check if cached data is still valid
   const isCacheValid = useCallback(() => {
@@ -33,6 +44,24 @@ export const useUserHierarchy = () => {
       return false;
     }
   }, [user?.userId]);
+
+  // Helper to check if data has licenses/PNP
+  const checkDataCompleteness = useCallback((data) => {
+    if (!data?.raw || data.raw.length === 0) {
+      return { licensesLoaded: false, pnpLoaded: false };
+    }
+
+    // Check if at least one user has licenses data
+    const hasLicenses = data.raw.some(u => u.licenses !== undefined && u.licenses !== null);
+    
+    // Check if at least one user has PNP data
+    const hasPnp = data.raw.some(u => u.pnp_data !== undefined && u.pnp_data !== null);
+
+    return {
+      licensesLoaded: hasLicenses || data.licensesLoaded === true,
+      pnpLoaded: hasPnp || data.pnpLoaded === true
+    };
+  }, []);
 
   // Get cached data
   const getCachedData = useCallback(() => {
@@ -63,84 +92,39 @@ export const useUserHierarchy = () => {
     }
   }, [user?.userId, user?.lagnname]);
 
-  // Fetch hierarchy data from API
+  // ⚡ PROGRESSIVE LOADING: Fetch hierarchy data in stages for faster initial render
   const fetchHierarchy = useCallback(async (forceRefresh = false) => {
     if (!user?.userId) {
       setHierarchyData(null);
       return null;
     }
 
-    // Check cache first (unless forcing refresh)
-    if (!forceRefresh && isCacheValid()) {
-      const cached = getCachedData();
-      if (cached) {
-        setHierarchyData(cached);
-        
-        // 📊 DETAILED CACHE USAGE LOGGING
-        console.group(`[useUserHierarchy] 📋 Using Cached Hierarchy for ${user.lagnname}`);
-        console.log('🕐 Cache Age:', Math.round((Date.now() - cached.lastFetched) / 1000 / 60), 'minutes old');
-        console.log('👥 Team Count:', cached.teamIds?.length || 0);
-        console.log('📝 Team Names:', cached.teamNames || []);
-        console.log('🆔 All IDs:', cached.allIds || []);
-        console.log('📄 All Names:', cached.allNames || []);
-        console.log('⏰ Last Fetched:', new Date(cached.lastFetched).toLocaleString());
-        console.log('💾 Cache Data Structure:', {
-          hasRaw: !!cached.raw,
-          teamIdsCount: cached.teamIds?.length || 0,
-          teamNamesCount: cached.teamNames?.length || 0,
-          allIdsCount: cached.allIds?.length || 0,
-          allNamesCount: cached.allNames?.length || 0
-        });
-        console.groupEnd();
-        
-        return cached;
-      }
-    }
+    // 🔧 CACHE TEMPORARILY DISABLED FOR DEBUGGING
+    console.log(`🔧 [DEBUG] Cache disabled - forcing fresh fetch`);
 
     setHierarchyLoading(true);
+    const startTime = Date.now();
+    
     try {
-      console.log(`[useUserHierarchy] 🔄 Fetching fresh hierarchy for ${user.lagnname}...`);
-      const resp = await api.post('/auth/searchByUserId', { userId: user.userId });
+      // 🚀 STAGE 1: Fetch basic hierarchy structure (fastest - no JOINs to licenses/PNP)
+      console.log(`\n⏱️ [FRONTEND] Progressive Loading Started at ${new Date().toLocaleTimeString()}`);
+      console.log(`🚀 [FRONTEND Stage 1/3] Fetching hierarchy structure for ${user.lagnname}...`);
+      setLoadingStages({ structure: true, licenses: false, pnp: false });
       
-      if (resp.data?.success) {
-        const hierarchy = Array.isArray(resp.data.data) ? resp.data.data : [];
-        
-        // Prepare hierarchy data for caching
-        const hierarchyInfo = {
-          raw: hierarchy,
-          teamIds: hierarchy.map(u => u.id).filter(Boolean),
-          teamNames: hierarchy.map(u => u.lagnname).filter(Boolean),
-          allIds: [user.userId, ...hierarchy.map(u => u.id).filter(Boolean)],
-          allNames: [user.lagnname, ...hierarchy.map(u => u.lagnname).filter(Boolean)].filter(Boolean),
-          lastFetched: Date.now()
-        };
-
-        // Cache the data
-        setCachedData(hierarchyInfo);
-        setHierarchyData(hierarchyInfo);
-        
-        // 📊 DETAILED FRESH FETCH LOGGING
-        console.group(`[useUserHierarchy] ✅ Fetched and Cached Fresh Hierarchy for ${user.lagnname}`);
-        console.log('🔄 Fetch Reason:', forceRefresh ? 'Force Refresh' : 'Cache Expired/Missing');
-        console.log('👥 Team Members Found:', hierarchyInfo.teamIds.length);
-        console.log('📝 Team Names:', hierarchyInfo.teamNames);
-        console.log('🆔 All Accessible IDs:', hierarchyInfo.allIds);
-        console.log('📄 All Accessible Names:', hierarchyInfo.allNames);
-        console.log('⏰ Cached At:', new Date().toLocaleString());
-        console.log('🗃️ Raw Hierarchy Response:', hierarchyInfo.raw);
-        console.log('💾 Cache Structure Created:', {
-          rawCount: hierarchyInfo.raw.length,
-          teamIdsCount: hierarchyInfo.teamIds.length,
-          teamNamesCount: hierarchyInfo.teamNames.length,
-          allIdsCount: hierarchyInfo.allIds.length,
-          allNamesCount: hierarchyInfo.allNames.length,
-          includesCurrentUser: hierarchyInfo.allIds.includes(user.userId)
-        });
-        console.log('⏳ Next Auto-Refresh In:', `${CACHE_DURATION / 1000 / 60} minutes`);
-        console.groupEnd();
-        
-        return hierarchyInfo;
-      } else {
+      const stage1RequestStart = Date.now();
+      const resp = await api.post('/auth/searchByUserId', { userId: user.userId });
+      const stage1NetworkTime = Date.now() - stage1RequestStart;
+      const stage1Time = Date.now() - startTime;
+      
+      const backendTime = resp.data?._timing?.backendMs || 'unknown';
+      const networkTime = stage1NetworkTime - (typeof backendTime === 'number' ? backendTime : 0);
+      
+      console.log(`✅ [FRONTEND Stage 1/3] Response received after ${stage1NetworkTime}ms`);
+      console.log(`   ⏱️  Backend processing: ${backendTime}ms`);
+      console.log(`   ⏱️  Network latency: ${networkTime}ms`);
+      console.log(`   ⏱️  Total elapsed: ${stage1Time}ms`);
+      
+      if (!resp.data?.success) {
         console.warn(`[useUserHierarchy] ⚠️ API returned unsuccessful response for ${user.lagnname}`);
         const emptyHierarchy = {
           raw: [],
@@ -151,9 +135,176 @@ export const useUserHierarchy = () => {
           lastFetched: Date.now()
         };
         setHierarchyData(emptyHierarchy);
-        setCachedData(emptyHierarchy);
+        // setCachedData(emptyHierarchy); // 🔧 CACHE DISABLED
+        setHierarchyLoading(false);
+        setLoadingStages({ structure: false, licenses: false, pnp: false });
         return emptyHierarchy;
       }
+      
+      const hierarchy = Array.isArray(resp.data.data) ? resp.data.data : [];
+      
+      // Prepare initial hierarchy data (structure only)
+      const hierarchyInfo = {
+        raw: hierarchy,
+        teamIds: hierarchy.map(u => u.id).filter(Boolean),
+        teamNames: hierarchy.map(u => u.lagnname).filter(Boolean),
+        allIds: [user.userId, ...hierarchy.map(u => u.id).filter(Boolean)],
+        allNames: [user.lagnname, ...hierarchy.map(u => u.lagnname).filter(Boolean)].filter(Boolean),
+        lastFetched: Date.now(),
+        licensesLoaded: false,
+        pnpLoaded: false
+      };
+
+      // 🎯 Set initial data immediately - UI can render with basic info now!
+      const renderStart = Date.now();
+      setHierarchyData(hierarchyInfo);
+      setLoadingStages({ structure: false, licenses: true, pnp: false });
+      const renderTime = Date.now() - renderStart;
+      
+      console.log(`🎨 [FRONTEND Stage 1/3] UI rendering triggered after ${renderTime}ms`);
+      console.log(`   👥 ${hierarchyInfo.teamIds.length} team members ready to display`);
+      console.log(`   🔍 Hierarchy structure:`, {
+        totalUsers: hierarchyInfo.raw.length,
+        allIds: hierarchyInfo.allIds,
+        sampleUser: hierarchyInfo.raw[0]
+      });
+      console.log(`   ⏱️  Time to interactive: ${stage1Time + renderTime}ms\n`);
+      
+      // 🚀 STAGE 2: Fetch licenses in parallel (doesn't block UI)
+      console.log(`🚀 [FRONTEND Stage 2/3] Fetching licenses for ${hierarchyInfo.allIds.length} users...`);
+      console.log(`   📤 Request payload:`, { userIds: hierarchyInfo.allIds });
+      const stage2RequestStart = Date.now();
+      
+      api.post('/auth/hierarchy/licenses', { userIds: hierarchyInfo.allIds })
+        .then(licenseResp => {
+          console.log(`   📥 License response received:`, licenseResp.data);
+          const stage2NetworkTime = Date.now() - stage2RequestStart;
+          const stage2Time = Date.now() - startTime;
+          
+          const backendTime = licenseResp.data?._timing?.backendMs || 'unknown';
+          const networkTime = stage2NetworkTime - (typeof backendTime === 'number' ? backendTime : 0);
+          
+          console.log(`✅ [FRONTEND Stage 2/3] Response received after ${stage2NetworkTime}ms`);
+          console.log(`   ⏱️  Backend processing: ${backendTime}ms`);
+          console.log(`   ⏱️  Network latency: ${networkTime}ms`);
+          console.log(`   ⏱️  Total elapsed since start: ${stage2Time}ms`);
+          
+          if (licenseResp.data?.success && licenseResp.data.data) {
+            // Merge licenses into hierarchy data
+            const updatedRaw = hierarchyInfo.raw.map(user => ({
+              ...user,
+              licenses: licenseResp.data.data[user.id] || []
+            }));
+            
+            const updatedHierarchyInfo = {
+              ...hierarchyInfo,
+              raw: updatedRaw,
+              licensesLoaded: true
+            };
+            
+            const licenseRenderStart = Date.now();
+            setHierarchyData(updatedHierarchyInfo);
+            setLoadingStages(prev => ({ ...prev, licenses: false, pnp: true }));
+            const licenseRenderTime = Date.now() - licenseRenderStart;
+            
+            console.log(`🎨 [FRONTEND Stage 2/3] UI updated with licenses after ${licenseRenderTime}ms`);
+            console.log(`   📜 ${Object.keys(licenseResp.data.data).length} users have license data\n`);
+            
+            // 🚀 STAGE 3: Fetch PNP data in parallel (doesn't block UI)
+            console.log(`🚀 [FRONTEND Stage 3/3] Fetching PNP data for ${hierarchyInfo.allIds.length} users...`);
+            const pnpPayload = { 
+              users: hierarchyInfo.raw.map(u => ({ id: u.id, lagnname: u.lagnname, esid: u.esid }))
+            };
+            console.log(`   📤 Request payload:`, pnpPayload);
+            const stage3RequestStart = Date.now();
+            
+            api.post('/auth/hierarchy/pnp', pnpPayload)
+              .then(pnpResp => {
+                console.log(`   📥 PNP response received:`, pnpResp.data);
+                const stage3NetworkTime = Date.now() - stage3RequestStart;
+                const stage3Time = Date.now() - startTime;
+                
+                const backendTime = pnpResp.data?._timing?.backendMs || 'unknown';
+                const networkTime = stage3NetworkTime - (typeof backendTime === 'number' ? backendTime : 0);
+                
+                console.log(`✅ [FRONTEND Stage 3/3] Response received after ${stage3NetworkTime}ms`);
+                console.log(`   ⏱️  Backend processing: ${backendTime}ms`);
+                console.log(`   ⏱️  Network latency: ${networkTime}ms`);
+                console.log(`   ⏱️  Total elapsed since start: ${stage3Time}ms`);
+                
+                if (pnpResp.data?.success && pnpResp.data.data) {
+                  // Merge PNP data into hierarchy
+                  const finalRaw = updatedRaw.map(user => ({
+                    ...user,
+                    pnp_data: pnpResp.data.data[user.id] || null
+                  }));
+                  
+                  const finalHierarchyInfo = {
+                    ...updatedHierarchyInfo,
+                    raw: finalRaw,
+                    pnpLoaded: true
+                  };
+                  
+                  // Cache the complete data
+                  const pnpRenderStart = Date.now();
+                  // setCachedData(finalHierarchyInfo); // 🔧 CACHE DISABLED
+                  setHierarchyData(finalHierarchyInfo);
+                  setLoadingStages({ structure: false, licenses: false, pnp: false });
+                  const pnpRenderTime = Date.now() - pnpRenderStart;
+                  
+                  console.log(`🎨 [FRONTEND Stage 3/3] UI updated with PNP data after ${pnpRenderTime}ms`);
+                  console.log(`   📊 ${Object.keys(pnpResp.data.data).length} users have PNP data`);
+                  console.log(`   💾 Complete hierarchy cached\n`);
+                  
+                  console.group(`🎉 [FRONTEND] Progressive Loading Complete!`);
+                  console.log('⏱️  Performance Breakdown:');
+                  console.log(`   Stage 1 (Structure):  ${stage1Time}ms → UI rendered at ${stage1Time}ms`);
+                  console.log(`   Stage 2 (Licenses):   ${stage2Time - stage1Time}ms → UI updated at ${stage2Time}ms`);
+                  console.log(`   Stage 3 (PNP):        ${stage3Time - stage2Time}ms → UI updated at ${stage3Time}ms`);
+                  console.log(`   ─────────────────────────────────────────`);
+                  console.log(`   Total Time: ${stage3Time}ms`);
+                  console.log(`   Time to Interactive: ${stage1Time}ms ⚡`);
+                  console.log(`   User Perceived Speed: ${Math.round((1 - stage1Time / stage3Time) * 100)}% faster!`);
+                  console.groupEnd();
+                } else {
+                  console.warn('[useUserHierarchy] ⚠️ PNP fetch unsuccessful, using data without PNP');
+                  console.warn('   Response:', pnpResp);
+                  // setCachedData(updatedHierarchyInfo); // 🔧 CACHE DISABLED
+                  setLoadingStages({ structure: false, licenses: false, pnp: false });
+                }
+              })
+              .catch(pnpError => {
+                console.error('[useUserHierarchy] ❌ PNP fetch failed:', pnpError);
+                console.error('   Error details:', {
+                  message: pnpError.message,
+                  response: pnpError.response?.data,
+                  status: pnpError.response?.status
+                });
+                // setCachedData(updatedHierarchyInfo); // 🔧 CACHE DISABLED
+                setLoadingStages({ structure: false, licenses: false, pnp: false });
+              });
+              
+          } else {
+            console.warn('[useUserHierarchy] ⚠️ License fetch unsuccessful, using data without licenses');
+            console.warn('   Response:', licenseResp);
+            // setCachedData(hierarchyInfo); // 🔧 CACHE DISABLED
+            setLoadingStages({ structure: false, licenses: false, pnp: false });
+          }
+        })
+        .catch(licenseError => {
+          console.error('[useUserHierarchy] ❌ License fetch failed:', licenseError);
+          console.error('   Error details:', {
+            message: licenseError.message,
+            response: licenseError.response?.data,
+            status: licenseError.response?.status
+          });
+          // setCachedData(hierarchyInfo); // 🔧 CACHE DISABLED
+          setLoadingStages({ structure: false, licenses: false, pnp: false });
+        });
+      
+      // Return the initial structure data immediately
+      return hierarchyInfo;
+      
     } catch (error) {
       console.warn('[useUserHierarchy] Failed to fetch hierarchy:', error);
       const errorHierarchy = {
@@ -165,6 +316,7 @@ export const useUserHierarchy = () => {
         lastFetched: Date.now()
       };
       setHierarchyData(errorHierarchy);
+      setLoadingStages({ structure: false, licenses: false, pnp: false });
       return errorHierarchy;
     } finally {
       setHierarchyLoading(false);
@@ -381,6 +533,7 @@ export const useUserHierarchy = () => {
   return {
     hierarchyData,
     hierarchyLoading,
+    loadingStages, // ⚡ NEW: Exposes loading progress for progressive rendering
     refreshHierarchy,
     isCacheValid: isCacheValid(),
     getHierarchyForComponent,

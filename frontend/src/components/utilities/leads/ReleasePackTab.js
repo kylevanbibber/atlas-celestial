@@ -16,6 +16,7 @@ const ReleasePackTab = () => {
   const [licensedStates, setLicensedStates] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [secondPackFilter, setSecondPackFilter] = useState('notSent');
+  const [exportFilter, setExportFilter] = useState('all');
 
   // Cell editing state
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -57,8 +58,26 @@ const ReleasePackTab = () => {
   // into yyyy-mm-dd format so it can be used by the native date input.
   const convertMDYToYMD = (dateStr) => {
     if (!dateStr) return '';
-    const [month, day, year] = dateStr.split('/');
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    
+    // Handle both mm/dd/yyyy and yyyy-mm-dd formats
+    const parts = String(dateStr).split('/');
+    
+    if (parts.length === 3) {
+      // mm/dd/yyyy format
+      const [month, day, year] = parts;
+      
+      // Validate all parts exist and are valid
+      if (!month || !day || !year || year.length < 4) {
+        return '';
+      }
+      
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    } else if (dateStr.includes('-')) {
+      // Already in yyyy-mm-dd format
+      return dateStr;
+    }
+    
+    return '';
   };
 
   const fetchPassedReleases = useCallback(async () => {
@@ -126,7 +145,8 @@ const ReleasePackTab = () => {
       const response = await api.get('/release/licensed-states');
       const data = response.data;
       if (data.success) {
-        setLicensedStates(data.data || []);
+        const licenses = data.data || [];
+        setLicensedStates(licenses);
       }
     } catch (err) {
       console.error('Failed to load licensed states:', err);
@@ -144,27 +164,45 @@ const ReleasePackTab = () => {
 
   // Combine passed releases with leads and license data
   const combinedData = useMemo(() => {
-    // Debug: Check what archive data we have
-    const archivedLeads = leadsReleased.filter(lead => lead.archive == 1 || lead.archive === '1');
-    console.log('🗃️ ReleasePackTab Archive debug - Total leads with archive=1:', archivedLeads.length, archivedLeads.map(l => ({ id: l.id, userId: l.userId, archive: l.archive, reason_archive: l.reason_archive })));
-    
     return passedReleases.map((agent) => {
       // Attach 2nd Pack info if present
       const leadInfo = leadsReleased.find(
         (lead) => lead.userId == agent.userId && (lead.type === '2nd Pack' || lead.type === 'Second Pack')
       );
 
-      // Filter licensedStates for entries matching this agent (by userId) 
-      // and with expiry_date strictly in the future.
+      // Get all licenses for this agent
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const validLicenses = licensedStates.filter((license) => {
-        if (!license.expiry_date) return false;
-        const expiryDate = new Date(convertMDYToYMD(license.expiry_date));
-        return license.userId == agent.userId && expiryDate > today;
+      
+      // Find all licenses for this agent
+      const agentLicenses = licensedStates.filter(l => l.userId == agent.userId);
+      
+      // Categorize licenses by status (but include ALL of them)
+      const licensesWithStatus = agentLicenses.map((license) => {
+        let status = 'valid';
+        
+        // Check if has expiry date
+        if (!license.expiry_date) {
+          status = 'no-expiry';
+        } else {
+          // Convert and validate the date
+          const convertedDate = convertMDYToYMD(license.expiry_date);
+          if (!convertedDate) {
+            status = 'no-expiry';
+          } else {
+            const expiryDate = new Date(convertedDate);
+            
+            // Check if date is valid
+            if (isNaN(expiryDate.getTime())) {
+              status = 'no-expiry';
+            } else if (expiryDate <= today) {
+              status = 'expired';
+            }
+          }
+        }
+        
+        return { ...license, status };
       });
-
-      const statesLicensed = validLicenses.map((license) => license.state).join(", ") || "N/A";
 
       const combinedAgent = {
         ...agent,
@@ -173,14 +211,9 @@ const ReleasePackTab = () => {
         lastUpdated: leadInfo ? leadInfo.last_updated : null,
         leadId: leadInfo ? leadInfo.id : null,
         leadEntry: leadInfo || null, // Add full leadEntry for archive filtering
-        statesLicensed,
+        licensesWithStatus, // Store licenses with their status for rendering
         sent: leadInfo ? leadInfo.sent : 0,
       };
-      
-      console.log(`✅ ReleasePackTab Combined agent ${agent.userId}:`, {
-        leadId: combinedAgent.leadId,
-        leadEntry: combinedAgent.leadEntry ? { id: combinedAgent.leadEntry.id, archive: combinedAgent.leadEntry.archive, reason_archive: combinedAgent.leadEntry.reason_archive } : null
-      });
       
       return combinedAgent;
     });
@@ -194,9 +227,6 @@ const ReleasePackTab = () => {
     filtered = filtered.filter(agent => {
       const archiveValue = agent.leadEntry?.archive;
       const isArchived = archiveValue == 1 || archiveValue === '1';
-      const hasLeadEntry = !!agent.leadEntry;
-      
-      console.log(`[ARCHIVE FILTER DEBUG] Agent ${agent.userId} (${agent.agentName}) - archiveValue: ${archiveValue}, isArchived: ${isArchived}, archivedView: ${archivedView}, hasLeadEntry: ${hasLeadEntry}`);
       
       if (archivedView) {
         // Archive view: only show records that are explicitly archived (archive = 1)
@@ -229,12 +259,75 @@ const ReleasePackTab = () => {
     }
     // "all" shows everything
 
-    // Log final filtering results
-    filtered.forEach(agent => {
-      console.log(`✅ ReleasePackTab Agent ${agent.userId} (${agent.agentName}) PASSED all filters for ${archivedView ? 'ARCHIVE' : 'NORMAL'} view`);
-    });
-    
-    console.log(`📊 ReleasePackTab Final filtered results for ${archivedView ? 'ARCHIVE' : 'NORMAL'} view: ${filtered.length} agents`);
+    // Log only for agents that are displayed
+    if (filtered.length > 0) {
+      console.log('=== LICENSED STATES DEBUG (Displayed Agents Only) ===');
+      console.log(`Total agents displayed: ${filtered.length}`);
+      console.log('\n--- ALL LICENSED STATES DATA ---');
+      console.log(`Total licensedStates records: ${licensedStates.length}`);
+      console.log('All unique userIds in licensedStates:', [...new Set(licensedStates.map(l => l.userId))].sort((a, b) => a - b));
+      console.log('Sample licensedStates records:', licensedStates.slice(0, 3).map(l => ({
+        userId: l.userId,
+        type: typeof l.userId,
+        state: l.state,
+        expiry_date: l.expiry_date
+      })));
+      
+      filtered.forEach(agent => {
+        const licenses = agent.licensesWithStatus || [];
+        console.log(`\nAgent ${agent.userId} (${agent.lagnname}):`);
+        
+        if (licenses.length === 0) {
+          console.log(`  → No licenses found`);
+          console.log(`  → Agent userId type: ${typeof agent.userId}, value: ${agent.userId}`);
+          
+          // Check if there are ANY licenses that might match with type conversion
+          const matchingByString = licensedStates.filter(l => String(l.userId) === String(agent.userId));
+          const matchingByNumber = licensedStates.filter(l => Number(l.userId) === Number(agent.userId));
+          const matchingByLooseEquality = licensedStates.filter(l => l.userId == agent.userId);
+          
+          console.log(`  → Matching by String comparison: ${matchingByString.length}`);
+          console.log(`  → Matching by Number comparison: ${matchingByNumber.length}`);
+          console.log(`  → Matching by loose equality (==): ${matchingByLooseEquality.length}`);
+          
+          // Show any licenses that have this agent's name
+          const possibleMatches = licensedStates.filter(l => 
+            l.lagnname && agent.lagnname && 
+            String(l.lagnname).toLowerCase() === String(agent.lagnname).toLowerCase()
+          );
+          if (possibleMatches.length > 0) {
+            console.log(`  → Found ${possibleMatches.length} licenses matching by name:`, possibleMatches.map(l => ({
+              licenseUserId: l.userId,
+              state: l.state,
+              name: l.lagnname
+            })));
+          }
+        } else {
+          const validCount = licenses.filter(l => l.status === 'valid').length;
+          const expiredCount = licenses.filter(l => l.status === 'expired').length;
+          const noExpiryCount = licenses.filter(l => l.status === 'no-expiry').length;
+          console.log(`  → Total licenses: ${licenses.length}`);
+          console.log(`  → Status: ${validCount} valid, ${expiredCount} expired, ${noExpiryCount} no expiry`);
+          console.log(`  → States: ${licenses.map(l => `${l.state}(${l.status})`).join(', ')}`);
+        }
+      });
+      
+      // Summary
+      const agentsWithLicenses = filtered.filter(a => a.licensesWithStatus && a.licensesWithStatus.length > 0).length;
+      const agentsWithoutLicenses = filtered.filter(a => !a.licensesWithStatus || a.licensesWithStatus.length === 0).length;
+      const totalValid = filtered.reduce((sum, a) => 
+        sum + (a.licensesWithStatus?.filter(l => l.status === 'valid').length || 0), 0);
+      const totalExpired = filtered.reduce((sum, a) => 
+        sum + (a.licensesWithStatus?.filter(l => l.status === 'expired').length || 0), 0);
+      const totalNoExpiry = filtered.reduce((sum, a) => 
+        sum + (a.licensesWithStatus?.filter(l => l.status === 'no-expiry').length || 0), 0);
+      
+      console.log('\n--- SUMMARY ---');
+      console.log(`Agents with licenses: ${agentsWithLicenses}`);
+      console.log(`Agents without licenses (showing N/A): ${agentsWithoutLicenses}`);
+      console.log(`Total licenses - Valid: ${totalValid}, Expired: ${totalExpired}, No Expiry: ${totalNoExpiry}`);
+      console.log('=== END DEBUG ===');
+    }
 
     return filtered;
   }, [combinedData, searchQuery, secondPackFilter, leadsReleased, archivedView]);
@@ -334,7 +427,6 @@ const ReleasePackTab = () => {
 
   // Archive handlers
   const handleArchive = useCallback((selectedIds) => {
-    console.log('🗃️ Archive requested for IDs:', selectedIds);
     setSelectedForArchive(selectedIds);
     setShowArchiveModal(true);
   }, []);
@@ -357,7 +449,6 @@ const ReleasePackTab = () => {
             archived_date: new Date().toISOString(),
             last_updated: new Date().toISOString().slice(0, 19).replace('T', ' ')
           };
-          console.log(`[ARCHIVE DEBUG] Sending archive request for leadId ${leadId}:`, payload);
           await api.put(`/release/leads-released/${leadId}`, payload);
         }
       });
@@ -387,7 +478,6 @@ const ReleasePackTab = () => {
   }, []);
 
   const handleToggleArchivedView = useCallback(() => {
-    console.log(`🔄 ReleasePackTab Toggling archive view from ${archivedView} to ${!archivedView}`);
     setArchivedView(!archivedView);
     // Refresh data when toggling view
     fetchPassedReleases();
@@ -412,7 +502,6 @@ const ReleasePackTab = () => {
         last_updated: new Date().toISOString().slice(0, 19).replace('T', ' ')
       };
       
-      console.log(`[UNARCHIVE DEBUG] Unarchiving leadId ${leadId}:`, payload);
       await api.put(`/release/leads-released/${leadId}`, payload);
       
       toast.success(`Successfully unarchived ${agent.agentName}`, { id: tId });
@@ -463,9 +552,97 @@ const ReleasePackTab = () => {
       Cell: ({ value }) => <span>{formatName(value)}</span>,
     },
     {
-      Header: 'Release Date',
-      accessor: 'releaseScheduled',
-      Cell: ({ value }) => formatUTCForDisplay(value),
+      Header: 'Days to Code',
+      accessor: 'days_to_code',
+      Cell: ({ value }) => {
+        if (value === null || value === undefined) return '—';
+        
+        const days = parseInt(value);
+        let color = '#000'; // default black
+        let backgroundColor = 'transparent';
+        
+        if (days >= 0 && days <= 7) {
+          // Green for 0-7 days (good)
+          color = '#155724';
+          backgroundColor = '#d4edda';
+        } else if (days > 7 && days <= 14) {
+          // Yellow for 8-14 days (caution)
+          color = '#856404';
+          backgroundColor = '#fff3cd';
+        } else if (days > 14) {
+          // Red for >14 days (concerning)
+          color = '#721c24';
+          backgroundColor = '#f8d7da';
+        }
+        
+        return (
+          <span style={{ 
+            color, 
+            backgroundColor, 
+            padding: '2px 6px', 
+            borderRadius: '4px',
+            fontWeight: '500'
+          }}>
+            {days}
+          </span>
+        );
+      }
+    },
+    { 
+      Header: 'SGA', 
+      accessor: 'sga',
+      width: 35,
+      Cell: ({ row }) => {
+        const mgaReptName = row.original.mga_rept_name || '';
+        return mgaReptName === 'LOCKER-ROTOLO' ? 'E4' : 'A$';
+      }
+    },
+    {
+      Header: 'Notes',
+      accessor: 'notes',
+      Cell: ({ value, row, isEditing, updateCell }) => {
+        const agent = row.original;
+        // Get the current edited value or fallback to original value
+        const currentEditedValue = editedRows[agent.userId]?.notes;
+        const notesVal = currentEditedValue !== undefined ? currentEditedValue : (value || '');
+        const canEdit = hasElevatedPermissions && agent.leadId;
+        
+        if (!canEdit) {
+          return <span>{notesVal || "N/A"}</span>;
+        }
+        
+        // If cell is being edited, render input field
+        if (isEditing) {
+          return (
+          <input
+            type="text"
+              value={notesVal}
+              onChange={(e) => updateCell(agent.userId, 'notes', e.target.value)}
+              style={{ 
+                width: '100%', 
+                border: 'none', 
+                outline: 'none', 
+                background: 'transparent',
+                minWidth: "80px"
+              }}
+              autoFocus
+            />
+          );
+        }
+        
+        return (
+          <span 
+            style={{ 
+              cursor: 'pointer',
+              minWidth: "80px", 
+              display: "inline-block"
+            }}
+          >
+            {notesVal || "—"}
+          </span>
+        );
+      },
+      editable: hasElevatedPermissions
     },
     {
       Header: 'MGA',
@@ -474,41 +651,33 @@ const ReleasePackTab = () => {
     },
     {
       Header: 'States Licensed',
-      accessor: 'statesLicensed',
-      Cell: ({ value }) => value || "N/A",
-    },
-    {
-      Header: '2nd Code Pack Sent',
-      accessor: 'packReleasedDate',
-      id: 'secondPackSent',
+      accessor: 'licensesWithStatus',
       Cell: ({ value, row }) => {
-        const agent = row.original;
-        return hasElevatedPermissions ? (
-          agent.packReleasedDate && agent.packReleasedDate !== "N/A" ? (
-            <button className="action-button" style={{ 
-              backgroundColor: '#6c757d',
-              color: 'white',
-              fontSize: '10px',
-              padding: '4px 8px',
-              border: 'none',
-              borderRadius: '3px'
-            }} disabled>
-              Already Sent
-            </button>
-          ) : (
-            <button onClick={() => handleSecondPack(agent)} className="btn-primary" style={{
-              backgroundColor: '#28a745',
-              color: 'white',
-              fontSize: '10px',
-              padding: '4px 8px',
-              border: 'none',
-              borderRadius: '3px'
-            }}>
-              Mark Sent
-            </button>
-          )
-        ) : (
-          value || "N/A"
+        const licenses = value || [];
+        
+        if (licenses.length === 0) {
+          return <span>N/A</span>;
+        }
+        
+        return (
+          <span>
+            {licenses.map((license, idx) => {
+              let color = '#000'; // Default black for valid licenses
+              
+              if (license.status === 'expired') {
+                color = '#dc3545'; // Red for expired
+              } else if (license.status === 'no-expiry') {
+                color = '#6c757d'; // Gray for no expiry date
+              }
+              
+              return (
+                <span key={idx}>
+                  <span style={{ color }}>{license.state}</span>
+                  {idx < licenses.length - 1 && ', '}
+                </span>
+              );
+            })}
+          </span>
         );
       },
     },
@@ -521,12 +690,22 @@ const ReleasePackTab = () => {
           let defaultVal = "";
           if (value) {
             // Parse the m/d/yy h:mm format
-            const [datePart, timePart] = value.split(" ");
-            const [M, D, YY] = datePart.split("/");
-            const yyyy = `20${YY}`;
-            const MM = M.padStart(2, "0");
-            const DD = D.padStart(2, "0");
-            defaultVal = `${yyyy}-${MM}-${DD}T${timePart}`;
+            const parts = String(value).split(" ");
+            const datePart = parts[0];
+            const timePart = parts[1] || "";
+            
+            if (datePart) {
+              const dateComponents = datePart.split("/");
+              if (dateComponents.length === 3) {
+                const [M, D, YY] = dateComponents;
+                if (M && D && YY) {
+                  const yyyy = `20${YY}`;
+                  const MM = M.padStart(2, "0");
+                  const DD = D.padStart(2, "0");
+                  defaultVal = `${yyyy}-${MM}-${DD}T${timePart}`;
+                }
+              }
+            }
           }
 
           return (
@@ -588,109 +767,6 @@ const ReleasePackTab = () => {
       },
     },
     {
-      Header: 'Last Updated',
-      accessor: 'lastUpdated',
-      Cell: ({ value }) => value || 'N/A',
-    },
-    {
-      Header: 'Notes',
-      accessor: 'notes',
-      Cell: ({ value, row, isEditing, updateCell }) => {
-        const agent = row.original;
-        // Get the current edited value or fallback to original value
-        const currentEditedValue = editedRows[agent.userId]?.notes;
-        const notesVal = currentEditedValue !== undefined ? currentEditedValue : (value || '');
-        const canEdit = hasElevatedPermissions && agent.leadId;
-        
-        if (!canEdit) {
-          return <span>{notesVal || "N/A"}</span>;
-        }
-        
-        // If cell is being edited, render input field
-        if (isEditing) {
-          return (
-          <input
-            type="text"
-              value={notesVal}
-              onChange={(e) => updateCell(agent.userId, 'notes', e.target.value)}
-              style={{ 
-                width: '100%', 
-                border: 'none', 
-                outline: 'none', 
-                background: 'transparent',
-                minWidth: "80px"
-              }}
-              autoFocus
-            />
-          );
-        }
-        
-        return (
-          <span 
-            style={{ 
-              cursor: 'pointer',
-              minWidth: "80px", 
-              display: "inline-block"
-            }}
-          >
-            {notesVal || "—"}
-          </span>
-        );
-      },
-      editable: hasElevatedPermissions
-    },
-    {
-      Header: 'Pending Date',
-      accessor: 'PendingDate',
-      Cell: ({ value }) => {
-        if (!value) return '—';
-        // Format the date for display
-        try {
-          const date = new Date(value);
-          return date.toLocaleDateString();
-        } catch (e) {
-          return value;
-        }
-      }
-    },
-    {
-      Header: 'Days to Code',
-      accessor: 'days_to_code',
-      Cell: ({ value }) => {
-        if (value === null || value === undefined) return '—';
-        
-        const days = parseInt(value);
-        let color = '#000'; // default black
-        let backgroundColor = 'transparent';
-        
-        if (days >= 0 && days <= 7) {
-          // Green for 0-7 days (good)
-          color = '#155724';
-          backgroundColor = '#d4edda';
-        } else if (days > 7 && days <= 14) {
-          // Yellow for 8-14 days (caution)
-          color = '#856404';
-          backgroundColor = '#fff3cd';
-        } else if (days > 14) {
-          // Red for >14 days (concerning)
-          color = '#721c24';
-          backgroundColor = '#f8d7da';
-        }
-        
-        return (
-          <span style={{ 
-            color, 
-            backgroundColor, 
-            padding: '2px 6px', 
-            borderRadius: '4px',
-            fontWeight: '500'
-          }}>
-            {days}
-          </span>
-        );
-      }
-    },
-    {
       Header: 'Archive',
       accessor: 'archive',
       id: 'archive',
@@ -745,7 +821,114 @@ const ReleasePackTab = () => {
         );
       },
     },
+    {
+      Header: 'Pending Date',
+      accessor: 'PendingDate',
+      Cell: ({ value }) => {
+        if (!value) return '—';
+        // Format the date for display
+        try {
+          const date = new Date(value);
+          return date.toLocaleDateString();
+        } catch (e) {
+          return value;
+        }
+      }
+    },
+    {
+      Header: 'Release Date',
+      accessor: 'releaseScheduled',
+      Cell: ({ value }) => formatUTCForDisplay(value),
+    },
+    {
+      Header: '2nd Code Pack Sent',
+      accessor: 'packReleasedDate',
+      id: 'secondPackSent',
+      Cell: ({ value, row }) => {
+        const agent = row.original;
+        return hasElevatedPermissions ? (
+          agent.packReleasedDate && agent.packReleasedDate !== "N/A" ? (
+            <button className="action-button" style={{ 
+              backgroundColor: '#6c757d',
+              color: 'white',
+              fontSize: '10px',
+              padding: '4px 8px',
+              border: 'none',
+              borderRadius: '3px'
+            }} disabled>
+              Already Sent
+            </button>
+          ) : (
+            <button onClick={() => handleSecondPack(agent)} className="btn-primary" style={{
+              backgroundColor: '#28a745',
+              color: 'white',
+              fontSize: '10px',
+              padding: '4px 8px',
+              border: 'none',
+              borderRadius: '3px'
+            }}>
+              Mark Sent
+            </button>
+          )
+        ) : (
+          value || "N/A"
+        );
+      },
+    },
+    {
+      Header: 'Last Updated',
+      accessor: 'lastUpdated',
+      Cell: ({ value }) => value || 'N/A',
+    },
   ], [hasElevatedPermissions, formatName, handleSecondPack, fetchLeadsReleased, combinedData, editedRows, handleArchive, handleUnarchive, archivedView]);
+
+  // Helper function to format dates for Excel export
+  const formatDateForExcel = (dateStr) => {
+    if (!dateStr || dateStr === 'N/A') return 'N/A';
+    
+    try {
+      // Handle m/d/yy h:mm format (e.g., "7/31/25, 15:59" or "7/31/25 15:59")
+      const cleanStr = dateStr.replace(',', '').trim();
+      const parts = cleanStr.split(' ');
+      
+      if (parts.length >= 1) {
+        const datePart = parts[0];
+        const timePart = parts[1] || '';
+        
+        const dateComponents = datePart.split('/');
+        if (dateComponents.length === 3) {
+          let [month, day, year] = dateComponents;
+          
+          // Validate all components exist
+          if (!month || !day || !year) {
+            return `'${dateStr}`;
+          }
+          
+          // Convert 2-digit year to 4-digit
+          if (year.length === 2) {
+            const yearNum = parseInt(year);
+            year = yearNum >= 0 && yearNum <= 50 ? `20${year}` : `19${year}`;
+          }
+          
+          // Pad month and day with leading zeros
+          month = month.padStart(2, '0');
+          day = day.padStart(2, '0');
+          
+          // Format as MM/DD/YYYY HH:MM for Excel
+          if (timePart) {
+            return `${month}/${day}/${year} ${timePart}`;
+          } else {
+            return `${month}/${day}/${year}`;
+          }
+        }
+      }
+      
+      // If we can't parse it, return as-is prefixed with apostrophe to force text
+      return `'${dateStr}`;
+    } catch (e) {
+      return `'${dateStr}`;
+    }
+  };
 
   // Export to Excel functionality
   const exportToExcel = () => {
@@ -754,13 +937,36 @@ const ReleasePackTab = () => {
       return;
     }
 
-    const exportData = filteredData.map((row) => ({
+    // Apply date filter for export
+    let dataToExport = [...filteredData];
+    
+    if (exportFilter !== 'all') {
+      const now = new Date();
+      const daysAgo = parseInt(exportFilter);
+      const cutoffDate = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
+      
+      dataToExport = filteredData.filter(row => {
+        if (!row.releaseScheduled) return false;
+        const releaseDate = new Date(row.releaseScheduled);
+        return releaseDate >= cutoffDate;
+      });
+      
+      if (dataToExport.length === 0) {
+        toast.error(`No data found for the last ${daysAgo} days`);
+        return;
+      }
+    }
+
+    const exportData = dataToExport.map((row) => ({
       agentName: row.lagnname,
       releaseScheduled: row.releaseScheduled ? formatUTCForDisplay(row.releaseScheduled) : "N/A",
       mga: row.mga,
-      statesLicensed: row.statesLicensed,
-      packReleasedDate: row.packReleasedDate || "N/A",
-      lastUpdated: row.lastUpdated || "N/A",
+      sga: (row.mga_rept_name === 'LOCKER-ROTOLO') ? 'E4' : 'A$',
+      statesLicensed: row.licensesWithStatus && row.licensesWithStatus.length > 0 
+        ? row.licensesWithStatus.map(l => l.state).join(', ') 
+        : "N/A",
+      packReleasedDate: formatDateForExcel(row.packReleasedDate),
+      lastUpdated: formatDateForExcel(row.lastUpdated),
       notes: row.notes || "",
     }));
 
@@ -769,7 +975,8 @@ const ReleasePackTab = () => {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Release Code Packs");
     XLSX.writeFile(workbook, "release_code_packs.xlsx");
     
-    toast.success('Excel file downloaded successfully');
+    const filterText = exportFilter === 'all' ? 'All' : `Last ${exportFilter} days`;
+    toast.success(`Excel file downloaded successfully (${filterText}: ${exportData.length} records)`);
   };
 
   // Show loading state while hierarchy loads for non-elevated, non-AGT users
@@ -824,6 +1031,26 @@ const ReleasePackTab = () => {
         onCancelChanges={handleCancelChanges}
         actionBarExtras={(
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {/* Export filter dropdown */}
+            <select
+              value={exportFilter}
+              onChange={(e) => setExportFilter(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                fontSize: '12px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                backgroundColor: 'white',
+                cursor: 'pointer'
+              }}
+              title="Select date range for export"
+            >
+              <option value="all">Export All</option>
+              <option value="30">Last 30 Days</option>
+              <option value="90">Last 90 Days</option>
+              <option value="180">Last 180 Days</option>
+            </select>
+            
             {/* Export button */}
             <button
               className="action-button"

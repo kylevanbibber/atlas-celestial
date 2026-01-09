@@ -54,7 +54,7 @@
 
 /* Dark Mode Theme Variables */
 [data-theme="dark"] {
-  --bg-primary: #121212ec;
+  --bg-primary: #0f0e12;
   --bg-secondary: #1e1e1e;
   --bg-tertiary: #242424;
   --text-primary: #f0f0f0;
@@ -114,6 +114,39 @@ body {
   user-select: none;
   -webkit-text-size-adjust: 100%;
   -ms-text-size-adjust: 100%;
+  
+  /* PWA Optimizations */
+  overscroll-behavior-y: contain; /* Prevent pull-to-refresh in PWA */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+}
+
+/* PWA Standalone Mode Optimizations */
+@media (display-mode: standalone) {
+  body {
+    /* Ensure proper spacing for PWA status bar */
+    padding-top: var(--safe-area-inset-top);
+    overscroll-behavior: none; /* Prevent bounce effect in standalone */
+  }
+  
+  /* Prevent header from being hidden by status bar */
+  .modern-header {
+    padding-top: var(--safe-area-inset-top);
+  }
+}
+
+/* iOS Standalone Mode Specific Adjustments */
+@supports (-webkit-touch-callout: none) {
+  @media (display-mode: standalone) {
+    body {
+      /* Additional iOS PWA adjustments */
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+    }
+    
+    html {
+      height: -webkit-fill-available;
+    }
+  }
 }
 
 /* Comprehensive zoom prevention */
@@ -213,7 +246,12 @@ a:hover {
   100% { transform: rotate(360deg); }
 }
 
-/* App container and layout */
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+/* App container and layout - Modern Header Only */
 .app-container {
   background: url('./img/globe_bg_watermark_blue.png') no-repeat center center fixed;
   background-size: 155%;
@@ -232,30 +270,18 @@ a:hover {
   display: flex;
   flex-direction: column;
   flex: 1;
-  margin-left: 45px;
   overflow: hidden;
-  transition: margin-left 0.3s ease-in-out;
-  margin-top: var(--header-height); /* Use CSS variable for header height */
+  margin-top: 40px; /* Modern header height */
   background-color: var(--bg-primary);
+  transition: background-color 0.3s ease;
 }
 
 .page-content {
   flex: 1;
   overflow-y: auto;
   padding: 0;
-  border-top-left-radius: 10px;
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  border: 1px solid #d0d0d0;
-}
-
-.app-container.expanded .main-content {
-  margin-left: 120px;
-}
-
-.app-container.expanded .header {
-  left: 120px;
-  width: calc(100% - 150px);
 }
 
 /* Buttons (global) */
@@ -465,44 +491,29 @@ form {
   }
 }
 
-/* When the sidebar is expanded, adjust the layout */
-.app-container.expanded .card-container {
-  grid-template-columns: 1fr; /* default for mobile */
-}
-
-@media (min-width: 650px) {
-  .app-container.expanded .card-container {
-    grid-template-columns: repeat(2, 1fr); /* medium screens */
-  }
-}
-
-@media (min-width: 1300px) {
-  .app-container.expanded .card-container {
-    grid-template-columns: repeat(4, 1fr); /* large screens: reduced from 4 to 3 columns */
-  }
-}
+/* Card container responsive layout - no sidebar adjustments needed */
 
 @media (max-width: 768px) {
   .app-container {
-    padding-bottom: calc(60px + var(--safe-area-inset-bottom)); /* Space for bottom navigation + safe area */
-    padding-left: 0; /* Remove body padding on mobile - let header handle it */
+    margin-bottom: 81px;
+    padding-left: 0;
     padding-right: 0;
   }
   
   body {
-    padding-left: 0; /* Override body safe area padding on mobile */
+    padding-left: 0;
     padding-right: 0;
   }
   
   .main-content {
-    margin-left: 0 !important;
-    width: 100% !important;
-    margin-top: var(--header-height-with-safe-area); /* Account for safe area in header */
+    width: 100%;
+    margin-top: 60px; /* Mobile header height */
   }
   
-  .header {
-    left: 0 !important;
-    width: 100% !important;
+  .modern-header {
+    left: 0;
+    right: 0;
+    width: 100%;
   }
   
   /* Remove side margins/padding on mobile */

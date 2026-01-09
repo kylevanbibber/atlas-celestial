@@ -20,20 +20,39 @@ const verifyToken = async (req, res, next) => {
     }
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    } catch (jwtError) {
+      console.error('[Auth] JWT verification failed:', jwtError.message);
+      return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+    }
     
-    // Check if token is valid in the database
+    // For onboarding users, skip the user_tokens table check
+    // Onboarding users authenticate via the pipeline table, not activeusers
+    const decodedUserId = decoded.userId || decoded.id;
+    const decodedRole = decoded.role || decoded.Role;
+
+    if (decodedRole === 'onboarding') {
+      // Set user info to request
+      req.user = { ...decoded, userId: decodedUserId, role: decodedRole };
+      req.isOnboarding = true;
+      return next();
+    }
+    
+    // For regular users, check if token is valid in the database
     const tokenCheck = await query(
       "SELECT * FROM user_tokens WHERE userId = ? AND userToken = ? AND valid = 'y'",
-      [decoded.userId, token]
+      [decodedUserId, token]
     );
     
     if (tokenCheck.length === 0) {
+      console.error('[Auth] Token not found in user_tokens table for userId:', decodedUserId);
       return res.status(401).json({ success: false, message: 'Invalid or expired token' });
     }
     
     // Set user info to request
-    req.user = decoded;
+    req.user = { ...decoded, userId: decodedUserId, role: decodedRole };
     
     next();
   } catch (error) {
