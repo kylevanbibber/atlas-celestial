@@ -989,9 +989,9 @@ router.get('/getweeklyall', async (req, res) => {
                 m.tree 
             FROM Weekly_ALP wa
             LEFT JOIN activeusers au 
-                ON wa.LagnName = au.lagnname
+                ON TRIM(REGEXP_REPLACE(wa.LagnName, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(au.lagnname, '[[:space:]]+', ' '))
             LEFT JOIN MGAs m 
-                ON wa.MGA_NAME = m.lagnname
+                ON TRIM(REGEXP_REPLACE(wa.MGA_NAME, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(m.lagnname, '[[:space:]]+', ' '))
             WHERE wa.REPORT = ?
             AND STR_TO_DATE(wa.reportdate, '%m/%d/%Y') BETWEEN STR_TO_DATE(?, '%m/%d/%Y') AND STR_TO_DATE(?, '%m/%d/%Y')
         `;
@@ -1094,9 +1094,9 @@ router.get('/getweeklysa', async (req, res) => {
                 m.tree 
             FROM Weekly_ALP wa
             LEFT JOIN activeusers au 
-                ON wa.LagnName = au.lagnname
+                ON TRIM(REGEXP_REPLACE(wa.LagnName, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(au.lagnname, '[[:space:]]+', ' '))
             LEFT JOIN MGAs m 
-                ON wa.MGA_NAME = m.lagnname
+                ON TRIM(REGEXP_REPLACE(wa.MGA_NAME, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(m.lagnname, '[[:space:]]+', ' '))
             WHERE wa.REPORT = ?
             AND au.clname = 'SA'
             AND STR_TO_DATE(wa.reportdate, '%m/%d/%Y') BETWEEN STR_TO_DATE(?, '%m/%d/%Y') AND STR_TO_DATE(?, '%m/%d/%Y')
@@ -1177,9 +1177,9 @@ router.get('/getweeklyga', async (req, res) => {
                 m.tree 
             FROM Weekly_ALP wa
             LEFT JOIN activeusers au 
-                ON wa.LagnName = au.lagnname
+                ON TRIM(REGEXP_REPLACE(wa.LagnName, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(au.lagnname, '[[:space:]]+', ' '))
             LEFT JOIN MGAs m 
-                ON wa.MGA_NAME = m.lagnname
+                ON TRIM(REGEXP_REPLACE(wa.MGA_NAME, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(m.lagnname, '[[:space:]]+', ' '))
             WHERE wa.REPORT = ?
             AND au.clname = 'GA'
             AND STR_TO_DATE(wa.reportdate, '%m/%d/%Y') BETWEEN STR_TO_DATE(?, '%m/%d/%Y') AND STR_TO_DATE(?, '%m/%d/%Y')
@@ -1257,9 +1257,9 @@ router.get('/getweeklymga', async (req, res) => {
                 m.tree
             FROM Weekly_ALP wa
             LEFT JOIN activeusers au 
-                ON wa.LagnName = au.lagnname
+                ON TRIM(REGEXP_REPLACE(wa.LagnName, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(au.lagnname, '[[:space:]]+', ' '))
             LEFT JOIN MGAs m 
-                ON wa.LagnName = m.LagnName
+                ON TRIM(REGEXP_REPLACE(wa.LagnName, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(m.LagnName, '[[:space:]]+', ' '))
             WHERE wa.REPORT = ?
             AND au.clname IN ('MGA', 'RGA')
             AND m.Active = 'y'
@@ -1354,9 +1354,9 @@ router.get('/getweeklyrga', async (req, res) => {
                 COALESCE(m.tree, ?) AS tree -- Ensure the selected tree is included
             FROM Weekly_ALP wa
             LEFT JOIN activeusers au 
-                ON wa.LagnName = au.lagnname
+                ON TRIM(REGEXP_REPLACE(wa.LagnName, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(au.lagnname, '[[:space:]]+', ' '))
             LEFT JOIN MGAs m 
-                ON wa.LagnName = m.LagnName
+                ON TRIM(REGEXP_REPLACE(wa.LagnName, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(m.LagnName, '[[:space:]]+', ' '))
             WHERE wa.REPORT = ?
             AND au.clname = 'RGA'
             AND m.Active = 'y'
@@ -1457,9 +1457,9 @@ router.get('/getmonthlyall', async (req, res) => {
                 m.tree 
             FROM Monthly_ALP ma
             LEFT JOIN activeusers au 
-                ON ma.LagnName = au.lagnname
+                ON TRIM(REGEXP_REPLACE(ma.LagnName, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(au.lagnname, '[[:space:]]+', ' '))
             LEFT JOIN MGAs m 
-                ON ma.MGA_NAME = m.lagnname
+                ON TRIM(REGEXP_REPLACE(ma.MGA_NAME, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(m.lagnname, '[[:space:]]+', ' '))
             WHERE ma.month = ?
         `;
 
@@ -1560,9 +1560,9 @@ router.get('/getmonthlysa', async (req, res) => {
                 m.tree 
             FROM Monthly_ALP ma
             LEFT JOIN activeusers au 
-                ON ma.LagnName = au.lagnname
+                ON TRIM(REGEXP_REPLACE(ma.LagnName, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(au.lagnname, '[[:space:]]+', ' '))
             LEFT JOIN MGAs m 
-                ON ma.MGA_NAME = m.lagnname
+                ON TRIM(REGEXP_REPLACE(ma.MGA_NAME, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(m.lagnname, '[[:space:]]+', ' '))
             WHERE au.clname = 'SA'
             AND ma.month = ?
         `;
@@ -1642,9 +1642,9 @@ router.get('/getmonthlyga', async (req, res) => {
                 m.tree 
             FROM Monthly_ALP ma
             LEFT JOIN activeusers au 
-                ON ma.LagnName = au.lagnname
+                ON TRIM(REGEXP_REPLACE(ma.LagnName, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(au.lagnname, '[[:space:]]+', ' '))
             LEFT JOIN MGAs m 
-                ON ma.MGA_NAME = m.lagnname
+                ON TRIM(REGEXP_REPLACE(ma.MGA_NAME, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(m.lagnname, '[[:space:]]+', ' '))
             WHERE au.clname = 'GA'
             AND ma.month = ?
         `;
@@ -1723,9 +1723,9 @@ router.get('/getmonthlymga', async (req, res) => {
                 m.tree
             FROM Monthly_ALP ma
             LEFT JOIN activeusers au 
-                ON ma.LagnName = au.lagnname
+                ON TRIM(REGEXP_REPLACE(ma.LagnName, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(au.lagnname, '[[:space:]]+', ' '))
             LEFT JOIN MGAs m 
-                ON ma.LagnName = m.LagnName
+                ON TRIM(REGEXP_REPLACE(ma.LagnName, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(m.LagnName, '[[:space:]]+', ' '))
             WHERE au.clname IN ('MGA', 'RGA')
             AND m.Active = 'y'
             AND m.hide = 'n'
@@ -1821,9 +1821,9 @@ router.get('/getmonthlyrga', async (req, res) => {
                 COALESCE(m.tree, ?) AS tree -- Ensure the selected tree is included
             FROM Monthly_ALP ma
             LEFT JOIN activeusers au 
-                ON ma.LagnName = au.lagnname
+                ON TRIM(REGEXP_REPLACE(ma.LagnName, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(au.lagnname, '[[:space:]]+', ' '))
             LEFT JOIN MGAs m 
-                ON ma.LagnName = m.LagnName
+                ON TRIM(REGEXP_REPLACE(ma.LagnName, '[[:space:]]+', ' ')) = TRIM(REGEXP_REPLACE(m.LagnName, '[[:space:]]+', ' '))
             WHERE au.clname = 'RGA'
             AND m.Active = 'y'
             AND m.hide = 'n'
