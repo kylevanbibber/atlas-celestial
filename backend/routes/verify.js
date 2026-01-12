@@ -55,7 +55,7 @@ router.post('/', async (req, res) => {
         const agent_ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.socket.remoteAddress || (req.connection.socket ? req.connection.socket.remoteAddress : null);
 
         // Check total_annual_premium to set status
-        const status = total_annual_premium < 1200 ? 'Not at Threshold' : 'Queued';
+        const status = total_annual_premium < 1440 ? 'Not at Threshold' : 'Queued';
 
         // Build url using application_id - this should be the client-facing URL, not the admin panel
         const url = `https://ariaslife.com/verify/clients.html?${application_id}`;

@@ -342,7 +342,7 @@ const inputStyle = (isDuplicate) => ({
 });
 
   // Determine if medical questions and/or senior medical questions should be shown
-  const shouldShowMedicalQuestions = totalAnnualPremium >= 1200;
+  const shouldShowMedicalQuestions = totalAnnualPremium >= 1440;
   const shouldShowSeniorMedicalQuestions = insureds.primary.senior || (spouseAdded && insureds.spouse.senior);
 
   // Determine which question sets to display
@@ -790,7 +790,7 @@ const inputStyle = (isDuplicate) => ({
   </div>
 </div>
 
-{totalAnnualPremium >= 1200 && questionSet === 'medical' && shouldShowMedicalQuestions && (
+{totalAnnualPremium >= 1440 && questionSet === 'medical' && shouldShowMedicalQuestions && (
         <MedicalQuestions
           insureds={insureds.children
             .filter(child => !child.senior)
@@ -808,7 +808,7 @@ const inputStyle = (isDuplicate) => ({
         />
       )}
 
-{totalAnnualPremium >= 1200 && questionSet === 'senior' && (
+{totalAnnualPremium >= 1440 && questionSet === 'senior' && (
   <SeniorMedicalQuestions
     insureds={insureds.children
       .filter(child => child.senior)
@@ -826,7 +826,7 @@ const inputStyle = (isDuplicate) => ({
   />
 )}
 
-{totalAnnualPremium >= 1200 && questionSet === 'both' && (
+{totalAnnualPremium >= 1440 && questionSet === 'both' && (
   <>
     <SeniorMedicalQuestions
       insureds={insureds.children
