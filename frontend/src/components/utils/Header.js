@@ -13,7 +13,6 @@ import Logo from "../Layout/Logo";
 import NotificationCenter from "../common/NotificationCenter";
 import GlobalSearch from "./GlobalSearch";
 import RightDetails from "./RightDetails";
-import Breadcrumb from "./Breadcrumb";
 import api from "../../api";
 import { usePresentationWindow } from "../../hooks/usePresentationWindow";
 import "./Header.css";
@@ -672,11 +671,6 @@ const Header = ({ pageTitle, onboardingMode = false }) => {
         </div>
       </div>
       </div>
-      
-      {/* Breadcrumb Navigation - Show below header */}
-      {!onboardingMode && location.pathname !== '/dashboard' && (
-        <Breadcrumb />
-      )}
       
       {/* Mobile navigation handled by BottomNav component in App.js */}
 

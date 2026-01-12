@@ -8,6 +8,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import Header from "./components/utils/Header";
+import SecondaryHeader from "./components/utils/SecondaryHeader";
 import BottomNav from "./components/utils/BottomNav";
 import Dashboard from "./pages/Dashboard";
 import RefsPage from "./pages/refs/page";
@@ -478,6 +479,7 @@ function AppContent() {
   return (
     <div className="app-container">
       <Header pageTitle={pageTitle} onboardingMode={isOnboardingHome} />
+      {!isOnboardingHome && <SecondaryHeader />}
       <div className="main-content">
         <div className="page-content">
           <Routes>

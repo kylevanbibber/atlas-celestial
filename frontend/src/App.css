@@ -47,9 +47,11 @@
   --safe-area-inset-bottom: env(safe-area-inset-bottom, 0);
   --safe-area-inset-left: env(safe-area-inset-left, 0);
   
-  /* Header height with safe area consideration */
-  --header-height: 60px;
-  --header-height-with-safe-area: calc(60px + var(--safe-area-inset-top));
+  /* Header heights with safe area consideration */
+  --header-height: 70px;
+  --secondary-header-height: 50px;
+  --total-header-height: calc(var(--header-height) + var(--secondary-header-height));
+  --header-height-with-safe-area: calc(var(--header-height) + var(--safe-area-inset-top));
 }
 
 /* Dark Mode Theme Variables */
@@ -271,7 +273,7 @@ a:hover {
   flex-direction: column;
   flex: 1;
   overflow: hidden;
-  margin-top: 40px; /* Modern header height */
+  margin-top: var(--total-header-height); /* Header + Secondary header */
   background-color: var(--bg-primary);
   transition: background-color 0.3s ease;
 }
@@ -507,7 +509,7 @@ form {
   
   .main-content {
     width: 100%;
-    margin-top: 60px; /* Mobile header height */
+    margin-top: calc(var(--header-height) + var(--secondary-header-height)); /* Mobile header + secondary header */
   }
   
   .modern-header {
