@@ -825,11 +825,11 @@ const AllotmentTab = () => {
           targetMonth: selectedMonth,
           overrideType: 'move_to_group',
           targetGroup: parseInt(targetGroup),
-          reason: `Bulk moved to Group ${targetGroup} by ${user.clname || user.lagnname}`
+          reason: `Bulk moved to Category ${targetGroup} by ${user.clname || user.lagnname}`
         });
       }
       
-      toast.success(`${agentsToMove.length} agents moved to Group ${targetGroup}`);
+      toast.success(`${agentsToMove.length} agents moved to Category ${targetGroup}`);
       setSelectedAgents({});
       setShowBulkActionsModal(false);
       fetchAllotmentData();
@@ -925,7 +925,7 @@ const AllotmentTab = () => {
     }
     
     columns.push({
-      Header: 'Group',
+      Header: 'Category',
       accessor: 'allotmentGroup',
       Cell: ({ value, row }) => {
         if (!value) return '-';
@@ -950,7 +950,7 @@ const AllotmentTab = () => {
                 lineHeight: '1.2',
                 fontStyle: 'italic'
               }}>
-                Custom Group
+                Custom Category
               </span>
             </div>
           );
@@ -1372,7 +1372,7 @@ const AllotmentTab = () => {
                 fontWeight: '600',
                 fontSize: '11px'
               }}>
-                ✓ In Custom Group
+                ✓ In Custom Category
               </span>
             );
           }
@@ -1479,7 +1479,7 @@ const AllotmentTab = () => {
                         handleRemoveOverride(agentId);
                       } else if (newType === 'move_to_group') {
                         // Prompt for target group
-                        const targetGroup = prompt('Enter target group (1-5 or custom-GROUP_ID):');
+                        const targetGroup = prompt('Enter target category (1-5 or custom-GROUP_ID):');
                         if (targetGroup) {
                           handleAddOverride(agentId, newType, targetGroup);
                         }
@@ -1511,7 +1511,7 @@ const AllotmentTab = () => {
                   onChange={(e) => {
                     const newType = e.target.value;
                     if (newType === 'move_to_group') {
-                      const targetGroup = prompt('Enter target group (1-5 or custom-GROUP_ID):');
+                      const targetGroup = prompt('Enter target category (1-5 or custom-GROUP_ID):');
                       if (targetGroup) {
                         handleAddOverride(agentId, newType, targetGroup);
                       }
@@ -1530,13 +1530,13 @@ const AllotmentTab = () => {
                 >
                   <option value="">No Override</option>
                   <option value="exclude">Exclude This Month</option>
-                  <option value="move_to_group">Move to Group...</option>
+                  <option value="move_to_group">Move to Category...</option>
                   <option value="exclude_all_future">Exclude All Future</option>
                 </select>
               )}
               {row.original.groupOverridden && (
                 <span style={{ fontSize: '9px', color: '#666', fontStyle: 'italic' }}>
-                  Original: Group {row.original.originalGroup}
+                  Original: Category {row.original.originalGroup}
                 </span>
               )}
             </div>
@@ -1634,7 +1634,7 @@ const AllotmentTab = () => {
         if (isN2G) {
           bgColor = '#fff3cd'; // Light yellow for n2g
           textColor = '#856404';
-          tooltip = 'New to Group data';
+          tooltip = 'New to Category data';
         } else if (percentage >= 75) {
           bgColor = '#d4edda'; // Light green
           textColor = '#155724';
@@ -1677,7 +1677,7 @@ const AllotmentTab = () => {
       Cell: ({ value }) => value || 'N/A'
     },
     {
-      Header: 'Prev Month Group',
+      Header: 'Prev Month Category',
       accessor: 'prevMonthGroup',
       Cell: ({ value }) => {
         const num = Number(value) || 0;
@@ -1921,7 +1921,7 @@ const AllotmentTab = () => {
                 whiteSpace: 'nowrap'
               }}
             >
-              + Custom Group
+              + Custom Category
             </button>
           )}
         </div>
@@ -2151,7 +2151,7 @@ const AllotmentTab = () => {
                 fontWeight: '600'
               }}
             >
-              Move to Group...
+              Move to Category...
             </button>
             <button
               onClick={() => {
@@ -2198,7 +2198,7 @@ const AllotmentTab = () => {
           }}>
             <h3 style={{ marginTop: 0, marginBottom: '16px' }}>
               {bulkActionType === 'exclude' && 'Exclude Agents from This Month'}
-              {bulkActionType === 'move' && 'Move Agents to Different Group'}
+              {bulkActionType === 'move' && 'Move Agents to Different Category'}
               {bulkActionType === 'exclude_all_future' && 'Exclude Agents from All Future Allotments'}
             </h3>
             
@@ -2239,7 +2239,7 @@ const AllotmentTab = () => {
             
             {bulkActionType === 'move' && (
               <div>
-                <p>Move {Object.keys(selectedAgents).filter(id => selectedAgents[id]).length} agents to which group for <strong>{selectedMonth}</strong>?</p>
+                <p>Move {Object.keys(selectedAgents).filter(id => selectedAgents[id]).length} agents to which category for <strong>{selectedMonth}</strong>?</p>
                 <div style={{ marginTop: '16px', marginBottom: '16px' }}>
                   {[1, 2, 3, 4, 5].map(groupNum => (
                     <button
@@ -2260,7 +2260,7 @@ const AllotmentTab = () => {
                         textAlign: 'left'
                       }}
                     >
-                      Group {groupNum} - {getGroupDetails(groupNum).leads} leads/month ({getGroupDetails(groupNum).perDrop} per drop)
+                      Category {groupNum} - {getGroupDetails(groupNum).leads} leads/month ({getGroupDetails(groupNum).perDrop} per drop)
                     </button>
                   ))}
                 </div>
@@ -2393,23 +2393,23 @@ const AllotmentTab = () => {
           <span>
             {(() => {
               if (activeGroupFilter === 'exceptions') {
-                return `Exceptions (Moved to Different Group) - ${filteredHighAlpData.length} agents`;
+                return `Exceptions (Moved to Different Category) - ${filteredHighAlpData.length} agents`;
               }
               if (activeGroupFilter === 'exclusions') {
                 return `Exclusions (Removed from Allotment) - ${filteredHighAlpData.length} agents`;
               }
               if (activeGroupFilter === '6k-reup') {
-                return `6k Reup Group (ALP < 3000) - ${filteredHighAlpData.length} agents`;
+                return `6k Reup Category (ALP < 3000) - ${filteredHighAlpData.length} agents`;
               }
               if (activeGroupFilter === 'f90') {
-                return `F90 Group (31-90 Days Since 1st Pack on Drop Date) - ${filteredHighAlpData.length} agents`;
+                return `F90 Category (31-90 Days Since 1st Pack on Drop Date) - ${filteredHighAlpData.length} agents`;
               }
               if (activeGroupFilter.startsWith('custom-')) {
                 const customGroupId = parseInt(activeGroupFilter.replace('custom-', ''));
                 const customGroup = customGroups.find(g => g.id === customGroupId);
-                return `${customGroup?.groupName || 'Custom Group'} - ${filteredHighAlpData.length} agents`;
+                return `${customGroup?.groupName || 'Custom Category'} - ${filteredHighAlpData.length} agents`;
               }
-              return `Agent Allotments - ${filteredHighAlpData.length} agents${activeGroupFilter !== 'all' ? ` in Group ${activeGroupFilter}` : ''}`;
+              return `Agent Allotments - ${filteredHighAlpData.length} agents${activeGroupFilter !== 'all' ? ` in Category ${activeGroupFilter}` : ''}`;
             })()}
           </span>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -2439,7 +2439,7 @@ const AllotmentTab = () => {
                   borderRadius: '4px',
                   border: '1px solid #fde68a'
                 }}>
-                  Moved to Different Groups
+                  Moved to Different Categories
                 </span>
               </>
             )}
@@ -2454,7 +2454,7 @@ const AllotmentTab = () => {
                   borderRadius: '4px',
                   border: '1px solid #ffc107'
                 }}>
-                  Can be added to Group 5 if they write 6k gross
+                  Can be added to Category 5 if they write 6k gross
                 </span>
               </>
             )}
@@ -2525,18 +2525,18 @@ const AllotmentTab = () => {
                           cursor: 'pointer'
                         }}
                       >
-                        Edit Group
+                        Edit Category
                       </button>
                       <button
                         onClick={async () => {
                           if (window.confirm(`Delete "${customGroup.groupName}"?`)) {
                             try {
                               await api.delete(`/pnp/custom-groups/${customGroup.id}`);
-                              toast.success('Custom group deleted');
+                              toast.success('Custom category deleted');
                               setActiveGroupFilter('all');
                               fetchAllotmentData();
                             } catch (error) {
-                              toast.error('Error deleting group');
+                              toast.error('Error deleting category');
                             }
                           }
                         }}
@@ -2560,7 +2560,7 @@ const AllotmentTab = () => {
           </div>
         </h3>
         
-        {/* Group Filter Tabs */}
+        {/* Category Filter Tabs */}
         <div style={{ 
           marginBottom: '15px', 
           borderBottom: '1px solid #dee2e6',
@@ -2683,10 +2683,10 @@ const AllotmentTab = () => {
                       e.currentTarget.style.color = '#6c757d';
                     }
                   }}
-                  title={groupDetails ? `${groupDetails.leads} leads/month (${groupDetails.perDrop} per drop) • ${groupDetails.refs} refs required • ${groupDetails.leadTypes}` : 'View all groups'}
+                  title={groupDetails ? `${groupDetails.leads} leads/month (${groupDetails.perDrop} per drop) • ${groupDetails.refs} refs required • ${groupDetails.leadTypes}` : 'View all categories'}
                 >
                   <span style={{ fontWeight: isActive ? 'bold' : '600' }}>
-                    {group === 'all' ? 'All Groups' : `Group ${group}`}
+                    {group === 'all' ? 'All Categories' : `Category ${group}`}
                   </span>
                   <span style={{ fontSize: '11px', opacity: 0.8 }}>
                     {count} agent{count !== 1 ? 's' : ''}
@@ -2792,7 +2792,7 @@ const AllotmentTab = () => {
                       e.currentTarget.style.color = '#6c757d';
                     }
                   }}
-                  title="Agents below 3k ALP - can be added to Group 5 if they write 6k gross"
+                  title="Agents below 3k ALP - can be added to Category 5 if they write 6k gross"
                 >
                   <span style={{ fontWeight: isActive ? 'bold' : '600' }}>
                     6k Reup
@@ -2935,26 +2935,26 @@ const AllotmentTab = () => {
                 disabled: row.overrideType === 'exclude'
               },
               {
-                label: 'Move to Group',
+                label: 'Move to Category',
                 submenu: [
                   {
-                    label: 'Group 1',
+                    label: 'Category 1',
                     onClick: () => handleAddOverride(row.agentId, 'move_to_group', '1')
                   },
                   {
-                    label: 'Group 2',
+                    label: 'Category 2',
                     onClick: () => handleAddOverride(row.agentId, 'move_to_group', '2')
                   },
                   {
-                    label: 'Group 3',
+                    label: 'Category 3',
                     onClick: () => handleAddOverride(row.agentId, 'move_to_group', '3')
                   },
                   {
-                    label: 'Group 4',
+                    label: 'Category 4',
                     onClick: () => handleAddOverride(row.agentId, 'move_to_group', '4')
                   },
                   {
-                    label: 'Group 5',
+                    label: 'Category 5',
                     onClick: () => handleAddOverride(row.agentId, 'move_to_group', '5')
                   },
                   ...customGroups.filter(g => g.target_month === (selectedMonth || apiResponseData?.targetMonth)).map(customGroup => ({
@@ -3017,7 +3017,7 @@ const AllotmentTab = () => {
                   'Retention': row.retention,
                   'Area Request': row.areaRequest,
                   'Previous Month Refs': row.prevMonthRefs,
-                  'Notes': alp >= 6000 ? 'Eligible for 6k Rule (Group 5)' : (alp >= 3000 ? 'Above threshold' : `Need $${neededFor6k} more for 6k rule`)
+                  'Notes': alp >= 6000 ? 'Eligible for 6k Rule (Category 5)' : (alp >= 3000 ? 'Above threshold' : `Need $${neededFor6k} more for 6k rule`)
                 };
               });
               
@@ -3030,13 +3030,13 @@ const AllotmentTab = () => {
               const url = window.URL.createObjectURL(blob);
               const link = document.createElement('a');
               link.href = url;
-              link.download = '6k_reup_group_data.csv';
+              link.download = '6k_reup_category_data.csv';
               document.body.appendChild(link);
               link.click();
               document.body.removeChild(link);
               window.URL.revokeObjectURL(url);
               
-              toast.success('6k Reup Group data exported successfully');
+              toast.success('6k Reup Category data exported successfully');
             } else {
               // Export high ALP data
               const csvData = filteredHighAlpData.map(row => {
@@ -3052,7 +3052,7 @@ const AllotmentTab = () => {
                 }
                 
                 return {
-                  'Group': row.allotmentGroup,
+                  'Category': row.allotmentGroup,
                   'Leads Per Month': groupDetails.leads,
                   'Leads Per Drop': groupDetails.perDrop,
                   'Lead Types': groupDetails.leadTypes,
