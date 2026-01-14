@@ -877,8 +877,7 @@ const PipelineChecklistDetails = ({ data, onClose, onSave }) => {
         top: 0,
         zIndex: 10
       }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1 }}>
-          <FiUser style={{ fontSize: '24px', marginTop: '4px', color: 'var(--primary-color)', flexShrink: 0 }} />
+        <div style={{ flex: 1 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2 style={{ 
               margin: 0, 
@@ -894,29 +893,80 @@ const PipelineChecklistDetails = ({ data, onClose, onSave }) => {
             <p style={{ margin: '0 0 4px 0', fontSize: '14px', color: 'var(--text-secondary)' }}>
               📧 {recruit.email}
             </p>
-            <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: 'var(--text-secondary)' }}>
+            <p style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--text-secondary)' }}>
               📞 {recruit.phone}
             </p>
-            <div style={{ 
-              display: 'inline-block',
-              padding: '4px 12px', 
-              fontSize: '13px', 
-              fontWeight: 600, 
-              color: 'white',
-              background: 'var(--primary-color)', 
-              borderRadius: '12px' 
-            }}>
-              Current: {currentStep}
-            </div>
+            
+            {/* XCEL Progress Section */}
+            {recruit.xcel_progress_pct !== null && recruit.xcel_progress_pct !== undefined && (
+              <div style={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '12px',
+                color: 'white'
+              }}>
+                <div style={{ 
+                  fontSize: '11px', 
+                  fontWeight: 600, 
+                  textTransform: 'uppercase', 
+                  letterSpacing: '0.5px',
+                  marginBottom: '6px',
+                  opacity: 0.9
+                }}>
+                  XCEL Pre-Licensing Course
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '24px', fontWeight: 700, marginBottom: '4px' }}>
+                      {recruit.xcel_progress_pct}%
+                    </div>
+                    {recruit.xcel_time_spent && (
+                      <div style={{ fontSize: '12px', opacity: 0.9 }}>
+                        Time: {recruit.xcel_time_spent}
+                      </div>
+                    )}
+                  </div>
+                  {recruit.xcel_prepared_to_pass === 'PREPARED' && (
+                    <div style={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      border: '2px solid rgba(255, 255, 255, 0.3)'
+                    }}>
+                      ✓ PREPARED
+                    </div>
+                  )}
+                </div>
+                {(recruit.xcel_date_enrolled || recruit.xcel_last_log_in) && (
+                  <div style={{ 
+                    fontSize: '11px', 
+                    marginTop: '8px', 
+                    opacity: 0.85,
+                    borderTop: '1px solid rgba(255, 255, 255, 0.2)',
+                    paddingTop: '8px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: '12px'
+                  }}>
+                    {recruit.xcel_date_enrolled && (
+                      <div>
+                        Enrolled: {new Date(recruit.xcel_date_enrolled).toLocaleDateString('en-US')}
+                      </div>
+                    )}
+                    {recruit.xcel_last_log_in && (
+                      <div>
+                        Last Login: {new Date(recruit.xcel_last_log_in).toLocaleDateString('en-US')}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
-        <button 
-          onClick={onClose}
-          className="close-button"
-          style={{ flexShrink: 0 }}
-        >
-          <FiX />
-        </button>
       </div>
 
       {/* Progress Summary Bar */}

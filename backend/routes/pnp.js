@@ -1135,7 +1135,10 @@ router.get('/allotment', verifyToken, async (req, res) => {
       }
       
       const vipAlp = vipCount * 5000; // Each VIP = 5,000 ALP
-      const finalAlp = (monthlyAlp + vipAlp) / 2; // Average of Monthly ALP and VIP ALP
+      // Only divide by 2 if using 2 months of data, otherwise use the single month value
+      const finalAlp = alpMonthsToUse.length === 2 
+        ? (monthlyAlp + vipAlp) / 2 
+        : (monthlyAlp + vipAlp);
       
       // Debug specific agent to troubleshoot data discrepancy
       if (row.LagnName === 'MARKINS CONOR N') {
@@ -1275,7 +1278,9 @@ router.get('/allotment', verifyToken, async (req, res) => {
           parsed_ytd_rate: ytdRate,
           monthly_alp: monthlyAlp,
           pnp_submit: pnpSubmit,
-          alp_source: 'monthly_alp_GROSS_2_months_summed_plus_vips_divided_by_2', // (GROSS ALP Sum of 2 months + VIP ALP) / 2
+          alp_source: alpMonthsToUse.length === 2 
+            ? 'monthly_alp_GROSS_2_months_summed_plus_vips_divided_by_2' 
+            : 'monthly_alp_GROSS_1_month_plus_vips', // Dynamic based on number of months used
           alp_monthly_component: monthlyAlp,
           alp_vip_component: vipAlp,
           alp_final_value: finalAlp,

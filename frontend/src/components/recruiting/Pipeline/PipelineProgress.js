@@ -638,7 +638,7 @@ const PipelineProgress = ({ kpiFilter }) => {
   const handleCloseChecklist = () => {
     setShowRightDetails(false);
     setRightDetailsData(null);
-    fetchData(); // Refresh to get updated progress
+    // Don't refresh on close - only refresh when data is actually saved
   };
 
   // Handle recruit added successfully
@@ -936,6 +936,61 @@ const PipelineProgress = ({ kpiFilter }) => {
           {row.original.recruit_first} {row.original.recruit_last}
         </div>
       )
+    },
+    {
+      Header: 'XCEL Progress',
+      accessor: 'xcel_progress_pct',
+      width: 100,
+      Cell: ({ value, row }) => {
+        const pct = value;
+        const preparedStatus = row.original.xcel_prepared_to_pass;
+        
+        if (pct === null || pct === undefined) {
+          return (
+            <div style={{
+              fontSize: '12px',
+              color: 'var(--text-secondary)',
+              fontStyle: 'italic'
+            }}>
+              Not enrolled
+            </div>
+          );
+        }
+        
+        // Determine color based on progress
+        let color = '#dc3545'; // red for low progress
+        if (pct >= 75) color = '#28a745'; // green
+        else if (pct >= 50) color = '#ffc107'; // yellow
+        else if (pct >= 25) color = '#fd7e14'; // orange
+        
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              fontSize: '13px',
+              fontWeight: 600,
+              color: color,
+              minWidth: '35px'
+            }}>
+              {pct}%
+            </div>
+            {preparedStatus === 'PREPARED' && (
+              <span 
+                style={{
+                  fontSize: '11px',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  backgroundColor: '#28a745',
+                  color: 'white',
+                  fontWeight: 500
+                }}
+                title="Prepared to Pass"
+              >
+                ✓
+              </span>
+            )}
+          </div>
+        );
+      }
     },
     {
       Header: 'Phone',

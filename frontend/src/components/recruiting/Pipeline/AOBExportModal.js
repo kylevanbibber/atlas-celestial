@@ -36,16 +36,25 @@ const AOBExportModal = ({ isOpen, onClose, onComplete }) => {
     }
   }, []);
 
-  // Clean up on unmount
+  // Clean up on unmount or when modal closes
   useEffect(() => {
     console.log('[AOB Export Modal] Component mounted');
+    
+    // Clean up when modal closes
+    if (!isOpen && pollingInterval.current) {
+      console.log('[AOB Export Modal] Modal closed, cleaning up polling');
+      clearInterval(pollingInterval.current);
+      pollingInterval.current = null;
+    }
+    
     return () => {
       console.log('[AOB Export Modal] Component unmounting, cleaning up polling');
       if (pollingInterval.current) {
         clearInterval(pollingInterval.current);
+        pollingInterval.current = null;
       }
     };
-  }, []);
+  }, [isOpen]);
 
   // Poll for status updates
   useEffect(() => {
@@ -115,6 +124,7 @@ const AOBExportModal = ({ isOpen, onClose, onComplete }) => {
             console.log('[AOB Export Modal] ✅ Export completed, stopping polling. Final status:', res.data.status);
             if (pollingInterval.current) {
               clearInterval(pollingInterval.current);
+              pollingInterval.current = null;
             }
             
             // Call onComplete callback if provided
@@ -125,7 +135,18 @@ const AOBExportModal = ({ isOpen, onClose, onComplete }) => {
         }
       } catch (err) {
         console.error('[AOB Export Modal] Polling error:', err);
-        // Don't stop polling on network errors, might be temporary
+        
+        // Stop polling on 404 (session not found/expired) or 401 (unauthorized)
+        if (err.response && (err.response.status === 404 || err.response.status === 401)) {
+          console.log('[AOB Export Modal] ⛔ Session not found or unauthorized, stopping polling');
+          if (pollingInterval.current) {
+            clearInterval(pollingInterval.current);
+            pollingInterval.current = null;
+          }
+          setStatus('error');
+          setError('Session expired or not found. Please try starting the export again.');
+        }
+        // Don't stop polling on other network errors, might be temporary
       }
     };
 
@@ -139,6 +160,7 @@ const AOBExportModal = ({ isOpen, onClose, onComplete }) => {
       console.log('[AOB Export Modal] Cleaning up polling interval');
       if (pollingInterval.current) {
         clearInterval(pollingInterval.current);
+        pollingInterval.current = null;
       }
     };
   }, [sessionId, onComplete]);
@@ -236,6 +258,7 @@ const AOBExportModal = ({ isOpen, onClose, onComplete }) => {
     console.log('[AOB Export Modal] 🚪 Closing modal');
     if (pollingInterval.current) {
       clearInterval(pollingInterval.current);
+      pollingInterval.current = null;
     }
     setShowCredentials(true);
     setSessionId(null);

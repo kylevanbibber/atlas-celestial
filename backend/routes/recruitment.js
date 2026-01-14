@@ -301,6 +301,12 @@ router.get('/recruits', async (req, res) => {
         DATE_FORMAT(ps.date_entered, '%Y-%m-%d %H:%i:%s') as current_stage_entered,
         DATE_FORMAT(p.date_added, '%Y-%m-%d %H:%i:%s') as date_added_utc,
         aob.ImportDate as aob_import_date,
+        pp.date_enrolled as xcel_date_enrolled,
+        pp.time_spent as xcel_time_spent,
+        pp.ple_complete_pct as xcel_progress_pct,
+        pp.prepared_to_pass as xcel_prepared_to_pass,
+        pp.email_date as xcel_last_updated,
+        pp.last_log_in as xcel_last_log_in,
         (SELECT pci.id
          FROM pipeline_checklist_items pci
          LEFT JOIN pipeline_checklist_progress pcp 
@@ -347,6 +353,7 @@ router.get('/recruits', async (req, res) => {
       LEFT JOIN activeusers au ON au.pipeline_id = p.id
       LEFT JOIN pipeline_steps ps ON ps.recruit_id = p.id AND ps.date_exited IS NULL
       LEFT JOIN AOBUpdates aob ON p.aob = aob.id
+      LEFT JOIN prelic_progress pp ON p.email = pp.email
       ORDER BY p.date_added DESC
     `;
     
@@ -1671,6 +1678,12 @@ router.get('/recruits/agent/:agentId', async (req, res) => {
         DATE_FORMAT(ps.date_entered, '%Y-%m-%d %H:%i:%s') as current_stage_entered,
         DATE_FORMAT(p.date_added, '%Y-%m-%d %H:%i:%s') as date_added_utc,
         aob.ImportDate as aob_import_date,
+        pp.date_enrolled as xcel_date_enrolled,
+        pp.time_spent as xcel_time_spent,
+        pp.ple_complete_pct as xcel_progress_pct,
+        pp.prepared_to_pass as xcel_prepared_to_pass,
+        pp.email_date as xcel_last_updated,
+        pp.last_log_in as xcel_last_log_in,
         (SELECT pci.id
          FROM pipeline_checklist_items pci
          LEFT JOIN pipeline_checklist_progress pcp 
@@ -1711,6 +1724,7 @@ router.get('/recruits/agent/:agentId', async (req, res) => {
       LEFT JOIN activeusers au ON au.pipeline_id = p.id
       LEFT JOIN pipeline_steps ps ON ps.recruit_id = p.id AND ps.date_exited IS NULL
       LEFT JOIN AOBUpdates aob ON p.aob = aob.id
+      LEFT JOIN prelic_progress pp ON p.email = pp.email
       WHERE p.recruiting_agent IN (${placeholders}) OR p.code_to IN (${placeholders})
       ORDER BY p.date_added DESC
     `;
@@ -1780,6 +1794,12 @@ router.post('/recruits/team', async (req, res) => {
         DATE_FORMAT(ps.date_entered, '%Y-%m-%d %H:%i:%s') as current_stage_entered,
         DATE_FORMAT(p.date_added, '%Y-%m-%d %H:%i:%s') as date_added_utc,
         aob.ImportDate as aob_import_date,
+        pp.date_enrolled as xcel_date_enrolled,
+        pp.time_spent as xcel_time_spent,
+        pp.ple_complete_pct as xcel_progress_pct,
+        pp.prepared_to_pass as xcel_prepared_to_pass,
+        pp.email_date as xcel_last_updated,
+        pp.last_log_in as xcel_last_log_in,
         (SELECT pci.id
          FROM pipeline_checklist_items pci
          LEFT JOIN pipeline_checklist_progress pcp 
@@ -1820,6 +1840,7 @@ router.post('/recruits/team', async (req, res) => {
       LEFT JOIN activeusers au ON au.pipeline_id = p.id
       LEFT JOIN pipeline_steps ps ON ps.recruit_id = p.id AND ps.date_exited IS NULL
       LEFT JOIN AOBUpdates aob ON p.aob = aob.id
+      LEFT JOIN prelic_progress pp ON p.email = pp.email
       WHERE p.recruiting_agent IN (${placeholders}) OR p.code_to IN (${placeholders})
       ORDER BY p.date_added DESC
     `;

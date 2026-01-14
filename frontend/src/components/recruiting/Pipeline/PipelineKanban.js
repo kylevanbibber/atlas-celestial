@@ -374,7 +374,7 @@ const PipelineKanban = ({ kpiFilter }) => {
   const handleCloseChecklist = () => {
     setShowRightDetails(false);
     setRightDetailsData(null);
-    fetchData();
+    // Don't refresh on close - only refresh when data is actually saved
   };
 
   const handleRecruitAdded = (newRecruit) => {
@@ -655,6 +655,28 @@ const PipelineKanban = ({ kpiFilter }) => {
                                   {recruit.recruit_first} {recruit.recruit_last}
                                 </h4>
                               </div>
+                              
+                              {/* XCEL Progress */}
+                              {recruit.xcel_progress_pct !== null && recruit.xcel_progress_pct !== undefined && (
+                                <div className="kanban-card-current-task" style={{ 
+                                  backgroundColor: recruit.xcel_progress_pct >= 75 ? '#d4edda' : 
+                                                   recruit.xcel_progress_pct >= 50 ? '#fff3cd' : 
+                                                   recruit.xcel_progress_pct >= 25 ? '#ffe5d0' : '#f8d7da',
+                                  color: recruit.xcel_progress_pct >= 75 ? '#155724' : 
+                                         recruit.xcel_progress_pct >= 50 ? '#856404' : 
+                                         recruit.xcel_progress_pct >= 25 ? '#cc5200' : '#721c24',
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: 600
+                                }}>
+                                  <FiCheckCircle size={12} />
+                                  <span>XCEL: {recruit.xcel_progress_pct}%</span>
+                                  {recruit.xcel_prepared_to_pass === 'PREPARED' && (
+                                    <span style={{ marginLeft: '4px' }}>✓</span>
+                                  )}
+                                </div>
+                              )}
                               
                               {/* Current Task */}
                               {recruit.current_task_name && (

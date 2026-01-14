@@ -652,7 +652,7 @@ const AllotmentTab = () => {
     }
     // Check if filtering by 6k reup group (low ALP)
     else if (activeGroupFilter === '6k-reup') {
-      filtered = lowAlpData;
+      filtered = lowAlpData.filter(item => !item.isExcluded);
       console.log(`🔍 [Frontend] 6k Reup Group filter → ${filtered.length} agents`);
     }
     // Check if filtering by F90 (agents from leads_released with 1st Pack 31-90 days before drop date)
@@ -706,13 +706,15 @@ const AllotmentTab = () => {
       const customGroup = customGroups.find(g => g.id === customGroupId);
       
       if (customGroup) {
-        // Get members from the custom group
-        filtered = customGroup.members.map(member => ({
-          ...member,
-          allotmentGroup: 'Custom',
-          customGroupName: customGroup.groupName,
-          customGroupColor: customGroup.color
-        }));
+        // Get members from the custom group (exclude excluded agents)
+        filtered = customGroup.members
+          .filter(member => !member.isExcluded)
+          .map(member => ({
+            ...member,
+            allotmentGroup: 'Custom',
+            customGroupName: customGroup.groupName,
+            customGroupColor: customGroup.color
+          }));
         console.log(`🔍 [Frontend] Custom group filter: ${customGroup.groupName} → ${filtered.length} agents`);
       } else {
         filtered = [];
@@ -721,8 +723,13 @@ const AllotmentTab = () => {
     // Filter by regular group
     else if (activeGroupFilter !== 'all') {
       const groupNumber = parseInt(activeGroupFilter);
-      filtered = highAlpData.filter(item => item.allotmentGroup === groupNumber);
+      filtered = highAlpData.filter(item => item.allotmentGroup === groupNumber && !item.isExcluded);
       console.log(`🔍 [Frontend] Group filter: ${activeGroupFilter} → ${filtered.length} agents`);
+    }
+    // Filter 'all' - exclude agents with isExcluded
+    else {
+      filtered = highAlpData.filter(item => !item.isExcluded);
+      console.log(`🔍 [Frontend] All groups filter → ${filtered.length} agents (excluded agents removed)`);
     }
     
     // Then filter by search query
@@ -2575,7 +2582,7 @@ const AllotmentTab = () => {
             {/* Custom Groups - Show first */}
             {customGroups.map(customGroup => {
               const isActive = activeGroupFilter === `custom-${customGroup.id}`;
-              const count = customGroup.memberCount;
+              const count = customGroup.members.filter(m => !m.isExcluded).length;
               
               return (
                 <button
@@ -2646,8 +2653,8 @@ const AllotmentTab = () => {
             {['all', '1', '2', '3', '4', '5'].map(group => {
               const isActive = activeGroupFilter === group;
               const count = group === 'all' ? 
-                highAlpData.length : 
-                highAlpData.filter(item => item.allotmentGroup === parseInt(group)).length;
+                highAlpData.filter(item => !item.isExcluded).length : 
+                highAlpData.filter(item => item.allotmentGroup === parseInt(group) && !item.isExcluded).length;
               
               const groupDetails = group !== 'all' ? getGroupDetails(parseInt(group)) : null;
               
