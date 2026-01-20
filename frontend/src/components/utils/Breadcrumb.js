@@ -1,6 +1,14 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FiChevronRight, FiHome } from 'react-icons/fi';
+import { FiHome } from 'react-icons/fi';
+import {
+  Breadcrumb as BreadcrumbRoot,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '../ui/breadcrumb';
 import './Breadcrumb.css';
 
 const Breadcrumb = ({ items = [] }) => {
@@ -11,25 +19,28 @@ const Breadcrumb = ({ items = [] }) => {
   const breadcrumbItems = items.length > 0 ? items : generateBreadcrumbs(location);
 
   return (
-    <nav className="breadcrumb-nav">
+    <div className="breadcrumb-nav">
       <div className="breadcrumb-container">
-        {breadcrumbItems.map((item, index) => (
-          <React.Fragment key={index}>
-            {index > 0 && <FiChevronRight className="breadcrumb-separator" />}
-            {index === breadcrumbItems.length - 1 ? (
-              <span className="breadcrumb-item current">{item.label}</span>
-            ) : (
-              <button
-                className="breadcrumb-item clickable"
-                onClick={() => item.path && navigate(item.path)}
-              >
-                {index === 0 && item.icon ? item.icon : item.label}
-              </button>
-            )}
-          </React.Fragment>
-        ))}
+        <BreadcrumbRoot>
+          <BreadcrumbList>
+            {breadcrumbItems.map((item, index) => (
+              <React.Fragment key={index}>
+                {index > 0 && <BreadcrumbSeparator />}
+                <BreadcrumbItem>
+                  {index === breadcrumbItems.length - 1 ? (
+                    <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                  ) : (
+                    <BreadcrumbLink onClick={() => item.path && navigate(item.path)}>
+                      {index === 0 && item.icon ? item.icon : item.label}
+                    </BreadcrumbLink>
+                  )}
+                </BreadcrumbItem>
+              </React.Fragment>
+            ))}
+          </BreadcrumbList>
+        </BreadcrumbRoot>
       </div>
-    </nav>
+    </div>
   );
 };
 

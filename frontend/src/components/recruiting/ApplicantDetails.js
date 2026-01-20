@@ -69,7 +69,7 @@ const ApplicantDetails = ({
     <div className="right-details-content">
       {/* Header */}
       <div className="right-details-header">
-        <div className="header-left">
+        <div className="applicant-header-left">
           <FaUser className="header-icon" />
           <div>
             <h2>{formData.fullName || 'Applicant Details'}</h2>

@@ -15,6 +15,7 @@ const TeamLeaderboard = ({
   loading = false,
   onAgentClick = null,
   showDetails = true,
+  showGoals = true,
   formatCurrency = (val) => new Intl.NumberFormat('en-US', { 
     style: 'currency', 
     currency: 'USD',
@@ -156,9 +157,11 @@ const TeamLeaderboard = ({
                 <th className="pb-3 pt-0 text-right text-xs font-medium text-muted-foreground">
                   Premium
                 </th>
-                <th className="hidden lg:table-cell pb-3 pt-0 text-right text-xs font-medium text-muted-foreground">
-                  Goal Progress
-                </th>
+                {showGoals && (
+                  <th className="hidden lg:table-cell pb-3 pt-0 text-right text-xs font-medium text-muted-foreground">
+                    Goal Progress
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -214,7 +217,7 @@ const TeamLeaderboard = ({
                             )}
                           </p>
                           {/* Show goal progress on mobile (hidden on lg+) */}
-                          {agent.monthlyGoal && (
+                          {showGoals && agent.monthlyGoal && (
                             <div className="lg:hidden mt-1 flex items-center gap-1">
                               <span className="text-xs text-muted-foreground">Goal:</span>
                               <span className={`text-xs font-medium ${
@@ -245,50 +248,52 @@ const TeamLeaderboard = ({
                           {formatCurrency(agent.total_premium || 0)}
                         </span>
                       </td>
-                      <td className="hidden lg:table-cell py-3 text-right">
-                        {agent.monthlyGoal ? (
-                          <div className="flex flex-col items-end gap-1">
-                            {agent.total_premium > 0 ? (
-                              <div className="flex items-center gap-2">
-                                <div className="w-24 h-2 bg-border rounded-full overflow-hidden">
-                                  <div 
-                                    className={`h-full transition-all ${
-                                      agent.goalProgress >= 100 ? 'bg-green-500' :
-                                      agent.goalProgress >= 75 ? 'bg-blue-500' :
-                                      agent.goalProgress >= 50 ? 'bg-yellow-500' :
-                                      'bg-red-500'
-                                    }`}
-                                    style={{ width: `${Math.min(agent.goalProgress, 100)}%` }}
-                                  />
+                      {showGoals && (
+                        <td className="hidden lg:table-cell py-3 text-right">
+                          {agent.monthlyGoal ? (
+                            <div className="flex flex-col items-end gap-1">
+                              {agent.total_premium > 0 ? (
+                                <div className="flex items-center gap-2">
+                                  <div className="w-24 h-2 bg-border rounded-full overflow-hidden">
+                                    <div 
+                                      className={`h-full transition-all ${
+                                        agent.goalProgress >= 100 ? 'bg-green-500' :
+                                        agent.goalProgress >= 75 ? 'bg-blue-500' :
+                                        agent.goalProgress >= 50 ? 'bg-yellow-500' :
+                                        'bg-red-500'
+                                      }`}
+                                      style={{ width: `${Math.min(agent.goalProgress, 100)}%` }}
+                                    />
+                                  </div>
+                                  <span className={`text-xs font-medium ${
+                                    agent.goalProgress >= 100 ? 'text-green-500' :
+                                    agent.goalProgress >= 75 ? 'text-blue-500' :
+                                    agent.goalProgress >= 50 ? 'text-yellow-500' :
+                                    'text-red-500'
+                                  }`}>
+                                    {agent.goalProgress}%
+                                  </span>
                                 </div>
-                                <span className={`text-xs font-medium ${
-                                  agent.goalProgress >= 100 ? 'text-green-500' :
-                                  agent.goalProgress >= 75 ? 'text-blue-500' :
-                                  agent.goalProgress >= 50 ? 'text-yellow-500' :
-                                  'text-red-500'
-                                }`}>
-                                  {agent.goalProgress}%
+                              ) : (
+                                <span className="text-xs text-muted-foreground">No production</span>
+                              )}
+                              <div className="w-full">
+                                <span className="text-xs text-muted-foreground">
+                                  {formatCurrency(agent.monthlyGoal)}
                                 </span>
                               </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">No production</span>
-                            )}
-                            <div className="w-full">
-                              <span className="text-xs text-muted-foreground">
-                                {formatCurrency(agent.monthlyGoal)}
-                              </span>
                             </div>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </td>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                        </td>
+                      )}
                     </tr>
 
                     {/* Expanded Details Row */}
                     {isExpanded && (
                       <tr className="bg-accent/50">
-                        <td colSpan={5} className="px-4 py-6">
+                        <td colSpan={showGoals ? 5 : 4} className="px-4 py-6">
                           {loadingDetails ? (
                             <div className="text-center py-4">
                               <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
@@ -296,8 +301,8 @@ const TeamLeaderboard = ({
                             </div>
                           ) : details ? (
                             <div className="space-y-4 sm:space-y-6">
-                              {/* Goal Summary - Show if goal exists */}
-                              {agent.monthlyGoal && (
+                              {/* Goal Summary - Show if goal exists and showGoals is true */}
+                              {showGoals && agent.monthlyGoal && (
                                 <div className="bg-background p-3 sm:p-4 rounded-lg border border-border">
                                   <div className="flex items-center justify-between mb-2">
                                     <p className="text-xs sm:text-sm text-muted-foreground">Monthly Goal Progress</p>

@@ -1,0 +1,14 @@
+/* Page Wrapper */
+.page-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+/* Page Inner - Contains the actual page content */
+.page-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}

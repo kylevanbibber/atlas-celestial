@@ -5,6 +5,7 @@ import { Applicants } from '../components/recruiting';
 import Pipeline from '../components/recruiting/Pipeline/Pipeline';
 // import SecondarySidebar from '../components/utils/SecondarySidebar';
 import RecruitingOverview from './RecruitingOverview';
+import Page from '../components/Layout/Page';
 import '../pages/utilities/Utilities.css'; // Reuse utilities styling
 
 const Recruiting = () => {
@@ -61,21 +62,21 @@ const Recruiting = () => {
   }
   
   return (
-    <div className="settings-container">
-      {/* Breadcrumb Navigation now in Header */}
-      
-      {/* <SecondarySidebar
-        items={recruitingItems}
-        activeItem={activeSection}
-        onItemClick={handleSectionChange}
-        warningItems={[]}
-      /> */}
-      <div className="settings-content">
-        <div className="padded-content">
-          {renderRecruitingSection()}
+    <Page>
+      <div className="settings-container">
+        {/* <SecondarySidebar
+          items={recruitingItems}
+          activeItem={activeSection}
+          onItemClick={handleSectionChange}
+          warningItems={[]}
+        /> */}
+        <div className="settings-content">
+          <div className="padded-content">
+            {renderRecruitingSection()}
+          </div>
         </div>
       </div>
-    </div>
+    </Page>
   );
 };
 

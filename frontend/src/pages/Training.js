@@ -8,6 +8,7 @@ import './Training.css';
 import Release from '../components/production/release/Release';
 import { ProgressProvider } from '../components/production/release/ProgressContext';
 import RoleplayCall from '../components/training/RoleplayCall';
+import Page from '../components/Layout/Page';
 
 // Main Training page component
 const Training = () => {
@@ -60,19 +61,21 @@ const Training = () => {
   };
   
   return (
-    <div className="training-container">
-      {/* <SecondarySidebar 
-        items={trainingItems} 
-        activeItem={activeSection} 
-        onItemClick={handleSectionChange} 
-        warningItems={warningItems}
-      /> */}
-      <div className="training-content">
-        <div className="padded-content">
-          {renderTrainingSection()}
+    <Page>
+      <div className="training-container">
+        {/* <SecondarySidebar 
+          items={trainingItems} 
+          activeItem={activeSection} 
+          onItemClick={handleSectionChange} 
+          warningItems={warningItems}
+        /> */}
+        <div className="training-content">
+          <div className="padded-content">
+            {renderTrainingSection()}
+          </div>
         </div>
       </div>
-    </div>
+    </Page>
   );
 };
 

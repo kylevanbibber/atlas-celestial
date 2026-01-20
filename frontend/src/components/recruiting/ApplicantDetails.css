@@ -164,7 +164,7 @@
   flex-shrink: 0;
 }
 
-.header-left {
+.applicant-header-left {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -172,7 +172,7 @@
   min-width: 0;
 }
 
-.header-left h2 {
+.applicant-header-left h2 {
   margin: 0;
   font-size: 1.2em;
   font-weight: 600;

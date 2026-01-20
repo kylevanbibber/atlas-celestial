@@ -6,6 +6,7 @@ import './Production.css';
 
 // Import component files
 import SecondarySidebar from '../components/utils/SecondarySidebar';
+import Page from '../components/Layout/Page';
 import DailyActivityForm from '../components/production/activity/DailyActivityForm';
 import ProductionTracker from '../components/production/activity/ProductionTracker';
 import ProductionGoals from '../components/production/ProductionGoals';
@@ -220,22 +221,22 @@ const Production = () => {
   }
 
   return (
-    <div className="settings-container">
-      {/* Breadcrumb Navigation now in Header */}
-      
-      {/* SecondarySidebar removed - navigation now in header dropdown */}
-      {/* <SecondarySidebar 
-        items={productionItems} 
-        activeItem={activeSection} 
-        onItemClick={handleSectionChange} 
-        warningItems={warningItems}
-      /> */}
-      <div className="settings-content">
-        <div className="padded-content">
-          {renderProductionSection()}
+    <Page>
+      <div className="settings-container">
+        {/* SecondarySidebar removed - navigation now in header dropdown */}
+        {/* <SecondarySidebar 
+          items={productionItems} 
+          activeItem={activeSection} 
+          onItemClick={handleSectionChange} 
+          warningItems={warningItems}
+        /> */}
+        <div className="settings-content">
+          <div className="padded-content">
+            {renderProductionSection()}
+          </div>
         </div>
       </div>
-    </div>
+    </Page>
   );
 };
 

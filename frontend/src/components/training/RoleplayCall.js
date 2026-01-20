@@ -650,7 +650,7 @@ const RoleplayCall = () => {
           <>
             {/* Header */}
             <div className="roleplay-header">
-          <div className="header-left">
+          <div className="roleplay-header-left">
             <h2>
               <FiPhone className="header-icon" />
               {activeSession ? 'Call in Progress' : 'Roleplay Call'}

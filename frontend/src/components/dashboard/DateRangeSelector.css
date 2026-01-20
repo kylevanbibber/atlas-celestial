@@ -2,7 +2,14 @@
   display: flex;
   justify-content: center;
   width: 100%;
-  margin-bottom: 1rem;
+  margin-bottom: 0;
+}
+
+/* Add margin when rendered in page content (mobile) */
+@media (max-width: 768px) {
+  .date-range-selector-wrapper {
+    margin-bottom: 1rem;
+  }
 }
 
 .date-range-selector {
@@ -17,7 +24,25 @@
   width: fit-content;
 }
 
-@media (min-width: 640px) {
+/* Super compact mode for smaller screens */
+@media (min-width: 640px) and (max-width: 900px) {
+  .date-range-selector {
+    gap: 0.25rem;
+    padding: 0.25rem 0.375rem;
+    font-size: 0.7rem;
+  }
+}
+
+/* Compact mode for medium screens (tablets/small desktops) */
+@media (min-width: 901px) and (max-width: 1200px) {
+  .date-range-selector {
+    gap: 0.375rem;
+    padding: 0.375rem 0.5rem;
+    font-size: 0.75rem;
+  }
+}
+
+@media (min-width: 1201px) {
   .date-range-selector {
     gap: 0.5rem;
     padding: 0.5rem;
@@ -29,7 +54,21 @@
   gap: 0.125rem;
 }
 
-@media (min-width: 640px) {
+/* Super compact mode for smaller screens */
+@media (min-width: 640px) and (max-width: 900px) {
+  .view-mode-buttons {
+    gap: 0.125rem;
+  }
+}
+
+/* Compact mode for medium screens */
+@media (min-width: 901px) and (max-width: 1200px) {
+  .view-mode-buttons {
+    gap: 0.125rem;
+  }
+}
+
+@media (min-width: 1201px) {
   .view-mode-buttons {
     gap: 0.25rem;
   }
@@ -40,7 +79,21 @@
   gap: 0.125rem;
 }
 
-@media (min-width: 640px) {
+/* Super compact mode for smaller screens */
+@media (min-width: 640px) and (max-width: 900px) {
+  .view-scope-buttons {
+    gap: 0.125rem;
+  }
+}
+
+/* Compact mode for medium screens */
+@media (min-width: 901px) and (max-width: 1200px) {
+  .view-scope-buttons {
+    gap: 0.125rem;
+  }
+}
+
+@media (min-width: 1201px) {
   .view-scope-buttons {
     gap: 0.25rem;
   }
@@ -53,7 +106,25 @@
   padding: 0 0.5rem;
 }
 
-@media (min-width: 640px) {
+/* Super compact mode for smaller screens */
+@media (min-width: 640px) and (max-width: 900px) {
+  .view-mode-button {
+    height: 1.5rem;
+    padding: 0 0.375rem;
+    font-size: 0.65rem;
+  }
+}
+
+/* Compact mode for medium screens */
+@media (min-width: 901px) and (max-width: 1200px) {
+  .view-mode-button {
+    height: 1.75rem;
+    padding: 0 0.5rem;
+    font-size: 0.7rem;
+  }
+}
+
+@media (min-width: 1201px) {
   .view-mode-button {
     height: 2rem;
     padding: 0 0.75rem;
@@ -68,7 +139,19 @@
   display: inline;
 }
 
-@media (min-width: 640px) {
+/* Compact mode for medium screens - show short labels */
+@media (min-width: 640px) and (max-width: 1200px) {
+  .view-mode-label-full {
+    display: none;
+  }
+  
+  .view-mode-label-short {
+    display: inline;
+  }
+}
+
+/* Large screens - show full labels */
+@media (min-width: 1201px) {
   .view-mode-label-full {
     display: inline;
   }
@@ -84,7 +167,21 @@
   background-color: var(--border-color);
 }
 
-@media (min-width: 640px) {
+/* Super compact mode for smaller screens - hide dividers */
+@media (min-width: 640px) and (max-width: 900px) {
+  .date-range-divider {
+    display: none;
+  }
+}
+
+/* Compact mode for medium screens */
+@media (min-width: 901px) and (max-width: 1200px) {
+  .date-range-divider {
+    height: 1.25rem;
+  }
+}
+
+@media (min-width: 1201px) {
   .date-range-divider {
     height: 1.5rem;
   }
@@ -153,7 +250,27 @@
   color: hsl(var(--primary-foreground)) !important;
 }
 
-@media (min-width: 640px) {
+/* Super compact mode for smaller screens */
+@media (min-width: 640px) and (max-width: 900px) {
+  .date-range-selector .view-mode-buttons button,
+  .date-range-selector .view-scope-buttons button {
+    height: 1.5rem !important;
+    padding: 0 0.375rem !important;
+    font-size: 0.65rem !important;
+  }
+}
+
+/* Compact mode for medium screens */
+@media (min-width: 901px) and (max-width: 1200px) {
+  .date-range-selector .view-mode-buttons button,
+  .date-range-selector .view-scope-buttons button {
+    height: 1.75rem !important;
+    padding: 0 0.5rem !important;
+    font-size: 0.7rem !important;
+  }
+}
+
+@media (min-width: 1201px) {
   .date-range-selector .view-mode-buttons button,
   .date-range-selector .view-scope-buttons button {
     height: 2rem !important;
@@ -181,7 +298,33 @@
   opacity: 1 !important;
 }
 
-@media (min-width: 640px) {
+/* Super compact mode for smaller screens */
+@media (min-width: 640px) and (max-width: 900px) {
+  .nav-button {
+    height: 1.5rem !important;
+    width: 1.5rem !important;
+  }
+  
+  .nav-icon {
+    height: 0.75rem;
+    width: 0.75rem;
+  }
+}
+
+/* Compact mode for medium screens */
+@media (min-width: 901px) and (max-width: 1200px) {
+  .nav-button {
+    height: 1.75rem !important;
+    width: 1.75rem !important;
+  }
+  
+  .nav-icon {
+    height: 0.875rem;
+    width: 0.875rem;
+  }
+}
+
+@media (min-width: 1201px) {
   .nav-button {
     height: 2rem !important;
     width: 2rem !important;
@@ -206,7 +349,32 @@
   justify-content: center;
 }
 
-@media (min-width: 640px) {
+/* Super compact mode for smaller screens - very short date display */
+@media (min-width: 640px) and (max-width: 900px) {
+  .date-display {
+    padding: 0.25rem 0.375rem;
+    font-size: 0.65rem;
+    min-width: 100px;
+    max-width: 120px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* Compact mode for medium screens - shorter date display */
+@media (min-width: 901px) and (max-width: 1200px) {
+  .date-display {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    min-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (min-width: 1201px) {
   .date-display {
     padding: 0.25rem 1rem;
     font-size: 0.875rem;
@@ -233,7 +401,33 @@
   opacity: 1 !important;
 }
 
-@media (min-width: 640px) {
+/* Super compact mode for smaller screens */
+@media (min-width: 640px) and (max-width: 900px) {
+  .calendar-button {
+    height: 1.5rem !important;
+    width: 1.5rem !important;
+  }
+  
+  .calendar-icon {
+    height: 0.75rem;
+    width: 0.75rem;
+  }
+}
+
+/* Compact mode for medium screens */
+@media (min-width: 901px) and (max-width: 1200px) {
+  .calendar-button {
+    height: 1.75rem !important;
+    width: 1.75rem !important;
+  }
+  
+  .calendar-icon {
+    height: 0.875rem;
+    width: 0.875rem;
+  }
+}
+
+@media (min-width: 1201px) {
   .calendar-button {
     height: 2rem !important;
     width: 2rem !important;

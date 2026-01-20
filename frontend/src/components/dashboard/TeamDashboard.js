@@ -15,6 +15,7 @@ import Leaderboard from '../utils/Leaderboard';
 import TeamLeaderboard from './TeamLeaderboard';
 import DateRangeSelector from './DateRangeSelector';
 import ThemeContext from '../../context/ThemeContext';
+import { useHeader } from '../../context/HeaderContext';
 import api from '../../api';
 import '../../pages/Dashboard.css';
 import '../../pages/OneOnOne.css';
@@ -23,6 +24,18 @@ import './TeamDashboard.css';
 const TeamDashboard = ({ userRole, user }) => {
   console.log('📊 [TeamDashboard] Rendering for:', { userRole, userId: user?.userId, lagnname: user?.lagnname });
   const { theme } = useContext(ThemeContext);
+  const { setHeaderContent } = useHeader();
+
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // View mode states for different roles
   const [saViewMode, setSaViewMode] = useState('team'); // 'personal' or 'team' for SA users
@@ -1824,6 +1837,36 @@ const TeamDashboard = ({ userRole, user }) => {
     }
   };
 
+  // Set the DateRangeSelector in the header for eligible roles (desktop only)
+  useEffect(() => {
+    if (!isMobile && ['MGA', 'RGA', 'GA', 'SA'].includes(userRole)) {
+      setHeaderContent(
+        <DateRangeSelector
+          dateRange={dateRangeState}
+          onDateRangeChange={handleDateRangeChange}
+          viewMode={viewMode}
+          onViewModeChange={handleViewModeChange}
+          viewScope={viewScope}
+          onViewScopeChange={(newScope) => {
+            if (userRole === 'SA') setSaViewMode(newScope);
+            else if (userRole === 'GA') setGaViewMode(newScope);
+            else if (userRole === 'MGA') setMgaViewMode(newScope);
+            else if (userRole === 'RGA') setRgaViewMode(newScope);
+          }}
+          userRole={userRole}
+        />
+      );
+    } else {
+      // Clear header content for mobile, AGT users, or other cases
+      setHeaderContent(null);
+    }
+
+    // Clear header content when component unmounts
+    return () => {
+      setHeaderContent(null);
+    };
+  }, [isMobile, userRole, dateRangeState, viewMode, viewScope, saViewMode, gaViewMode, mgaViewMode, rgaViewMode, setHeaderContent]);
+
   // Fetch data on mount and when viewScope, timePeriod, or dateRangeState changes
   useEffect(() => {
     fetchOrgMetrics();
@@ -1959,8 +2002,8 @@ const TeamDashboard = ({ userRole, user }) => {
         <CompetitionsDisplay />
       </div>
 
-      {/* Date Range Selection with View Scope Toggle */}
-      {['MGA', 'RGA', 'GA', 'SA'].includes(userRole) && (
+      {/* Date Range Selector - Mobile only (desktop shows in header) */}
+      {isMobile && ['MGA', 'RGA', 'GA', 'SA'].includes(userRole) && (
         <DateRangeSelector
           dateRange={dateRangeState}
           onDateRangeChange={handleDateRangeChange}
@@ -2021,6 +2064,7 @@ const TeamDashboard = ({ userRole, user }) => {
             loading={teamLeaderboardLoading}
             onAgentClick={handleTeamLeaderboardAgentClick}
             showDetails={true}
+            showGoals={viewMode === 'month'}
             formatCurrency={formatCurrency}
           />
         </div>

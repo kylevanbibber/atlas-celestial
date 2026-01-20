@@ -37,7 +37,7 @@
     padding-bottom: 12px;
   }
   
-  .header-left {
+  .goals-header .header-left {
     text-align: center;
   }
   
@@ -142,7 +142,7 @@
   color: var(--primary-color);
 }
 
-.header-left h2 {
+.goals-header .header-left h2 {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -152,11 +152,11 @@
   font-weight: 600;
 }
 
-.header-icon {
+.goals-header .header-icon {
   color: var(--primary-color);
 }
 
-.header-left p {
+.goals-header .header-left p {
   margin: 0;
   color: var(--text-secondary);
   font-size: 0.9rem;

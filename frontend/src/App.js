@@ -8,7 +8,6 @@ import {
   useNavigate,
 } from "react-router-dom";
 import Header from "./components/utils/Header";
-import SecondaryHeader from "./components/utils/SecondaryHeader";
 import BottomNav from "./components/utils/BottomNav";
 import Dashboard from "./pages/Dashboard";
 import RefsPage from "./pages/refs/page";
@@ -40,6 +39,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 import { useTeamStyles, TeamStyleProvider } from './context/TeamStyleContext';
 import { LicenseWarningProvider } from "./context/LicenseWarningContext";
 import { NotificationProvider } from "./context/NotificationContext";
+import { HeaderProvider } from "./context/HeaderContext";
 import NotificationUtilities from "./components/utilities/notification/NotificationUtilities";
 import InPageNotificationContainer from "./components/notifications/InPageNotificationContainer";
 import RefEntry from "./components/refvalidation/RefEntry";
@@ -479,7 +479,6 @@ function AppContent() {
   return (
     <div className="app-container">
       <Header pageTitle={pageTitle} onboardingMode={isOnboardingHome} />
-      {!isOnboardingHome && <SecondaryHeader />}
       <div className="main-content">
         <div className="page-content">
           <Routes>
@@ -737,7 +736,9 @@ function App() {
           <TeamStyleProvider>
             <NotificationProvider>
               <LicenseWarningProvider>
-                <AppContent />
+                <HeaderProvider>
+                  <AppContent />
+                </HeaderProvider>
               </LicenseWarningProvider>
             </NotificationProvider>
           </TeamStyleProvider>

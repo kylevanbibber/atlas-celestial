@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import ThemeContext from "../../context/ThemeContext";
 import { useTeamStyles } from "../../context/TeamStyleContext";
-import { FiMenu, FiUser, FiLogOut, FiMoon, FiSun, FiUsers, FiChevronRight, FiPhone, FiMonitor, FiExternalLink, FiChevronDown, FiMessageSquare, FiHome, FiClipboard, FiUserPlus, FiSettings, FiTrendingUp } from "react-icons/fi";
+import { FiMenu, FiUser, FiLogOut, FiMoon, FiSun, FiUsers, FiChevronRight, FiPhone, FiMonitor, FiExternalLink, FiChevronDown, FiMessageSquare, FiHome, FiClipboard, FiUserPlus, FiSettings, FiTrendingUp, FiX, FiBookOpen } from "react-icons/fi";
 import getSidebarNavItems from "../../context/sidebarNavItems";
 import { useLicenseWarning } from "../../context/LicenseWarningContext";
 import { useNotificationContext } from "../../context/NotificationContext";
@@ -15,9 +15,11 @@ import GlobalSearch from "./GlobalSearch";
 import RightDetails from "./RightDetails";
 import api from "../../api";
 import { usePresentationWindow } from "../../hooks/usePresentationWindow";
+import { useHeader } from "../../context/HeaderContext";
 import "./Header.css";
 
-const Header = ({ pageTitle, onboardingMode = false }) => {
+const Header = ({ pageTitle, onboardingMode = false, headerContent: propHeaderContent = null }) => {
+  const { headerContent: contextHeaderContent } = useHeader();
   const { 
     user, 
     isImpersonating, 
@@ -121,6 +123,17 @@ const Header = ({ pageTitle, onboardingMode = false }) => {
     return () => clearInterval(interval);
   }, []);
 
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (submenuTimeoutRef.current) {
+        clearTimeout(submenuTimeoutRef.current);
+      }
+      if (hamburgerTimeoutRef.current) {
+        clearTimeout(hamburgerTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Check if device is mobile on mount and on resize
   React.useEffect(() => {
@@ -137,18 +150,52 @@ const Header = ({ pageTitle, onboardingMode = false }) => {
   // State for the profile dropdown menu
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   
-  // State for nav tab dropdowns
-  const [activeNavDropdown, setActiveNavDropdown] = useState(null);
-  const navDropdownTimeoutRef = useRef(null);
+  // Refs for timeouts - declared early to avoid TDZ issues
+  const submenuTimeoutRef = useRef(null);
+  const hamburgerTimeoutRef = useRef(null);
+  const hamburgerContainerRef = useRef(null);
+  
+  // State for hamburger menu
+  const [isHamburgerOpen, setIsHamburgerOpen] = useState(false);
+  const [activeSubmenu, setActiveSubmenu] = useState(null);
 
-  // Cleanup nav dropdown timeout on unmount
+  // Keep hamburger open while pointer is anywhere within the hamburger container DOM.
+  // This avoids geometry-based mouseleave quirks when submenu is positioned outside the container.
   useEffect(() => {
-    return () => {
-      if (navDropdownTimeoutRef.current) {
-        clearTimeout(navDropdownTimeoutRef.current);
+    if (!isHamburgerOpen) return;
+
+    const handlePointerMove = (e) => {
+      const target = e.target;
+      const container = hamburgerContainerRef.current;
+      const isInside = !!(container && target && container.contains(target));
+
+      if (isInside) {
+        if (hamburgerTimeoutRef.current) {
+          clearTimeout(hamburgerTimeoutRef.current);
+          hamburgerTimeoutRef.current = null;
+        }
+        return;
+      }
+
+      // Delay close slightly to allow moving between menu + submenu without flicker
+      if (!hamburgerTimeoutRef.current) {
+        hamburgerTimeoutRef.current = setTimeout(() => {
+          setIsHamburgerOpen(false);
+          setActiveSubmenu(null);
+          hamburgerTimeoutRef.current = null;
+        }, 250);
       }
     };
-  }, []);
+
+    document.addEventListener('pointermove', handlePointerMove, { passive: true });
+    return () => {
+      document.removeEventListener('pointermove', handlePointerMove);
+      if (hamburgerTimeoutRef.current) {
+        clearTimeout(hamburgerTimeoutRef.current);
+        hamburgerTimeoutRef.current = null;
+      }
+    };
+  }, [isHamburgerOpen]);
 
   // Phone Scripts window function
   const openPhone = (phoneFile) => {
@@ -550,82 +597,265 @@ const Header = ({ pageTitle, onboardingMode = false }) => {
   // Helper function to check if nav item is active
   const isNavItemActive = (path) => {
     if (!path) return false;
+    
+    // Check for exact match including query parameters
+    const currentFullPath = location.pathname + location.search;
+    if (currentFullPath === path) return true;
+    
+    // Check for pathname match or starts with for nested routes
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
+
+  // Get the icon for the current page
+  const getCurrentPageIcon = () => {
+    const currentPath = location.pathname;
+    
+    // Check main nav items
+    for (const item of mainNavItems) {
+      if (currentPath === item.path || currentPath.startsWith(`${item.path}/`)) {
+        return item.icon;
+      }
+      // Check submenu items
+      if (item.submenu) {
+        for (const subItem of item.submenu) {
+          if (currentPath === subItem.path || currentPath.startsWith(`${subItem.path}/`)) {
+            return subItem.icon;
+          }
+        }
+      }
+    }
+    
+    // Check utilities
+    if (utilitiesItem) {
+      if (currentPath === utilitiesItem.path || currentPath.startsWith(`${utilitiesItem.path}/`)) {
+        return utilitiesItem.icon;
+      }
+      if (utilitiesItem.submenu) {
+        for (const subItem of utilitiesItem.submenu) {
+          if (currentPath === subItem.path || currentPath.startsWith(`${subItem.path}/`)) {
+            return subItem.icon;
+          }
+        }
+      }
+    }
+    
+    // Default to home icon
+    return <FiHome />;
+  };
+
+  // Get the current page name and subpage for breadcrumb
+  const getCurrentPageInfo = () => {
+    const currentPath = location.pathname;
+    const searchParams = new URLSearchParams(location.search);
+    
+    // Check main nav items
+    for (const item of mainNavItems) {
+      if (currentPath === item.path || currentPath.startsWith(`${item.path}/`)) {
+        const pageInfo = { icon: item.icon, name: item.name, path: item.path };
+        
+        // Check for subpage
+        if (item.submenu) {
+          for (const subItem of item.submenu) {
+            if (currentPath === subItem.path || currentPath.startsWith(`${subItem.path}/`)) {
+              pageInfo.subIcon = subItem.icon;
+              pageInfo.subName = subItem.name;
+              pageInfo.subPath = subItem.path;
+              break;
+            }
+          }
+        }
+        
+        // Check for query param sections
+        const section = searchParams.get('section') || searchParams.get('active');
+        if (section && !pageInfo.subName) {
+          const sectionLabel = section.split('-').map(word => 
+            word.charAt(0).toUpperCase() + word.slice(1)
+          ).join(' ');
+          pageInfo.subName = sectionLabel;
+        }
+        
+        return pageInfo;
+      }
+    }
+    
+    // Check utilities
+    if (utilitiesItem) {
+      if (currentPath === utilitiesItem.path || currentPath.startsWith(`${utilitiesItem.path}/`)) {
+        const pageInfo = { icon: utilitiesItem.icon, name: utilitiesItem.name, path: utilitiesItem.path };
+        
+        if (utilitiesItem.submenu) {
+          for (const subItem of utilitiesItem.submenu) {
+            if (currentPath === subItem.path || currentPath.startsWith(`${subItem.path}/`)) {
+              pageInfo.subIcon = subItem.icon;
+              pageInfo.subName = subItem.name;
+              pageInfo.subPath = subItem.path;
+              break;
+            }
+          }
+        }
+        
+        return pageInfo;
+      }
+    }
+    
+    return null;
+  };
+
+  const pageInfo = getCurrentPageInfo();
+  const isOnDashboard = location.pathname === '/dashboard' || location.pathname === '/';
 
   return (
     <>
       <div className="modern-header">
-        {/* Left section - Logo */}
+        {/* Left section - Logo and Hamburger Menu */}
         <div className="header-left">
           {!isMobile && (
-            <div className="header-logo-container" onClick={() => navigate('/dashboard')} style={{ cursor: 'pointer' }}>
-              <Logo size="small" className="header-logo" />
-            </div>
+            <>
+              <div className="header-logo-container" onClick={() => navigate('/dashboard')} style={{ cursor: 'pointer' }}>
+                <div className="logo-icon-default">
+                  <Logo size="small" className="header-logo" />
+                </div>
+                <div className="logo-icon-hover">
+                  <FiHome className="home-icon" />
+                </div>
+              </div>
+              
+              {/* Separator between logo and hamburger when not on dashboard */}
+              {!isOnDashboard && (
+                <FiChevronRight className="logo-hamburger-separator" />
+              )}
+              
+              {/* Hamburger Menu with Slide-out Nav */}
+              {!onboardingMode && (
+        <div
+          className="hamburger-container"
+                  ref={hamburgerContainerRef}
+                  onMouseEnter={() => {
+                    if (hamburgerTimeoutRef.current) {
+                      clearTimeout(hamburgerTimeoutRef.current);
+                      hamburgerTimeoutRef.current = null;
+                    }
+                    setIsHamburgerOpen(true);
+                  }}
+                >
+                  <button 
+                    className={`hamburger-menu-btn ${isHamburgerOpen ? 'active' : ''}`}
+                    aria-label="Navigation menu"
+                  >
+                    <span className="hamburger-icon-default">{getCurrentPageIcon()}</span>
+                    <span className="hamburger-icon-hover"><FiX /></span>
+                  </button>
+                  
+                  {/* Slide-out Navigation */}
+                  <div 
+                    className={`hamburger-nav-slideout ${isHamburgerOpen ? 'open' : ''}`}
+                    onMouseEnter={() => {
+                      if (hamburgerTimeoutRef.current) {
+                        clearTimeout(hamburgerTimeoutRef.current);
+                        hamburgerTimeoutRef.current = null;
+                      }
+                    }}
+                  >
+                    {mainNavItems.map((item) => (
+                      <div 
+                        key={item.name} 
+                        className="hamburger-nav-group"
+                        onMouseEnter={(e) => {
+                          // Clear all timeouts when entering a nav group
+                          if (submenuTimeoutRef.current) {
+                            clearTimeout(submenuTimeoutRef.current);
+                          }
+                          if (hamburgerTimeoutRef.current) {
+                            clearTimeout(hamburgerTimeoutRef.current);
+                          }
+                          if (item.submenu && item.submenu.length > 0) {
+                            setActiveSubmenu(item.name);
+                          }
+                        }}
+                        onMouseLeave={() => {
+                          // Delay submenu close slightly to allow moving into the submenu
+                          submenuTimeoutRef.current = setTimeout(() => {
+                            setActiveSubmenu(null);
+                          }, 500);
+                        }}
+                      >
+                        <div
+                          className={`hamburger-slide-nav-item ${isNavItemActive(item.path) ? 'active' : ''}`}
+                          onClick={() => navigate(item.path)}
+                        >
+                          <span>{item.name}</span>
+                          {item.hasWarning && <span className="hamburger-warning-dot"></span>}
+                        </div>
+                        
+                        {/* Submenu Items */}
+                        {item.submenu && item.submenu.length > 0 && activeSubmenu === item.name && (
+                          <div 
+                            className="hamburger-slide-submenu"
+                            onMouseEnter={() => {
+                              // Clear both timeouts to keep everything open
+                              if (submenuTimeoutRef.current) {
+                                clearTimeout(submenuTimeoutRef.current);
+                                submenuTimeoutRef.current = null;
+                              }
+                              if (hamburgerTimeoutRef.current) {
+                                clearTimeout(hamburgerTimeoutRef.current);
+                                hamburgerTimeoutRef.current = null;
+                              }
+                              // Explicitly keep hamburger menu open
+                              setIsHamburgerOpen(true);
+                            }}
+                            onMouseLeave={() => {
+                              // Close submenu after delay (hamburger close handled by pointer guard)
+                              submenuTimeoutRef.current = setTimeout(() => {
+                                setActiveSubmenu(null);
+                              }, 300);
+                            }}
+                          >
+                            {item.submenu.map((subItem) => (
+                              <div
+                                key={subItem.name}
+                                className={`hamburger-slide-submenu-item ${isNavItemActive(subItem.path) ? 'active' : ''}`}
+                                onClick={() => navigate(subItem.path)}
+                              >
+                                {subItem.icon}
+                                <span>{subItem.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Breadcrumb - Show subpage/section after hamburger */}
+              {!isOnDashboard && pageInfo && pageInfo.subName && (
+                <div className="header-breadcrumb">
+                  <FiChevronRight className="breadcrumb-separator" />
+                  <span className="breadcrumb-subpage">{pageInfo.subName}</span>
+                </div>
+              )}
+            </>
           )}
           
           {/* Mobile - Just show logo */}
           {isMobile && (
-            <div className="mobile-logo-container" onClick={() => navigate('/dashboard')} style={{ cursor: 'pointer' }}>
-              <Logo size="xs" className="header-logo" />
+            <div className="mobile-logo-container header-logo-container" onClick={() => navigate('/dashboard')} style={{ cursor: 'pointer' }}>
+              <div className="logo-icon-default">
+                <Logo size="xs" className="header-logo" />
+              </div>
+              <div className="logo-icon-hover">
+                <FiHome className="home-icon mobile-home-icon" />
+              </div>
             </div>
           )}
         </div>
         
-        {/* Center section - Main Navigation Tabs */}
-        {!isMobile && !onboardingMode && (
-          <div className="header-center-nav">
-            {mainNavItems.map((item, index) => (
-              <React.Fragment key={item.name}>
-                <div
-                  className="nav-tab-container"
-                  onMouseEnter={() => {
-                    if (navDropdownTimeoutRef.current) {
-                      clearTimeout(navDropdownTimeoutRef.current);
-                    }
-                    if (item.submenu && item.submenu.length > 0) {
-                      setActiveNavDropdown(item.name);
-                    }
-                  }}
-                  onMouseLeave={() => {
-                    navDropdownTimeoutRef.current = setTimeout(() => {
-                      setActiveNavDropdown(null);
-                    }, 200);
-                  }}
-                >
-                  <div
-                    className={`nav-tab ${isNavItemActive(item.path) ? 'active' : ''}`}
-                    onClick={() => navigate(item.path)}
-                  >
-                    <span>{item.name}</span>
-                    {item.hasWarning && <span className="nav-tab-warning-dot"></span>}
-                  </div>
-                  
-                  {/* Submenu Dropdown */}
-                  {activeNavDropdown === item.name && item.submenu && (
-                    <div className="nav-tab-dropdown">
-                      {item.submenu.map((subItem) => (
-                        <div
-                          key={subItem.name}
-                          className={`nav-dropdown-item ${isNavItemActive(subItem.path) ? 'active' : ''}`}
-                      onClick={() => {
-                            navigate(subItem.path);
-                            setActiveNavDropdown(null);
-                      }}
-                    >
-                          {subItem.icon}
-                          <span>{subItem.name}</span>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
-                {/* Add separator between items, but not after the last one */}
-                {index < mainNavItems.length - 1 && (
-                  <span className="nav-separator">|</span>
-            )}
-              </React.Fragment>
-            ))}
+        {/* Center section - Custom header content (e.g., dashboard KPIs, date range selector) */}
+        {(contextHeaderContent || propHeaderContent) && (
+          <div className="header-center-content">
+            {contextHeaderContent || propHeaderContent}
           </div>
         )}
         
@@ -670,7 +900,7 @@ const Header = ({ pageTitle, onboardingMode = false }) => {
           )}
         </div>
       </div>
-      </div>
+    </div>
       
       {/* Mobile navigation handled by BottomNav component in App.js */}
 
