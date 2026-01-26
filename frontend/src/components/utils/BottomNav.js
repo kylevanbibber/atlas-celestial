@@ -6,6 +6,7 @@ import { useTeamStyles } from "../../context/TeamStyleContext";
 import { useLicenseWarning } from "../../context/LicenseWarningContext";
 import { AuthContext } from "../../context/AuthContext";
 import { useNotificationContext } from '../../context/NotificationContext';
+import { useAgency } from "../../context/AgencyContext";
 import { FiSettings, FiChevronUp, FiActivity, FiAward, FiList, FiPercent, FiCheckCircle, FiStar, FiTarget, FiFileText, FiMessageSquare, FiUser, FiPenTool, FiUsers, FiBell, FiMail, FiClipboard, FiBarChart2, FiSearch } from "react-icons/fi";
 import Logo from "../Layout/Logo";
 import ContextMenuPortal from "./ContextMenuPortal";
@@ -21,6 +22,7 @@ const BottomNav = () => {
   const { hasWarning: licenseWarning } = useLicenseWarning();
   const { user, hasPermission } = useContext(AuthContext);
   const { unreadCount } = useNotificationContext();
+  const { hasPageAccess } = useAgency();
   const { theme, toggleTheme } = useContext(ThemeContext);
   
   // Submenu state
@@ -42,7 +44,7 @@ const BottomNav = () => {
   const shouldShowLicenseWarning = teamRole !== "app" ? licenseWarning : false;
   
   // Get nav items with warning status
-  const allNavItems = getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole, user?.userId, user?.lagnname, user?.clname);
+  const allNavItems = getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole, user?.userId, user?.lagnname, user?.clname, hasPageAccess);
 
   // Helper function to get production submenu items
   const getProductionItems = () => {

@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Embedded Mode Test - Atlas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .iframe-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .iframe-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .iframe-header h3 {
+            color: #333;
+            margin: 0;
+        }
+
+        .current-url {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #495057;
+            word-break: break-all;
+            margin-bottom: 15px;
+        }
+
+        iframe {
+            width: 100%;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background: white;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: white;
+            border: 2px solid #007bff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #007bff;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            background: #007bff;
+            color: white;
+        }
+
+        .tab:hover {
+            background: #e7f3ff;
+        }
+
+        .tab.active:hover {
+            background: #0056b3;
+        }
+
+        .view-content {
+            display: none;
+        }
+
+        .view-content.active {
+            display: block;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .info-box h4 {
+            margin-top: 0;
+            color: #004085;
+        }
+
+        .info-box p {
+            margin: 5px 0;
+            color: #004085;
+            font-size: 14px;
+        }
+
+        .quick-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .quick-link {
+            padding: 10px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-link:hover {
+            background: #e9ecef;
+            border-color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Atlas Embedded Mode Tester</h1>
+        <p class="subtitle">Test how your pages will look when embedded in external applications</p>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('iframe')">iFrame View</div>
+            <div class="tab" onclick="switchTab('popup')">Popup Window</div>
+            <div class="tab" onclick="switchTab('code')">Integration Code</div>
+        </div>
+
+        <!-- iFrame View -->
+        <div id="iframe-view" class="view-content active">
+            <div class="controls">
+                <h3>Configure Embedded View</h3>
+                
+                <div class="control-group">
+                    <label for="page-select">Select Page:</label>
+                    <select id="page-select" onchange="updateUrl()">
+                        <option value="/dashboard">Dashboard</option>
+                        <option value="/production">Production Overview</option>
+                        <option value="/production?section=scorecard" selected>Production - Scorecard</option>
+                        <option value="/production?section=leaderboard">Production - Leaderboard</option>
+                        <option value="/production?section=goals">Production - Goals</option>
+                        <option value="/production?section=daily-activity">Production - Daily Activity</option>
+                        <option value="/recruiting">Recruiting</option>
+                        <option value="/recruiting?section=pipeline">Recruiting - Pipeline</option>
+                        <option value="/resources">Resources</option>
+                        <option value="/utilities">Utilities</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="height-select">iFrame Height:</label>
+                    <select id="height-select" onchange="updateHeight()">
+                        <option value="600">600px</option>
+                        <option value="800" selected>800px</option>
+                        <option value="1000">1000px</option>
+                        <option value="100vh">Full Screen</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="mode-select">Embed Mode:</label>
+                    <select id="mode-select" onchange="updateUrl()">
+                        <option value="iframe" selected>iFrame Mode</option>
+                        <option value="popup">Popup Mode</option>
+                    </select>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-primary" onclick="loadIframe()">Load Preview</button>
+                    <button class="btn-secondary" onclick="openInNewTab()">Open in New Tab</button>
+                    <button class="btn-success" onclick="copyUrl()">Copy URL</button>
+                </div>
+
+                <div class="info-box">
+                    <h4>Quick Test Links:</h4>
+                    <div class="quick-links">
+                        <div class="quick-link" onclick="loadQuickPage('/production?section=scorecard')">Scorecard</div>
+                        <div class="quick-link" onclick="loadQuickPage('/dashboard')">Dashboard</div>
+                        <div class="quick-link" onclick="loadQuickPage('/production')">Production</div>
+                        <div class="quick-link" onclick="loadQuickPage('/recruiting?section=pipeline')">Pipeline</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="iframe-container">
+                <div class="iframe-header">
+                    <h3>Preview</h3>
+                    <button class="btn-secondary" onclick="refreshIframe()">🔄 Refresh</button>
+                </div>
+                <div class="current-url" id="current-url">
+                    Loading...
+                </div>
+                <iframe id="preview-frame" src="about:blank"></iframe>
+            </div>
+        </div>
+
+        <!-- Popup View -->
+        <div id="popup-view" class="view-content">
+            <div class="controls">
+                <h3>Popup Window Test</h3>
+                
+                <div class="control-group">
+                    <label for="popup-page-select">Select Page:</label>
+                    <select id="popup-page-select">
+                        <option value="/dashboard">Dashboard</option>
+                        <option value="/production">Production Overview</option>
+                        <option value="/production?section=scorecard" selected>Production - Scorecard</option>
+                        <option value="/production?section=leaderboard">Production - Leaderboard</option>
+                        <option value="/recruiting">Recruiting</option>
+                        <option value="/recruiting?section=pipeline">Recruiting - Pipeline</option>
+                    </select>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-primary" onclick="openPopup()">Open Popup Window</button>
+                    <button class="btn-success" onclick="copyPopupUrl()">Copy URL</button>
+                </div>
+
+                <div class="info-box">
+                    <h4>About Popup Mode:</h4>
+                    <p>Popup mode opens the page in a new window, perfect for:</p>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li>External links from PHP apps</li>
+                        <li>Multi-monitor setups</li>
+                        <li>When iframe security restrictions apply</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Code View -->
+        <div id="code-view" class="view-content">
+            <div class="controls">
+                <h3>Integration Code Examples</h3>
+                
+                <div class="control-group">
+                    <label for="code-page-select">Select Page:</label>
+                    <select id="code-page-select" onchange="updateCode()">
+                        <option value="/production?section=scorecard" selected>Scorecard</option>
+                        <option value="/dashboard">Dashboard</option>
+                        <option value="/production">Production</option>
+                        <option value="/recruiting">Recruiting</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>HTML iFrame Code:</label>
+                    <textarea id="html-code" readonly style="width: 100%; height: 150px; font-family: monospace; padding: 10px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+                    <button class="btn-success" onclick="copyCode('html-code')" style="margin-top: 10px;">Copy HTML Code</button>
+                </div>
+
+                <div class="control-group" style="margin-top: 20px;">
+                    <label>PHP Integration Code:</label>
+                    <textarea id="php-code" readonly style="width: 100%; height: 200px; font-family: monospace; padding: 10px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+                    <button class="btn-success" onclick="copyCode('php-code')" style="margin-top: 10px;">Copy PHP Code</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const baseUrl = 'http://localhost:3000';
+
+        function getEmbeddedUrl(page, mode = 'iframe') {
+            const separator = page.includes('?') ? '&' : '?';
+            return `${baseUrl}${page}${separator}embedded=true&mode=${mode}`;
+        }
+
+        function updateUrl() {
+            const page = document.getElementById('page-select').value;
+            const mode = document.getElementById('mode-select').value;
+            const url = getEmbeddedUrl(page, mode);
+            document.getElementById('current-url').textContent = url;
+        }
+
+        function updateHeight() {
+            const height = document.getElementById('height-select').value;
+            const iframe = document.getElementById('preview-frame');
+            iframe.style.height = height === '100vh' ? '100vh' : height + 'px';
+        }
+
+        function loadIframe() {
+            const page = document.getElementById('page-select').value;
+            const mode = document.getElementById('mode-select').value;
+            const url = getEmbeddedUrl(page, mode);
+            
+            document.getElementById('current-url').textContent = url;
+            document.getElementById('preview-frame').src = url;
+        }
+
+        function loadQuickPage(page) {
+            document.getElementById('page-select').value = page;
+            loadIframe();
+        }
+
+        function refreshIframe() {
+            const iframe = document.getElementById('preview-frame');
+            iframe.src = iframe.src;
+        }
+
+        function openInNewTab() {
+            const page = document.getElementById('page-select').value;
+            const mode = document.getElementById('mode-select').value;
+            const url = getEmbeddedUrl(page, mode);
+            window.open(url, '_blank');
+        }
+
+        function copyUrl() {
+            const url = document.getElementById('current-url').textContent;
+            navigator.clipboard.writeText(url).then(() => {
+                alert('URL copied to clipboard!');
+            });
+        }
+
+        function openPopup() {
+            const page = document.getElementById('popup-page-select').value;
+            const url = getEmbeddedUrl(page, 'popup');
+            const windowName = 'AtlasPopup';
+            const windowFeatures = 'width=1200,height=800,menubar=no,toolbar=no,location=no,status=no';
+            window.open(url, windowName, windowFeatures);
+        }
+
+        function copyPopupUrl() {
+            const page = document.getElementById('popup-page-select').value;
+            const url = getEmbeddedUrl(page, 'popup');
+            navigator.clipboard.writeText(url).then(() => {
+                alert('URL copied to clipboard!');
+            });
+        }
+
+        function updateCode() {
+            const page = document.getElementById('code-page-select').value;
+            const url = getEmbeddedUrl(page, 'iframe');
+
+            // HTML Code
+            const htmlCode = `<!-- Embed Atlas Page -->
+<iframe 
+    src="${url}" 
+    style="width: 100%; height: 800px; border: none;"
+    frameborder="0"
+></iframe>`;
+
+            document.getElementById('html-code').value = htmlCode;
+
+            // PHP Code
+            const phpCode = `<?php
+// Embed Atlas ${page} page
+$atlasUrl = '${url}';
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Atlas - ${page}</title>
+</head>
+<body>
+    <h1>My Application</h1>
+    
+    <iframe 
+        src="<?php echo htmlspecialchars($atlasUrl); ?>" 
+        style="width: 100%; height: 800px; border: 1px solid #ddd;"
+        frameborder="0"
+    ></iframe>
+</body>
+</html>`;
+
+            document.getElementById('php-code').value = phpCode;
+        }
+
+        function copyCode(elementId) {
+            const code = document.getElementById(elementId).value;
+            navigator.clipboard.writeText(code).then(() => {
+                alert('Code copied to clipboard!');
+            });
+        }
+
+        function switchTab(tab) {
+            // Hide all views
+            document.querySelectorAll('.view-content').forEach(view => {
+                view.classList.remove('active');
+            });
+            
+            // Deactivate all tabs
+            document.querySelectorAll('.tab').forEach(tabEl => {
+                tabEl.classList.remove('active');
+            });
+
+            // Show selected view
+            const viewMap = {
+                'iframe': 'iframe-view',
+                'popup': 'popup-view',
+                'code': 'code-view'
+            };
+            
+            document.getElementById(viewMap[tab]).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Initialize
+        updateUrl();
+        updateHeight();
+        updateCode();
+        loadIframe();
+    </script>
+</body>
+</html>
+

@@ -7,6 +7,7 @@ import { useTeamStyles } from "../../context/TeamStyleContext";
 import { useLicenseWarning } from "../../context/LicenseWarningContext";
 import { AuthContext, useAuth } from "../../context/AuthContext";
 import { useNotificationContext } from '../../context/NotificationContext';
+import { useAgency } from "../../context/AgencyContext";
 import ContextMenuPortal from "./ContextMenuPortal";
 import "./Sidebar.css";
 import Logo from "../Layout/Logo";
@@ -18,6 +19,7 @@ const Sidebar = ({ isExpanded, setIsExpanded, onboardingMode = false }) => {
   const { hasWarning: licenseWarning } = useLicenseWarning();
   const { user, hasPermission } = useAuth();
   const { unreadCount } = useNotificationContext();
+  const { hasPageAccess } = useAgency();
   
   // Check if user is admin using the hasPermission function
   const isAdmin = hasPermission('admin');
@@ -29,7 +31,7 @@ const Sidebar = ({ isExpanded, setIsExpanded, onboardingMode = false }) => {
   const shouldShowLicenseWarning = teamRole !== "app" ? licenseWarning : false;
   
   // Get sidebar items with warning indicators based on license status
-  let navItems = getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole, user?.userId, user?.lagnname, user?.clname) || [];
+  let navItems = getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole, user?.userId, user?.lagnname, user?.clname, hasPageAccess) || [];
   if (onboardingMode) {
     // Limit to Onboarding Home only
     navItems = [

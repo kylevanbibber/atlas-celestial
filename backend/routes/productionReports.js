@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { pool, query } = require("../db");
 const verifyToken = require("../middleware/verifyToken");
+const { getSgaWhereClause, isSgaName } = require('../utils/sgaHelper');
 
 // Apply auth middleware to all routes
 router.use(verifyToken);
@@ -661,9 +662,11 @@ router.get('/submitting-agent-count', async (req, res) => {
     }
     
     // Filter by manager for SGA endpoints
-    if (manager === 'ARIAS ORGANIZATION') {
-      sqlQuery += ` AND MGA = ?`;
-      params.push('ARIAS ORGANIZATION');
+    const isManagerSga = await isSgaName(manager);
+    if (isManagerSga) {
+      const { clause: sgaClause, params: sgaParams } = await getSgaWhereClause('MGA', manager);
+      sqlQuery += ` AND ${sgaClause}`;
+      params.push(...sgaParams);
     }
     
     sqlQuery += ` ORDER BY date ASC`;

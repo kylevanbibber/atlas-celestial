@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FiActivity, FiCheckCircle, FiAward, FiList, FiPercent, FiStar, FiTarget, FiTrendingUp } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
+import { useAgency } from '../context/AgencyContext';
 import './Production.css';
 
 // Import component files
@@ -13,6 +14,7 @@ import ProductionGoals from '../components/production/ProductionGoals';
 import Verify from '../components/production/verification/Verify';
 import Release from '../components/production/release/Release';
 import Scorecard from '../components/production/Scorecard/Scorecard';
+import ScorecardAlt from '../components/production/Scorecard/ScorecardAlt';
 import { ProgressProvider } from '../components/production/release/ProgressContext';
 import LeaderboardPage from './LeaderboardPage';
 import VIPsPage from './vips/page';
@@ -21,6 +23,10 @@ import ProductionOverview from './ProductionOverview';
 // Main Production page component
 const Production = () => {
   const { user } = useAuth();
+  const { selectedAgency } = useAgency();
+  
+  // Check if we should use the alternative scorecard for non-default SGAs
+  const useAltScorecard = selectedAgency && !selectedAgency.is_default;
   
   // Permission checks
   const hideDailyActivity = user?.Role === 'Admin' && user?.teamRole === 'app';
@@ -166,10 +172,13 @@ const Production = () => {
   
   // Render the selected production section
   const renderProductionSection = () => {
+    // Helper to render the appropriate scorecard based on selected SGA
+    const renderScorecard = () => useAltScorecard ? <ScorecardAlt /> : <Scorecard />;
+    
     switch (activeSection) {
       case 'daily-activity':
         if (shouldHideDailyActivity) {
-          return <Scorecard />;
+          return renderScorecard();
         }
         return <DailyActivityForm />;
       
@@ -178,19 +187,19 @@ const Production = () => {
 
       case 'goals':
         if (shouldHideGoals) {
-          return <Scorecard />;
+          return renderScorecard();
         }
         return <ProductionGoals />;
 
       case 'scorecard':
-        return <Scorecard />;
+        return renderScorecard();
 
       case 'leaderboard':
         return <LeaderboardPage />;
       
       case 'verification':
         if (hideVerificationForSGA) {
-          return <Scorecard />;
+          return renderScorecard();
         }
         return <Verify />;
       
@@ -205,7 +214,7 @@ const Production = () => {
           if (hasProductionTrackerAccess) {
             return <ProductionTracker />;
           }
-          return <Scorecard />;
+          return renderScorecard();
         }
         return <DailyActivityForm />;
     }

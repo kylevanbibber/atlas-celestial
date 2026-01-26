@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { query } = require('../db');
+const { getSgaWhereClause, getDefaultSgaName } = require('../utils/sgaHelper');
 
 router.get('/potentialvip', async (req, res) => {
     const { column, value, month } = req.query;
@@ -652,7 +653,13 @@ router.get('/subagent-alp-sga', async (req, res) => {
     }
 
     try {
-        // Query to fetch data from the new sub_agent table for SGA (ARIAS ORGANIZATION)
+        // Get the default SGA name (supports alternative names)
+        const defaultSga = await getDefaultSgaName();
+        
+        // Build WHERE clause that matches any SGA name variation
+        const { clause: whereClause, params: whereParams } = await getSgaWhereClause('MGA', defaultSga);
+        
+        // Query to fetch data from the new sub_agent table for SGA
         const queryStr = `
             SELECT 
                 date,
@@ -661,12 +668,12 @@ router.get('/subagent-alp-sga', async (req, res) => {
                 post_six,
                 first_six
             FROM sub_agent 
-            WHERE MGA = 'ARIAS ORGANIZATION'
+            WHERE ${whereClause}
             ORDER BY date ASC
         `;
 
-        // Execute the query
-        const results = await query(queryStr);
+        // Execute the query with dynamic parameters
+        const results = await query(queryStr, whereParams);
 
         // Return the results
         return res.status(200).json({

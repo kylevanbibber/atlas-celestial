@@ -4,7 +4,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import ThemeContext from "../../context/ThemeContext";
 import { useTeamStyles } from "../../context/TeamStyleContext";
-import { FiMenu, FiUser, FiLogOut, FiMoon, FiSun, FiUsers, FiChevronRight, FiPhone, FiMonitor, FiExternalLink, FiChevronDown, FiMessageSquare, FiHome, FiClipboard, FiUserPlus, FiSettings, FiTrendingUp, FiX, FiBookOpen } from "react-icons/fi";
+import { useAgency } from "../../context/AgencyContext";
+import { FiMenu, FiUser, FiLogOut, FiMoon, FiSun, FiUsers, FiChevronRight, FiPhone, FiMonitor, FiExternalLink, FiChevronDown, FiMessageSquare, FiHome, FiClipboard, FiUserPlus, FiSettings, FiTrendingUp, FiX, FiBookOpen, FiCheck } from "react-icons/fi";
 import getSidebarNavItems from "../../context/sidebarNavItems";
 import { useLicenseWarning } from "../../context/LicenseWarningContext";
 import { useNotificationContext } from "../../context/NotificationContext";
@@ -37,6 +38,9 @@ const Header = ({ pageTitle, onboardingMode = false, headerContent: propHeaderCo
   const profilePic = user?.profpic || defaultProfilePic;
   const navigate = useNavigate();
   
+  // Agency switching state - must be before navigation items
+  const { selectedAgency, userAgencies, hasMultipleAgencies, switchAgency, hasPageAccess } = useAgency();
+  
   // Check if user is admin
   const isAdmin = hasPermission('admin');
   const teamRole = user?.teamRole || null;
@@ -45,7 +49,7 @@ const Header = ({ pageTitle, onboardingMode = false, headerContent: propHeaderCo
   // Get navigation items (previously from sidebar)
   const navItems = onboardingMode 
     ? [{ name: 'Onboarding Home', path: '/onboarding/home', icon: <FiMenu /> }]
-    : getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole, user?.userId, user?.lagnname, user?.clname) || [];
+    : getSidebarNavItems(shouldShowLicenseWarning, isAdmin, unreadCount, teamRole, user?.userId, user?.lagnname, user?.clname, hasPageAccess) || [];
   
   // State to detect if on mobile
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -76,6 +80,11 @@ const Header = ({ pageTitle, onboardingMode = false, headerContent: propHeaderCo
   
   // Presentation menu state
   const [showPresentationMenu, setShowPresentationMenu] = useState(false);
+
+  // Agency menu state
+  const [showAgencyMenu, setShowAgencyMenu] = useState(false);
+  const [agencyMenuPosition, setAgencyMenuPosition] = useState({ x: 0, y: 0 });
+  const agencyMenuRef = useRef(null);
 
   // Use custom team name or fall back to the page title
   const displayTitle = pageTitle || teamName || "Atlas";
@@ -196,6 +205,45 @@ const Header = ({ pageTitle, onboardingMode = false, headerContent: propHeaderCo
       }
     };
   }, [isHamburgerOpen]);
+
+  // Agency menu click outside handler
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showAgencyMenu && agencyMenuRef.current && !agencyMenuRef.current.contains(event.target)) {
+        setShowAgencyMenu(false);
+      }
+    };
+
+    if (showAgencyMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showAgencyMenu]);
+
+  // Handle logo right-click for agency switching
+  const handleLogoContextMenu = (e) => {
+    // Only show menu if user has multiple agencies
+    if (!hasMultipleAgencies || userAgencies.length <= 1) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    
+    setAgencyMenuPosition({ x: e.clientX, y: e.clientY });
+    setShowAgencyMenu(true);
+  };
+
+  // Handle agency selection
+  const handleAgencySwitch = async (agency) => {
+    setShowAgencyMenu(false);
+    if (agency.id === selectedAgency?.id) return;
+
+    try {
+      await switchAgency(agency.id);
+    } catch (error) {
+      console.error('Error switching agency:', error);
+      alert('Failed to switch agency. Please try again.');
+    }
+  };
 
   // Phone Scripts window function
   const openPhone = (phoneFile) => {
@@ -711,7 +759,13 @@ const Header = ({ pageTitle, onboardingMode = false, headerContent: propHeaderCo
         <div className="header-left">
           {!isMobile && (
             <>
-              <div className="header-logo-container" onClick={() => navigate('/dashboard')} style={{ cursor: 'pointer' }}>
+              <div 
+                className="header-logo-container" 
+                onClick={() => navigate('/dashboard')} 
+                onContextMenu={handleLogoContextMenu}
+                style={{ cursor: 'pointer' }}
+                title={hasMultipleAgencies ? 'Right-click to switch agencies' : 'Go to dashboard'}
+              >
                 <div className="logo-icon-default">
                   <Logo size="small" className="header-logo" />
                 </div>
@@ -912,8 +966,64 @@ const Header = ({ pageTitle, onboardingMode = false, headerContent: propHeaderCo
           onClose={() => setAgentProfileData(null)}
         />
       )}
+
+      {/* Agency Switcher Context Menu */}
+      {showAgencyMenu && hasMultipleAgencies && (
+        <div
+          ref={agencyMenuRef}
+          className="agency-context-menu"
+          style={{
+            position: 'fixed',
+            top: agencyMenuPosition.y,
+            left: agencyMenuPosition.x,
+            backgroundColor: 'var(--card-bg)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            padding: '8px 0',
+            minWidth: '220px',
+            zIndex: 10000,
+          }}
+        >
+          <div style={{ 
+            padding: '8px 16px', 
+            fontSize: '12px', 
+            fontWeight: '600', 
+            color: 'var(--text-secondary)',
+            borderBottom: '1px solid var(--border-color)',
+            marginBottom: '4px'
+          }}>
+            Switch Agency
+          </div>
+          {userAgencies.map((agency) => (
+            <div
+              key={agency.id}
+              onClick={() => handleAgencySwitch(agency)}
+              style={{
+                padding: '10px 16px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '14px',
+                color: 'var(--text-primary)',
+                transition: 'background-color 0.2s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--hover-bg)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <span>{agency.display_name || agency.rept_name}</span>
+              {selectedAgency?.id === agency.id && (
+                <FiCheck style={{ color: 'var(--primary-color)', fontSize: '16px' }} />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 };
 
 export default Header;
+
+

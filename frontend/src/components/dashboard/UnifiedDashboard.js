@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Unified Dashboard Layout Component
  * 
  * This component renders the dashboard layout using configuration-driven approach.
@@ -67,22 +67,18 @@ const UnifiedDashboard = ({ userRole, user }) => {
       // For "Last Month" tab, use previous month's date range
       const prevMonthRange = getPreviousMonthRange();
       setSelectedDateRange(prevMonthRange);
-      console.log('📊 [Dashboard] Setting date range for Last Month tab:', prevMonthRange);
     } else if (activeTab === 'ytd') {
       // For "YTD" tab, use year-to-date range
       const ytdRange = getYearToDateRange();
       setSelectedDateRange(ytdRange);
-      console.log('📊 [Dashboard] Setting date range for YTD tab:', ytdRange);
     } else if (activeTab === 'thisMonth') {
       // For "This Month" tab, use current month's date range
       const currentMonthRange = getCurrentMonthRange();
       setSelectedDateRange(currentMonthRange);
-      console.log('📊 [Dashboard] Setting date range for This Month tab:', currentMonthRange);
     } else {
       // For other tabs (thisWeek), use current week range
       const currentWeekRange = getCurrentWeekRange();
       setSelectedDateRange(currentWeekRange);
-      console.log('📊 [Dashboard] Setting date range for', activeTab, 'tab:', currentWeekRange);
     }
   }, [activeTab, setSelectedDateRange]);
 
@@ -146,17 +142,6 @@ const UnifiedDashboard = ({ userRole, user }) => {
           ytdData.totalRefs = dailyActivityData.totalRefs || 0;
           ytdData.agentCount = dailyActivityData.agentCount || 0;
           ytdData.dailyActivityLoading = dailyActivityLoading;
-          
-          console.log(`📊 [Dashboard] ${userRole} YTD section - including Daily Activity data:`, {
-            userRole,
-            saViewMode: userRole === 'SA' ? saViewMode : 'N/A',
-            totalAlp: ytdData.totalAlp,
-            totalRefAlp: ytdData.totalRefAlp,
-            totalRefs: ytdData.totalRefs,
-            agentCount: ytdData.agentCount,
-            dataSource: userRole === 'SA' && saViewMode === 'team' ? 'SA Team Daily Activity (agent + SA)' : 'Standard Daily Activity',
-            timestamp: new Date().toISOString()
-          });
         }
         
         return ytdData;
@@ -181,17 +166,6 @@ const UnifiedDashboard = ({ userRole, user }) => {
           lastMonthData.totalRefs = dailyActivityData.totalRefs || 0;
           lastMonthData.agentCount = dailyActivityData.agentCount || 0;
           lastMonthData.dailyActivityLoading = dailyActivityLoading;
-          
-          console.log(`📊 [Dashboard] ${userRole} Last Month section - including Daily Activity data:`, {
-            userRole,
-            saViewMode: userRole === 'SA' ? saViewMode : 'N/A',
-            totalAlp: lastMonthData.totalAlp,
-            totalRefAlp: lastMonthData.totalRefAlp,
-            totalRefs: lastMonthData.totalRefs,
-            agentCount: lastMonthData.agentCount,
-            dataSource: userRole === 'SA' && saViewMode === 'team' ? 'SA Team Daily Activity (agent + SA)' : 'Standard Daily Activity',
-            timestamp: new Date().toISOString()
-          });
         }
         
         return lastMonthData;
@@ -237,64 +211,6 @@ const UnifiedDashboard = ({ userRole, user }) => {
             currentMonthVipsLoading: currentMonthVipsLoading
           };
 
-          console.log(`📊 [Dashboard] Monthly activity section data for ${userRole}:`, {
-            userRole,
-            activeTab,
-            userLagnName: user?.lagnname,
-            rawDataSources: {
-              monthlyAlpSumData: monthlyAlpSumData,
-              monthlyHiresSumData: monthlyHiresSumData,
-              monthlyCodesSumData: monthlyCodesSumData,
-              monthlyRefSalesSumData: monthlyRefSalesSumData,
-              dailyActivityData: dailyActivityData
-            },
-            processedSectionData: {
-              monthlyAlp: monthlyActivitySectionData.monthlyAlp,
-              comparisonAlp: monthlyActivitySectionData.comparisonAlp,
-              monthStart: monthlyAlpSumData.monthStart,
-              monthEnd: monthlyAlpSumData.monthEnd,
-              maxReportDate: monthlyAlpSumData.maxReportDate,
-              monthlyHires: monthlyActivitySectionData.monthlyHires,
-              monthlyCodes: monthlyActivitySectionData.monthlyCodes,
-              monthlyRefSales: monthlyActivitySectionData.monthlyRefSales,
-              dailyActivityTotals: {
-                totalAlp: monthlyActivitySectionData.totalAlp,
-                totalRefAlp: monthlyActivitySectionData.totalRefAlp,
-                totalRefs: monthlyActivitySectionData.totalRefs,
-                agentCount: monthlyActivitySectionData.agentCount
-              }
-            },
-            dataValidation: {
-              hasMonthlyAlpData: monthlyAlpSumData.monthlyAlp > 0,
-              hasComparisonData: monthlyAlpSumData.comparisonAlp > 0,
-              hasDateRange: !!(monthlyAlpSumData.monthStart && monthlyAlpSumData.monthEnd),
-              hasMaxReportDate: !!monthlyAlpSumData.maxReportDate,
-              isAgtUser: userRole === 'AGT',
-              shouldHaveLagnNameFilter: userRole !== 'SGA'
-            },
-            timestamp: new Date().toISOString()
-          });
-          
-          // Additional logging for AGT users specifically
-          if (userRole === 'AGT') {
-            console.log('👤 [Dashboard] AGT User Monthly ALP Details:', {
-              agtUser: user?.lagnname,
-              monthlyAlpFromWeeklyALP: monthlyAlpSumData.monthlyAlp,
-              comparisonAlpFromDailyActivity: monthlyAlpSumData.comparisonAlp,
-              weeklyAlpTable_MTD_Recap: {
-                maxReportDate: monthlyAlpSumData.maxReportDate,
-                monthStart: monthlyAlpSumData.monthStart,
-                monthEnd: monthlyAlpSumData.monthEnd,
-                value: monthlyAlpSumData.monthlyAlp
-              },
-              dailyActivityTable: {
-                monthRange: `${monthlyAlpSumData.monthStart} to ${monthlyAlpSumData.monthEnd}`,
-                value: monthlyAlpSumData.comparisonAlp
-              },
-              expectedQuery: `Weekly_ALP WHERE LagnName='${user?.lagnname}' AND REPORT='MTD Recap' AND reportdate='${monthlyAlpSumData.maxReportDate}'`
-            });
-          }
-
           return monthlyActivitySectionData;
         } else {
           // Weekly data for "This Week" tab (default)
@@ -328,37 +244,6 @@ const UnifiedDashboard = ({ userRole, user }) => {
             loading: loading,
             dailyActivityLoading: dailyActivityLoading
           };
-          
-          console.log(`📊 [Dashboard] Weekly activity section data for ${userRole}:`, {
-            userRole,
-            activeTab,
-            weeklyAlpData: {
-              weeklyAlp: activitySectionData.weeklyAlp,
-              comparisonAlp: activitySectionData.comparisonAlp,
-              weekStart: weeklyAlpData.weekStart,
-              weekEnd: weeklyAlpData.weekEnd
-            },
-            weeklyHiresData: {
-              weeklyHires: activitySectionData.weeklyHires,
-              maxDate: weeklyHiresData.maxDate
-            },
-            weeklyCodesData: {
-              weeklyCodes: activitySectionData.weeklyCodes,
-              weekStart: weeklyCodesData.weekStart,
-              weekEnd: weeklyCodesData.weekEnd
-            },
-            weeklyRefSalesData: {
-              weeklyRefSales: activitySectionData.weeklyRefSales,
-              weekStart: weeklyRefSalesData.weekStart,
-              weekEnd: weeklyRefSalesData.weekEnd
-            },
-            dailyActivityData: {
-              totalAlp: activitySectionData.totalAlp,
-              totalRefAlp: activitySectionData.totalRefAlp,
-              totalRefs: activitySectionData.totalRefs,
-              agentCount: activitySectionData.agentCount
-            }
-          });
 
           return activitySectionData;
         }
@@ -764,13 +649,6 @@ const UnifiedDashboard = ({ userRole, user }) => {
           const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
           const prevMonthName = prevMonth.toLocaleDateString('en-US', { month: 'long' });
           
-          console.log(`📊 [${userRole} Last Month Cards] Using previous month name:`, {
-            userRole,
-            currentMonth: now.toLocaleDateString('en-US', { month: 'long' }),
-            previousMonth: prevMonthName,
-            viewMode: userRole === 'SA' ? saViewMode : gaViewMode
-          });
-          
           // Insert Daily Activity cards after the first Monthly ALP card
           return [
             defaultCards[0], // Monthly ALP
@@ -798,12 +676,6 @@ const UnifiedDashboard = ({ userRole, user }) => {
             },
             defaultCards[3] // Only Monthly Ref Sales (skip codes+vips and hires)
           ];
-          
-          console.log(`📊 [${userRole} Personal Last Month] Cards included:`, {
-            cardCount: 4,
-            cards: ['Monthly ALP', 'Daily ALP', 'Daily Ref ALP', 'Monthly Ref Sales'],
-            skipped: ['Monthly Codes+VIPs', 'Monthly Hires']
-          });
         } else if (sectionType === DASHBOARD_SECTIONS.YTD_PERFORMANCE) {
           const defaultCards = config.cards[sectionType] || [];
           // Insert Daily Activity cards after the first YTD ALP card
@@ -833,12 +705,6 @@ const UnifiedDashboard = ({ userRole, user }) => {
             },
             defaultCards[3] // Only YTD Ref Sales (skip codes+vips and hires)
           ];
-          
-          console.log(`📊 [${userRole} Personal YTD] Cards included:`, {
-            cardCount: 4,
-            cards: [`YTD ${userRole} ALP`, 'YTD Daily ALP', 'YTD Daily Ref ALP', 'YTD Ref Sales'],
-            skipped: ['YTD Codes+VIPs', 'YTD Hires']
-          });
         }
       } else if ((userRole === 'SA' && saViewMode === 'team') || 
                  (userRole === 'GA' && gaViewMode === 'team') ||
@@ -852,13 +718,6 @@ const UnifiedDashboard = ({ userRole, user }) => {
           const now = new Date();
           const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
           const prevMonthName = prevMonth.toLocaleDateString('en-US', { month: 'long' });
-          
-          console.log(`📊 [${userRole} Last Month Cards] Using previous month name:`, {
-            userRole,
-            currentMonth: now.toLocaleDateString('en-US', { month: 'long' }),
-            previousMonth: prevMonthName,
-            viewMode: userRole === 'SA' ? saViewMode : gaViewMode
-          });
           
           return [
             defaultCards[0], // Monthly ALP
@@ -923,7 +782,6 @@ const UnifiedDashboard = ({ userRole, user }) => {
             className={`time-button ${saViewMode === 'personal' ? 'active' : ''}`}
             onClick={() => {
               setSaViewMode('personal');
-              console.log('📊 [SA Dashboard] Switched to Personal view mode');
             }}
             style={{ 
               fontSize: '14px', 
@@ -937,7 +795,6 @@ const UnifiedDashboard = ({ userRole, user }) => {
             className={`time-button ${saViewMode === 'team' ? 'active' : ''}`}
             onClick={() => {
               setSaViewMode('team');
-              console.log('📊 [SA Dashboard] Switched to Team view mode');
             }}
             style={{ 
               fontSize: '14px', 
@@ -963,7 +820,6 @@ const UnifiedDashboard = ({ userRole, user }) => {
             className={`time-button ${gaViewMode === 'personal' ? 'active' : ''}`}
             onClick={() => {
               setGaViewMode('personal');
-              console.log('📊 [GA Dashboard] Switched to Personal view mode');
             }}
             style={{ 
               fontSize: '14px', 
@@ -977,7 +833,6 @@ const UnifiedDashboard = ({ userRole, user }) => {
             className={`time-button ${gaViewMode === 'team' ? 'active' : ''}`}
             onClick={() => {
               setGaViewMode('team');
-              console.log('📊 [GA Dashboard] Switched to Team view mode');
             }}
             style={{ 
               fontSize: '14px', 
@@ -1003,7 +858,6 @@ const UnifiedDashboard = ({ userRole, user }) => {
             className={`time-button ${mgaViewMode === 'personal' ? 'active' : ''}`}
             onClick={() => {
               setMgaViewMode('personal');
-              console.log('📊 [MGA Dashboard] Switched to Personal view mode');
             }}
             style={{ 
               fontSize: '14px', 
@@ -1017,7 +871,6 @@ const UnifiedDashboard = ({ userRole, user }) => {
             className={`time-button ${mgaViewMode === 'team' ? 'active' : ''}`}
             onClick={() => {
               setMgaViewMode('team');
-              console.log('📊 [MGA Dashboard] Switched to Team view mode');
             }}
             style={{ 
               fontSize: '14px', 
@@ -1043,7 +896,6 @@ const UnifiedDashboard = ({ userRole, user }) => {
             className={`time-button ${rgaViewMode === 'personal' ? 'active' : ''}`}
             onClick={() => {
               setRgaViewMode('personal');
-              console.log('📊 [RGA Dashboard] Switched to Personal view mode');
             }}
             style={{ 
               fontSize: '14px', 
@@ -1057,7 +909,6 @@ const UnifiedDashboard = ({ userRole, user }) => {
             className={`time-button ${rgaViewMode === 'mga' ? 'active' : ''}`}
             onClick={() => {
               setRgaViewMode('mga');
-              console.log('📊 [RGA Dashboard] Switched to MGA view mode');
             }}
             style={{ 
               fontSize: '14px', 
@@ -1071,7 +922,6 @@ const UnifiedDashboard = ({ userRole, user }) => {
             className={`time-button ${rgaViewMode === 'rga' ? 'active' : ''}`}
             onClick={() => {
               setRgaViewMode('rga');
-              console.log('📊 [RGA Dashboard] Switched to RGA view mode');
             }}
             style={{ 
               fontSize: '14px', 
@@ -1178,3 +1028,4 @@ const UnifiedDashboard = ({ userRole, user }) => {
 };
 
 export default UnifiedDashboard;
+

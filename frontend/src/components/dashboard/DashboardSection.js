@@ -90,8 +90,6 @@ const DashboardSection = ({
       comparisonLabel = `from ${comparisonMonthLabel}`;
     }
 
-    console.log(`🔍 [DashboardSection] Card: ${card.title}, DataKey: ${card.dataKey}, CurrentValue: ${currentValue}, PreviousValue: ${previousValue}`);
-
     return {
       showComparison: true,
       currentValue,
@@ -194,16 +192,6 @@ const DashboardSection = ({
                 return '';
               // Monthly card date ranges
               case 'monthly_alp':
-                console.log('🔍🔍🔍 [Monthly ALP Card] Date formatting DEBUG:', {
-                  hasMaxReportDate: !!data.maxReportDate,
-                  maxReportDate: data.maxReportDate,
-                  maxReportDateType: typeof data.maxReportDate,
-                  monthStart: data.monthStart,
-                  monthEnd: data.monthEnd,
-                  cardType: 'monthly_alp',
-                  allData: data
-                });
-                
                 if (data.maxReportDate) {
                   // Parse the maxReportDate (format: mm/dd/yyyy) and format it nicely
                   const dateParts = data.maxReportDate.split('/');
@@ -216,14 +204,9 @@ const DashboardSection = ({
                       year: 'numeric'
                     });
                     const asOfText = `as of ${formattedDate}`;
-                    console.log('✅ [Monthly ALP Card] Using maxReportDate format:', asOfText);
                     return asOfText;
-                  } else {
-                    console.warn('⚠️ [Monthly ALP Card] maxReportDate has wrong format:', data.maxReportDate);
                   }
                 }
-                
-                console.warn('⚠️ [Monthly ALP Card] No maxReportDate found, falling back to month range');
                 
                 // Fallback to month range if no maxReportDate (with timezone fix)
                 if (data.monthStart && data.monthEnd) {
@@ -238,10 +221,8 @@ const DashboardSection = ({
                     day: 'numeric' 
                   });
                   const fallbackText = `${startDate} - ${endDate}`;
-                  console.log('📊 [Monthly ALP Card] Using fallback month range:', fallbackText);
                   return fallbackText;
                 }
-                console.log('📊 [Monthly ALP Card] No date data available');
                 return '';
               case 'monthly_hires':
                 if (data.hiresMonthStart && data.hiresMonthEnd) {
@@ -298,72 +279,6 @@ const DashboardSection = ({
             }
           };
 
-          // Log ALP card data specifically - after getDateRange is defined
-          if (card.type === 'weekly_alp') {
-            console.log(`📊 [Card Render] Weekly ALP card data:`, {
-              cardTitle: cardTitle,
-              cardValue: getCardValue(card, data),
-              dataKey: card.dataKey,
-              rawDataValue: data[card.dataKey],
-              comparisonDataKey: card.comparisonDataKey,
-              comparisonValue: data[card.comparisonDataKey],
-              comparisonData: getComparisonData(card, data),
-              fullData: data
-            });
-          } else if (card.type === 'monthly_alp') {
-            console.log(`🎯 [Card Render] Monthly ALP card data:`, {
-              cardTitle: cardTitle,
-              cardType: card.type,
-              cardValue: getCardValue(card, data),
-              dataKey: card.dataKey,
-              rawMonthlyAlp: data[card.dataKey],
-              comparisonDataKey: card.comparisonDataKey,
-              comparisonValue: data[card.comparisonDataKey],
-              dateRange: getDateRange(card.type),
-              maxReportDate: data.maxReportDate || 'No max report date',
-              formattedAsOf: data.maxReportDate ? (() => {
-                const dateParts = data.maxReportDate.split('/');
-                if (dateParts.length === 3) {
-                  const [month, day, year] = dateParts;
-                  const reportDate = new Date(year, month - 1, day);
-                  return `as of ${reportDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-                }
-                return 'Invalid date format';
-              })() : 'No formatted date',
-              comparisonData: getComparisonData(card, data),
-              isZeroValue: (data[card.dataKey] || 0) === 0,
-              allRelevantData: {
-                monthlyAlp: data.monthlyAlp,
-                comparisonAlp: data.comparisonAlp,
-                monthStart: data.monthStart,
-                monthEnd: data.monthEnd,
-                maxReportDate: data.maxReportDate
-              },
-              renderTime: new Date().toISOString()
-            });
-            
-            if ((data[card.dataKey] || 0) === 0) {
-              console.warn(`⚠️ [Monthly ALP Card] Zero value detected - check backend data filtering for AGT users`);
-            }
-          } else if (card.type === 'daily_alp' || card.type === 'daily_ref_alp') {
-            const sectionType = title || 'Unknown Section';
-            console.log(`📊 [Card Render] ${sectionType} Daily Activity card data:`, {
-              cardTitle: cardTitle,
-              cardType: card.type,
-              cardValue: getCardValue(card, data),
-              dataKey: card.dataKey,
-              rawValue: data[card.dataKey],
-              isLoading: isDailyActivityCard && data.dailyActivityLoading,
-              allDailyActivityData: {
-                totalAlp: data.totalAlp,
-                totalRefAlp: data.totalRefAlp,
-                totalRefs: data.totalRefs,
-                agentCount: data.agentCount
-              },
-              renderTime: new Date().toISOString()
-            });
-          }
-          
           return (
             <div
               key={index}
@@ -396,3 +311,4 @@ const DashboardSection = ({
 };
 
 export default DashboardSection;
+

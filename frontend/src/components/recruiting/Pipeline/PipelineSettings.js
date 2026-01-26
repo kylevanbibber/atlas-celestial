@@ -16,10 +16,20 @@ import './PipelineSettings.css';
 
 // Initialize Stripe with publishable key
 const stripePublishableKey = process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || 'pk_live_51RWdlFCWGp502EtX31JKFMyHlTGUdoKzPdSXyVW5Z5iELKPnadNDMIygB3EodwXsOIwmEIOmmiJXaEOWk7eyx8hx002MQKBpBn';
-console.log('[PipelineSettings] Stripe publishable key present?', !!stripePublishableKey);
-console.log('[PipelineSettings] Stripe publishable key (first 20 chars):', stripePublishableKey?.substring(0, 20));
 
-const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
+// Initialize Stripe with error handling
+let stripePromise = null;
+try {
+  if (stripePublishableKey) {
+    stripePromise = loadStripe(stripePublishableKey).catch(error => {
+      console.error('[PipelineSettings] Failed to load Stripe.js:', error);
+      return null;
+    });
+  }
+} catch (error) {
+  console.error('[PipelineSettings] Error initializing Stripe:', error);
+  stripePromise = Promise.resolve(null);
+}
 
 const PipelineSettings = () => {
   const { user } = useAuth(); // user kept in case we extend billing with team-level options later
@@ -35,6 +45,7 @@ const PipelineSettings = () => {
   const [showCardForm, setShowCardForm] = useState(false);
   const [showManageCard, setShowManageCard] = useState(false);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [stripeLoaded, setStripeLoaded] = useState(false);
   
   // Test SMS state
   const [testPhoneNumber, setTestPhoneNumber] = useState('');
@@ -49,6 +60,19 @@ const PipelineSettings = () => {
     console.log('[PipelineSettings] useEffect: fetching data');
     fetchSmsCredits();
     fetchPaymentMethods();
+    
+    // Check if Stripe loaded successfully
+    if (stripePromise) {
+      stripePromise.then(stripe => {
+        if (stripe) {
+          setStripeLoaded(true);
+        } else {
+          console.warn('[PipelineSettings] Stripe.js failed to load');
+        }
+      }).catch(error => {
+        console.error('[PipelineSettings] Error checking Stripe status:', error);
+      });
+    }
   }, []);
 
   // Handle onboarding sync
@@ -596,7 +620,7 @@ const PipelineSettings = () => {
       </div>
 
       {/* Stripe Card Form Modal */}
-      {showCardForm && clientSecret && (
+      {showCardForm && clientSecret && stripeLoaded && stripePromise && (
         <Elements stripe={stripePromise}>
           <StripeCardForm
             clientSecret={clientSecret}
@@ -604,6 +628,25 @@ const PipelineSettings = () => {
             onCancel={handleCardCancel}
           />
         </Elements>
+      )}
+      
+      {/* Stripe Loading Error Message */}
+      {showCardForm && !stripeLoaded && (
+        <div style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          backgroundColor: 'white',
+          padding: '20px',
+          borderRadius: '8px',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+          zIndex: 1000,
+          textAlign: 'center'
+        }}>
+          <p>Payment processing is temporarily unavailable.</p>
+          <button onClick={handleCardCancel} style={{ marginTop: '10px' }}>Close</button>
+        </div>
       )}
 
       {/* Card Management Modal */}

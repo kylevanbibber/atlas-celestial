@@ -1,0 +1,2674 @@
+/* Responsive tweaks: Active Presentations panel */
+@media (max-width: 1279px) {
+  /* Keep the container from growing too tall on smaller viewports */
+  .active-now-container {
+    /* Reduce vertical footprint while preserving header */
+    max-height: 25vh; /* was effectively taller; tune as needed */
+    overflow: hidden; /* hide any accidental overflow from header/actions */
+  }
+}
+
+/* Chart theme variables (default) */
+:root {
+  --chart-line: rgba(54, 162, 235, 1);
+  --chart-fill: rgba(54, 162, 235, 0.5);
+  --chart-grid: rgba(0, 0, 0, 0.08);
+  --chart-text: #333;
+}
+/* Ensure Presentations header actions (including collapse button) are visible */
+#activeNow .active-now-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#activeNow .active-now-header .active-now-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+#activeNowCollapseToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+#activeNowCollapseToggle i {
+  font-size: 0.9rem;
+}
+/* Collapsed state: hide the list only, keep header visible */
+#activeNow .active-now-list.collapsed {
+  display: none;
+}
+#productionTable tfoot td {
+  cursor: pointer;
+}
+
+#productionTable tfoot td:hover {
+  color: #007bff;
+}
+
+.tooltip {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.95);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 5px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  z-index: 1000;
+  pointer-events: none; /* Ensures the tooltip doesn’t interfere with mouse events */
+}
+
+#dashboardSticky.sticky {
+  height: 145px;
+  padding-right: 0;
+  position: sticky; /* ensure it remains sticky */
+  z-index: 200; /* elevated above table head/foot and other content */
+  overflow: visible; /* allow dropdowns to escape */
+}
+/* Recruiting sticky block: no chart, keep compact */
+#recruitingSticky.sticky {
+  height: auto;
+  padding: 8px 15px 0;
+  /* Ensure dropdowns and overlays inside the recruiting sticky can render above the table header/footer */
+  z-index: 200; /* productionTable thead=101, tfoot=102; stay above both */
+  overflow: visible; /* allow absolutely-positioned children to escape */
+}
+#myChart {
+  padding-right: 15px;
+  max-height: fit-content;
+}
+.stats-top-controls {
+  display: flex;
+  justify-content: flex-end; /* Align everything to the right */
+  align-items: center;
+  width: 100%;
+  padding: 0 8px 0 0;
+  gap: 10px; /* Adds spacing between elements */
+}
+
+/* Right-aligned Icons */
+.stats-icons {
+  display: flex;
+  gap: 10px;
+  margin: auto .6rem auto 0;
+}
+
+/* Trophy icon badge for Totals Leaderboard update */
+.icon-with-badge { position: relative; display: inline-flex; }
+.icon-with-badge .update-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff3b30; /* red dot */
+  box-shadow: 0 0 0 2px #fff; /* ring for contrast */
+  pointer-events: none; /* do not block clicks on the icon */
+  display: none;
+}
+.icon-with-badge.has-badge .update-badge { display: inline-block; }
+
+/* What’s New panel inside Totals Leaderboard overlay */
+.whats-new {
+  border: 1px solid #e5e5e5;
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 8px 0 10px;
+}
+.whats-new.hidden { display: none; }
+.whats-new.visible { display: block; }
+.whats-new .whats-new-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.whats-new ul { margin: 0 0 8px 18px; padding: 0; }
+.whats-new li { margin: 2px 0; font-size: .9em; }
+
+/* Dark mode adjustments */
+body.dark-mode .icon-with-badge .update-badge { box-shadow: 0 0 0 2px #1e1e1e; }
+body.dark-mode .whats-new { background: #1f232a; border-color: #333; }
+
+/* Anchor the popover to the level toggle */
+.leaderboard-level-toggle { position: relative; }
+.whats-new-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 9;
+  min-width: 260px;
+  max-width: 340px;
+  border: 1px solid #e5e5e5;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+.whats-new-popover.hidden { display: none; }
+.whats-new-popover.visible { display: block; animation: popFade .18s ease-out both; }
+.whats-new-popover .whats-new-title { margin-bottom: 6px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.whats-new-popover::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 14px;
+  width: 12px;
+  height: 12px;
+  background: #ffffff;
+  border-left: 1px solid #e5e5e5;
+  border-top: 1px solid #e5e5e5;
+  transform: rotate(45deg);
+}
+@keyframes popFade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Utility: generic hidden class (used by history labels and other UI) */
+.hidden { display: none !important; }
+
+/* Subtle pulse to draw attention to the toggle */
+.leaderboard-level-toggle.highlight-pulse {
+  animation: pulseGlow 1.4s ease-in-out 4;
+}
+@keyframes pulseGlow {
+  0% { box-shadow: 0 0 0 0 rgba(0,123,255,0.35); }
+  70% { box-shadow: 0 0 0 8px rgba(0,123,255,0); }
+  100% { box-shadow: 0 0 0 0 rgba(0,123,255,0); }
+}
+body.dark-mode .whats-new-popover { background: #1f232a; border-color: #333; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+body.dark-mode .whats-new-popover::before { background: #1f232a; border-color: #333; }
+
+/* Team Multi Panel: sticky header and dark mode styles */
+.team-selector-container { display: none; }
+.team-dropdown.open .team-selector-container { display: flex; }
+/* Ensure the team selector overlays table footers and other UI */
+.team-dropdown { position: relative; z-index: 1300; }
+.team-selector-container {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%); /* center under Team button */
+  right: auto;
+  z-index: 1400; /* above sticky header, table tfoot, and menus */
+  width: max-content; /* size to contents */
+  max-width: calc(100vw - 24px); /* keep within viewport on small screens */
+}
+
+/* Prevent clipping when parent containers are shorter than the dropdown
+  Enable horizontal scrolling again for wide production tables while allowing
+  vertical overflow (dropdowns, tooltips) to escape. */
+.narrow-container { position: relative; overflow-x: auto; overflow-y: visible; -webkit-overflow-scrolling: touch; }
+.content-container { overflow: visible; }
+.team-multi-panel {
+  display: block; /* always render when container is open */
+  position: relative;
+  z-index: 5;
+  background: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 0 8px 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  margin-top: 8px;
+  max-height: 320px;
+  overflow: auto;
+}
+.team-multi-header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #ffffff;
+  border-bottom: 1px solid #eee;
+  padding: 8px 8px 6px;
+}
+.team-multi-actions { display: flex; gap: 6px; }
+.team-multi-panel .edit-button { padding: 4px 8px; font-size: 12px; }
+.team-multi-panel .edit-button.primary { padding: 4px 10px; background: transparent; color: #6b7280; border: 1px solid #d1d5db; transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
+.team-multi-panel .edit-button.primary.has-selection { background: #2563eb; color: #fff; border-color: #2563eb; }
+.team-multi-groups {
+  display: grid;
+  grid-template-columns: 1fr; /* single column */
+  gap: 8px;
+  position: relative; z-index: 1;
+}
+.team-multi-list label { color: #111827; }
+.team-multi-group > div:first-child { color: #374151; font-weight: 600; font-size: 12px; margin-bottom: 4px; }
+#teamMultiSearch {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.team-multi-tip { font-size: 11px; color: #6b7280; margin-top: 6px; }
+.team-multi-groups { position: relative; z-index: 1; }
+.team-multi-list label { color: #111827; }
+.team-multi-group > div:first-child { color: #374151; }
+
+/* Dark mode overrides for team multi panel */
+body.dark-mode .team-multi-panel { background: #111827 !important; border-color: #374151 !important; }
+body.dark-mode .team-multi-header { background: #111827 !important; border-bottom-color: #374151 !important; z-index: 100; }
+body.dark-mode #teamMultiSearch {
+  background: #1f2937 !important;
+  color: #e5e7eb !important;
+  border-color: #374151 !important;
+}
+body.dark-mode .team-multi-list label { color: #e5e7eb; }
+body.dark-mode .team-multi-group > div:first-child { color: #d1d5db; }
+body.dark-mode .team-multi-panel input[type="checkbox"] { accent-color: #2563eb; }
+/* Scope button styling inside panel in dark mode (non-Apply) */
+body.dark-mode .team-multi-panel .edit-button { background: #374151; color: #e5e7eb; border-color: #4b5563; }
+body.dark-mode .team-multi-panel .edit-button.primary { background: transparent; color: #6b7280; border-color: #4b5563; }
+body.dark-mode .team-multi-panel .edit-button.primary.has-selection { background: #2563eb; color: #fff; border-color: #2563eb; }
+
+/* Stats Container */
+.stats-container {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  align-items: center;
+}
+
+/* Wrapper to enable overlay arrows over the scrollable metrics */
+.stats-scroll-wrapper {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-width: 0; /* allow the scroller to shrink within the row */
+}
+
+/* Top controls row: date range left, icons right */
+.top-controls-row {
+  display: flex;
+  align-items: flex-start; /* allow left block to wrap to multiple lines */
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+.top-controls-row .date-range-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap; /* left side can wrap without pushing icons */
+  flex: 1 1 auto; /* take remaining space */
+  min-width: 0; /* allow shrinking without overflow */
+}
+.top-controls-row .stats-icons {
+  margin-left: auto; /* push icons to the right */
+  display: inline-flex;
+  gap: 10px;
+  flex: 0 0 auto; /* don't let icons shrink/wrap */
+}
+
+/* Meatballs overflow menu (hidden by default; visible on small screens) */
+.stats-menu { position: relative; display: none; }
+.stats-menu-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 32px;
+  border: none;
+  background: #fff;
+  color: #555;
+  cursor: pointer;
+}
+.stats-menu-button:hover { background: #f5f7fa; }
+.stats-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 220px;
+  background: #fff;
+  border: 1px solid #d0d4da;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 6px;
+  display: none;
+  z-index: 1200; /* ensure above sticky */
+}
+.stats-menu-dropdown {
+  border-radius: 8px;
+}
+.stats-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  color: #333;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.stats-menu-item:hover { background: #f3f6f9; }
+.stats-menu.open .stats-menu-dropdown { display: block; }
+
+/* Small badge on the meatballs if the trophy has updates */
+.meatball-badge {
+  position: absolute; top: -2px; right: -2px; width: 8px; height: 8px;
+  background: #ff3b30; border-radius: 50%; box-shadow: 0 0 0 2px #fff; display: none;
+}
+
+/* Dark mode */
+body.dark-mode .stats-menu-button { background: #0a0b0d; color: #cfcfcf; border-color: #333; }
+body.dark-mode .stats-menu-button:hover { background: #13161b; }
+body.dark-mode .stats-menu-dropdown { background: #141519; color: #e0e0e0; border-color: #333; box-shadow: 0 8px 24px rgba(255,255,255,0.08); }
+body.dark-mode .stats-menu-item { color: #e0e0e0; }
+body.dark-mode .stats-menu-item:hover { background: #1a1f25; }
+
+/* ==========================
+   Stats Overlay (scoped)
+   ========================== */
+#statsOverlay .stats-overlay-content { padding: 10px 12px 14px; }
+#statsOverlay .stats-columns { display: flex; flex-wrap: wrap; gap: 18px; }
+#statsOverlay .stats-column { background: var(--card-bg, #ffffff); border: 1px solid rgba(0,0,0,0.06); border-radius: 10px; padding: 12px 14px; min-width: 220px; box-shadow: 0 6px 18px rgba(0,0,0,0.06); transition: background .2s ease, border-color .2s ease, box-shadow .2s ease; }
+#statsOverlay .stats-column.dimmed { opacity: .45; filter: grayscale(0.05); transition: opacity .2s ease, filter .2s ease; }
+#statsOverlay .stats-column-header { display: flex; align-items: flex-start; justify-content: space-between; margin: 0 0 8px; gap: 8px; }
+#statsOverlay .stats-column-header h3 { margin: 0; font-size: 16px; line-height: 1.2; }
+#statsOverlay .overlay-filter-toggle { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; user-select: none; }
+#statsOverlay .overlay-filter-toggle input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; accent-color: #2563eb; }
+#statsOverlay .overlay-filter-toggle .mini-label { font-size: 10px; color: #6b7280; line-height: 1; }
+
+/* Dark mode for overlay */
+body.dark-mode #statsOverlay .stats-column { background: #111827; border-color: #374151; box-shadow: 0 10px 24px rgba(0,0,0,0.45); }
+body.dark-mode #statsOverlay .overlay-filter-toggle .mini-label { color: #94a3b8; }
+body.dark-mode #statsOverlay .stats-column.dimmed { opacity: .42; filter: grayscale(0.1); }
+
+/* Respect user OS theme on first paint, but prefer explicit dark-mode class overrides */
+@media (prefers-color-scheme: dark) {
+  html:not(.dark-mode) body:not(.dark-mode) #statsOverlay .stats-column { background: var(--card-bg, #ffffff); border-color: rgba(0,0,0,0.06); box-shadow: 0 6px 18px rgba(0,0,0,0.06); }
+  html.dark-mode body.dark-mode #statsOverlay .stats-column { background: #111827; }
+}
+
+/* Left Column: Large ALP Number */
+#currentALP {
+  flex: 0 0 auto; /* Keeps its size static */
+  overflow: hidden; /* allow smooth collapse */
+  /* Smoothly animate when collapsing to give stats more room */
+  max-width: 40ch; /* generous cap so long ALP strings fit */
+  transition: max-width .25s ease, opacity .2s ease, transform .25s ease;
+}
+/* When scroller is not at far left, collapse ALP to free space */
+.stats-container.alp-collapsed #currentALP {
+  max-width: 0 !important;
+  opacity: 0;
+  transform: translateX(-12px);
+}
+/* Optionally tighten spacing when collapsed */
+.stats-container.alp-collapsed { gap: 8px; }
+/* Make stats content scrollable */
+.stats-content {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scrollbar-width: none; /* Hide scrollbar */
+  -ms-overflow-style: none;
+  scroll-behavior: smooth;
+  width: max-content; /* Make content wider than the container */
+  min-width: 100%;
+}
+
+/* Ensure stats container allows scrolling */
+#statsDisplayContainer {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  width: 100%;
+  border-radius: 6px 0 0 6px;
+  background: #eef0f3;
+}
+body.dark-mode #statsDisplayContainer {
+  background: rgba(20,21,25,0.85);
+}
+
+/* Hide scrollbar */
+#statsDisplayContainer::-webkit-scrollbar {
+  display: none;
+}
+
+/* Scroll Buttons */
+/* Overlay scroll buttons (as side panels) */
+.scroll-button {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 28px; /* width of the rectangular panel */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e0e4e8;
+  color: #555;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+  z-index: 2; /* above the scroll area */
+  -webkit-backdrop-filter: blur(1px);
+  backdrop-filter: blur(1px);
+}
+.scroll-button#scrollLeft { left: 0; border-right: none; border-radius: 6px 0 0 6px; }
+.scroll-button#scrollRight { right: 0; border-left: none; }
+
+.scroll-button:hover { background: rgba(0,123,255,0.08); color: #007bff; }
+
+/* Prefer OS theme on first paint to avoid flash before dark-mode is applied
+   Note: Explicitly override when dark mode is NOT enabled to avoid "stuck" dark styles */
+@media (prefers-color-scheme: dark){
+  .scroll-button { background: rgba(20,21,25,0.85); color: #cfcfcf; }
+  /* If user has turned OFF dark mode, force light button styles */
+  html:not(.dark-mode) .scroll-button,
+  body:not(.dark-mode) .scroll-button { background: #e0e4e8; color: #555; }
+}
+
+/* Disabled Scroll Buttons */
+.scroll-button-disabled {
+  display: none;
+  pointer-events: none;
+}
+
+/* Ensure the scroller sits beneath the overlay buttons */
+.stats-scroll-wrapper #statsDisplayContainer {
+  position: relative;
+  z-index: 1;
+}
+
+/* Dark mode variants for overlay panels */
+html.dark-mode .scroll-button, body.dark-mode .scroll-button {
+  background: rgba(20,21,25,0.85);
+  border-color: #333;
+  color: #cfcfcf;
+  box-shadow: 0 0 6px rgba(255,255,255,0.05) inset;
+}
+html.dark-mode .scroll-button:hover, body.dark-mode .scroll-button:hover { background: rgba(0,86,179,0.18); color: #4da3ff; }
+
+.search-container-container {
+  display: flex;
+  justify-content: flex-end; /* Align everything to the right */
+  align-items: center;
+  width: 100%;
+  padding: 0 8px 0 0;
+  gap: 10px; /* Adds spacing between elements */
+}
+
+.search-container,
+.filter-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: auto;
+  padding: 10px 0;
+}
+
+/* Default (collapsed) state */
+.search-container input,
+.filter-container input {
+  width: 0;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  opacity: 0;
+  transition: width 0.3s ease-in-out, opacity 0.2s;
+  pointer-events: none;
+  position: absolute;
+  text-align: left;
+  font-size: .8em;
+}
+.search-container input {
+  right: 0;
+}
+.filter-container input {
+  left: 5px;
+}
+
+/* Expanded state - grows from right to left */
+.search-container.active input {
+  width: 150px; /* Adjust width as needed */
+  opacity: 1;
+  pointer-events: all;
+  padding: 3px 30px 3px 10px; /* Space for input text */
+  position: absolute;
+  right: 0; /* Keeps right edge fixed, expands left */
+  margin: 0;
+}
+.filter-container.active input {
+  width: 10ch; /* Adjust width as needed */
+  opacity: 1;
+  pointer-events: all;
+  padding: 3px 10px 3px 35px; /* Space for input text */
+  position: absolute;
+  left: 0; /* Keeps right edge fixed, expands left */
+  margin: 0;
+  text-align: left;
+}
+
+/* Search icon - stays on the right */
+.search-container .search-icon,
+.filter-container .filter-icon {
+  position: absolute;
+  cursor: pointer;
+  color: #333;
+  transition: color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2; /* Keep icon above input */
+}
+.search-container .search-icon {
+  right: 5px; /* Always on the right */
+}
+.filter-container .filter-icon {
+  left: 12px;
+}
+/* Flash highlight effect */
+.flash-highlight {
+  animation: flashFade 0.5s ease-in-out;
+}
+
+@keyframes flashFade {
+  0% { background-color: #ffff99; } /* Yellowish highlight */
+  100% { background-color: transparent; }
+}
+
+/* Dark mode adjustment */
+body.dark-mode .flash-highlight {
+  animation: darkFlashFade 0.5s ease-in-out;
+}
+
+@keyframes darkFlashFade {
+  0% { background-color: #333; } /* Orange highlight */
+  100% { background-color: transparent; }
+}
+
+/* 🌙 Dark Mode */
+body.dark-mode .search-container input,
+body.dark-mode .filter-container input {
+  background: #23272e;
+  color: #ffffff;
+  border: 1px solid #555;
+}
+
+body.dark-mode .search-container .search-icon,
+body.dark-mode .filter-container .filter-icon {
+  color: #bbb;
+}
+
+body.dark-mode .search-container .search-icon:hover,
+body.dark-mode .filter-container .filter-icon:hover {
+  color: #fff;
+}
+
+/* 📊 Stats Navigation */
+.stats-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px;
+  transition: all 0.3s ease-in-out;
+}
+
+/* 📊 When search is active, slightly push elements */
+#searchContainer.active {
+  flex-grow: 1;
+  max-width: 200px;
+}
+
+/* Totals Leaderboard Overlay */
+/* Expand the leaderboard card across three columns */
+.leaderboard-card.expanded {
+  grid-column: span 3;
+  padding: 20px;
+  font-size: 1.1em;
+  transition: all 0.3s ease-in-out; /* Smooth transition */
+}
+
+/* Ensure animation when expanding */
+@keyframes expandToTop {
+  from {
+      transform: translateY(20px);
+      opacity: 0.7;
+  }
+  to {
+      transform: translateY(0);
+      opacity: 1;
+  }
+}
+
+/* Apply animation to expanded card */
+.leaderboard-card.expanded {
+  animation: expandToTop 0.3s ease-out;
+}
+
+/* Increase text and image size when expanded */
+.leaderboard-card.expanded h3 {
+  font-size: 1.25em;
+}
+
+.leaderboard-card.expanded ul li {
+  font-size: 1em;
+  padding: 8px 12px;
+}
+
+.leaderboard-card.expanded .leaderboard-img {
+  width: 36px;
+  height: 36px;
+}
+
+/* Ensure dark mode styles apply */
+body.dark-mode .leaderboard-card.expanded {
+  background: #23272e;
+  border: 1px solid #444;
+}
+
+/* Highlight current user row subtly in Totals Leaderboard */
+.leaderboard-card .current-user-row {
+  background-color: #eef0f3; /* Light blue background */
+  border-left: 4px solid #007bff; /* Blue border on the left */
+  font-weight: bold;
+  padding-left: 6px !important; /* Add slight left padding */
+}
+
+/* Hover effect for current user row */
+.leaderboard-card .current-user-row:hover {
+  background-color: rgba(1,136,255,0.1); /* Light blue background */
+}
+
+/* Dark mode styles for current user row in Totals Leaderboard */
+body.dark-mode .leaderboard-card .current-user-row {
+  background-color: #141519;
+  border-left: 4px solid #0056B3;
+  font-weight: bold;
+}
+
+/* Dark mode hover effect */
+body.dark-mode .leaderboard-card .current-user-row:hover {
+  background-color: rgba(1,136,255,0.1);
+}
+
+/* Current user highlight in Recruiting right-side leaderboards */
+#recLeaderboardTable .current-user-row,
+#recTop3Table .current-user-row {
+  background-color: #eef6ff; /* slightly lighter blue */
+  border-left: 4px solid #007bff;
+  font-weight: 600;
+}
+
+body.dark-mode #recLeaderboardTable .current-user-row,
+body.dark-mode #recTop3Table .current-user-row {
+  background-color: #10141a;
+  border-left: 4px solid #0056B3;
+}
+
+/* Recruiting 10WK expand/collapse styles */
+.rec-week-row .week-label { display: inline-flex; align-items: center; gap: 6px; }
+.rec-week-row .week-expander { margin-left: 6px; font-size: 0.9em; color: #666; }
+.rec-week-row .week-label:hover .week-expander { color: #007bff; }
+
+.rec-day-row { background: #f8fafc; }
+.rec-day-row:nth-child(even) { background: #f3f6f9; }
+.rec-day-row td { border-top: 1px dashed #e1e5ea; }
+.rec-day-row.rec-day-row-end td { border-bottom: 2px solid #cfd6de; }
+.rec-day-row .day-label { padding-left: 16px; color: #555; }
+
+/* Dark mode variants */
+body.dark-mode .rec-day-row { background: #14171c; }
+body.dark-mode .rec-day-row:nth-child(even) { background: #111418; }
+body.dark-mode .rec-day-row td { border-top: 1px dashed #2a2f36; }
+body.dark-mode .rec-day-row.rec-day-row-end td { border-bottom: 2px solid #2a2f36; }
+body.dark-mode .rec-week-row .week-expander { color: #aaa; }
+body.dark-mode .rec-week-row .week-label:hover .week-expander { color: #4da3ff; }
+
+/* Dashboard weekly expand/collapse day rows */
+.day-detail-row { background: #f8fafc; }
+.day-detail-row:nth-child(even) { background: #f3f6f9; }
+.day-detail-row td { border-top: 1px dashed #e1e5ea; }
+.day-detail-row.day-detail-row-end td { border-bottom: 2px solid #cfd6de; }
+
+body.dark-mode .day-detail-row { background: #14171c; }
+body.dark-mode .day-detail-row:nth-child(even) { background: #111418; }
+body.dark-mode .day-detail-row td { border-top: 1px dashed #2a2f36; }
+body.dark-mode .day-detail-row.day-detail-row-end td { border-bottom: 2px solid #2a2f36; }
+
+/* Scope label for Totals Leaderboard */
+.lb-scope-label {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 0.85rem;
+  border-radius: 999px;
+  background: #eef0f3;
+  color: #333;
+  vertical-align: middle;
+}
+
+body.dark-mode .lb-scope-label {
+  background: #2b2f36;
+  color: #ddd;
+  border: 1px solid #3a3f47;
+}
+
+/* 🌙 Dark Mode - Totals Leaderboard Overlay */
+/* Dark Mode Leaderboard Grid */
+body.dark-mode .totals-leaderboard-grid {
+  gap: 15px;
+}
+
+/* Dark Mode Leaderboard Cards */
+body.dark-mode .leaderboard-card {
+  background: #23272e; /* Darker background for leaderboard cards */
+  border: 1px solid #333;
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.1);
+}
+
+/* Dark Mode Leaderboard Header */
+body.dark-mode .leaderboard-card h3 {
+  color: #ffffff;
+  border-bottom: 2px solid #444;
+}
+
+/* Dark Mode Leaderboard Items */
+body.dark-mode .leaderboard-card ul li {
+  border-bottom: 1px solid #3a3f47;
+}
+
+body.dark-mode .leaderboard-card ul li:hover {
+  border-bottom: 1px solid #0056b3;
+}
+
+/* Dark Mode Copy Icon */
+body.dark-mode .totals-card-icon {
+  color: #888; /* Subtle color */
+}
+
+body.dark-mode .dashboard-icon:hover {
+  color: #0056b3; /* Highlight on hover */
+}
+
+/* Top count pill badge for leadership cards */
+.top-count-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px 3px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  border-radius: 999px;
+  background: linear-gradient(135deg,#f0f3f7,#d9e1e9);
+  color: #3a4654;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  line-height: 1;
+  vertical-align: middle;
+  border: 1px solid #c5d1dc;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+body.dark-mode .top-count-badge {
+  background: linear-gradient(135deg,#2b3138,#1f242a);
+  color: #d1d8e0;
+  border: 1px solid #39414a;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+
+/* Slight hover focus for accessibility */
+.leaderboard-card h3 .top-count-badge:hover,
+.leaderboard-card h3 .top-count-badge:focus {
+  filter: brightness(1.05);
+}
+
+body.dark-mode .copy-indicator {
+  background-color: #0056B3;
+  color: #E0E0E0;
+}
+/* Utility: truncate long names in leaderboard cells */
+.name-ellipsis {
+  display: inline-block;
+  max-width: 14ch; /* roughly 18 characters */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+@media (max-width: 1279px) {
+  .name-ellipsis {
+    max-width: 14ch;
+  }
+}
+/* Copy Icon */
+.totals-card-icon {
+  cursor: pointer;
+  color: #aaa; /* Subtle color */
+  transition: color 0.2s ease-in-out;
+}
+
+.dashboard-icon:hover {
+  color: #007bff; /* Highlight on hover */
+  cursor: pointer;
+}
+
+/* Keep section title and its icons on the same line */
+.sub-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+/* Make the Top Last Week title+icon behave as a single interactive trigger */
+.top3-trigger { cursor: pointer; }
+.top3-trigger #top3-title,
+.top3-trigger #openLastWeekOverlay { transition: color 0.2s ease-in-out; }
+.top3-trigger:hover #top3-title,
+.top3-trigger:hover #openLastWeekOverlay { color: #007bff; }
+body.dark-mode .top3-trigger:hover #top3-title,
+body.dark-mode .top3-trigger:hover #openLastWeekOverlay { color: #0056b3; }
+
+.copy-indicator {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #007bff;
+  color: white;
+  padding: 10px 15px;
+  border-radius: 5px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  display: none;
+  z-index: 1001;
+}
+
+/* Leaderboard Header for Copy Icon Alignment */
+.leaderboard-header {
+  display: flex;
+  justify-content: flex-start; /* keep items on the left */
+  align-items: center;         /* align text and icon nicely */
+  gap: 10px;                   /* 10px between title and search icon */
+}
+/* Ensure the search icon has a reliable clickable area when collapsed */
+.leaderboard-header .search-container {
+  width: 22px;
+  height: 22px;
+  padding: 0;   /* remove extra space so gap is exact */
+  margin: 0;    /* keep it snug to the title */
+  position: relative; /* for centering the absolute icon */
+}
+.leaderboard-header .search-container .search-icon { top: 50%; transform: translateY(-50%); }
+
+.totals-leaderboard-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+  overflow-y: auto;
+}
+
+/* Overlay Content */
+.totals-leaderboard-content {
+  background: white;
+  padding: 15px;
+  width: 95%;
+  max-width: 1100px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  position: relative;
+}
+
+/* Leaderboard Grid */
+.totals-leaderboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Responsive */
+  gap: 15px;
+  padding: 10px;
+  justify-content: center;
+}
+
+/* Leaderboard Card */
+.leaderboard-card {
+  background: #f9f9f9;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+/* Leaderboard Header */
+.leaderboard-card h3 {
+  margin-bottom: 8px;
+}
+
+/* Ensure leaderboard items align correctly */
+.leaderboard-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.leaderboard-card ul li {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Space between rank, image, and text */
+  padding: 5px 10px;
+  border-bottom: 1px solid #ddd;
+  font-size: .8em;
+  cursor: pointer;
+}
+/* Sub-leaderboard row should be block-level and not share the flex row layout */
+.leaderboard-card ul li.sub-leaderboard {
+  display: block;
+  padding: 0 10px 6px 10px; /* tighter spacing around nested list */
+  cursor: default;
+  border-bottom: none;
+}
+.leaderboard-card ul li.sub-leaderboard:hover { border-bottom: none; }
+/* Ensure hover underline for both light & dark modes */
+.leaderboard-card ul li:hover {
+  border-bottom: 1px solid #007bff; /* Blue underline on hover */
+}
+
+/* Sub-leaderboard: rendered directly under a leader-group item */
+.leader-group.expanded {
+  background: rgba(0,0,0,0.02);
+}
+.leader-group + .sub-leaderboard,
+.leader-group .sub-leaderboard {
+  width: 100%;
+}
+.sub-leaderboard .sub-loading,
+.sub-leaderboard .sub-empty,
+.sub-leaderboard .sub-error {
+  padding: 4px 0 0 38px; /* align under leader content */
+  font-size: .85em;
+  color: #777;
+}
+.sub-leaderboard .sub-error { color: #b00; }
+.sub-leaderboard .sub-list {
+  list-style: none;
+  margin: 4px 0 6px 28px; /* indent under leader */
+  padding: 0 0 0 10px;
+  border-left: 2px solid #ddd; /* visual connector to leader */
+}
+.sub-leaderboard .sub-agent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+}
+.sub-leaderboard .sub-agent .rank {
+  width: 20px;
+  text-align: right;
+}
+.sub-leaderboard .sub-agent .name { flex: 1; }
+
+/* Dark mode variants for sub-leaderboard */
+body.dark-mode .leader-group.expanded { background: rgba(255,255,255,0.03); }
+body.dark-mode .sub-leaderboard .sub-list { border-left-color: #444; }
+body.dark-mode .sub-leaderboard .sub-loading,
+body.dark-mode .sub-leaderboard .sub-empty { color: #aaa; }
+body.dark-mode .sub-leaderboard .sub-error { color: #dc3545; }
+
+/* Ensure images are properly aligned */
+.leaderboard-img {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+}
+/* When no image is present (leadership lists), reduce gap for tighter alignment */
+.leaderboard-card ul li:not(:has(img)) {
+  gap: 6px;
+}
+
+/* Adjust spacing for rank, name, and score */
+.rank {
+  font-weight: bold;
+  width: 20px; /* Ensures consistent alignment */
+  text-align: right;
+}
+
+.name {
+  flex-grow: 1; /* Pushes name and score into correct alignment */
+}
+
+.score {
+  font-weight: bold;
+  text-align: right;
+  min-width: 50px; /* Prevents shifting when numbers vary */
+}
+
+/* Leaderboard level toggle buttons */
+.leaderboard-level-toggle .lb-level-btn {
+  padding: 4px 10px;
+  border: 1px solid #ccc;
+  border-radius: 16px;
+  background: #f5f5f5;
+  font-size: 12px;
+  cursor: pointer;
+}
+.leaderboard-level-toggle .lb-level-btn.active {
+  background: #007bff;
+  color: #fff;
+  border-color: #007bff;
+}
+body.dark-mode .leaderboard-level-toggle .lb-level-btn {
+  background: #1E2025;
+  color: #cfcfcf;
+  border-color: #333;
+}
+body.dark-mode .leaderboard-level-toggle .lb-level-btn.active {
+  background: #0056b3;
+  color: #fff;
+  border-color: #0056b3;
+}
+
+/* Badge for leaders mode */
+.lb-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 10px;
+  color: #555;
+  background: #eef0f3;
+  border-radius: 10px;
+  margin-left: 6px;
+}
+body.dark-mode .lb-badge { background: #1E2025; color: #cfcfcf; }
+
+
+/* Dark Mode */
+body.dark-mode .totals-leaderboard-overlay {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+body.dark-mode .totals-leaderboard-content {
+  background: #141519;
+  color: #E0E0E0;
+  box-shadow: 0 4px 8px rgba(255, 255, 255, 0.1);
+  border: 1px solid #333;
+}
+
+#totalsLeaderboardTrigger:hover {
+  color: #007bff;
+}
+.productionTable th, .productionTable td {
+  white-space: nowrap; /* Prevent content from wrapping */
+  padding: 0 4px 4px; /* Add slight padding for readability */
+  text-align: center; /* Center align content */
+}
+
+.productionTable th {
+  font-size: .65em;
+  cursor: pointer;
+  position: relative; /* Ensures the border stays inside without shifting layout */
+}
+
+/* Apply bottom border on hover */
+.productionTable th:hover::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: #007bff;
+}
+.productionTable th:hover {
+  user-select: none;
+}
+/* Selected metric with inside bottom border */
+.selected-metric {
+  background-color: transparent !important; /* Removes background color */
+}
+
+.selected-metric::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px; /* Border inside */
+  background-color: #007bff;
+}
+
+body.dark-mode .productionTable th, body.dark-mode .productionTable td {
+  color: #cfcfcf;
+}
+/* Dark mode styling */
+body.dark-mode .productionTable th:hover::after {
+  background-color: #0056B3;
+}
+
+body.dark-mode .selected-metric::after {
+  background-color: #0056B3;
+}
+
+/* Dark Mode Stats Overlay */
+body.dark-mode .stats-overlay-content {
+  background: #141519; /* Dark background */
+  color: #E0E0E0; /* Light text */
+  box-shadow: 0 4px 8px rgba(255, 255, 255, 0.1);
+  border: 1px solid #333;
+}
+
+body.dark-mode .stats-column h3 {
+  color: #ffffff; /* Brighter heading */
+  border-bottom: 2px solid #555;
+}
+
+/* Dark Mode Close Button */
+body.dark-mode .close-overlay {
+  color: #fff;
+}
+
+/* Dark Mode Stats Overlay Background */
+body.dark-mode .stats-overlay {
+  background: rgba(0, 0, 0, 0.8); /* Darker background for overlay */
+}
+
+/* Last Week Overlay content adjustments */
+#lastWeekOverlay .stats-overlay-content {
+  max-width: 1100px;
+  width: 95%;
+}
+
+/* Ensure Last Week overlay sits above all others (modal=1002, stats=1001, totals=1000) */
+#lastWeekOverlay {
+  z-index: 10050; /* above all other overlays and sticky elements */
+}
+#lastWeekOverlay .stats-overlay-content {
+  position: relative;
+  z-index: 10051; /* content above overlay backdrop and any page elements */
+}
+
+#lastWeekOverlayBody .top5-section,
+#lastWeekOverlayBody .agt-section { margin-top: 12px; }
+
+#lastWeekOverlayBody .top5-card { font-size: 0.95em; }
+/* Floating Tooltip */
+.stat-tooltip {
+  position: absolute;
+  background-color: rgba(0, 0, 0, 0.95);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: .8em;
+  line-height: 1.4;
+  white-space: nowrap;
+  z-index: 1001;
+  pointer-events: none; /* Prevent tooltips from interfering with mouse events */
+  display: none;
+  text-align: left;
+  transform: translateX(0); /* Default transform, overridden dynamically */
+}
+.input-tooltip {
+  position: absolute;
+  background-color: rgba(0, 0, 0, 0.95);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: .8em;
+  line-height: 1.4;
+  white-space: nowrap;
+  z-index: 1000;
+  pointer-events: none; /* Prevent tooltips from interfering with mouse events */
+  text-align: left;
+  transform: translateX(0); /* Default transform, overridden dynamically */
+}
+/* Stats Overlay Background */
+.stats-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1001;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Overlay Content */
+.stats-overlay-content {
+  background: white;
+  padding: 10px;
+  width: 90%; /* Increase width to accommodate three columns */
+  max-width: 800px; /* Expand max-width for better spacing */
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  position: relative;
+}
+
+/* Close Button */
+.close-overlay {
+  font-size: 1.5em;
+  cursor: pointer;
+  position: absolute;
+  right: 15px;
+  top: 10px;
+}
+
+.close-overlay:hover {
+  color: #dc3545;
+}
+
+/* Columns Container */
+.stats-columns {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* Each Column */
+.stats-column {
+  flex: 1;
+  min-width: 180px;
+  max-width: 200px;
+  text-align: left;
+}
+
+/* Column Headings */
+.stats-column h3 {
+  text-align: center;
+  margin-bottom: 10px;
+  font-size: 18px;
+  border-bottom: 2px solid #ddd;
+  padding-bottom: 5px;
+}
+
+/* Stat Rows */
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  padding: .6rem .3rem;
+  flex-direction: column;
+  align-items: flex-end; /* Align text visually to the right */
+  white-space: nowrap;
+  min-width: 90px;
+  border-bottom: 1px solid transparent;
+}
+.stat-item:hover {
+  border-bottom: 1px solid #007bff;
+}
+.stat-label {
+  font-weight: bold;
+}
+.stat-label:hover {
+  cursor: pointer;
+  user-select: none;
+}
+.stats-overlay-content .sub-title {
+  display: inline-block;
+	padding-left: 0;
+  padding-bottom: 15px;
+}
+.date-range-textContent.sub-title {
+  font-size: .9em;
+}
+.sub-title {
+  margin-right: 10px;
+}
+.user-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Push left and right sections apart */
+  gap: 20px;
+  margin: 5px 10px;
+  width: 95%; /* Ensure full width */
+}
+
+.user-info-left {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Space between Name and ALP */
+  white-space: nowrap; /* Prevent text wrapping */
+}
+
+.user-info-row .sub-title {
+  font-weight: bold;
+  white-space: nowrap; /* Ensure the text stays in one line */
+  padding-left: 0;
+}
+
+/* Light Mode Modal Styles */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1002;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent background */
+}
+.modal-content {
+  background-color: #ffffff; /* Bright background for light mode */
+  margin: 15% auto;
+  padding: 20px;
+  border: 1px solid #ccc; /* Subtle border */
+  width: 30%;
+  max-width: 400px; /* Responsive width */
+  text-align: center;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Soft shadow */
+}
+.modal-content h3 {
+  margin-bottom: 20px;
+  font-size: 1.5em;
+  color: #333; /* Dark text for titles */
+}
+.modal-content label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+  color: #555; /* Medium contrast text */
+}
+.modal-content input[type="date"] {
+  width: 90%;
+  padding: 10px;
+  margin: 10px 0;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  box-sizing: border-box;
+}
+/* Dark Mode Modal Styles */
+body.dark-mode .modal {
+  background-color: rgba(0, 0, 0, 0.8); /* Darker background */
+}
+body.dark-mode .modal-content {
+  background-color: #141519; /* Dark background */
+  border: 1px solid #333; /* Subtle border for dark mode */
+  color: #e0e0e0; /* Light text */
+  box-shadow: 0 4px 10px rgba(255, 255, 255, 0.1); /* Light shadow */
+}
+body.dark-mode .modal-content h3 {
+  color: #cfcfcf; /* Light text for titles */
+}
+body.dark-mode .modal-content label {
+  color: #aaa; /* Medium-light text for labels */
+}
+body.dark-mode .modal-content input[type="date"] {
+  background-color: #333;
+  border: 1px solid #555;
+  color: #e0e0e0;
+}
+/* Leaderboard Styling */
+.leaderboard-container {
+  width: 100%; /* Full width of the parent */
+  margin: 0;
+  box-sizing: border-box; /* Includes padding in width calculation */
+  overflow-x: hidden; /* Prevents horizontal overflow */
+}
+
+/* Error state for invalid inputs (used by recruiting validation) */
+input.input-error,
+input[aria-invalid="true"] {
+  border-color: #dc2626 !important; /* red-600 */
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.35); /* subtle red ring */
+}
+body.dark-mode input.input-error,
+body.dark-mode input[aria-invalid="true"] {
+  border-color: #f87171 !important; /* red-400 for dark mode contrast */
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.35);
+}
+#leaderboardTable, 
+#top3Table,
+#recLeaderboardTable,
+#recTop3Table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  table-layout: auto; /* Allows columns to resize dynamically based on content */
+}
+#leaderboardTable th:nth-child(1),
+#leaderboardTable td:nth-child(1),
+#top3Table th:nth-child(1),
+#top3Table td:nth-child(1),
+#recLeaderboardTable th:nth-child(1),
+#recLeaderboardTable td:nth-child(1),
+#recTop3Table th:nth-child(1),
+#recTop3Table td:nth-child(1) {
+  text-align: center;
+}
+#leaderboardTable th,
+#leaderboardTable td,
+#top3Table th,
+#top3Table td,
+#recLeaderboardTable th,
+#recLeaderboardTable td,
+#recTop3Table th,
+#recTop3Table td {
+  width: auto; /* Let the browser decide the width based on content */
+  padding: 12px 10px;
+  white-space: nowrap; /* Prevents content from wrapping */
+  text-overflow: ellipsis; /* Ensures text is truncated if it overflows */
+  overflow: hidden; /* Hides overflowing text */
+}
+#leaderboardTable th,
+#top3Table th,
+#recLeaderboardTable th,
+#recTop3Table th {
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #555;
+}
+#leaderboardTable td,
+#top3Table td,
+#recLeaderboardTable td,
+#recTop3Table td {
+  font-size: 0.9rem;
+}
+body.dark-mode #leaderboardTable td,
+body.dark-mode #top3Table td,
+body.dark-mode #recLeaderboardTable td,
+body.dark-mode #recTop3Table td {
+  font-size: 0.9rem;
+}
+/* Remove ellipsis from rank (first) column so badge isn't clipped */
+#leaderboardTable th:nth-child(1),
+#leaderboardTable td:nth-child(1),
+#top3Table th:nth-child(1),
+#top3Table td:nth-child(1),
+#agtLeadersTable th:nth-child(1),
+#agtLeadersTable td:nth-child(1) {
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+/* Remove ellipsis/clipping from profile picture (second) column */
+#leaderboardTable th:nth-child(2),
+#leaderboardTable td:nth-child(2),
+#top3Table th:nth-child(2),
+#top3Table td:nth-child(2),
+#agtLeadersTable th:nth-child(2),
+#agtLeadersTable td:nth-child(2) {
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+#leaderboardTable img,
+#top3Table img,
+#recLeaderboardTable img,
+#recTop3Table img {
+  display: inline-block;
+  vertical-align: middle;
+}
+/* Normalize avatar size across tables */
+#leaderboardTable img,
+#top3Table img,
+#agtLeadersTable img{
+  width:28px;
+  height:28px;
+  border-radius:50%;
+  object-fit:cover;
+}
+#leaderboard-title::before,
+#top3-title::before {
+  content: attr(data-title);
+}
+/* Make the Top Last Week title interactive like its expand icon */
+#top3-title {
+  cursor: pointer;
+  transition: color 0.2s ease-in-out;
+}
+#top3-title:hover {
+  color: #007bff;
+}
+body.dark-mode #top3-title:hover {
+  color: #0056b3;
+}
+.custom-tooltip {
+  position: absolute;
+  background-color: rgba(0, 0, 0, 0.95);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  z-index: 1000;
+  pointer-events: none; /* Prevent tooltips from interfering with mouse events */
+  display: none;
+  text-align: left;
+  transform: translateX(0); /* Default transform, overridden dynamically */
+  visibility: hidden;
+}
+#userOverlayBackdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5); /* Dimming effect */
+  z-index: 1000;
+}
+#userOverlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1001;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 90%; /* Limit width for smaller screens */
+  max-height: 90vh; /* Prevent it from exceeding viewport height */
+  overflow: auto; /* Avoid content overflow */
+}
+#overlayProductionTable {
+  overflow: auto;
+}
+#overlayProductionTable td {
+  font-size: 11px;
+}
+#overlayProductionTable.productionTable th:hover::after {
+  visibility: hidden;
+}
+#userOverlay .overlay-image-container {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 12px;
+}
+#userOverlay img {
+  display: block;
+  max-width: 100%; /* Ensure the image does not exceed the width of its container */
+  max-height: 50vh; /* Prevent it from exceeding 50% of the viewport height */
+  border-radius: 10px; /* Consistent rounded look */
+  object-fit: contain; /* Ensure the image scales within its bounds without cropping */
+  width: auto; /* Allow the width to adjust dynamically */
+  height: auto; /* Maintain the aspect ratio */
+  margin: 0 auto; /* Center the image horizontally */
+  box-sizing: border-box; /* Include padding and border in the element's dimensions */
+}
+#overlayUserRank {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: #FFFFFF; /* Semi-transparent background */
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-size: 30px;
+  font-weight: bold;
+  z-index: 2; /* Ensure it stays above the image */
+}
+/* Close button for small screens */
+#closeOverlayButton {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #FFFFFF; /* Semi-transparent background */
+  padding: 5px 10px;
+  border-radius: 5px;
+  border: none;
+  font-size: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  z-index: 3; /* Above all elements */
+}
+#closeOverlayButton:hover {
+  color: #ff0000; /* Highlight red on hover */
+}
+/* User info styling */
+#userOverlay div {
+  text-align: center;
+  font-size: clamp(14px, 1.5vw, 18px); /* Responsive font size */
+}
+/* Dark mode adjustments */
+body.dark-mode #userOverlay {
+  background: #141519; /* Dark background */
+  border: 1px solid #333; /* Subtle border */
+  box-shadow: 0 4px 6px rgba(255, 255, 255, 0.1); /* Light shadow */
+}
+body.dark-mode #userOverlay img {
+  border: 1px solid #444; /* Subtle border for images */
+}
+body.dark-mode #overlayUserRank, body.dark-mode #closeOverlayButton {
+  background: #141519; /* Light background for dark mode */
+  color: #E0E0E0; /* Dark text for visibility */
+}
+body.dark-mode #closeOverlayButton:hover {
+  color: #dc3545;
+}
+.warning-banner {
+  background-color: #ffc107;
+  color: #000;
+  text-align: center;
+  padding: 10px;
+  font-size: 1.2em;
+  font-weight: bold;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  display: none;
+}
+
+/* Coachmark anchored to Day/Week toggle */
+.auto-week-coachmark {
+  position: absolute;
+  display: none;
+  max-width: 360px;
+  padding: 10px 12px;
+  padding-right: 44px; /* leave room for the close button */
+  border-radius: 8px;
+  background: #fff8e1;
+  color: #333;
+  border: 1px solid #f5c851;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+  z-index: 2000;
+}
+.auto-week-coachmark .auto-week-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 4px;
+}
+.auto-week-coachmark .auto-week-close:hover { background: rgba(0,0,0,0.06); }
+.auto-week-text { margin-right: 4px; }
+.auto-week-coachmark .auto-week-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.auto-week-coachmark .auto-week-btn {
+  padding: 4px 8px;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+}
+.auto-week-coachmark.above .coachmark-arrow {
+  bottom: -10px;
+  top: auto;
+  transform: rotate(180deg);
+}
+.coachmark-arrow {
+  position: absolute;
+  top: -10px;
+  left: 0; /* will be set precisely by JS */
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 10px solid #fff8e1; /* match background */
+}
+.coachmark-target-highlight {
+  outline: 2px solid #ffc107;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Dark mode variants */
+body.dark-mode .auto-week-coachmark {
+  background: #2b2f36;
+  color: #e0e0e0;
+  border-color: #5a4b12;
+}
+body.dark-mode .coachmark-arrow {
+  border-bottom-color: #2b2f36;
+}
+body.dark-mode .auto-week-coachmark .auto-week-close:hover { background: rgba(255,255,255,0.08); }
+.large-number-text {
+  font-size: 2.5em;
+  white-space: nowrap;
+  align-self: center; /* Aligns text to the bottom within a flex container */
+}
+
+.medium-text {
+  font-size: 16px;
+  margin-left: 5px;
+}
+.date-range-selector, #historyWTD, #historyMTD, #historyYTD, #history10WK {
+  font-weight: bold;
+}
+.date-range-divider {
+  margin: 0 .2rem;
+}
+#back-arrow, #forward-arrow, #historyWTD, #historyMTD, #historyYTD, #history10WK, .date-range-selector {
+  cursor: pointer;
+  color: #474C55; /* Default color */
+}
+#back-arrow.active, #forward-arrow.active, .date-range-selector.active, #historyWTD.active, #historyMTD.active, #historyYTD.active, #history10WK.active {
+  color: #007bff; /* Highlight color for active items */
+}
+.date-range-selector:hover {
+  color: #007bff; /* Keep hover highlight for date range selector only */
+}
+#back-arrow.disabled, #forward-arrow.disabled {
+  opacity: 0.35;
+  pointer-events: none;
+  cursor: default;
+}
+#back-arrow.disabled:hover, #forward-arrow.disabled:hover {
+  color: inherit; /* no hover highlight when disabled */
+}
+#back-arrow {
+  cursor: pointer;
+}
+#forward-arrow {
+  margin-left: .3rem;
+}
+/* Active Calendar Icon */
+/* Active Calendar Icon */
+#calendar-icon.active {
+  color: #007bff; /* Highlight color */
+  cursor: pointer; /* Maintain interactivity */
+}
+#calendar-icon {
+  margin-left: .3rem;
+  cursor: pointer; /* Maintain interactivity */
+}
+#calendar-icon:hover {
+  color: #007bff; /* Highlight color */
+}
+/* Recruiting calendar icon (mirror of #calendar-icon) */
+body.dark-mode #rec-calendar-icon {
+  color: #cfcfcf; /* Default muted color in dark mode */
+}
+#rec-calendar-icon.active {
+  color: #007bff; /* Highlight color */
+  cursor: pointer; /* Maintain interactivity */
+}
+#rec-calendar-icon {
+  margin-left: .3rem;
+  cursor: pointer; /* Maintain interactivity */
+}
+#rec-calendar-icon:hover {
+  color: #007bff; /* Highlight color */
+}
+.date-range-group {
+  margin: .5rem 0;
+}
+.fa-calendar {
+  cursor: default; /* Ensure no pointer cursor to indicate it’s not interactive */
+  color: #474C55; /* Optional: Adjust to your preferred static color */
+}
+.graph-container {
+  width: 100%;
+  margin: 0px auto;
+  height: 200px; /* Adjust the height as needed */
+}
+.productionTable button {
+  margin-top: 10px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.save-indicator {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 16px;
+  text-align: center;
+  z-index: 1000;
+  display: none; /* Hidden by default */
+}
+.report-date {
+  font-size: 12px;
+  font-weight: bold;
+  color: #474C55;
+  padding: 5px;
+  display: inline-block;
+}
+/* Prevent text selection on the Week/Date column and clickable labels/expanders
+   Applies to both dashboard and recruiting tables (they share .productionTable) */
+.productionTable th:first-child,
+.productionTable td:first-child,
+.report-date,
+.week-label,
+.day-label,
+.week-expander {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+/* Highlight the selected row */
+.highlight-row {
+  background-color: #ffff99 !important; /* Light yellow highlight */
+  transition: background-color 0.5s ease;
+}
+/* Remove Arrows for Number Inputs in All Browsers */
+/* For Chrome, Safari, Edge, Opera */
+input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  padding: 2px;
+  appearance: textfield; /* Standard property for cross-browser support */
+  min-width: 6ch;
+  text-align: center;
+}
+/* Dynamic Column Widths for Production Table */
+.productionTable {
+  width: 100%; /* Adjust table width based on content */
+  border-collapse: collapse; /* Remove space between cells */
+  table-layout: auto; /* Columns adjust dynamically */
+  background-color: white;
+}
+.productionTable input[type="number"], .productionTable input[type="date"] {
+  width: 6ch; /* Allow inputs to resize dynamically */
+  text-align: center; /* Center align inputs */
+  padding: 2px; /* Slight padding for inputs */
+  margin: 5px 0;
+}
+/* Sticky Table Header */
+#overlayProductionTable.productionTable thead {
+  top: 0; /* Default to 0; will be adjusted dynamically */
+}
+/* Sticky Table Header */
+.productionTable thead {
+  position: sticky;
+  top: 145px; /* Default to 0; will be adjusted dynamically */
+  z-index: 50; /* Below team dropdown (z-index: 1300) but above normal content */
+  background-color: white; /* Prevent transparency */
+}
+/* Recruiting page has no chart; stick header to the very top */
+#recruitingProductionTable.productionTable thead {
+  top: 0;
+}
+.productionTable tfoot td:first-child {
+  text-align: center; /* Align "Total" label to the left */
+  color: #555; /* Medium contrast text for label */
+}
+.productionTable tfoot td {
+  padding: 5px 10px; /* Consistent padding with other rows */
+  font-size: 0.8rem;
+  color: #333; /* Darker text for totals */
+}
+/* Ensure table footer is sticky and has a solid separation */
+.productionTable tfoot {
+  position: sticky;
+  bottom: 0;
+  z-index: 102; /* Keep it above the table content */
+  background-color: #DADBDD; /* Light background for footer */
+  font-weight: bold; /* Emphasize the totals */
+  text-align: center; /* Center-align all columns */
+  box-shadow: 0 -2px 0 #444;; /* Add shadow for visual separation */
+}
+.avg-footer {
+  background-color: #eef0f3;
+}
+body.dark-mode .avg-footer {
+  background-color: #0a0b0d;
+}
+.agency-toggle-group .edit-button {
+  margin: 0 5px 5px;
+  padding: 5px 20px;
+}
+#teamViewBtn {
+  display: inline-block;
+  position: relative; /* Anchor the dropdown arrow */
+  max-width: 20ch; /* Limit visible characters */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+  padding-right: 16px; /* Reserve space for the arrow */
+}
+.agency-toggle-group .edit-button.active {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+  transition: background .2s ease;
+}
+/* Recruiter Edit icon (lock/unlock) */
+.rec-edit-icon {
+  cursor: pointer;
+  color: #474C55;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+.rec-edit-icon:hover { color: #007bff; }
+.rec-edit-icon.active {
+  color: #28a745;
+  border-color: #28a74522;
+  background: rgba(40,167,69,0.08);
+}
+body.dark-mode .rec-edit-icon { color: #cfcfcf; }
+body.dark-mode .rec-edit-icon:hover { color: #4da3ff; }
+body.dark-mode .rec-edit-icon.active { color: #49d07a; border-color: #49d07a33; background: rgba(73,208,122,0.08); }
+.disabled-input {
+  cursor: not-allowed;
+  color: #007bff; /* Blue text like dashboard disabled inputs */
+}
+/* Position the dropdown correctly */
+.team-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+/* Style the dropdown container */
+.team-selector-container {
+  display: none; /* Initially hidden */
+  position: absolute;
+  top: 100%; /* Directly below the button */
+  right: 0;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 5px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  width: auto; /* Auto size based on content */
+  max-width: fit-content; /* Ensure it only stretches as needed */
+  min-width: max-content; /* Prevent shrinking too much */
+  white-space: nowrap;
+}
+
+
+/* Show the dropdown when active */
+.team-selector-container.active {
+  display: flex;
+}
+
+#teamViewBtn::after {
+  content: " \25BC";
+  display: inline-block;
+  position: absolute; /* Keep arrow visible when text truncates */
+  right: 6px;
+}
+/* Move arrow down with smooth animation */
+#teamViewBtn:hover::after {
+  content: " \25BC";
+  display: inline-block;
+  animation: moveArrow 0.3s ease forwards;
+}
+.no-hover:hover::after {
+  animation: none !important;
+  content: " \25BC";
+}
+
+/* Define the animation */
+@keyframes moveArrow {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(3px); } /* Move down */
+  100% { transform: translateY(0px); } /* Move back */
+}
+
+/* General Body Styling for Dark Mode */
+body.dark-mode {
+  background-color: #0a0b0d; /* Dark background */
+  color: #e0e0e0; /* Light text for general content */
+}
+/* Large and Medium Text */
+body.dark-mode .large-number-text {
+  color: #ffffff; /* Bright white for visibility */
+}
+body.dark-mode .medium-text {
+  color: #cfcfcf; /* Slightly dimmed for contrast */
+}
+/* Date Range Selector and Arrows */
+body.dark-mode .date-range-selector,
+body.dark-mode #historyWTD,
+body.dark-mode #historyMTD,
+body.dark-mode #historyYTD,
+body.dark-mode #history10WK,
+body.dark-mode #back-arrow,
+body.dark-mode #forward-arrow,
+body.dark-mode #calendar-icon {
+  color: #cfcfcf; /* Default muted color in dark mode */
+}
+body.dark-mode #back-arrow.active,
+body.dark-mode #forward-arrow.active,
+body.dark-mode .date-range-selector.active,
+body.dark-mode #historyWTD.active,
+body.dark-mode #historyMTD.active,
+body.dark-mode #historyYTD.active,
+body.dark-mode #history10WK.active,
+body.dark-mode #back-arrow:hover,
+body.dark-mode #forward-arrow:hover,
+body.dark-mode .date-range-selector:hover {
+  color: #007bff; /* Bright blue for active or hover state */
+}
+/* Report Date Styling */
+body.dark-mode .report-date {
+  color: #e0e0e0; /* Light text for contrast */
+}
+/* Highlight Row */
+body.dark-mode .highlight-row {
+  background-color: #333333 !important; /* Dark highlight for selected rows */
+  transition: background-color 0.5s ease;
+}
+/* Input Fields */
+body.dark-mode input[type="number"] {
+  background-color: #141519;
+  color: #ffffff;
+  border: 1px solid #333333; /* Subtle border for inputs */
+}
+body.dark-mode input[type="date"] {
+  background-color: #141519;
+  color: #ffffff;
+  border: 1px solid #333333;
+}
+/* Production Table */
+body.dark-mode .productionTable {
+  background-color: #0a0b0d; /* Dark background */
+  color: #e0e0e0; /* Light text */
+}
+body.dark-mode .productionTable thead {
+  background-color: #0a0b0d; /* Sticky header background */
+  color: #ffffff; /* Light text for readability */
+}
+/* Dark Mode Adjustments */
+body.dark-mode .productionTable tfoot {
+  background-color: #141519; /* Dark background for footer */
+  color: #cfcfcf; /* Light text for totals */
+}
+body.dark-mode .productionTable tfoot td:first-child {
+  color: #e0e0e0; /* Bright text for "Total" label */
+}
+body.dark-mode .productionTable tfoot td {
+  color: #cfcfcf; /* Light text for totals */
+}
+
+/* Mobile footer uses scroll container padding; no extra offset needed */
+/* Disabled Input Styling */
+body.dark-mode .disabled-input {
+  color: #007bff !important; /* Add !important to ensure it overrides other styles */
+  cursor: not-allowed !important;
+}
+/* Recruiting column color groups (greens step up: External < Internal < Personal) */
+#recruitingProductionTable .col-external { background: #f6fcf7; }
+#recruitingProductionTable .col-internal { background: #eff9f1; }
+#recruitingProductionTable .col-personal { background: #eaf6ed; }
+#recruitingProductionTable .col-showinvite { background: #fffbe8; }
+/* Final Interview + Hiring column backgrounds (light to keep inputs legible) */
+#recruitingProductionTable .col-finalint { background: #fff4f6; }
+#recruitingProductionTable .col-hiring { background: #ffefe6; }
+#recruitingProductionTable .pct-col {
+  font-weight: 600;
+  min-width: 5ch; /* ensure space for '100%' */
+  white-space: nowrap;
+  text-align: center;
+}
+#recruitingProductionTable .pct-col span {
+  display: inline-block;
+  min-width: 5ch; /* ensure space for '100%' */
+  text-align: center;
+}
+
+/* Dark mode variations (subtle stepping per group) */
+body.dark-mode #recruitingProductionTable .col-external { background: #0e1712; }
+body.dark-mode #recruitingProductionTable .col-internal { background: #0c1611; }
+body.dark-mode #recruitingProductionTable .col-personal { background: #0a1512; }
+body.dark-mode #recruitingProductionTable .pct-col { color: #e6e6e6; }
+/* Show & Invite + Final + Hiring dark backgrounds */
+body.dark-mode #recruitingProductionTable .col-showinvite { background: #1e1a10; }
+body.dark-mode #recruitingProductionTable .col-finalint { background: #1b1517; }
+body.dark-mode #recruitingProductionTable .col-hiring { background: #1c1511; }
+/* Graph Container */
+body.dark-mode .graph-container {
+  background-color: #0a0b0d;
+}
+/* Agency Toggle Group */
+body.dark-mode .agency-toggle-group .edit-button {
+  color: #cfcfcf; /* Default muted color */
+}
+body.dark-mode .agency-toggle-group .edit-button.active {
+  background-color: #0056b3; /* Slightly darker blue for active state */
+  color: #ffffff; /* Bright white text */
+  border-color: #0056b3;
+  transition: background 0.2s ease;
+}
+/* Save Indicator */
+body.dark-mode .save-indicator {
+  color: #ffffff; /* Bright text for visibility */
+}
+body.dark-mode .team-selector-container {
+  background-color: #1E2025;
+  border: 1px solid #333333;
+  box-shadow: 0 4px 6px rgba(255, 255, 255, 0.1); /* Light shadow */
+}
+/* Mobile Adjustments */
+@media (max-width: 1279px) {
+  #leaderboardTable th:nth-child(3),
+  #leaderboardTable td:nth-child(3),
+  #top3Table th:nth-child(3),
+  #top3Table td:nth-child(3) {
+    display: none;
+  }
+  .custom-tooltip {
+    visibility: visible;
+  }
+  .large-number-text {
+    font-size: 2.25em;
+  }
+}
+@media (max-width: 768px) {
+    /* Hide search on small screens; keep title visible */
+    .leaderboard-header .search-container{display:none !important}
+    .leaderboard-header.search-active #leaderboard-title{display:inline !important}
+  .active-now-header{ justify-content:center; margin-top: 5px; }
+  /* When right panel is expanded, left-align Presentations header */
+  .rightside-container.expanded .active-now-header{ justify-content:flex-start !important; margin-top: 0; }
+  
+    /* Icon-only rows: remove text and tighten spacing */
+    .active-item-main{display:none !important}
+    .active-item{gap:0; padding:10px 0; justify-content:center; background:transparent; border-radius:0}
+    .active-item img{width:26px;height:26px; border:none; transition:transform .12s ease, filter .12s ease}
+    .active-now-list{gap:4px}
+    /* Hover behavior in icon-only mode: no bg/shadow; animate the icon */
+    .active-item:hover{background:transparent !important; box-shadow:none !important}
+    .active-item:hover img{transform:scale(1.06); filter:brightness(1.12)}
+  .active-now-header .sub-title{display:none !important}
+  /* When expanded, show the Presentations title again */
+  .rightside-container.expanded .active-now-header .sub-title{display:inline !important}
+
+  .top-controls-row .stats-icons { display: none; }
+  .top-controls-row .stats-menu { display: inline-block; margin-left: auto; }
+
+  /* Hide chart/graph on mobile */
+  .graph-container { display: none !important; }
+  #leaderboardTable th:nth-child(1),
+  #leaderboardTable td:nth-child(1),
+  #leaderboardTable th:nth-child(4),
+  #leaderboardTable td:nth-child(4),
+  #top3Table th:nth-child(1),
+  #top3Table td:nth-child(1),
+  #top3Table th:nth-child(4),
+  #top3Table td:nth-child(4),
+  .search-container-container,
+  #openLastWeekOverlay {
+    display: none;
+  }
+  #leaderboard-title::before {
+    content: "LB"; /* Abbreviation for small screens */
+  }
+  #top3-title::before {
+    content: "LW"; /* Abbreviation for small screens */
+  }
+  #alpFilterContainer {
+    display: none;
+  }
+  #leaderboard-title, #top3-title,
+  #activeNow .sub-title {
+    margin-left: -10px;
+  }
+  .modal-content {
+    width: 90%; /* Full width for smaller screens */
+  }
+  .modal-buttons {
+    flex-direction: column;
+    gap: 10px; /* Add spacing between stacked buttons */
+  }
+  .large-number-text {
+    font-size: 2em;
+  }
+  #dashboardSticky.sticky {
+    height: 130px;
+  }
+  .productionTable thead {
+    top: 130px; /* Default to 0; will be adjusted dynamically */
+  }
+  /* Right panel expand trigger - only shown on mobile */
+  .rightside-expand-bar { display: block !important; text-align: center; margin: 6px 0 8px; position: sticky; top: 0; z-index: 5; padding: 4px 0; background: inherit; }
+  .rightside-expand-btn {
+    width: 32px; height: 32px;
+    border: 1px solid #cbd5e1; background: #fff; color: #374151;
+    border-radius: 50%; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .rightside-expand-btn:hover { background:#f3f4f6; }
+  body.dark-mode .rightside-expand-btn { background:#141519; color:#e5e7eb; border-color:#333 }
+  body.dark-mode .rightside-expand-btn:hover { background:#1a1f25; }
+  /* Micro-interaction: subtle button scale on expand */
+  .rightside-expand-btn { transition: transform .15s ease, background-color .15s ease; }
+  .rightside-container.expanded .rightside-expand-btn { transform: scale(1.05); }
+  /* Smooth open/close animation for the right panel */
+  .rightside-container {
+    /* Define collapsed baseline in the same file to ensure animatable pair */
+    width: 50px !important;
+    min-width: 50px !important;
+    flex: 0 0 50px !important;
+    transition: flex-basis .25s ease, width .25s ease, min-width .25s ease !important;
+    will-change: width, flex-basis;
+  }
+  /* Respect reduced motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    .rightside-container { transition: none; }
+    .rightside-expand-btn { transition: none; }
+  }
+  /* When expanded, widen the right column and restore hidden columns */
+  .rightside-container.expanded { width: 350px !important; min-width: 350px !important; flex: 0 0 350px !important; }
+  /* Restore hidden table columns in expanded mode */
+  .rightside-container.expanded #leaderboardTable th:nth-child(1),
+  .rightside-container.expanded #leaderboardTable td:nth-child(1),
+  .rightside-container.expanded #leaderboardTable th:nth-child(3),
+  .rightside-container.expanded #leaderboardTable td:nth-child(3),
+  .rightside-container.expanded #leaderboardTable th:nth-child(4),
+  .rightside-container.expanded #leaderboardTable td:nth-child(4),
+  .rightside-container.expanded #top3Table th:nth-child(1),
+  .rightside-container.expanded #top3Table td:nth-child(1),
+  .rightside-container.expanded #top3Table th:nth-child(3),
+  .rightside-container.expanded #top3Table td:nth-child(3),
+  .rightside-container.expanded #top3Table th:nth-child(4),
+  .rightside-container.expanded #top3Table td:nth-child(4) {
+    display: table-cell !important;
+  }
+  /* Restore full titles instead of LB/LW when expanded */
+  .rightside-container.expanded #leaderboard-title::before,
+  .rightside-container.expanded #top3-title::before { content: attr(data-title) !important; }
+  /* Restore search in header when expanded */
+  .rightside-container.expanded .leaderboard-header .search-container { display: flex !important; }
+  /* Also show the Top Last Week popout icon when expanded */
+  .rightside-container.expanded #openLastWeekOverlay { display: inline-block !important; }
+  /* In icon-only mode we hid .active-item-main; show it when expanded */
+  .rightside-container.expanded .active-item-main { display: flex !important; }
+  .rightside-container.expanded .active-item { gap:10px; padding:6px 8px; background:#fafafa; border-radius:8px; justify-content:flex-start; }
+  body.dark-mode .rightside-container.expanded .active-item { background:#0b0f15; }
+}
+
+@media (max-width: 600px) {
+  .top-controls-row { 
+    flex-wrap: nowrap; align-items: flex-start; 
+  }
+  .input-tooltip {
+    display: none;
+  }
+  #teamViewSpan {
+    display: block; /* Can break to a new line on very small screens */
+    text-align: center;
+  }
+  /* Slightly reduce the cap on extra-small screens */
+  #teamViewBtn { max-width: 16ch; }
+}
+@media only screen and (max-height: 600px) and (orientation: landscape) {
+  .graph-container{
+    display: none;
+  }
+  .title-bar {
+    height: 50px;
+  }
+  .narrow-container {
+    max-height: calc(100vh - 50px); /* Adjust for the header height */
+  }
+  .large-number-text {
+    font-size: 1.75em;
+  }
+  .productionTable thead {
+    top: 145px; /* Default to 0; will be adjusted dynamically */
+  }
+  #dashboardSticky.sticky {
+    max-height: 145px;
+  }
+}
+
+  .agency-toggle-group {
+      display: flex;
+      justify-content: center; /* Pushes elements to edges */
+      align-content: center;
+      align-items: center;
+      width: 100%;
+  }
+
+  
+/* Row View toggle cell (dashboard table + overlay) */
+#productionTable thead th#toggleDayWeek,
+#overlayProductionTable thead th#toggleOverlayTableDayWeek {
+    position: relative;
+    min-width: 34px;
+    cursor: pointer;
+}
+
+/* Attention highlight ring (works in light and dark) */
+#toggleDayWeek.row-view-attn,
+#toggleOverlayTableDayWeek.row-view-attn {
+    box-shadow: inset 0 0 0 2px #f59e0b; /* amber ring */
+    border-radius: 6px;
+}
+
+/* Dark mode: ensure readable icon/label color on header cell */
+body.dark-mode #toggleDayWeek,
+body.dark-mode #toggleOverlayTableDayWeek {
+    color: #e5e7eb; /* gray-200 */
+}
+
+/* Highlight expanded week/month rows and their day groups (dashboard + overlay) */
+#productionTable tbody tr.week-row.expanded,
+#productionTable tbody tr.month-row.expanded,
+#overlayProductionTable tbody tr.week-row.expanded,
+#overlayProductionTable tbody tr.month-row.expanded {
+    background-color: #e8f0fe; /* light blue */
+}
+body.dark-mode #productionTable tbody tr.week-row.expanded,
+body.dark-mode #productionTable tbody tr.month-row.expanded,
+body.dark-mode #overlayProductionTable tbody tr.week-row.expanded,
+body.dark-mode #overlayProductionTable tbody tr.month-row.expanded {
+    background-color: #0b1a3a; /* dark navy for contrast */
+}
+/* Shade all cells within expanded parent rows */
+#productionTable tbody tr.week-row.expanded td,
+#productionTable tbody tr.month-row.expanded td,
+#overlayProductionTable tbody tr.week-row.expanded td,
+#overlayProductionTable tbody tr.month-row.expanded td {
+    background-color: inherit;
+}
+/* Blue borders around expanded day groups */
+#productionTable tbody tr.day-detail-row.day-detail-row-start td,
+#overlayProductionTable tbody tr.day-detail-row.day-detail-row-start td {
+    border-top: 3px solid #3b82f6; /* blue-500 */
+}
+#productionTable tbody tr.day-detail-row.day-detail-row-end td,
+#overlayProductionTable tbody tr.day-detail-row.day-detail-row-end td {
+    border-bottom: 3px solid #3b82f6; /* blue-500 */
+}
+/* Make inputs in expanded parent rows blend into highlight */
+#productionTable tbody tr.week-row.expanded input[disabled],
+#productionTable tbody tr.month-row.expanded input[disabled],
+#overlayProductionTable tbody tr.week-row.expanded input[disabled],
+#overlayProductionTable tbody tr.month-row.expanded input[disabled] {
+    background-color: transparent;
+}
+/* Active Now (Live Presentations) */
+/* Prefer OS theme on first paint to avoid flash before JS/theme class applies */
+.active-now-container{border:1px solid #e5e7eb;margin-bottom:12px;background:#fff}
+@media (prefers-color-scheme: dark){
+  .active-now-container{background:#0f1217; border-color:#1f2937}
+  /* If user has turned OFF dark mode, force light styles for active-now */
+  html:not(.dark-mode) .active-now-container,
+  body:not(.dark-mode) .active-now-container{background:#fff; border-color:#e5e7eb}
+}
+html.dark-mode .active-now-container, body.dark-mode .active-now-container{border-color:#1f2937;background:#0f1217}
+.active-now-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.active-now-title{font-weight:700; font-size:1.05rem; line-height:1.2}
+.active-now-count{color:#666;margin-left:6px}
+html.dark-mode .active-now-count, body.dark-mode .active-now-count{color:#9ca3af}
+.active-now-count{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 9999px; /* pill */
+  background: #eef0f3;
+  color: #333;
+  border: 1px solid #d0d4da;
+  vertical-align: middle;
+}
+/* Dark mode badge */
+html.dark-mode .active-now-count,
+body.dark-mode .active-now-count{
+  background: #1f232a;
+  color: #e5e7eb;
+  border-color: #333;
+}
+.active-now-actions{display:flex;gap:8px}
+.active-toggle-btn{background:transparent;border:1px solid #ccc;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer}
+.active-toggle-btn:hover{background:#f3f4f6}
+html.dark-mode .active-toggle-btn, body.dark-mode .active-toggle-btn{border-color:#374151;color:#e5e7eb}
+html.dark-mode .active-toggle-btn:hover, body.dark-mode .active-toggle-btn:hover{background:#111827}
+.active-now-list{max-height:23vh;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:4px}
+.active-item{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:8px;background:#fafafa;cursor:pointer;transition:background-color .15s ease, box-shadow .15s ease, transform .15s ease}
+
+/* Rank badge for leaderboard (mirrors Active Now count badge) */
+.rank-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:18px;
+  height:18px;
+  padding:0 5px;
+  font-size:11px;
+  line-height:1;
+  border-radius:9999px;
+  background:#eef0f3;
+  color:#333;
+  border:1px solid #d0d4da;
+  vertical-align:middle;
+  font-weight:700;
+}
+.rank-badge.rank-gold{
+  background: linear-gradient(135deg,#fff5c2,#ffe082);
+  color:#7a5e00;
+  border-color:#e6c95c;
+}
+.rank-badge.rank-silver{
+  background: linear-gradient(135deg,#f3f4f6,#dfe4ea);
+  color:#465362;
+  border-color:#cfd6de;
+}
+.rank-badge.rank-bronze{
+  background: linear-gradient(135deg,#fde2c7,#f2b994);
+  color:#6d3f1a;
+  border-color:#e7a773;
+}
+/* Dark mode adjustments */
+html.dark-mode .rank-badge, body.dark-mode .rank-badge{
+  background:#1f232a;
+  color:#e5e7eb;
+  border-color:#333;
+}
+html.dark-mode .rank-badge.rank-gold, body.dark-mode .rank-badge.rank-gold{
+  background: linear-gradient(135deg,#3a2f00,#6b5500);
+  color:#f6e8a6;
+  border-color:#7a6400;
+}
+html.dark-mode .rank-badge.rank-silver, body.dark-mode .rank-badge.rank-silver{
+  background: linear-gradient(135deg,#2b3138,#1f242a);
+  color:#d1d8e0;
+  border-color:#39414a;
+}
+html.dark-mode .rank-badge.rank-bronze, body.dark-mode .rank-badge.rank-bronze{
+  background: linear-gradient(135deg,#40240f,#5a3014);
+  color:#f3cfb5;
+  border-color:#6a3a1a;
+}
+html.dark-mode .active-item, body.dark-mode .active-item{background:#0b0f15}
+.active-item:hover{background:#f3f4f6; box-shadow:0 1px 2px rgba(0,0,0,.06)}
+html.dark-mode .active-item:hover, body.dark-mode .active-item:hover{background:#111827; box-shadow:0 1px 2px rgba(0,0,0,.4)}
+.active-item img{width:30px;height:30px;border-radius:50%;object-fit:cover;border:1px solid #e5e7eb}
+html.dark-mode .active-item img, body.dark-mode .active-item img{border-color:#1f2937}
+.active-item-main{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.active-item-top{display:flex;align-items:baseline;gap:6px;min-width:0}
+.active-item-top .agent-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.active-item-top .lead-sep{color:#9ca3af}
+.active-item-top .lead-type{white-space:nowrap;color:#374151}
+.active-item-meta{font-size:12px;color:#555;display:flex;align-items:center;justify-content:space-between;gap:8px}
+html.dark-mode .active-item-meta, body.dark-mode .active-item-meta{color:#9ca3af}
+.active-restore{display:none;margin-bottom:12px}
+.active-restore .active-toggle-btn{border-style:dashed}
+/* Empty state for Live widget */
+.active-empty{font-size:13px;color:#666;padding:6px 4px}
+html.dark-mode .active-empty, body.dark-mode .active-empty{color:#9ca3af}
+/* Live indicator (row-level) */
+.live-ind{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:#d32f2f}
+.live-ind .dot{width:8px;height:8px;border-radius:50%;background:#e53935;box-shadow:0 0 0 0 rgba(229,57,53,.7);animation:lt-pulse 1.6s ease-out infinite}
+@keyframes lt-pulse{0%{box-shadow:0 0 0 0 rgba(229,57,53,.7)}70%{box-shadow:0 0 0 10px rgba(229,57,53,0)}100%{box-shadow:0 0 0 0 rgba(229,57,53,0)}}
+html.dark-mode .live-ind, body.dark-mode .live-ind{color:#ff8585}
+html.dark-mode .live-ind .dot, body.dark-mode .live-ind .dot{background:#ff5252}
+/* Ended indicator */
+.end-ind{font-weight:500;color:#6b7280}
+html.dark-mode .end-ind, body.dark-mode .end-ind{color:#9ca3af}
+/* Responsive tweaks: mirror the approach used in leaderboard header */
+@media (max-width: 1279px){
+    /* Give agent name more room by hiding lead type + separator */
+    .active-item-top .lead-sep,
+    .active-item-top .lead-type{display:none}
+}
+    .active-now-actions{display:none}
+
+/* Right sidebar: allow outer scrolling, but hide the scrollbar */
+.rightside-container{overflow-y:auto; overflow-x:hidden; -ms-overflow-style:none; scrollbar-width:none}
+.rightside-container::-webkit-scrollbar{display:none}
+/* Expand control hidden by default (desktop); enabled in mobile media query */
+.rightside-expand-bar{ display:none; }
+/* Scrollable lists inside the right bar */
+.scroll-section{overflow-y:auto; overflow-x:hidden}
+/* Tuned heights per section */
+.scroll-top3{max-height:300px}
+.scroll-leaderboard{max-height:300px}
+/* Prevent horizontal scroll from leaderboard tables */
+#leaderboardTable, #top3Table { width:100%; table-layout:fixed; }
+#leaderboardTable th, #leaderboardTable td, #top3Table th, #top3Table td { box-sizing:border-box; }
+/* Ellipsis for agent name cells (JS wraps text in .name-ellipsis) */
+.name-ellipsis{ display:inline-block; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* Overlay profile picture: small by default, click to zoom */
+.overlay-image-container img#overlayProfilePicture{width:150px;height:150px;border-radius:50%;object-fit:cover;cursor:zoom-in}
+#profileZoomBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:100000}
+#profileZoomBackdrop img{max-width:90vw;max-height:90vh;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.5);cursor:zoom-out}
+/* Presentation overlay layout */
+.presentation-flex{display:flex;gap:18px;align-items:flex-start;justify-content:center;min-width:280px}
+.stats-overlay .stats-overlay-content .presentation-flex{max-width:560px;margin:0 auto}
+#presentationOverlay .stats-overlay-content{max-width:560px;width:calc(100% - 32px);margin:0 auto}
+.presentation-left{flex:1 1 auto;max-width:520px;display:flex;flex-direction:column;align-items:center}
+.presentation-left .overlay-image-container img#presentationProfilePicture{width:150px;height:150px;border-radius:50%;object-fit:cover;cursor:zoom-in}
+.presentation-agent-name{margin-top:8px;font-weight:700;text-align:center}
+.presentation-agent-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.presentation-details-title{margin-top:12px;margin-bottom:6px;font-weight:700;color:#374151}
+body.dark-mode .presentation-details-title{color:#d1d5db}
+.presentation-info{display:flex;flex-direction:column;gap:6px;width:100%;max-width:520px}
+.presentation-details-table{width:100%;border-collapse:separate;border-spacing:0;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.presentation-details-table th,.presentation-details-table td{padding:8px 10px}
+.presentation-details-table th{text-align:left;width:160px;background:#f3f4f6;color:#374151;font-weight:600}
+.presentation-details-table tr+tr th,.presentation-details-table tr+tr td{border-top:1px solid #e5e7eb}
+body.dark-mode .presentation-details-table{background:#0f1217;border-color:#374151;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+body.dark-mode .presentation-details-table th{background:#111827;color:#d1d5db}
+body.dark-mode .presentation-details-table tr+tr th,body.dark-mode .presentation-details-table tr+tr td{border-top:1px solid #374151}
+.presentation-details-table .live-row td{background:#eef2ff;color:#1e40af;font-weight:600}
+body.dark-mode .presentation-details-table .live-row td{background:#0b1a3a;color:#93c5fd}
+.pi-row{display:flex;gap:8px}
+.pi-label{width:140px;color:#374151;font-weight:600}
+body.dark-mode .pi-label{color:#d1d5db}
+.pi-value{flex:1;color:#4b5563}
+body.dark-mode .pi-value{color:#9ca3af}
+@media (max-width: 640px){
+    .presentation-flex{flex-direction:column;align-items:center}
+    .presentation-left{max-width:100%}
+}
+/* Leaderboard header with inline search */
+  .active-now-header{justify-content:flex-start; margin-bottom:4px}
+  .active-now-header > div:first-child{width:auto; text-align:left}
+    .active-now-header .active-now-count{margin-left:0; font-size:12px; font-weight:600}
+.leaderboard-header{display:flex;align-items:center;justify-content:flex-start;gap:10px;margin:0;}
+.leaderboard-header #leaderboard-title{flex:0 0 auto}
+.leaderboard-header .search-container{flex:0 0 auto;display:flex;align-items:center;gap:0;width:22px;height:22px;position:relative;transition:max-width .2s ease, opacity .2s ease}
+.leaderboard-header .search-input{flex:1 1 auto;height:100%}
+.leaderboard-header.search-active #leaderboard-title{display:none}
+.leaderboard-header.search-active .search-container{flex:1 1 auto;display:flex;align-items:center;gap:6px;max-width:280px;height:32px}
+
+/* Final overrides: Leaderboard and Top Last Week row layout */
+#leaderboardTable td, #top3Table td { padding: 8px 6px; vertical-align: middle; }
+/* Rank column: fixed narrow width, centered */
+#leaderboardTable th:nth-child(1), #leaderboardTable td:nth-child(1),
+#top3Table th:nth-child(1), #top3Table td:nth-child(1) {
+  width: 40px;
+  padding-left: 8px; padding-right: 8px;
+  text-align: center;
+}
+/* Avatar column: small fixed width, tight padding */
+#leaderboardTable th:nth-child(2), #leaderboardTable td:nth-child(2),
+#top3Table th:nth-child(2), #top3Table td:nth-child(2) {
+  width: 48px;
+  padding-left: 10px; padding-right: 10px;
+}
+/* Avatar size */
+#leaderboardTable td:nth-child(2) img, #top3Table td:nth-child(2) img {
+  width: 24px; height: 24px; border-radius: 50%; object-fit: cover;
+}
+/* Name column: flexible; give it the room */
+#leaderboardTable th:nth-child(3), #leaderboardTable td:nth-child(3),
+#top3Table th:nth-child(3), #top3Table td:nth-child(3) {
+  width: auto;
+  max-width: 100%;
+  padding-left: 6px;
+}
+/* Value column: compact, right-aligned */
+#leaderboardTable th:nth-child(4), #leaderboardTable td:nth-child(4),
+#top3Table th:nth-child(4), #top3Table td:nth-child(4) {
+  width: 88px; /* fits $9,999 comfortably */
+  text-align: center;
+  padding-left: 6px; padding-right: 6px;
+}
+/* Ensure name ellipsis can use full width of its cell */
+#leaderboardTable td:nth-child(3) .name-ellipsis,
+#top3Table td:nth-child(3) .name-ellipsis { max-width: 100%; display: inline-block; }
+
+/* F6 Toggle Switch (First 6 Months) */
+#f6Toggle.f6-switch { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 14px; cursor: pointer; user-select: none; background: #ffffff; vertical-align: middle; margin-bottom: 5px; }
+#f6Toggle .switch-track { width: 38px; height: 20px; background: #e5e7eb; border-radius: 999px; position: relative; transition: background 0.2s ease; flex: 0 0 auto; }
+#f6Toggle .switch-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: #ffffff; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.2); transition: left 0.2s ease; }
+#f6Toggle.active .switch-track { background: #22c55e; }
+#f6Toggle.active .switch-knob { left: 20px; }
+#f6Toggle .switch-label { font-size: 12px; color: #374151; line-height: 1; }
+
+/* Dark mode styling for F6 Toggle */
+body.dark-mode #f6Toggle.f6-switch { background: #0a0b0d; }
+body.dark-mode #f6Toggle .switch-track { background: #374151; }
+body.dark-mode #f6Toggle .switch-knob { background: #e5e7eb; box-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+body.dark-mode #f6Toggle .switch-label { color: #cfcfcf; }
+body.dark-mode #f6Toggle.active .switch-track { background: #16a34a; }
+
+/* Align the scope buttons row (You/Agency/Team) and F6 switch vertically centered */
+.agency-toggle-group { align-items: center; }
+
+/* Stat chip styling (used in quick stats display) */
+.stat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  background: #f3f4f6;
+  color: #333;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+body.dark-mode .stat-chip {
+  background: #1a1f25;
+  color: #d1d5db;
+}
+
+body.legacy-mode .stat-chip {
+  background: rgba(28,22,16,0.5);
+  color: var(--legacy-text-primary);
+  border: 1px solid rgba(139,106,55,0.35);
+}

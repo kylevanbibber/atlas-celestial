@@ -11,9 +11,10 @@ import { FiHome, FiClipboard, FiSettings, FiBell, FiShield, FiUsers, FiList, FiT
  * @param {number} userId - The user's ID for conditional features
  * @param {string} userLagnname - The user's lagnname for conditional features
  * @param {string} userClname - The user's clname for conditional features
+ * @param {function} hasPageAccess - Function to check if user has access to a page (SGA permissions)
  * @returns {Array} Navigation items with status indicators
  */
-const getSidebarNavItems = (hasLicenseWarning = false, isAdmin = false, unreadNotifications = 0, teamRole = null, userId = null, userLagnname = null, userClname = null) => {
+const getSidebarNavItems = (hasLicenseWarning = false, isAdmin = false, unreadNotifications = 0, teamRole = null, userId = null, userLagnname = null, userClname = null, hasPageAccess = null) => {
   // Check user type for conditional sections
   const isAppAdmin = isAdmin && teamRole === 'app';
   const isSGANonAdmin = ['SA', 'GA', 'MGA', 'RGA'].includes(userClname) && !isAdmin;
@@ -193,6 +194,36 @@ const getSidebarNavItems = (hasLicenseWarning = false, isAdmin = false, unreadNo
   // Admin section removed - admin users don't need the admin badge in sidebar
   // Admin functionality is still accessible via direct URLs:
   // /admin/notifications, /admin/hierarchy, /admin/hierarchy-table
+  
+  // Filter navigation items based on SGA page permissions
+  if (hasPageAccess && typeof hasPageAccess === 'function') {
+    return navItems.filter(item => {
+      // Map navigation paths to page_keys
+      const pathToPageKey = {
+        '/production': 'production',
+        '/resources': 'resources',
+        '/recruiting': 'recruiting',
+        '/utilities': 'utilities',
+        '/promotion-tracking': 'production_overview',
+        '/ref-entry': 'refs',
+      };
+      
+      // Dashboard is always accessible
+      if (item.path === '/dashboard') {
+        return true;
+      }
+      
+      // Check if this item requires permission
+      const pageKey = pathToPageKey[item.path];
+      if (pageKey) {
+        return hasPageAccess(pageKey);
+      }
+      
+      // If no mapping exists, hide it by default for safety
+      // Admin and special pages should be explicitly mapped if needed
+      return false;
+    });
+  }
   
   return navItems;
 };

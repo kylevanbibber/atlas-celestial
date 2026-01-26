@@ -40,6 +40,8 @@ import { useTeamStyles, TeamStyleProvider } from './context/TeamStyleContext';
 import { LicenseWarningProvider } from "./context/LicenseWarningContext";
 import { NotificationProvider } from "./context/NotificationContext";
 import { HeaderProvider } from "./context/HeaderContext";
+import { AgencyProvider } from "./context/AgencyContext";
+import { EmbeddedProvider, useEmbedded } from "./context/EmbeddedContext";
 import NotificationUtilities from "./components/utilities/notification/NotificationUtilities";
 import InPageNotificationContainer from "./components/notifications/InPageNotificationContainer";
 import RefEntry from "./components/refvalidation/RefEntry";
@@ -65,6 +67,7 @@ import AdminCheck from "./pages/admin/AdminCheck";
 import AnalyticsDashboard from "./pages/admin/AnalyticsDashboard";
 import { logRedirect, logNavigation } from "./utils/navigationLogger";
 import "./App.css";
+import "./embedded.css";
 
 // Placeholder component for pages under construction
 const PlaceholderPage = ({ title }) => (
@@ -78,6 +81,7 @@ const PlaceholderPage = ({ title }) => (
 function AppContent() {
   const { isAuthenticated, loading: authLoading, user, hasPermission } = useAuth();
   const { styles, loading: stylesLoading, teamName } = useTeamStyles();
+  const { isEmbedded } = useEmbedded();
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -477,8 +481,8 @@ function AppContent() {
   // Otherwise, render the main app layout with header, sidebar, etc.
   const isOnboardingHome = location.pathname.startsWith('/onboarding/home');
   return (
-    <div className="app-container">
-      <Header pageTitle={pageTitle} onboardingMode={isOnboardingHome} />
+    <div className={`app-container ${isEmbedded ? 'embedded-mode' : ''}`}>
+      {!isEmbedded && <Header pageTitle={pageTitle} onboardingMode={isOnboardingHome} />}
       <div className="main-content">
         <div className="page-content">
           <Routes>
@@ -734,13 +738,17 @@ function App() {
       <AuthProvider>
         <ThemeProvider>
           <TeamStyleProvider>
-            <NotificationProvider>
-              <LicenseWarningProvider>
-                <HeaderProvider>
-                  <AppContent />
-                </HeaderProvider>
-              </LicenseWarningProvider>
-            </NotificationProvider>
+            <AgencyProvider>
+              <EmbeddedProvider>
+                <NotificationProvider>
+                  <LicenseWarningProvider>
+                    <HeaderProvider>
+                      <AppContent />
+                    </HeaderProvider>
+                  </LicenseWarningProvider>
+                </NotificationProvider>
+              </EmbeddedProvider>
+            </AgencyProvider>
           </TeamStyleProvider>
         </ThemeProvider>
       </AuthProvider>

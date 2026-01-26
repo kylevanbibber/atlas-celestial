@@ -142,6 +142,10 @@ app.use("/api/discord", discordRoutes);
 const competitionsRoutes = require("./routes/competitions");
 app.use("/api/competitions", competitionsRoutes);
 
+// SGAs routes
+const sgasRoutes = require("./routes/sgas");
+app.use("/api/sgas", sgasRoutes);
+
 // Document signing routes
 const sigRoutes = require("./routes/sigRoutes");
 app.use("/api/signing-session", sigRoutes);
