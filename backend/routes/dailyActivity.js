@@ -247,6 +247,72 @@ router.get("/team-summary", async (req, res) => {
     }
 });
 
+// GET /api/dailyActivity/reported-alp-summary - Get reported ALP totals by user for date range
+router.get("/reported-alp-summary", async (req, res) => {
+    const { startDate, endDate, userIds } = req.query;
+
+    if (!startDate || !endDate) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Missing required parameters: startDate and endDate' 
+        });
+    }
+
+    try {
+        let queryStr;
+        let params;
+
+        if (userIds) {
+            // If specific userIds provided, filter by them
+            const userIdArray = Array.isArray(userIds) ? userIds : userIds.split(',');
+            const placeholders = userIdArray.map(() => '?').join(',');
+            
+            queryStr = `
+                SELECT 
+                    userId,
+                    agent,
+                    SUM(alp) as reported_alp,
+                    COUNT(*) as report_days
+                FROM Daily_Activity
+                WHERE userId IN (${placeholders})
+                  AND reportDate BETWEEN STR_TO_DATE(?, '%Y-%m-%d') AND STR_TO_DATE(?, '%Y-%m-%d')
+                  AND userId IS NOT NULL
+                GROUP BY userId, agent
+                ORDER BY reported_alp DESC
+            `;
+            params = [...userIdArray, startDate, endDate];
+        } else {
+            // Get all users with reported ALP for the date range
+            queryStr = `
+                SELECT 
+                    userId,
+                    agent,
+                    SUM(alp) as reported_alp,
+                    COUNT(*) as report_days
+                FROM Daily_Activity
+                WHERE reportDate BETWEEN STR_TO_DATE(?, '%Y-%m-%d') AND STR_TO_DATE(?, '%Y-%m-%d')
+                  AND userId IS NOT NULL
+                GROUP BY userId, agent
+                ORDER BY reported_alp DESC
+            `;
+            params = [startDate, endDate];
+        }
+
+        const result = await query(queryStr, params);
+
+        res.status(200).json({ 
+            success: true, 
+            data: result || [] 
+        });
+    } catch (err) {
+        console.error('Database query error (reported-alp-summary):', err);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Internal server error' 
+        });
+    }
+});
+
 // POST /api/dailyActivity/update - Update multiple daily activity records
 router.post("/update", verifyToken, async (req, res) => {
     const userId = req.user?.id || req.body.userId;

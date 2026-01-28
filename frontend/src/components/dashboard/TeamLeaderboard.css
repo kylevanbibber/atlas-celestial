@@ -46,3 +46,78 @@
   background-color: hsl(var(--accent)) !important;
 }
 
+/* Filter Menu Styles */
+.team-leaderboard-filter-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.team-leaderboard-filter-menu {
+  position: absolute;
+  z-index: 50;
+  min-width: 280px;
+  max-width: 320px;
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.team-leaderboard-filter-menu-content {
+  padding: 1rem;
+}
+
+.team-leaderboard-filter-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--foreground);
+}
+
+.team-leaderboard-filter-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.team-leaderboard-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.team-leaderboard-filter-option:hover {
+  background-color: var(--accent);
+}
+
+.team-leaderboard-filter-option.active {
+  background-color: var(--accent);
+}
+
+.team-leaderboard-filter-option input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+.team-leaderboard-filter-option-text {
+  flex: 1;
+}
+
+.team-leaderboard-filter-option-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.team-leaderboard-filter-option-description {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  margin-top: 0.125rem;
+}
+

@@ -3097,6 +3097,52 @@ router.get('/sales/user-sales', async (req, res) => {
 });
 
 /**
+ * @route GET /api/discord/sales/all-users
+ * @desc Get all unique user IDs with discord sales for a date range (for filtering)
+ * @access Private
+ */
+router.get('/sales/all-users', async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Start date and end date are required'
+      });
+    }
+
+    const query = `
+      SELECT DISTINCT
+        ds.user_id,
+        ds.id,
+        ds.alp,
+        ds.refs,
+        ds.lead_type,
+        ds.ts
+      FROM discord_sales ds
+      WHERE DATE(ds.ts) >= ? 
+        AND DATE(ds.ts) <= ?
+      ORDER BY ds.ts DESC
+    `;
+
+    const salesData = await db.query(query, [startDate, endDate]);
+
+    res.json({
+      success: true,
+      data: salesData || []
+    });
+
+  } catch (error) {
+    console.error('Error fetching all users with discord sales:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch discord sales data'
+    });
+  }
+});
+
+/**
  * @route PUT /api/discord/sales/:id
  * @desc Update a discord sale record
  * @access Private

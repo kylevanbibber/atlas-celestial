@@ -1,7 +1,5 @@
 import React, { useState, useRef } from 'react';
 import { FiChevronLeft, FiChevronRight, FiCalendar } from 'react-icons/fi';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
 import './DateRangeSelector.css';
 
 const DateRangeSelector = ({
@@ -166,30 +164,24 @@ const DateRangeSelector = ({
     if (userRole === 'RGA') {
       return (
         <>
-          <Button
-            variant={viewScope === 'personal' ? 'default' : 'ghost'}
-            size="sm"
+          <button
             onClick={() => onViewScopeChange('personal')}
-            className="view-mode-button"
+            className={`view-mode-button ${viewScope === 'personal' ? 'active' : ''}`}
           >
             Personal
-          </Button>
-          <Button
-            variant={viewScope === 'mga' ? 'default' : 'ghost'}
-            size="sm"
+          </button>
+          <button
             onClick={() => onViewScopeChange('mga')}
-            className="view-mode-button"
+            className={`view-mode-button ${viewScope === 'mga' ? 'active' : ''}`}
           >
             MGA
-          </Button>
-          <Button
-            variant={viewScope === 'rga' ? 'default' : 'ghost'}
-            size="sm"
+          </button>
+          <button
             onClick={() => onViewScopeChange('rga')}
-            className="view-mode-button"
+            className={`view-mode-button ${viewScope === 'rga' ? 'active' : ''}`}
           >
             RGA
-          </Button>
+          </button>
         </>
       );
     }
@@ -197,22 +189,18 @@ const DateRangeSelector = ({
     if (['SA', 'GA', 'MGA'].includes(userRole)) {
       return (
         <>
-          <Button
-            variant={viewScope === 'personal' ? 'default' : 'ghost'}
-            size="sm"
+          <button
             onClick={() => onViewScopeChange('personal')}
-            className="view-mode-button"
+            className={`view-mode-button ${viewScope === 'personal' ? 'active' : ''}`}
           >
             Personal
-          </Button>
-          <Button
-            variant={viewScope === 'team' ? 'default' : 'ghost'}
-            size="sm"
+          </button>
+          <button
             onClick={() => onViewScopeChange('team')}
-            className="view-mode-button"
+            className={`view-mode-button ${viewScope === 'team' ? 'active' : ''}`}
           >
             Team
-          </Button>
+          </button>
         </>
       );
     }
@@ -225,45 +213,37 @@ const DateRangeSelector = ({
       <div className="date-range-selector-wrapper">
         <div className="date-range-selector">
           {/* Calendar Button - LEFT SIDE */}
-          <Button
+          <button
             ref={calendarButtonRef}
-            variant="outline"
-            size="icon"
             onClick={() => setIsCalendarOpen(true)}
             className="calendar-button"
           >
             <FiCalendar className="calendar-icon" />
-          </Button>
+          </button>
 
           {/* View Mode Buttons (W, M, Y) */}
           <div className="view-mode-buttons">
-            <Button
-              variant={viewMode === 'week' ? 'default' : 'ghost'}
-              size="sm"
+            <button
               onClick={() => handleViewModeChange('week')}
-              className="view-mode-button"
+              className={`view-mode-button ${viewMode === 'week' ? 'active' : ''}`}
             >
               <span className="view-mode-label-full">Week</span>
               <span className="view-mode-label-short">W</span>
-            </Button>
-            <Button
-              variant={viewMode === 'month' ? 'default' : 'ghost'}
-              size="sm"
+            </button>
+            <button
               onClick={() => handleViewModeChange('month')}
-              className="view-mode-button"
+              className={`view-mode-button ${viewMode === 'month' ? 'active' : ''}`}
             >
               <span className="view-mode-label-full">Month</span>
               <span className="view-mode-label-short">M</span>
-            </Button>
-            <Button
-              variant={viewMode === 'year' ? 'default' : 'ghost'}
-              size="sm"
+            </button>
+            <button
               onClick={() => handleViewModeChange('year')}
-              className="view-mode-button"
+              className={`view-mode-button ${viewMode === 'year' ? 'active' : ''}`}
             >
               <span className="view-mode-label-full">Year</span>
               <span className="view-mode-label-short">Y</span>
-            </Button>
+            </button>
           </div>
 
           <div className="date-range-divider" />
@@ -310,7 +290,7 @@ const DateRangeSelector = ({
             <div className="dropdown-content">
               <div className="input-group">
                 <label className="input-label">Start Date</label>
-                <Input
+                <input
                   type="date"
                   value={customStart}
                   onChange={(e) => setCustomStart(e.target.value)}
@@ -318,15 +298,15 @@ const DateRangeSelector = ({
               </div>
               <div className="input-group">
                 <label className="input-label">End Date</label>
-                <Input
+                <input
                   type="date"
                   value={customEnd}
                   onChange={(e) => setCustomEnd(e.target.value)}
                 />
               </div>
-              <Button onClick={applyCustomRange} className="apply-button">
+              <button onClick={applyCustomRange} className="apply-button">
                 Apply Date Range
-              </Button>
+              </button>
             </div>
           </div>
         </>
