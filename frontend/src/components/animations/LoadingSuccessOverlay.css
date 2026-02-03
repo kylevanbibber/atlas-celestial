@@ -1,0 +1,86 @@
+.loading-success-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  pointer-events: all;
+}
+
+.loading-success-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 2rem;
+  border-radius: 12px;
+}
+
+.loading-success-globe-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-success-globe {
+  width: 80%;
+  height: 80%;
+  animation: loading-success-spin 2s linear infinite;
+}
+
+.loading-success-checkmark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-success-checkmark-svg {
+  width: 80%;
+  height: 80%;
+}
+
+.loading-success-checkmark-circle {
+  fill: #10b981;
+  stroke: #ffffff;
+  stroke-width: 3;
+  stroke-dasharray: 157;
+  stroke-dashoffset: 157;
+  animation: loading-success-draw 0.6s ease forwards;
+}
+
+.loading-success-checkmark-path {
+  stroke: #ffffff;
+  stroke-width: 4;
+  stroke-dasharray: 36;
+  stroke-dashoffset: 36;
+  animation: loading-success-draw 0.35s ease 0.15s forwards;
+}
+
+.loading-success-message {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0f172a;
+  text-align: center;
+}
+
+@keyframes loading-success-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes loading-success-draw {
+  0% {
+    stroke-dashoffset: 160;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
