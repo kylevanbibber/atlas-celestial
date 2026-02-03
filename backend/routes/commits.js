@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const verifyToken = require('../middleware/verifyToken');
+const { debug } = require('../utils/logger');
 
 // GET /api/commits/admin - Admin endpoint to get commits with flexible filtering
 router.get('/admin', verifyToken, async (req, res) => {
@@ -11,7 +12,7 @@ router.get('/admin', verifyToken, async (req, res) => {
     const userLagnname = req.user?.lagnname;
     const { time_period, type, start, end, lagnname, clname, all } = req.query;
 
-    console.log('[commits/admin] GET - Request context:', {
+    debug('[commits/admin] GET - Request context:', {
       userId,
       userClname,
       userLagnname,
@@ -33,7 +34,7 @@ router.get('/admin', verifyToken, async (req, res) => {
 
     // If 'all' parameter is true and user is SGA, return all commits
     if (all === 'true' && userClname === 'SGA') {
-      console.log('[commits/admin] Fetching all commits (SGA access)');
+      debug('[commits/admin] Fetching all commits (SGA access)');
     } 
     // If lagnname is specified, fetch commits for that specific user
     else if (lagnname) {
@@ -41,23 +42,23 @@ router.get('/admin', verifyToken, async (req, res) => {
       if (userClname === 'SGA') {
         query += ' AND lagnname = ?';
         params.push(lagnname);
-        console.log('[commits/admin] Fetching commits for specific lagnname (SGA access):', lagnname);
+        debug('[commits/admin] Fetching commits for specific lagnname (SGA access):', lagnname);
       } else if (userClname === 'RGA') {
         // RGA can only fetch for their own MGAs - need to verify relationship
         // For now, allow RGA to fetch any MGA commits (could add hierarchy check later)
         query += ' AND lagnname = ?';
         params.push(lagnname);
-        console.log('[commits/admin] Fetching commits for specific lagnname (RGA access):', lagnname);
+        debug('[commits/admin] Fetching commits for specific lagnname (RGA access):', lagnname);
       } else if (userClname === 'MGA' && lagnname.toUpperCase() === userLagnname.toUpperCase()) {
         // MGA can only fetch their own commits
         query += ' AND lagnname = ?';
         params.push(lagnname);
-        console.log('[commits/admin] Fetching commits for own lagnname (MGA access):', lagnname);
+        debug('[commits/admin] Fetching commits for own lagnname (MGA access):', lagnname);
       } else if (['GA', 'SA'].includes(userClname) && lagnname.toUpperCase() === userLagnname.toUpperCase()) {
         // GA/SA can only fetch their own commits
         query += ' AND lagnname = ?';
         params.push(lagnname);
-        console.log('[commits/admin] Fetching commits for own lagnname (GA/SA access):', lagnname);
+        debug('[commits/admin] Fetching commits for own lagnname (GA/SA access):', lagnname);
       } else {
         return res.status(403).json({ 
           success: false, 
@@ -70,12 +71,12 @@ router.get('/admin', verifyToken, async (req, res) => {
       if (userClname === 'SGA') {
         query += ' AND clname = ?';
         params.push(clname);
-        console.log('[commits/admin] Fetching commits for clname:', clname);
+        debug('[commits/admin] Fetching commits for clname:', clname);
       } else if (userClname === 'RGA' && clname === 'MGA') {
         // RGA can fetch all MGA commits (could add hierarchy check later)
         query += ' AND clname = ?';
         params.push(clname);
-        console.log('[commits/admin] Fetching commits for MGA clname (RGA access)');
+        debug('[commits/admin] Fetching commits for MGA clname (RGA access)');
       } else {
         return res.status(403).json({ 
           success: false, 
@@ -87,7 +88,7 @@ router.get('/admin', verifyToken, async (req, res) => {
     else {
       query += ' AND userId = ?';
       params.push(userId);
-      console.log('[commits/admin] Fetching commits for own userId:', userId);
+      debug('[commits/admin] Fetching commits for own userId:', userId);
     }
 
     // Add filters
@@ -108,9 +109,9 @@ router.get('/admin', verifyToken, async (req, res) => {
 
     query += ' ORDER BY created_at DESC';
 
-    console.log('[commits/admin] Executing query:', query, 'with params:', params);
+    debug('[commits/admin] Executing query:', query, 'with params:', params);
     const results = await db.query(query, params);
-    console.log('[commits/admin] Found', results.length, 'commits');
+    debug('[commits/admin] Found', results.length, 'commits');
     
     return res.json({ success: true, data: results });
   } catch (error) {
@@ -125,8 +126,8 @@ router.get('/', verifyToken, async (req, res) => {
     const userId = req.user?.id || req.user?.userId;
     const { time_period, type, start, end } = req.query;
 
-    // Debug logging for impersonation
-    console.log('[commits] GET - User context:', {
+    // Debug logging for impersonation (off by default)
+    debug('[commits] GET - User context:', {
       userId,
       lagnname: req.user?.lagnname,
       clname: req.user?.clname,
@@ -175,8 +176,8 @@ router.post('/', verifyToken, async (req, res) => {
     const clname = req.body?.clname || req.user?.clname;
     const { time_period, type, start, end, amount } = req.body;
 
-    // Debug logging for impersonation
-    console.log('[commits] POST - User context:', {
+    // Debug logging for impersonation (off by default)
+    debug('[commits] POST - User context:', {
       userId,
       lagnname,
       clname,
@@ -197,7 +198,7 @@ router.post('/', verifyToken, async (req, res) => {
 
     // Always insert a new row to maintain history of changes
     // This allows tracking when commits were changed over time
-    console.log('[commits] Creating new commit entry with values:', { 
+    debug('[commits] Creating new commit entry with values:', { 
       userId, 
       lagnname, 
       clname, 
@@ -213,7 +214,7 @@ router.post('/', verifyToken, async (req, res) => {
       [userId, lagnname, clname, time_period, type, start, end, amount]
     );
     
-    console.log('[commits] New commit created with ID:', result.insertId);
+    debug('[commits] New commit created with ID:', result.insertId);
     return res.json({ success: true, message: 'Commit created', id: result.insertId });
   } catch (error) {
     console.error('[commits] POST error:', error);

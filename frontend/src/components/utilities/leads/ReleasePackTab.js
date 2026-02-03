@@ -713,8 +713,28 @@ const ReleasePackTab = () => {
               type="datetime-local"
               defaultValue={defaultVal}
               onBlur={async (e) => {
+                // Validate input before processing
+                if (!e.target.value || !e.target.value.trim()) {
+                  toast.error('Please enter a valid date and time');
+                  return;
+                }
+
                 const [datePart, timePart] = e.target.value.split("T");
+                
+                // Validate that we have both date and time parts
+                if (!datePart || !timePart) {
+                  toast.error('Please enter both date and time');
+                  return;
+                }
+
                 const [year, month, day] = datePart.split("-");
+                
+                // Validate all date components exist and are valid numbers
+                if (!year || !month || !day || isNaN(parseInt(year)) || isNaN(parseInt(month)) || isNaN(parseInt(day))) {
+                  toast.error('Invalid date format');
+                  return;
+                }
+
                 const yy = year.slice(-2);
                 const sentDate = `${parseInt(month)}/${parseInt(day)}/${yy} ${timePart}`;
 
@@ -725,34 +745,39 @@ const ReleasePackTab = () => {
                   `${now.getHours().toString().padStart(2,"0")}:` +
                   `${now.getMinutes().toString().padStart(2,"0")}`;
 
-                if (agent.leadId) {
-                  await api.put(`/release/leads-released/${agent.leadId}`, {
-                    sent_date: sentDate,
-                    last_updated: lastUpdated,
-                    sent: 1
-                  });
-                } else {
-                  const payload = {
-                    type: "2nd Pack",
-                    notes: null,
-                    last_updated: lastUpdated,
-                    userId: agent.userId,
-                    lagnname: agent.lagnname,
-                    sent: 1,
-                    sent_date: sentDate,
-                    sent_by: null,
-                  };
-                  const response = await api.post('/release/leads-released', payload);
-                  const json = response.data;
-                  if (json.success) {
-                    agent.leadId = json.data.id;
-                    setLeadsReleased(prev => [...prev, json.data]);
+                try {
+                  if (agent.leadId) {
+                    await api.put(`/release/leads-released/${agent.leadId}`, {
+                      sent_date: sentDate,
+                      last_updated: lastUpdated,
+                      sent: 1
+                    });
+                  } else {
+                    const payload = {
+                      type: "2nd Pack",
+                      notes: null,
+                      last_updated: lastUpdated,
+                      userId: agent.userId,
+                      lagnname: agent.lagnname,
+                      sent: 1,
+                      sent_date: sentDate,
+                      sent_by: null,
+                    };
+                    const response = await api.post('/release/leads-released', payload);
+                    const json = response.data;
+                    if (json.success) {
+                      agent.leadId = json.data.id;
+                      setLeadsReleased(prev => [...prev, json.data]);
+                    }
                   }
-                }
 
-                // Refresh data
-                fetchLeadsReleased();
-                toast.success('Code pack release date updated');
+                  // Refresh data
+                  fetchLeadsReleased();
+                  toast.success('Code pack release date updated');
+                } catch (error) {
+                  console.error('Failed to update date:', error);
+                  toast.error('Failed to update date');
+                }
               }}
               style={{
                 width: "180px",
@@ -886,9 +911,42 @@ const ReleasePackTab = () => {
   const formatDateForExcel = (dateStr) => {
     if (!dateStr || dateStr === 'N/A') return 'N/A';
     
+    // Convert to string and check for invalid date patterns
+    const dateString = String(dateStr).trim();
+    
+    // Check for malformed dates (NaN, undefined, null in string form)
+    if (dateString.includes('NaN') || dateString.includes('undefined') || dateString.includes('null')) {
+      return 'N/A';
+    }
+    
     try {
-      // Handle m/d/yy h:mm format (e.g., "7/31/25, 15:59" or "7/31/25 15:59")
-      const cleanStr = dateStr.replace(',', '').trim();
+      // Check if it's MySQL datetime format (YYYY-MM-DD HH:MM:SS or YYYY-MM-DD)
+      if (dateString.includes('-') && dateString.match(/^\d{4}-\d{1,2}-\d{1,2}/)) {
+        // Parse MySQL datetime: "2026-01-30 19:27:22" or "2026-01-30"
+        const [datePart, timePart] = dateString.split(' ');
+        const [year, month, day] = datePart.split('-');
+        
+        const monthNum = parseInt(month);
+        const dayNum = parseInt(day);
+        
+        // Validate
+        if (isNaN(monthNum) || isNaN(dayNum) || isNaN(parseInt(year))) {
+          return 'N/A';
+        }
+        
+        // Format as MM/DD/YYYY HH:MM:SS for Excel
+        const formattedMonth = String(monthNum).padStart(2, '0');
+        const formattedDay = String(dayNum).padStart(2, '0');
+        
+        if (timePart) {
+          return `${formattedMonth}/${formattedDay}/${year} ${timePart}`;
+        } else {
+          return `${formattedMonth}/${formattedDay}/${year}`;
+        }
+      }
+      
+      // Handle m/d/yy h:mm format (e.g., "4/14/25, 13:59" or "7/31/25 15:59")
+      const cleanStr = dateString.replace(',', '').trim();
       const parts = cleanStr.split(' ');
       
       if (parts.length >= 1) {
@@ -899,20 +957,33 @@ const ReleasePackTab = () => {
         if (dateComponents.length === 3) {
           let [month, day, year] = dateComponents;
           
-          // Validate all components exist
+          // Validate all components exist and are valid numbers
           if (!month || !day || !year) {
-            return `'${dateStr}`;
+            return 'N/A';
+          }
+          
+          const monthNum = parseInt(month);
+          const dayNum = parseInt(day);
+          const yearNum = parseInt(year);
+          
+          // Check if any parsing resulted in NaN
+          if (isNaN(monthNum) || isNaN(dayNum) || isNaN(yearNum)) {
+            return 'N/A';
+          }
+          
+          // Validate ranges
+          if (monthNum < 1 || monthNum > 12 || dayNum < 1 || dayNum > 31) {
+            return 'N/A';
           }
           
           // Convert 2-digit year to 4-digit
           if (year.length === 2) {
-            const yearNum = parseInt(year);
             year = yearNum >= 0 && yearNum <= 50 ? `20${year}` : `19${year}`;
           }
           
           // Pad month and day with leading zeros
-          month = month.padStart(2, '0');
-          day = day.padStart(2, '0');
+          month = String(monthNum).padStart(2, '0');
+          day = String(dayNum).padStart(2, '0');
           
           // Format as MM/DD/YYYY HH:MM for Excel
           if (timePart) {
@@ -923,10 +994,11 @@ const ReleasePackTab = () => {
         }
       }
       
-      // If we can't parse it, return as-is prefixed with apostrophe to force text
-      return `'${dateStr}`;
+      // If we can't parse it, return N/A
+      return 'N/A';
     } catch (e) {
-      return `'${dateStr}`;
+      console.error('Error formatting date for excel:', dateStr, e);
+      return 'N/A';
     }
   };
 

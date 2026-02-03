@@ -51,6 +51,8 @@
   position: fixed;
   inset: 0;
   z-index: 40;
+  /* Dim the page behind the menu so it doesn't look transparent */
+  background: rgba(0, 0, 0, 0.25);
 }
 
 .team-leaderboard-filter-menu {
@@ -58,8 +60,9 @@
   z-index: 50;
   min-width: 280px;
   max-width: 320px;
-  background-color: var(--card);
-  border: 1px solid var(--border);
+  /* Use the same vars used across the app (Dashboard/WidgetCard) */
+  background-color: var(--card-bg, #ffffff);
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.12));
   border-radius: 0.5rem;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
@@ -72,7 +75,7 @@
   font-size: 0.875rem;
   font-weight: 600;
   margin-bottom: 0.75rem;
-  color: var(--foreground);
+  color: var(--text-primary, var(--foreground));
 }
 
 .team-leaderboard-filter-options {
@@ -92,11 +95,11 @@
 }
 
 .team-leaderboard-filter-option:hover {
-  background-color: var(--accent);
+  background-color: var(--hover-background, var(--accent));
 }
 
 .team-leaderboard-filter-option.active {
-  background-color: var(--accent);
+  background-color: var(--hover-background, var(--accent));
 }
 
 .team-leaderboard-filter-option input[type="checkbox"] {
@@ -112,12 +115,12 @@
 .team-leaderboard-filter-option-title {
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--foreground);
+  color: var(--text-primary, var(--foreground));
 }
 
 .team-leaderboard-filter-option-description {
   font-size: 0.75rem;
-  color: var(--muted-foreground);
+  color: var(--text-secondary, var(--muted-foreground));
   margin-top: 0.125rem;
 }
 

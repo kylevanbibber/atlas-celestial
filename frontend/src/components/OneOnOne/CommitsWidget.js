@@ -1,7 +1,7 @@
-﻿import React, { useContext } from 'react';
+import React, { useContext } from 'react';
 import WidgetCard from '../utils/WidgetCard';
 import ThemeContext from '../../context/ThemeContext';
-import { FiUsers, FiUserCheck, FiAward, FiDollarSign, FiEdit2 } from 'react-icons/fi';
+import { FiUsers, FiUserCheck, FiAward, FiDollarSign, FiEdit2, FiToggleLeft, FiToggleRight } from 'react-icons/fi';
 
 const CommitsWidget = ({
   viewingUserClname,
@@ -25,10 +25,20 @@ const CommitsWidget = ({
   formatNumber,
   userClname,
   timePeriod,
+  viewMode,
   // Historical data for comparison
   orgMetricsHistory,
   // Display options
-  showSectionBackground = true // Whether to show the oneonone-section background
+  showSectionBackground = true, // Whether to show the oneonone-section background
+  // MGA/RGA Official ALP toggle props
+  mgaAlpMode,
+  setMgaAlpMode,
+  rgaAlpMode,
+  setRgaAlpMode,
+  mgaOfficialAlp,
+  rgaOfficialAlp,
+  hasMgaOfficialAlpData,
+  hasRgaOfficialAlpData
 }) => {
   const { theme } = useContext(ThemeContext);
   const [comparisonPopover, setComparisonPopover] = React.useState(null); // { data, position }
@@ -210,12 +220,35 @@ const CommitsWidget = ({
             return true;
           })
           .map((type) => {
-          const value = orgMetrics?.[`${type}MTD`] || 0;
+          const isAlp = type === 'alp';
+          
+          // Determine ALP mode and value for MGA/RGA views
+          let alpMode = 'reported';
+          let hasOfficialData = false;
+          if (isAlp) {
+            if (viewScope === 'mga') {
+              alpMode = mgaAlpMode || 'reported';
+              hasOfficialData = hasMgaOfficialAlpData;
+            } else if (viewScope === 'rga') {
+              alpMode = rgaAlpMode || 'reported';
+              hasOfficialData = hasRgaOfficialAlpData;
+            }
+          }
+          
+          // Get the value to display
+          let value = orgMetrics?.[`${type}MTD`] || 0;
+          if (isAlp && alpMode === 'official') {
+            if (viewScope === 'mga') {
+              value = mgaOfficialAlp || 0;
+            } else if (viewScope === 'rga') {
+              value = rgaOfficialAlp || 0;
+            }
+          }
+          
           const commit = commits[type];
           const isEditing = editingCommit === type;
           const history = commitHistory[type] || [];
           const hasHistory = history.length > 1;
-          const isAlp = type === 'alp';
           const isHires = type === 'hires';
           const isGA = userClname === 'GA';
           const isSA = userClname === 'SA';
@@ -252,6 +285,38 @@ const CommitsWidget = ({
               title={`${config.title} - ${periodLabel}`}
               topRightAction={
                 canEditCommits && !orgMetricsLoading && !showComingSoon && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {/* Toggle between reported and official ALP for MGA/RGA views */}
+                    {isAlp && hasOfficialData && (viewScope === 'mga' || viewScope === 'rga') && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (viewScope === 'mga') {
+                            setMgaAlpMode(mgaAlpMode === 'reported' ? 'official' : 'reported');
+                          } else if (viewScope === 'rga') {
+                            setRgaAlpMode(rgaAlpMode === 'reported' ? 'official' : 'reported');
+                          }
+                        }}
+                        style={{
+                          padding: '6px',
+                          borderRadius: '6px',
+                          background: 'transparent',
+                          color: '#06b6d4',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'background 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#06b6d420'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        title={`Switch to ${alpMode === 'reported' ? 'official' : 'reported'} ALP`}
+                      >
+                        {alpMode === 'reported' ? <FiToggleRight size={18} /> : <FiToggleLeft size={18} />}
+                      </button>
+                    )}
+                    {/* Edit button */}
                   <button
                     onClick={(e) => { 
                       e.stopPropagation(); 
@@ -276,6 +341,7 @@ const CommitsWidget = ({
                   >
                     <FiEdit2 size={18} />
                   </button>
+                  </div>
                 )
               }
               value={
@@ -302,7 +368,13 @@ const CommitsWidget = ({
                   undefined
               }
               linkTo={getCardLink(type)}
-              showProgress={commit !== null && commit > 0 && !showComingSoon}
+              // Week view should NOT show goal/progress on the ALP card (personal/MGA/RGA).
+              showProgress={
+                (isAlp ? viewMode !== 'week' : true) &&
+                commit !== null &&
+                commit > 0 &&
+                !showComingSoon
+              }
               currentValue={value}
               goalValue={commit}
               showComparison={!orgMetricsLoading && !showComingSoon && comparison.value !== null}
@@ -312,10 +384,30 @@ const CommitsWidget = ({
               showComparisonPercentage={false}
               onComparisonClick={(e) => handleComparisonClick(type, value, comparison, e)}
               subText={
-                isAlp && alpAsOfDate && !orgMetricsLoading ? (
+                isAlp && !orgMetricsLoading ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.5rem' }}>
+                    {/* Mode label for MGA/RGA views */}
+                    {(viewScope === 'mga' || viewScope === 'rga') && (
+                      <div style={{
+                        display: 'inline-block',
+                        padding: '0.125rem 0.5rem',
+                        borderRadius: '4px',
+                        fontSize: '0.65rem',
+                        fontWeight: '600',
+                        textTransform: 'uppercase',
+                        background: alpMode === 'official' ? '#06b6d420' : '#8b5cf620',
+                        color: alpMode === 'official' ? '#06b6d4' : '#8b5cf6',
+                        alignSelf: 'flex-start'
+                      }}>
+                        {alpMode === 'official' ? 'Official' : 'Reported'}
+                      </div>
+                    )}
+                    {alpAsOfDate && (
                   <span style={{ fontSize: '0.75rem', color: '#666' }}>
                     As of {alpAsOfDate}
                   </span>
+                    )}
+                  </div>
                 ) : null
               }
               actionButton={

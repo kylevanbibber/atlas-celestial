@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { query } = require('../db');
+const { debug, debugWarn } = require('../utils/logger');
 const verifyToken = require('../middleware/verifyToken');
 
 // Apply authentication middleware to all routes
@@ -30,9 +31,9 @@ const HARDCODED_AGENCY_RATES = {
 
 // GET /api/goals/agency-rates - Get hardcoded agency-wide conversion rates (instant response)
 router.get('/agency-rates', async (req, res) => {
-  console.log('\n🏢 AGENCY RATES: Returning hardcoded agency standards');
+  debug('\n🏢 AGENCY RATES: Returning hardcoded agency standards');
   
-  console.log(`✅ Hardcoded rates: ${HARDCODED_AGENCY_RATES.callsToAppts} calls per appt, ${Math.round(HARDCODED_AGENCY_RATES.apptsToSits*100)}% show, ${Math.round(HARDCODED_AGENCY_RATES.sitsToSales*100)}% close`);
+  debug(`✅ Hardcoded rates: ${HARDCODED_AGENCY_RATES.callsToAppts} calls per appt, ${Math.round(HARDCODED_AGENCY_RATES.apptsToSits*100)}% show, ${Math.round(HARDCODED_AGENCY_RATES.sitsToSales*100)}% close`);
   res.json(HARDCODED_AGENCY_RATES);
 });
 
@@ -91,7 +92,7 @@ router.post('/batch', async (req, res) => {
 router.get('/personal-rates/:userId', async (req, res) => {
   const { userId } = req.params;
   const { start, end, minRows } = req.query;
-  console.log(`\n👤 PERSONAL RATES: User ${userId}`);
+  debug(`\n👤 PERSONAL RATES: User ${userId}`);
   
   try {
     // Determine date range: use provided start/end or default to last 2 months
@@ -103,7 +104,7 @@ router.get('/personal-rates/:userId', async (req, res) => {
     const startDateStr = startDate.toISOString().split('T')[0];
     const minRequired = parseInt(minRows, 10) || 10;
     
-    console.log(`📅 Date range: ${startDateStr} to ${endDateStr} (minRows=${minRequired})`);
+    debug(`📅 Date range: ${startDateStr} to ${endDateStr} (minRows=${minRequired})`);
     
     const sql = `
       SELECT 
@@ -126,9 +127,9 @@ router.get('/personal-rates/:userId', async (req, res) => {
     }
     
     const recordCount = parseInt(data.recordCount, 10) || 0;
-    console.log(`📊 Found ${recordCount} records for user ${userId}`);
+    debug(`📊 Found ${recordCount} records for user ${userId}`);
     if (recordCount < minRequired) {
-      console.log(`❌ Insufficient data: only ${recordCount} records (need at least ${minRequired})`);
+      debug(`❌ Insufficient data: only ${recordCount} records (need at least ${minRequired})`);
       return res.json(null);
     }
     
@@ -159,10 +160,10 @@ router.get('/personal-rates/:userId', async (req, res) => {
       endDate: endDateStr
     };
     
-    console.log(`✅ Personal rates computed`);
+    debug(`✅ Personal rates computed`);
     res.json(response);
   } catch (error) {
-    console.log('❌ Personal rates error:', error.message);
+    // keep as error-level
     res.status(500).json({ error: 'Failed to calculate personal rates' });
   }
 });
@@ -176,7 +177,7 @@ router.get('/:userId/:year/:month', async (req, res) => {
   const hasAuthHeader = !!(req.headers.authorization || req.headers['x-access-token']);
   const resolvedUser = req.user?.userId || req.userId || null;
   const finalGoalType = normalizeGoalType(goalType);
-  console.log(`\n🎯 GOAL LOOKUP: ${year}-${month} (${finalGoalType})`, {
+  debug(`\n🎯 GOAL LOOKUP: ${year}-${month} (${finalGoalType})`, {
     paramUserId: userId,
     resolvedUserId: resolvedUser,
     goalType: finalGoalType,
@@ -184,13 +185,12 @@ router.get('/:userId/:year/:month', async (req, res) => {
     env: process.env.NODE_ENV
   });
   const slowWatch = setTimeout(() => {
-    console.warn(`[GOALS] ⚠️ Slow response (>3000ms) for user=${userId} ${year}-${month}`);
+    debugWarn(`[GOALS] ⚠️ Slow response (>3000ms) for user=${userId} ${year}-${month}`);
   }, 3000);
   
   try {
     // Validate parameters
     if (!userId || !year || !month) {
-      console.log('❌ Missing parameters');
       return res.status(400).json({ error: 'Missing required parameters: userId, year, month' });
     }
     
@@ -199,22 +199,21 @@ router.get('/:userId/:year/:month', async (req, res) => {
       WHERE activeUserId = ? AND year = ? AND month = ? AND goal_type = ?
     `;
     
-    console.log(`📋 SQL: ${sql.replace(/\s+/g, ' ').trim()}`);
-    console.log(`📋 Params: [${userId}, ${year}, ${month}, ${finalGoalType}]`);
+    debug(`📋 SQL: ${sql.replace(/\s+/g, ' ').trim()}`);
+    debug(`📋 Params: [${userId}, ${year}, ${month}, ${finalGoalType}]`);
     
     const queryStart = Date.now();
     const results = await query(sql, [userId, year, month, finalGoalType]);
     const queryMs = Date.now() - queryStart;
-    console.log(`[GOALS] ✅ DB query completed in ${queryMs}ms (rows=${results.length})`);
+    debug(`[GOALS] ✅ DB query completed in ${queryMs}ms (rows=${results.length})`);
     
     if (results.length === 0) {
-      console.log(`✅ No goal found (normal) - returning null`);
       clearTimeout(slowWatch);
-      console.log(`[GOALS] ⏱️ Total handler time: ${Date.now() - startedAt}ms`);
+      debug(`[GOALS] ⏱️ Total handler time: ${Date.now() - startedAt}ms`);
       return res.json(null);
     }
     
-    console.log(`✅ Goal found! ID: ${results[0].id}, ALP: $${results[0].monthlyAlpGoal}`);
+    debug(`✅ Goal found! ID: ${results[0].id}, ALP: $${results[0].monthlyAlpGoal}`);
     
     const goal = results[0];
     
@@ -227,16 +226,15 @@ router.get('/:userId/:year/:month', async (req, res) => {
         goal.workingDays = JSON.parse(goal.workingDays);
       }
     } catch (parseError) {
-      console.log('⚠️ JSON parse error (continuing):', parseError.message);
+      debugWarn('⚠️ JSON parse error (continuing):', parseError.message);
     }
     
     clearTimeout(slowWatch);
-    console.log(`[GOALS] ⏱️ Total handler time: ${Date.now() - startedAt}ms`);
+    debug(`[GOALS] ⏱️ Total handler time: ${Date.now() - startedAt}ms`);
     res.json(goal);
   } catch (error) {
     clearTimeout(slowWatch);
-    console.log('❌ Database error:', error.message);
-    console.log(`[GOALS] ⏱️ Total handler time (error): ${Date.now() - startedAt}ms`);
+    // keep as error-level
     res.status(500).json({ 
       error: 'Failed to fetch goal',
       message: 'Server error occurred'
@@ -248,11 +246,10 @@ router.get('/:userId/:year/:month', async (req, res) => {
 router.post('/', async (req, res) => {
   const { userId, year, month, monthlyAlpGoal, goalType, workingDays, rateSource, customRates } = req.body;
   const finalGoalType = normalizeGoalType(goalType);
-  console.log(`\n💾 SAVE GOAL: User ${userId} for ${year}-${month} (${finalGoalType}) - $${monthlyAlpGoal} ALP`);
+  debug(`\n💾 SAVE GOAL: User ${userId} for ${year}-${month} (${finalGoalType}) - $${monthlyAlpGoal} ALP`);
   
   try {
     if (!userId || !year || !month || !monthlyAlpGoal) {
-      console.log('❌ Missing required fields');
       return res.status(400).json({ error: 'Missing required fields' });
     }
     
@@ -263,7 +260,7 @@ router.post('/', async (req, res) => {
     `;
     
     const allExisting = await query(allExistingSql, [userId, year, month]);
-    console.log(`🔍 Current goals for user ${userId} (${year}-${month}):`, allExisting.map(g => `${g.goal_type}(${g.id})`).join(', '));
+    debug(`🔍 Current goals for user ${userId} (${year}-${month}):`, allExisting.map(g => `${g.goal_type}(${g.id})`).join(', '));
     
     // Check if goal already exists for this specific goal type
     const existingSql = `
@@ -272,15 +269,15 @@ router.post('/', async (req, res) => {
     `;
     
     const existing = await query(existingSql, [userId, year, month, finalGoalType]);
-    console.log(`🎯 Existing ${finalGoalType} goal:`, existing.length > 0 ? `ID ${existing[0].id}` : 'None');
+    debug(`🎯 Existing ${finalGoalType} goal:`, existing.length > 0 ? `ID ${existing[0].id}` : 'None');
     
     const customRatesJson = customRates ? JSON.stringify(customRates) : null;
     const workingDaysJson = workingDays ? JSON.stringify(workingDays) : null;
     
-    console.log(`📊 ${workingDays?.length || 0} working days, ${rateSource} rates`);
+    debug(`📊 ${workingDays?.length || 0} working days, ${rateSource} rates`);
     
     if (existing.length > 0) {
-      console.log(`📝 Updating existing goal (ID: ${existing[0].id})`);
+      debug(`📝 Updating existing goal (ID: ${existing[0].id})`);
       const updateSql = `
         UPDATE production_goals 
         SET monthlyAlpGoal = ?, workingDays = ?, rateSource = ?, customRates = ?, updatedAt = NOW()
@@ -288,9 +285,9 @@ router.post('/', async (req, res) => {
       `;
       
       await query(updateSql, [monthlyAlpGoal, workingDaysJson, rateSource, customRatesJson, userId, year, month, finalGoalType]);
-      console.log('✅ Goal updated successfully');
+      debug('✅ Goal updated successfully');
     } else {
-      console.log('📝 Creating new goal');
+      debug('📝 Creating new goal');
       const insertSql = `
         INSERT INTO production_goals (
           activeUserId, year, month, monthlyAlpGoal, goal_type, workingDays, rateSource, customRates, createdAt, updatedAt
@@ -298,21 +295,21 @@ router.post('/', async (req, res) => {
       `;
       
       await query(insertSql, [userId, year, month, monthlyAlpGoal, finalGoalType, workingDaysJson, rateSource, customRatesJson]);
-      console.log('✅ Goal created successfully');
+      debug('✅ Goal created successfully');
     }
     
     res.json({ success: true });
   } catch (error) {
-    console.log('❌ Save goal error:', error.message);
+    console.error('Save goal error:', error.message);
     
     // Handle duplicate entry errors specifically
     if (error.code === 'ER_DUP_ENTRY') {
-      console.log('🔄 Duplicate entry detected - this means the database constraint needs to be fixed');
-      console.log('🔍 Error details:', error.sqlMessage || error.message);
+      debugWarn('🔄 Duplicate entry detected - this means the database constraint needs to be fixed');
+      debugWarn('🔍 Error details:', error.sqlMessage || error.message);
       
       // Check what constraint is causing the issue
       if (error.sqlMessage && error.sqlMessage.includes('unique_user_month_year')) {
-        console.log('❌ Old constraint still exists! Database migration required.');
+        debugWarn('❌ Old constraint still exists! Database migration required.');
         
         return res.status(409).json({ 
           error: 'Database constraint prevents multiple goal types',
@@ -341,7 +338,7 @@ router.post('/', async (req, res) => {
         `;
         
         await query(forceUpdateSql, [userId, year, month, monthlyAlpGoal, finalGoalType, workingDaysJson, rateSource, customRatesJson]);
-        console.log(`✅ Workaround successful - ${finalGoalType} goal saved`);
+        debug(`✅ Workaround successful - ${finalGoalType} goal saved`);
         
         return res.json({ 
           success: true, 
@@ -349,7 +346,7 @@ router.post('/', async (req, res) => {
           warning: 'Database constraints should be updated for optimal performance'
         });
       } catch (forceError) {
-        console.log('❌ Workaround also failed:', forceError.message);
+        console.error('Workaround also failed:', forceError.message);
         return res.status(500).json({ 
           error: 'Unable to save goal due to database constraints',
           details: 'Please update database constraints to allow multiple goal types per user'
@@ -423,7 +420,7 @@ router.post('/bulk', async (req, res) => {
       return goal;
     });
     
-    console.log(`📦 Bulk goals fetched: ${goals.length} goals (years: ${years || 'N/A'}, users: ${userIds?.length || 'all'}, goalType: ${goalType || 'all'})`);
+    debug(`📦 Bulk goals fetched: ${goals.length} goals (years: ${years || 'N/A'}, users: ${userIds?.length || 'all'}, goalType: ${goalType || 'all'})`);
     res.json(goals);
   } catch (error) {
     console.error('Error fetching bulk user goals:', error);
@@ -467,7 +464,7 @@ router.get('/:userId', async (req, res) => {
 // POST /api/goals/team-alp - Get ALP data for multiple users efficiently
 router.post('/team-alp', async (req, res) => {
   const { userIds, year, month } = req.body;
-  console.log(`\n👥 TEAM ALP: Getting data for ${userIds?.length || 0} users for ${year}-${month}`);
+  debug(`\n👥 TEAM ALP: Getting data for ${userIds?.length || 0} users for ${year}-${month}`);
   
   try {
     if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
@@ -484,8 +481,8 @@ router.post('/team-alp', async (req, res) => {
     const startDateStr = startDate.toISOString().split('T')[0];
     const endDateStr = endDate.toISOString().split('T')[0];
     
-    console.log(`📅 Date range: ${startDateStr} to ${endDateStr}`);
-    console.log(`👥 User IDs: ${userIds.join(', ')}`);
+    debug(`📅 Date range: ${startDateStr} to ${endDateStr}`);
+    debug(`👥 User IDs: ${userIds.join(', ')}`);
     
     // Create placeholders for the IN clause
     const placeholders = userIds.map(() => '?').join(',');
@@ -506,7 +503,7 @@ router.post('/team-alp', async (req, res) => {
     const queryParams = [...userIds, startDateStr, endDateStr];
     const results = await query(sql, queryParams);
     
-    console.log(`📊 Found ALP data for ${results.length} users`);
+    debug(`📊 Found ALP data for ${results.length} users`);
     
     // Convert results to a map for easy lookup
     const alpData = {};
@@ -527,7 +524,7 @@ router.post('/team-alp', async (req, res) => {
       }
     });
     
-    console.log(`✅ Returning ALP data for ${Object.keys(alpData).length} users`);
+    debug(`✅ Returning ALP data for ${Object.keys(alpData).length} users`);
     res.json(alpData);
     
   } catch (error) {

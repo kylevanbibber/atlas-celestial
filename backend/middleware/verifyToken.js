@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { query: dbQuery } = require('../db');
 require('dotenv').config();
+const { debug, debugWarn } = require('../utils/logger');
 
 function parseCookies(cookieHeader) {
   if (!cookieHeader) return {};
@@ -54,11 +55,11 @@ function verifyToken(req, res, next) {
       const getUserQuery = `SELECT id, lagnname, clname, Role FROM activeusers WHERE id = ? AND Active = 'y' LIMIT 1`;
       
       try {
-        console.log(`[verifyToken] Fetching impersonated user data for ID ${impersonatedUserId}`);
+        debug(`[verifyToken] Fetching impersonated user data for ID ${impersonatedUserId}`);
         const userResults = await dbQuery(getUserQuery, [impersonatedUserId]);
         
         if (!userResults || userResults.length === 0) {
-          console.warn(`[verifyToken] No user found for impersonation ID ${impersonatedUserId}`);
+          debugWarn(`[verifyToken] No user found for impersonation ID ${impersonatedUserId}`);
           req.userId = impersonatedUserId;
           req.user = {
             userId: impersonatedUserId,
@@ -75,7 +76,7 @@ function verifyToken(req, res, next) {
         }
         
         const impersonatedUser = userResults[0];
-        console.log(`[verifyToken] ✅ Successfully fetched impersonated user: ${impersonatedUser.lagnname} (${impersonatedUser.clname})`);
+        debug(`[verifyToken] ✅ Successfully fetched impersonated user: ${impersonatedUser.lagnname} (${impersonatedUser.clname})`);
         
         // Set request context with impersonated user's actual data
         req.userId = impersonatedUserId;

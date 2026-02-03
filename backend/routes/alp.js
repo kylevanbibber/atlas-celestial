@@ -2,6 +2,7 @@
 const express = require("express");
 const router = express.Router();
 const { pool, query: dbQuery } = require("../db");
+const { debug, debugWarn } = require("../utils/logger");
 
 /* =========================
    Daily_Activity Endpoints
@@ -41,7 +42,7 @@ router.get("/daily/sum", (req, res) => {
     } else {
       return res.status(400).json({ error: "Please provide either a 'date' or both 'startDate' and 'endDate'" });
     }
-    console.log('📊 [Daily Sum] Filtering Daily_Activity by joining with activeusers.lagnname:', lagnName);
+    debug('📊 [Daily Sum] Filtering Daily_Activity by joining with activeusers.lagnname:', lagnName);
   } else {
     // Original queries for SGA (organization-wide)
     if (date) {
@@ -237,7 +238,7 @@ router.get("/weekly", (req, res) => {
 
 // GET /api/alp/weekly-tracker - Fetch weekly production data for Production Tracker
 router.get("/weekly-tracker", async (req, res) => {
-    console.log('📊 [Weekly Tracker] GET request received');
+        debug('📊 [Weekly Tracker] GET request received');
     
     try {
         const { startDate, endDate } = req.query;
@@ -249,7 +250,7 @@ router.get("/weekly-tracker", async (req, res) => {
             });
         }
         
-        console.log('📊 [Weekly Tracker] Fetching data from', startDate, 'to', endDate);
+        debug('📊 [Weekly Tracker] Fetching data from', startDate, 'to', endDate);
         
         // Fetch all Weekly Recap reports from Weekly_ALP table for the current year
         // The reportdate represents when the report was generated (Wed or Fri)
@@ -272,7 +273,7 @@ router.get("/weekly-tracker", async (req, res) => {
         
         const results = await dbQuery(query, [startDate, endDate, currentYear]);
         
-        console.log('📊 [Weekly Tracker] Fetched', results.length, 'records from', startDate, 'to', endDate, 'for year', currentYear);
+        debug('📊 [Weekly Tracker] Fetched', results.length, 'records from', startDate, 'to', endDate, 'for year', currentYear);
         
         // Helper function to get week start (Wed-Tue weeks)
         // For a given date, find the Wednesday that starts its Wed-Tue week
@@ -300,7 +301,7 @@ router.get("/weekly-tracker", async (req, res) => {
         
         results.forEach(row => {
             if (!row.reportdate) {
-                console.warn('📊 [Weekly Tracker] Skipping row with no reportdate:', row);
+                debugWarn('📊 [Weekly Tracker] Skipping row with no reportdate:', row);
                 return;
             }
             
@@ -313,7 +314,7 @@ router.get("/weekly-tracker", async (req, res) => {
             const reportDate = new Date(year, month - 1, day); // month is 0-indexed
             
             if (isNaN(reportDate.getTime())) {
-                console.warn('📊 [Weekly Tracker] Invalid date:', row.reportdate);
+                debugWarn('📊 [Weekly Tracker] Invalid date:', row.reportdate);
                 return;
             }
             
@@ -343,10 +344,10 @@ router.get("/weekly-tracker", async (req, res) => {
             return new Date(b.weekStart) - new Date(a.weekStart);
         });
         
-        console.log('📊 [Weekly Tracker] Aggregated into', weeklyArray.length, 'weeks');
+        debug('📊 [Weekly Tracker] Aggregated into', weeklyArray.length, 'weeks');
         if (weeklyArray.length > 0) {
-            console.log('📊 [Weekly Tracker] First week:', weeklyArray[0].weekStart, '| Net:', weeklyArray[0].net, '| Gross:', weeklyArray[0].gross);
-            console.log('📊 [Weekly Tracker] Last week:', weeklyArray[weeklyArray.length - 1].weekStart, '| Net:', weeklyArray[weeklyArray.length - 1].net, '| Gross:', weeklyArray[weeklyArray.length - 1].gross);
+            debug('📊 [Weekly Tracker] First week:', weeklyArray[0].weekStart, '| Net:', weeklyArray[0].net, '| Gross:', weeklyArray[0].gross);
+            debug('📊 [Weekly Tracker] Last week:', weeklyArray[weeklyArray.length - 1].weekStart, '| Net:', weeklyArray[weeklyArray.length - 1].net, '| Gross:', weeklyArray[weeklyArray.length - 1].gross);
         }
         
         res.json({
@@ -977,9 +978,12 @@ router.get('/getweeklyall', async (req, res) => {
                 wa.REPORT, 
                 wa.LagnName, 
                 au.clname, 
-                wa.CTLNO, 
+                wa.CTLNO,
+                wa.CL_Name,
                 wa.LVL_1_NET,
-                wa.LVL_1_GROSS, 
+                wa.LVL_1_GROSS,
+                wa.LVL_3_NET,
+                wa.LVL_3_GROSS, 
                 wa.MGA_NAME, 
                 au.profpic, 
                 au.esid,
@@ -1025,31 +1029,10 @@ router.get('/getweeklyall', async (req, res) => {
             }
 
 
-
-            // 🛠 Deduplication Logic: Keep only the row where `CTLNO = MGA` if duplicates exist
-            const deduplicatedResults = [];
-            const seen = new Map();
-
-            for (const row of results) {
-                const uniqueKey = row.LagnName;
-
-                if (!seen.has(uniqueKey)) {
-                    seen.set(uniqueKey, row);
-                } else {
-                    // If a duplicate exists, prefer the row where `CTLNO = MGA`
-                    if (row.CTLNO === 'MGA') {
-                        seen.set(uniqueKey, row);
-                    }
-                }
-            }
-
-            const finalResults = Array.from(seen.values());
-
-
-
+            // Return all rows - frontend will handle aggregation
             res.status(200).json({
                 success: true,
-                data: finalResults,
+                data: results,
             });
         });
     } catch (error) {
@@ -1057,6 +1040,72 @@ router.get('/getweeklyall', async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Internal server error while fetching data for getweeklyall',
+            error: error.message,
+        });
+    }
+});
+
+// GET /api/alp/getweeklyall_simple - Weekly_ALP data without expensive joins (frontend already has /users/active)
+router.get('/getweeklyall_simple', async (req, res) => {
+    const { startDate, endDate, report = 'Weekly Recap', MGA_NAME } = req.query;
+
+    if (!startDate || !endDate) {
+        return res.status(400).json({ success: false, message: 'Start date and end date are required' });
+    }
+
+    try {
+        let query = `
+            SELECT
+                wa.reportdate,
+                wa.REPORT,
+                wa.LagnName,
+                wa.CTLNO,
+                wa.CL_Name,
+                wa.LVL_1_NET,
+                wa.LVL_1_GROSS,
+                wa.LVL_3_NET,
+                wa.LVL_3_GROSS,
+                wa.MGA_NAME,
+                0 AS policy_count
+            FROM Weekly_ALP wa
+            WHERE wa.REPORT = ?
+            AND STR_TO_DATE(wa.reportdate, '%m/%d/%Y') BETWEEN STR_TO_DATE(?, '%m/%d/%Y') AND STR_TO_DATE(?, '%m/%d/%Y')
+        `;
+
+        const params = [report, startDate, endDate];
+
+        // Optional: MGA filter (same semantics as getweeklyall)
+        if (MGA_NAME) {
+            query += ' AND (wa.MGA_NAME = ? OR wa.LagnName = ?)';
+            params.push(MGA_NAME, MGA_NAME);
+        }
+
+        pool.query(query, params, (err, results) => {
+            if (err) {
+                console.error('[alp/getweeklyall_simple] SQL error:', {
+                    message: err.message,
+                    code: err.code,
+                    report,
+                    startDate,
+                    endDate,
+                    MGA_NAME,
+                });
+                return res.status(500).json({
+                    success: false,
+                    message: 'Internal server error while fetching data for getweeklyall_simple',
+                    error: err.message,
+                });
+            }
+
+            res.status(200).json({
+                success: true,
+                data: results,
+            });
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error while fetching data for getweeklyall_simple',
             error: error.message,
         });
     }
@@ -1245,7 +1294,10 @@ router.get('/getweeklymga', async (req, res) => {
                 wa.REPORT, 
                 wa.LagnName, 
                 au.clname, 
-                wa.CTLNO, 
+                wa.CTLNO,
+                wa.CL_Name,
+                wa.LVL_1_NET,
+                wa.LVL_1_GROSS, 
                 wa.LVL_3_NET,
                 wa.LVL_3_F6_NET,
                 wa.LVL_3_GROSS,
@@ -1291,29 +1343,14 @@ router.get('/getweeklymga', async (req, res) => {
                 });
             }
 
-            // 🛠 Deduplication Logic: Keep only rows where `CTLNO = 'MGA'`, or the lowest `CTLNO`
-            const deduplicatedResults = [];
-            const seen = new Map();
-
-            for (const row of results) {
-                const uniqueKey = row.LagnName;
-
-                if (!seen.has(uniqueKey)) {
-                    seen.set(uniqueKey, row);
-                } else {
-                    if (row.CTLNO === 'MGA' || parseInt(row.CTLNO) < parseInt(seen.get(uniqueKey).CTLNO)) {
-                        seen.set(uniqueKey, row);
-                    }
-                }
-            }
-
-            const finalResults = Array.from(seen.values());
-
-
-
+            // Return all rows - frontend will handle aggregation
+            // This allows proper summing of:
+            // 1. Multiple CTLNO codes per user
+            // 2. Multiple reportdates (Arias Main + New York reports within 3 days)
+            // 3. CL_Name filtering for MGA vs RGA views
             res.status(200).json({
                 success: true,
-                data: finalResults,
+                data: results,
             });
         });
     } catch (error) {
@@ -1343,7 +1380,10 @@ router.get('/getweeklyrga', async (req, res) => {
                 wa.REPORT, 
                 wa.LagnName, 
                 au.clname, 
-                wa.CTLNO, 
+                wa.CTLNO,
+                wa.CL_Name,
+                wa.LVL_1_NET,
+                wa.LVL_1_GROSS,
                 wa.LVL_3_NET,
                 wa.LVL_3_F6_NET,
                 wa.LVL_3_GROSS,
@@ -1388,29 +1428,10 @@ router.get('/getweeklyrga', async (req, res) => {
                 });
             }
 
-            // 🛠 Deduplication Logic: Keep only one row per `LagnName` with the lowest `CTLNO`
-            const deduplicatedResults = [];
-            const seen = new Map();
-
-            for (const row of results) {
-                const uniqueKey = row.LagnName;
-
-                if (!seen.has(uniqueKey)) {
-                    seen.set(uniqueKey, row);
-                } else {
-                    if (parseInt(row.CTLNO) < parseInt(seen.get(uniqueKey).CTLNO)) {
-                        seen.set(uniqueKey, row);
-                    }
-                }
-            }
-
-            const finalResults = Array.from(seen.values());
-
-
-
+            // Return all rows - frontend will handle aggregation
             res.status(200).json({
                 success: true,
-                data: finalResults,
+                data: results,
             });
         });
     } catch (error) {
@@ -2009,10 +2030,10 @@ router.get("/mga/weekly-ytd", async (req, res) => {
     try {
         const { lagnName, viewMode } = req.query;
         
-        console.log('[YTD Backend] Fetching YTD data for lagnName:', lagnName, 'viewMode:', viewMode);
+        debug('[YTD Backend] Fetching YTD data for lagnName:', lagnName, 'viewMode:', viewMode);
         
         if (!lagnName) {
-            console.log('[YTD Backend] ERROR: lagnName parameter missing');
+            debugWarn('[YTD Backend] ERROR: lagnName parameter missing');
             return res.status(400).json({ error: "lagnName parameter is required" });
         }
         
@@ -2050,27 +2071,27 @@ router.get("/mga/weekly-ytd", async (req, res) => {
             )
         `;
         
-        console.log('[YTD Backend] Executing query:', query);
-        console.log('[YTD Backend] Query parameters:', [lagnName, currentYear, lagnName, currentYear]);
-        console.log('[YTD Backend] Current year filter:', currentYear);
-        console.log('[YTD Backend] CL_Name condition:', clNameCondition || 'None (no filtering)');
+        debug('[YTD Backend] Executing query:', query);
+        debug('[YTD Backend] Query parameters:', [lagnName, currentYear, lagnName, currentYear]);
+        debug('[YTD Backend] Current year filter:', currentYear);
+        debug('[YTD Backend] CL_Name condition:', clNameCondition || 'None (no filtering)');
         
         const { query: dbQuery } = require('../db');
         const results = await dbQuery(query, [lagnName, currentYear, lagnName, currentYear]);
         
-        console.log('[YTD Backend] Query returned', results.length, 'rows');
+        debug('[YTD Backend] Query returned', results.length, 'rows');
         
         if (results.length > 0) {
             const row = results[0];
-            console.log('[YTD Backend] First row data:');
-            console.log('[YTD Backend] - LagnName:', row.LagnName);
-            console.log('[YTD Backend] - REPORT:', row.REPORT);
-            console.log('[YTD Backend] - reportdate:', row.reportdate);
-            console.log('[YTD Backend] - LVL_1_NET:', row.LVL_1_NET);
-            console.log('[YTD Backend] - LVL_2_F6_NET:', row.LVL_2_F6_NET);
-            console.log('[YTD Backend] - Available fields:', Object.keys(row));
+            debug('[YTD Backend] First row data:');
+            debug('[YTD Backend] - LagnName:', row.LagnName);
+            debug('[YTD Backend] - REPORT:', row.REPORT);
+            debug('[YTD Backend] - reportdate:', row.reportdate);
+            debug('[YTD Backend] - LVL_1_NET:', row.LVL_1_NET);
+            debug('[YTD Backend] - LVL_2_F6_NET:', row.LVL_2_F6_NET);
+            debug('[YTD Backend] - Available fields:', Object.keys(row));
         } else {
-            console.log('[YTD Backend] No data found for lagnName:', lagnName);
+            debug('[YTD Backend] No data found for lagnName:', lagnName);
         }
         
         res.json({

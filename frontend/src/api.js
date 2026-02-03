@@ -257,13 +257,18 @@ api.interceptors.response.use(
     }
     
     // Log errors for debugging (remove in production if sensitive data might be logged)
-    console.error('[API] ❌ Error Response:', {
-      url: error.config?.url,
-      method: error.config?.method?.toUpperCase(),
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      message: error.message,
-    });
+    // Skip logging for intentional request cancellations (from AbortController)
+    if (error.message !== 'canceled' && error.code !== 'ERR_CANCELED') {
+      const errorSummary = {
+        url: error.config?.url,
+        method: error.config?.method?.toUpperCase(),
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        message: error.message,
+        ...(process.env.NODE_ENV !== 'production' ? { data: error.response?.data } : {})
+      };
+      console.error('[API] ❌ Error Response:', errorSummary);
+    }
     
     return Promise.reject(error);
   }
@@ -278,12 +283,14 @@ const enhancedApi = {
     const cacheKey = getCacheKey(url, params);
     const cached = cache.get(cacheKey);
     
-    if (cached && isCacheValid(cached.timestamp) && !options.forceRefresh) {
+    const { forceRefresh, ...axiosOptions } = options || {};
+
+    if (cached && isCacheValid(cached.timestamp) && !forceRefresh) {
       return cached.data;
     }
     
     await delayIfNeeded();
-    const response = await api.get(url, { params });
+    const response = await api.get(url, { params, ...axiosOptions });
     
     // Cache successful responses
     if (response.status === 200) {

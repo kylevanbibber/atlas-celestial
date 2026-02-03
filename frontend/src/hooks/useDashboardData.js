@@ -633,7 +633,7 @@ const calculateCodesAndHiresMetrics = (vipsData, associatesData, hiresData, repo
 /**
  * Main hook for dashboard data
  */
-export const useDashboardData = (userRole, user, saViewMode = 'team', gaViewMode = 'team', mgaViewMode = 'team', rgaViewMode = 'team') => {
+export const useDashboardData = (userRole, user, viewScope = 'team') => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedDateRange, setSelectedDateRange] = useState(getCurrentWeekRange());
@@ -717,18 +717,10 @@ export const useDashboardData = (userRole, user, saViewMode = 'team', gaViewMode
         let monthlyAlpUrl = `${endpoints.monthlyAlp}?lagnName=${lagnName}`;
         let weeklyYtdUrl = `${endpoints.weeklyYtd}?lagnName=${lagnName}`;
         
-        if (userRole === 'GA') {
-          monthlyAlpUrl += `&viewMode=${gaViewMode}`;
-          weeklyYtdUrl += `&viewMode=${gaViewMode}`;
-          console.log('📞 [Main Fetch] GA user with viewMode:', { userRole, gaViewMode, monthlyAlpUrl, weeklyYtdUrl });
-        } else if (userRole === 'MGA') {
-          monthlyAlpUrl += `&viewMode=${mgaViewMode}`;
-          weeklyYtdUrl += `&viewMode=${mgaViewMode}`;
-          console.log('📞 [Main Fetch] MGA user with viewMode:', { userRole, mgaViewMode, monthlyAlpUrl, weeklyYtdUrl });
-        } else if (userRole === 'RGA') {
-          monthlyAlpUrl += `&viewMode=${rgaViewMode}`;
-          weeklyYtdUrl += `&viewMode=${rgaViewMode}`;
-          console.log('📞 [Main Fetch] RGA user with viewMode:', { userRole, rgaViewMode, monthlyAlpUrl, weeklyYtdUrl });
+        if (['GA', 'MGA', 'RGA'].includes(userRole)) {
+          monthlyAlpUrl += `&viewMode=${viewScope}`;
+          weeklyYtdUrl += `&viewMode=${viewScope}`;
+          console.log('📞 [Main Fetch] User with viewMode:', { userRole, viewScope, monthlyAlpUrl, weeklyYtdUrl });
         }
         
         // Build URLs for associates, vips, hires with viewMode for RGA users
@@ -737,9 +729,9 @@ export const useDashboardData = (userRole, user, saViewMode = 'team', gaViewMode
         let hiresUrl = `${endpoints.hires}?lagnName=${lagnName}&userRole=${userRole}`;
         
         if (userRole === 'RGA') {
-          associatesUrl += `&viewMode=${rgaViewMode}`;
-          vipsUrl += `&viewMode=${rgaViewMode}`;
-          hiresUrl += `&viewMode=${rgaViewMode}`;
+          associatesUrl += `&viewMode=${viewScope}`;
+          vipsUrl += `&viewMode=${viewScope}`;
+          hiresUrl += `&viewMode=${viewScope}`;
         }
         
         [weeklyYtdResponse, monthlyAlpResponse, associatesResponse, vipsResponse, hiresResponse] = await Promise.all([
@@ -853,7 +845,7 @@ export const useDashboardData = (userRole, user, saViewMode = 'team', gaViewMode
     } finally {
       setLoading(false);
     }
-  }, [userRole, user?.lagnname, gaViewMode, mgaViewMode, rgaViewMode]); // Re-fetch when users switch view modes
+  }, [userRole, user?.lagnname, viewScope]); // Re-fetch when users switch view modes
 
   /**
    * Fetch daily activity data separately (dependent on date range)
@@ -876,23 +868,23 @@ export const useDashboardData = (userRole, user, saViewMode = 'team', gaViewMode
       if (userRole === 'SGA') {
         url = `${endpoints.dailyActivity}?startDate=${selectedDateRange.startDate}&endDate=${selectedDateRange.endDate}`;
         dailyActivityResponse = await api.get(url);
-      } else if ((userRole === 'SA' && saViewMode === 'team' && endpoints.saTeamDailyActivity) || 
-                 (userRole === 'GA' && gaViewMode === 'team' && endpoints.gaTeamDailyActivity) ||
-                 (userRole === 'MGA' && mgaViewMode === 'team' && endpoints.mgaTeamDailyActivity) ||
-                 (userRole === 'RGA' && (rgaViewMode === 'mga' || rgaViewMode === 'rga') && endpoints.rgaTeamDailyActivity)) {
+      } else if ((userRole === 'SA' && viewScope === 'team' && endpoints.saTeamDailyActivity) || 
+                 (userRole === 'GA' && viewScope === 'team' && endpoints.gaTeamDailyActivity) ||
+                 (userRole === 'MGA' && viewScope === 'team' && endpoints.mgaTeamDailyActivity) ||
+                 (userRole === 'RGA' && ['mga', 'rga'].includes(viewScope) && endpoints.rgaTeamDailyActivity)) {
         // For SA/GA/MGA/RGA users in team mode, use special endpoint that combines hierarchical data
         if (userRole === 'SA') {
           url = `${endpoints.saTeamDailyActivity}?lagnName=${lagnName}&startDate=${selectedDateRange.startDate}&endDate=${selectedDateRange.endDate}`;
-          console.log('📞 [fetchDailyActivityData] Using SA team endpoint for', userRole, 'in', saViewMode, 'mode:', lagnName);
+          console.log('📞 [fetchDailyActivityData] Using SA team endpoint for', userRole, 'in', viewScope, 'mode:', lagnName);
         } else if (userRole === 'GA') {
           url = `${endpoints.gaTeamDailyActivity}?lagnName=${lagnName}&startDate=${selectedDateRange.startDate}&endDate=${selectedDateRange.endDate}`;
-          console.log('📞 [fetchDailyActivityData] Using GA team endpoint for', userRole, 'in', gaViewMode, 'mode:', lagnName);
+          console.log('📞 [fetchDailyActivityData] Using GA team endpoint for', userRole, 'in', viewScope, 'mode:', lagnName);
         } else if (userRole === 'MGA') {
           url = `${endpoints.mgaTeamDailyActivity}?lagnName=${lagnName}&startDate=${selectedDateRange.startDate}&endDate=${selectedDateRange.endDate}`;
-          console.log('📞 [fetchDailyActivityData] Using MGA team endpoint for', userRole, 'in', mgaViewMode, 'mode:', lagnName);
+          console.log('📞 [fetchDailyActivityData] Using MGA team endpoint for', userRole, 'in', viewScope, 'mode:', lagnName);
         } else if (userRole === 'RGA') {
-          url = `${endpoints.rgaTeamDailyActivity}?lagnName=${lagnName}&startDate=${selectedDateRange.startDate}&endDate=${selectedDateRange.endDate}&viewMode=${rgaViewMode}`;
-          console.log('📞 [fetchDailyActivityData] Using RGA team endpoint for', userRole, 'in', rgaViewMode, 'mode:', lagnName);
+          url = `${endpoints.rgaTeamDailyActivity}?lagnName=${lagnName}&startDate=${selectedDateRange.startDate}&endDate=${selectedDateRange.endDate}&viewMode=${viewScope}`;
+          console.log('📞 [fetchDailyActivityData] Using RGA team endpoint for', userRole, 'in', viewScope, 'mode:', lagnName);
         }
         dailyActivityResponse = await api.get(url);
       } else {
@@ -919,7 +911,7 @@ export const useDashboardData = (userRole, user, saViewMode = 'team', gaViewMode
     } finally {
       setDailyActivityLoading(false);
     }
-  }, [userRole, user?.lagnname, selectedDateRange, saViewMode, gaViewMode, mgaViewMode, rgaViewMode]);
+  }, [userRole, user?.lagnname, selectedDateRange, viewScope]);
 
   /**
    * Fetch weekly ALP data separately
@@ -962,18 +954,9 @@ export const useDashboardData = (userRole, user, saViewMode = 'team', gaViewMode
         endpoint = `${endpoints.weeklyAlp}?lagnName=${lagnName}`;
         
         // For SA/GA/MGA/RGA users, add viewMode parameter to determine LVL_1_NET vs LVL_2_NET vs LVL_3_NET
-        if (userRole === 'SA') {
-          endpoint += `&viewMode=${saViewMode}`;
-          console.log('📞 [fetchWeeklyAlpData] SA user with viewMode:', { userRole, saViewMode, endpoint });
-        } else if (userRole === 'GA') {
-          endpoint += `&viewMode=${gaViewMode}`;
-          console.log('📞 [fetchWeeklyAlpData] GA user with viewMode:', { userRole, gaViewMode, endpoint });
-        } else if (userRole === 'MGA') {
-          endpoint += `&viewMode=${mgaViewMode}`;
-          console.log('📞 [fetchWeeklyAlpData] MGA user with viewMode:', { userRole, mgaViewMode, endpoint });
-        } else if (userRole === 'RGA') {
-          endpoint += `&viewMode=${rgaViewMode}`;
-          console.log('📞 [fetchWeeklyAlpData] RGA user with viewMode:', { userRole, rgaViewMode, endpoint });
+        if (['SA', 'GA', 'MGA', 'RGA'].includes(userRole)) {
+          endpoint += `&viewMode=${viewScope}`;
+          console.log('📞 [fetchWeeklyAlpData] User with viewMode:', { userRole, viewScope, endpoint });
         }
         
         console.log('📞 [fetchWeeklyAlpData] Calling user endpoint:', { endpoint, lagnName });
@@ -1010,7 +993,7 @@ export const useDashboardData = (userRole, user, saViewMode = 'team', gaViewMode
     } finally {
       setWeeklyAlpLoading(false);
     }
-  }, [userRole, user?.lagnname, saViewMode, gaViewMode, mgaViewMode, rgaViewMode]);
+  }, [userRole, user?.lagnname, viewScope]);
 
   /**
    * Fetch weekly hires data for SGA dashboard
@@ -1181,18 +1164,9 @@ export const useDashboardData = (userRole, user, saViewMode = 'team', gaViewMode
         url += `?lagnName=${encodeURIComponent(user.lagnname)}`;
         
         // For SA/GA/MGA/RGA users, add viewMode parameter to determine LVL_1_NET vs LVL_2_NET vs LVL_3_NET
-        if (userRole === 'SA') {
-          url += `&viewMode=${saViewMode}`;
-          console.log('📞 [fetchMonthlyAlpData] SA user with viewMode:', { userRole, saViewMode, url });
-        } else if (userRole === 'GA') {
-          url += `&viewMode=${gaViewMode}`;
-          console.log('📞 [fetchMonthlyAlpData] GA user with viewMode:', { userRole, gaViewMode, url });
-        } else if (userRole === 'MGA') {
-          url += `&viewMode=${mgaViewMode}`;
-          console.log('📞 [fetchMonthlyAlpData] MGA user with viewMode:', { userRole, mgaViewMode, url });
-        } else if (userRole === 'RGA') {
-          url += `&viewMode=${rgaViewMode}`;
-          console.log('📞 [fetchMonthlyAlpData] RGA user with viewMode:', { userRole, rgaViewMode, url });
+        if (['SA', 'GA', 'MGA', 'RGA'].includes(userRole)) {
+          url += `&viewMode=${viewScope}`;
+          console.log('📞 [fetchMonthlyAlpData] User with viewMode:', { userRole, viewScope, url });
         }
         
         console.log('📞 [fetchMonthlyAlpData] Adding lagnName parameter for', userRole, ':', user.lagnname);
@@ -1280,7 +1254,7 @@ export const useDashboardData = (userRole, user, saViewMode = 'team', gaViewMode
     } finally {
       setMonthlyAlpSumLoading(false);
     }
-  }, [userRole, user?.lagnname, saViewMode, gaViewMode, mgaViewMode, rgaViewMode]);
+  }, [userRole, user?.lagnname, viewScope]);
 
   /**
    * Fetch monthly hires data for SGA dashboard

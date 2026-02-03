@@ -1,5 +1,13 @@
-import React, { useState, useRef } from 'react';
-import { FiChevronLeft, FiChevronRight, FiCalendar } from 'react-icons/fi';
+import React, { useEffect, useState, useRef } from 'react';
+import { FiChevronLeft, FiChevronRight, FiCalendar, FiFilter } from 'react-icons/fi';
+import { 
+  formatLocalDate, 
+  getMondayOfWeek, 
+  getSundayOfWeek,
+  calculateDateRange,
+  parseLocalDate as parseDate,
+  formatDateRangeDisplay 
+} from '../../utils/dateRangeUtils';
 import './DateRangeSelector.css';
 
 const DateRangeSelector = ({
@@ -11,6 +19,11 @@ const DateRangeSelector = ({
   viewScope,
   onViewScopeChange,
   userRole,
+  // Stats timeframe props
+  statsTimeframe,
+  onStatsTimeframeChange,
+  // As of date
+  asOfDate,
 }) => {
   const [internalViewMode, setInternalViewMode] = useState('month');
   const viewMode = externalViewMode !== undefined ? externalViewMode : internalViewMode;
@@ -20,27 +33,40 @@ const DateRangeSelector = ({
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const calendarButtonRef = useRef(null);
+  const [isStatsDropdownOpen, setIsStatsDropdownOpen] = useState(false);
+  const statsButtonRef = useRef(null);
+  const [calendarDropdownStyle, setCalendarDropdownStyle] = useState(null);
+  const [statsDropdownStyle, setStatsDropdownStyle] = useState(null);
 
-  // Format date in local timezone (YYYY-MM-DD)
-  const formatLocalDate = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+  // Position dropdown below its trigger so it doesn't get clipped by the header
+  const getAnchoredDropdownStyle = (buttonEl, { align = 'left' } = {}) => {
+    if (!buttonEl) return null;
+
+    const rect = buttonEl.getBoundingClientRect();
+    const margin = 8;
+    const dropdownWidth = 320; // matches CSS (20rem)
+
+    const top = rect.bottom + margin;
+    let left = rect.left;
+    if (align === 'right') {
+      left = rect.right - dropdownWidth;
+    }
+
+    // Clamp within viewport
+    left = Math.max(margin, Math.min(left, window.innerWidth - dropdownWidth - margin));
+    const maxHeight = Math.max(160, window.innerHeight - top - margin);
+
+    return {
+      position: 'fixed',
+      top: `${top}px`,
+      left: `${left}px`,
+      transform: 'none',
+      maxHeight: `${maxHeight}px`,
+      overflowY: 'auto',
+    };
   };
 
-  // Get Monday of the week
-  const getMondayOfWeek = (date) => {
-    const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-    return new Date(date.getFullYear(), date.getMonth(), diff);
-  };
-
-  // Get Sunday of the week
-  const getSundayOfWeek = (date) => {
-    const monday = getMondayOfWeek(date);
-    return new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
-  };
+  // Date utilities are now imported from centralized dateRangeUtils
 
   // Update date range based on view mode
   const updateDateRange = (date, mode) => {
@@ -130,30 +156,54 @@ const DateRangeSelector = ({
         start: customStart,
         end: customEnd,
       });
+      // Keep the navigation/display anchored to the selected range
+      const nextCurrent = parseDate(customStart);
+      if (nextCurrent) setCurrentDate(nextCurrent);
       setIsCalendarOpen(false);
     }
   };
 
-  // Parse date string as local time (not UTC)
-  const parseLocalDate = (dateStr) => {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    return new Date(year, month - 1, day);
-  };
+  // Keep internal currentDate in sync with external dateRange (important for custom ranges)
+  useEffect(() => {
+    if (!dateRange?.start) return;
+    const next = parseDate(dateRange.start);
+    if (next) setCurrentDate(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange?.start]);
 
   // Format display text
   const getDisplayText = () => {
-    const start = parseLocalDate(dateRange.start);
-    const end = parseLocalDate(dateRange.end);
+    const start = parseDate(dateRange.start);
+    const end = parseDate(dateRange.end);
+
+    // If the selected range doesn't match the standard period window,
+    // show the actual custom range in the center display.
+    try {
+      const expected = (viewMode === 'week' || viewMode === 'month' || viewMode === 'year')
+        ? calculateDateRange(viewMode, start)
+        : null;
+
+      if (expected && expected.startDate && expected.endDate) {
+        const isCustom = expected.startDate !== dateRange.start || expected.endDate !== dateRange.end;
+        if (isCustom) {
+          const fmt = (d) =>
+            d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+          return `${fmt(start)} - ${fmt(end)}`;
+        }
+      }
+    } catch {
+      // fall back to standard formatting below
+    }
 
     switch (viewMode) {
       case 'week':
-        return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+        return formatDateRangeDisplay('week', start, end);
       case 'month':
-        return start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        return formatDateRangeDisplay('month', start, end);
       case 'year':
-        return start.getFullYear().toString();
+        return formatDateRangeDisplay('year', start, end);
       default:
-        return start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        return formatDateRangeDisplay('month', start, end);
     }
   };
 
@@ -215,7 +265,10 @@ const DateRangeSelector = ({
           {/* Calendar Button - LEFT SIDE */}
           <button
             ref={calendarButtonRef}
-            onClick={() => setIsCalendarOpen(true)}
+            onClick={() => {
+              setCalendarDropdownStyle(getAnchoredDropdownStyle(calendarButtonRef.current, { align: 'left' }));
+              setIsCalendarOpen(true);
+            }}
             className="calendar-button"
           >
             <FiCalendar className="calendar-icon" />
@@ -258,7 +311,7 @@ const DateRangeSelector = ({
 
           {/* Display Text */}
           <div className="date-display">
-            {getDisplayText()}
+            <div>{getDisplayText()}</div>
           </div>
 
           <button
@@ -272,8 +325,60 @@ const DateRangeSelector = ({
 
           {/* View Scope Buttons (Personal/MGA/RGA) - RIGHT SIDE */}
           {renderViewScopeButtons()}
+
+          {/* Stats Timeframe Filter - Show only for personal view */}
+          {viewScope === 'personal' && onStatsTimeframeChange && (
+            <>
+              <div className="date-range-divider" style={{ marginLeft: '0.5rem', marginRight: '0.5rem' }} />
+              <button
+                ref={statsButtonRef}
+                onClick={() => {
+                  const nextOpen = !isStatsDropdownOpen;
+                  if (nextOpen) {
+                    setStatsDropdownStyle(getAnchoredDropdownStyle(statsButtonRef.current, { align: 'right' }));
+                  }
+                  setIsStatsDropdownOpen(nextOpen);
+                }}
+                className="calendar-button"
+                title="Filter stats timeframe"
+              >
+                <FiFilter className="calendar-icon" />
+              </button>
+            </>
+          )}
         </div>
       </div>
+
+      {/* Stats Timeframe Dropdown */}
+      {isStatsDropdownOpen && (
+        <>
+          <div
+            className="date-range-backdrop"
+            onClick={() => setIsStatsDropdownOpen(false)}
+          />
+          <div className="date-range-dropdown" style={statsDropdownStyle || undefined}>
+            <h3 className="dropdown-title">Stats Timeframe</h3>
+            <div className="dropdown-content" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {['thisMonth', 'lastMonth', 'sixMonths', 'allTime'].map((timeframe) => (
+                <button
+                  key={timeframe}
+                  onClick={() => {
+                    onStatsTimeframeChange(timeframe);
+                    setIsStatsDropdownOpen(false);
+                  }}
+                  className={`view-mode-button ${statsTimeframe === timeframe ? 'active' : ''}`}
+                  style={{ width: '100%', justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
+                >
+                  {timeframe === 'thisMonth' && 'This Month'}
+                  {timeframe === 'lastMonth' && 'Last Month'}
+                  {timeframe === 'sixMonths' && '6 Months'}
+                  {timeframe === 'allTime' && 'All Time'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Custom Date Range Dropdown */}
       {isCalendarOpen && (
@@ -285,7 +390,7 @@ const DateRangeSelector = ({
           />
           
           {/* Dropdown Panel */}
-          <div className="date-range-dropdown">
+          <div className="date-range-dropdown" style={calendarDropdownStyle || undefined}>
             <h3 className="dropdown-title">Select Custom Date Range</h3>
             <div className="dropdown-content">
               <div className="input-group">

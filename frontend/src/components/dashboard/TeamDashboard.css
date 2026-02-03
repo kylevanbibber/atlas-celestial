@@ -148,3 +148,49 @@
   }
 }
 
+/* Personal ALP goal editor (inside WidgetCard) */
+.alp-goal-edit-row {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.alp-goal-input {
+  flex: 1 1 160px;
+  min-width: 140px;
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-color);
+}
+
+.alp-goal-btn {
+  flex: 0 0 auto;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.alp-goal-btn-save {
+  background: #06b6d4;
+  color: white;
+  border: none;
+}
+
+.alp-goal-btn-cancel {
+  background: transparent;
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+}
+
+@media (max-width: 420px) {
+  .alp-goal-btn {
+    flex: 1 1 100%;
+    text-align: center;
+  }
+}
+

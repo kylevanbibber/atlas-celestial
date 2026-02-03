@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { pool, query } = require("../db");
 const { verifyToken } = require("../middleware/authMiddleware");
+const { debug } = require("../utils/logger");
 
 // POST /api/dailyActivity/submit - Submit daily activity data
 router.post("/submit", async (req, res) => {
@@ -146,7 +147,7 @@ router.get("/user-summary", async (req, res) => {
         return res.status(400).json({ error: 'Invalid userId parameter' });
     }
 
-    console.log('[dailyActivity/user-summary] Request params:', { userId, startDate, endDate });
+    debug('[dailyActivity/user-summary] Request params:', { userId, startDate, endDate });
 
     try {
         const queryStr = `
@@ -162,7 +163,7 @@ router.get("/user-summary", async (req, res) => {
 
         const result = await query(queryStr, [userId, startDate, endDate]);
 
-        console.log('[dailyActivity/user-summary] Query result:', { rowCount: result.length, userId, startDate, endDate });
+        debug('[dailyActivity/user-summary] Query result:', { rowCount: result.length, userId, startDate, endDate });
 
         if (result.length > 0) {
             res.status(200).json({ success: true, data: result });

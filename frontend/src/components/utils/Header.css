@@ -6,7 +6,7 @@
   left: 0;
   right: 0;
   height: var(--header-height, 70px);
-  background-color: var(--bg-primary);
+  background-color: transparent;
   display: flex;
   align-items: center;
   justify-content: space-between;

@@ -268,11 +268,15 @@ router.get('/active', verifyToken, async (req, res) => {
         u.ga,
         u.mga,
         u.rga,
+        u.profpic,
+        m.hide,
+        m.active,
         l.id as license_id,
         l.state,
         l.resident_state
       FROM activeusers u
       LEFT JOIN licensed_states l ON u.id = l.userId
+      LEFT JOIN MGAs m ON u.lagnname = m.lagnname
       WHERE u.Active = 'y'
       ORDER BY u.clname ASC
     `;
@@ -303,6 +307,9 @@ router.get('/active', verifyToken, async (req, res) => {
           ga: row.ga,
           mga: row.mga,
           rga: row.rga,
+          profpic: row.profpic,
+          hide: row.hide,
+          active: row.active,
           licenses: row.license_id ? [{
             id: row.license_id,
             state: row.state,
@@ -318,6 +325,90 @@ router.get('/active', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Error fetching active users:', error);
     res.status(500).json({ error: 'Failed to fetch active users' });
+  }
+});
+
+// Get user profile by lagnname
+router.get('/profile/:lagnname', verifyToken, async (req, res) => {
+  try {
+    const { lagnname } = req.params;
+    
+    if (!lagnname) {
+      return res.status(400).json({ success: false, message: 'Missing lagnname parameter' });
+    }
+
+    const query = `
+      SELECT 
+        u.id,
+        u.lagnname,
+        u.email,
+        u.phone,
+        u.clname,
+        u.managerActive,
+        u.esid,
+        u.sa,
+        u.ga,
+        u.mga,
+        u.rga,
+        u.profpic,
+        u.header_pic,
+        u.bio,
+        u.agtnum,
+        m.rga as mga_rga,
+        m.legacy as mga_legacy,
+        m.tree as mga_tree,
+        l.id as license_id,
+        l.state,
+        l.resident_state
+      FROM activeusers u
+      LEFT JOIN MGAs m ON u.lagnname = m.lagnname
+      LEFT JOIN licensed_states l ON u.id = l.userId
+      WHERE u.lagnname = ?
+    `;
+    
+    const results = await db.query(query, [lagnname]);
+
+    if (!results || results.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Process results to group licenses by user
+    const userData = {
+      id: results[0].id,
+      lagnname: results[0].lagnname,
+      email: results[0].email,
+      phone: results[0].phone,
+      clname: results[0].clname,
+      managerActive: results[0].managerActive,
+      esid: results[0].esid,
+      sa: results[0].sa,
+      ga: results[0].ga,
+      mga: results[0].mga,
+      rga: results[0].rga,
+      profpic: results[0].profpic,
+      header_pic: results[0].header_pic,
+      bio: results[0].bio,
+      agtnum: results[0].agtnum,
+      mga_rga: results[0].mga_rga,
+      mga_legacy: results[0].mga_legacy,
+      mga_tree: results[0].mga_tree,
+      licenses: results
+        .filter(row => row.license_id)
+        .map(row => ({
+          id: row.license_id,
+          state: row.state,
+          resident_state: row.resident_state
+        }))
+    };
+
+    // Add formatted display name
+    const nameInfo = parseAndFormatName(userData.lagnname);
+    userData.displayName = nameInfo.formatted;
+
+    res.json({ success: true, data: userData });
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch user profile' });
   }
 });
 

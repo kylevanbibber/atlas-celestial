@@ -9,6 +9,7 @@ import {
 } from "react-router-dom";
 import Header from "./components/utils/Header";
 import BottomNav from "./components/utils/BottomNav";
+import DailyActivityReminder from "./components/dashboard/DailyActivityReminder";
 import Dashboard from "./pages/Dashboard";
 import RefsPage from "./pages/refs/page";
 import Production from "./pages/Production";
@@ -482,7 +483,13 @@ function AppContent() {
   const isOnboardingHome = location.pathname.startsWith('/onboarding/home');
   return (
     <div className={`app-container ${isEmbedded ? 'embedded-mode' : ''}`}>
-      {!isEmbedded && <Header pageTitle={pageTitle} onboardingMode={isOnboardingHome} />}
+      {!isEmbedded && (
+        <>
+          <Header pageTitle={pageTitle} onboardingMode={isOnboardingHome} />
+          {/* Daily Activity Reminder - Shows below header on all pages if yesterday's data is missing */}
+          {user && <DailyActivityReminder user={user} />}
+        </>
+      )}
       <div className="main-content">
         <div className="page-content">
           <Routes>

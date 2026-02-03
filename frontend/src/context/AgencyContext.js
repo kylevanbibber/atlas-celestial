@@ -40,20 +40,12 @@ export const AgencyProvider = ({ children }) => {
       const response = await api.get(`/sgas/user/${user.userId}/agencies`);
       if (response.data.success) {
         const agencies = response.data.data || [];
-        console.log('[AgencyContext] Fetched user agencies:', agencies);
         setUserAgencies(agencies);
         setHasMultipleAgencies(agencies.length > 1);
         
         // Set allowed pages from the first (primary) agency
         if (agencies.length > 0 && agencies[0].allowed_pages) {
-          console.log('[AgencyContext] Setting allowed pages:', {
-            agencyName: agencies[0].display_name || agencies[0].rept_name,
-            agencyId: agencies[0].id,
-            allowed_pages: agencies[0].allowed_pages
-          });
           setAllowedPages(agencies[0].allowed_pages);
-        } else {
-          console.log('[AgencyContext] No allowed_pages found in agencies');
         }
       }
     } catch (error) {
@@ -81,22 +73,11 @@ export const AgencyProvider = ({ children }) => {
       const response = await api.get(`/sgas/user/${user.userId}/selected`);
       if (response.data.success) {
         const agency = response.data.data;
-        console.log('[AgencyContext] Fetched selected agency:', agency);
         setSelectedAgency(agency);
         
         // Update allowed pages based on selected agency
         if (agency.allowed_pages) {
-          console.log('[AgencyContext] Setting allowed pages from selected agency:', {
-            agencyName: agency.display_name || agency.rept_name,
-            agencyId: agency.id,
-            allowed_pages: agency.allowed_pages
-          });
           setAllowedPages(agency.allowed_pages);
-        } else {
-          console.log('[AgencyContext] No allowed_pages in selected agency:', {
-            agencyName: agency.display_name || agency.rept_name,
-            agencyId: agency.id
-          });
         }
       }
     } catch (error) {
@@ -141,22 +122,10 @@ export const AgencyProvider = ({ children }) => {
   };
 
   const hasPageAccess = (pageKey) => {
-    console.log('[AgencyContext] Checking page access:', { 
-      pageKey, 
-      currentAgency: selectedAgency?.display_name || selectedAgency?.rept_name,
-      agencyId: selectedAgency?.id,
-      allowedPages, 
-      loading 
-    });
     if (!pageKey) return true;
     if (loading) return true; // Allow access while loading
     if (allowedPages.length === 0) return false; // If no permissions loaded, deny access
     const hasAccess = allowedPages.includes(pageKey);
-    console.log('[AgencyContext] Page access result:', { 
-      pageKey, 
-      currentAgency: selectedAgency?.display_name || selectedAgency?.rept_name,
-      hasAccess 
-    });
     return hasAccess;
   };
 

@@ -18,10 +18,13 @@ import '../../pages/Dashboard.css';
 const UnifiedDashboard = ({ userRole, user }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('thisMonth');
-  const [saViewMode, setSaViewMode] = useState('team'); // 'personal' or 'team' for SA users
-  const [gaViewMode, setGaViewMode] = useState('team'); // 'personal' or 'team' for GA users
-  const [mgaViewMode, setMgaViewMode] = useState('team'); // 'personal' or 'team' for MGA users
-  const [rgaViewMode, setRgaViewMode] = useState('mga'); // 'personal', 'mga', or 'rga' for RGA users
+  
+  // Unified view scope state - 'personal' | 'team' (for SA/GA/MGA) | 'mga' | 'rga' (for RGA)
+  const [viewScope, setViewScope] = useState(() => {
+    if (['SA', 'GA', 'MGA'].includes(userRole)) return 'team';
+    if (userRole === 'RGA') return 'mga';
+    return 'personal'; // AGT default
+  });
   
   // RightDetails state for agent profile
   const [showRightDetails, setShowRightDetails] = useState(false);
@@ -59,7 +62,7 @@ const UnifiedDashboard = ({ userRole, user }) => {
     formatCurrency,
     formatDateRange,
     setSelectedDateRange
-  } = useDashboardData(userRole, user, saViewMode, gaViewMode, mgaViewMode, rgaViewMode);
+  } = useDashboardData(userRole, user, viewScope);
 
   // Update date range based on active tab for proper Daily Activity data fetching
   useEffect(() => {
@@ -337,12 +340,8 @@ const UnifiedDashboard = ({ userRole, user }) => {
           }
         ];
 
-        // For AGT users, SA/GA/MGA/RGA users in personal mode, show Daily Activity cards instead of Hires/Codes
-        if (userRole === 'AGT' || 
-            (userRole === 'SA' && saViewMode === 'personal') || 
-            (userRole === 'GA' && gaViewMode === 'personal') ||
-            (userRole === 'MGA' && mgaViewMode === 'personal') ||
-            (userRole === 'RGA' && rgaViewMode === 'personal')) {
+        // For AGT users, or any users in personal mode, show Daily Activity cards instead of Hires/Codes
+        if (userRole === 'AGT' || viewScope === 'personal') {
           return [
             ...baseCards,
             {
@@ -377,8 +376,7 @@ const UnifiedDashboard = ({ userRole, user }) => {
           // For SGA, RGA, MGA, GA users, or SA users in team mode, show different cards
           const cards = [...baseCards];
           
-          if ((userRole === 'SA' && saViewMode === 'team') || 
-              (userRole === 'GA' && gaViewMode === 'team')) {
+          if (['SA', 'GA'].includes(userRole) && viewScope === 'team') {
             // For SA/GA users in team mode, show Daily Activity ALP
             cards.push(
               {
@@ -409,8 +407,8 @@ const UnifiedDashboard = ({ userRole, user }) => {
                 navigateTo: '/reports?report=ref-sales'
               }
             );
-          } else if ((userRole === 'MGA' && mgaViewMode === 'team') ||
-                     (userRole === 'RGA' && (rgaViewMode === 'mga' || rgaViewMode === 'rga'))) {
+          } else if ((userRole === 'MGA' && viewScope === 'team') ||
+                     (userRole === 'RGA' && ['mga', 'rga'].includes(viewScope))) {
             // For MGA/RGA users in team mode, show Hires, VIPs, and Codes instead of Daily Activity ALP
             cards.push(
               {
@@ -492,12 +490,8 @@ const UnifiedDashboard = ({ userRole, user }) => {
           }
         ];
 
-        // For AGT users, SA/GA/MGA/RGA users in personal mode, show Daily Activity cards instead of Hires/Codes
-        if (userRole === 'AGT' || 
-            (userRole === 'SA' && saViewMode === 'personal') || 
-            (userRole === 'GA' && gaViewMode === 'personal') ||
-            (userRole === 'MGA' && mgaViewMode === 'personal') ||
-            (userRole === 'RGA' && rgaViewMode === 'personal')) {
+        // For AGT users, or any users in personal mode, show Daily Activity cards instead of Hires/Codes
+        if (userRole === 'AGT' || viewScope === 'personal') {
           return [
             ...baseCards,
             {
@@ -532,8 +526,7 @@ const UnifiedDashboard = ({ userRole, user }) => {
           // For SGA, RGA, MGA, GA users, or SA users in team mode, show different cards
           const cards = [...baseCards];
           
-          if ((userRole === 'SA' && saViewMode === 'team') || 
-              (userRole === 'GA' && gaViewMode === 'team')) {
+          if (['SA', 'GA'].includes(userRole) && viewScope === 'team') {
             // For SA/GA users in team mode, show Daily Activity ALP
             cards.push(
               {
@@ -564,8 +557,8 @@ const UnifiedDashboard = ({ userRole, user }) => {
                 navigateTo: '/reports?report=ref-sales'
               }
             );
-          } else if ((userRole === 'MGA' && mgaViewMode === 'team') ||
-                     (userRole === 'RGA' && (rgaViewMode === 'mga' || rgaViewMode === 'rga'))) {
+          } else if ((userRole === 'MGA' && viewScope === 'team') ||
+                     (userRole === 'RGA' && ['mga', 'rga'].includes(viewScope))) {
             // For MGA/RGA users in team mode, show Hires, VIPs, and Codes instead of Daily Activity ALP
             cards.push(
               {
@@ -636,10 +629,7 @@ const UnifiedDashboard = ({ userRole, user }) => {
     
     // For other sections (YTD_PERFORMANCE, LAST_MONTH_PERFORMANCE), handle SA/GA/MGA/RGA toggles
     if (userRole === 'SA' || userRole === 'GA' || userRole === 'MGA' || userRole === 'RGA') {
-      if ((userRole === 'SA' && saViewMode === 'personal') || 
-          (userRole === 'GA' && gaViewMode === 'personal') ||
-          (userRole === 'MGA' && mgaViewMode === 'personal') ||
-          (userRole === 'RGA' && rgaViewMode === 'personal')) {
+      if (['SA', 'GA', 'MGA', 'RGA'].includes(userRole) && viewScope === 'personal') {
         // For SA/GA/MGA/RGA users in personal mode, modify Last Month and YTD cards to include Daily Activity cards
         if (sectionType === DASHBOARD_SECTIONS.LAST_MONTH_PERFORMANCE) {
           const defaultCards = config.cards[sectionType] || [];
@@ -706,10 +696,10 @@ const UnifiedDashboard = ({ userRole, user }) => {
             defaultCards[3] // Only YTD Ref Sales (skip codes+vips and hires)
           ];
         }
-      } else if ((userRole === 'SA' && saViewMode === 'team') || 
-                 (userRole === 'GA' && gaViewMode === 'team') ||
-                 (userRole === 'MGA' && mgaViewMode === 'team') ||
-                 (userRole === 'RGA' && (rgaViewMode === 'mga' || rgaViewMode === 'rga'))) {
+      } else if (['SA', 'GA', 'MGA'].includes(userRole) && viewScope === 'team') {
+        // SA/GA/MGA in team mode
+      } else if (userRole === 'RGA' && ['mga', 'rga'].includes(viewScope)) {
+        // RGA in mga or rga mode
         // For SA/GA/MGA/RGA users in team mode, replace hires with Daily Activity ALP but keep codes and ref sales
         if (sectionType === DASHBOARD_SECTIONS.LAST_MONTH_PERFORMANCE) {
           const defaultCards = config.cards[sectionType] || [];
@@ -769,9 +759,9 @@ const UnifiedDashboard = ({ userRole, user }) => {
         className="dashboard-competitions"
       />
       
-      {/* SA View Mode Toggle */}
-      {userRole === 'SA' && (
-        <div className="sa-view-toggle" style={{ 
+      {/* View Mode Toggle - Unified for SA/GA/MGA */}
+      {['SA', 'GA', 'MGA'].includes(userRole) && (
+        <div className="view-mode-toggle" style={{ 
           marginBottom: '20px', 
           display: 'flex', 
           alignItems: 'center', 
@@ -779,10 +769,8 @@ const UnifiedDashboard = ({ userRole, user }) => {
         }}>
           <span style={{ fontWeight: 'bold', marginRight: '10px' }}>View Mode:</span>
           <button
-            className={`time-button ${saViewMode === 'personal' ? 'active' : ''}`}
-            onClick={() => {
-              setSaViewMode('personal');
-            }}
+            className={`time-button ${viewScope === 'personal' ? 'active' : ''}`}
+            onClick={() => setViewScope('personal')}
             style={{ 
               fontSize: '14px', 
               padding: '8px 16px',
@@ -792,86 +780,8 @@ const UnifiedDashboard = ({ userRole, user }) => {
             Personal
           </button>
           <button
-            className={`time-button ${saViewMode === 'team' ? 'active' : ''}`}
-            onClick={() => {
-              setSaViewMode('team');
-            }}
-            style={{ 
-              fontSize: '14px', 
-              padding: '8px 16px',
-              minWidth: '80px'
-            }}
-          >
-            Team
-          </button>
-        </div>
-      )}
-      
-      {/* GA View Mode Toggle */}
-      {userRole === 'GA' && (
-        <div className="ga-view-toggle" style={{ 
-          marginBottom: '20px', 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '10px' 
-        }}>
-          <span style={{ fontWeight: 'bold', marginRight: '10px' }}>View Mode:</span>
-          <button
-            className={`time-button ${gaViewMode === 'personal' ? 'active' : ''}`}
-            onClick={() => {
-              setGaViewMode('personal');
-            }}
-            style={{ 
-              fontSize: '14px', 
-              padding: '8px 16px',
-              minWidth: '80px'
-            }}
-          >
-            Personal
-          </button>
-          <button
-            className={`time-button ${gaViewMode === 'team' ? 'active' : ''}`}
-            onClick={() => {
-              setGaViewMode('team');
-            }}
-            style={{ 
-              fontSize: '14px', 
-              padding: '8px 16px',
-              minWidth: '80px'
-            }}
-          >
-            Team
-          </button>
-        </div>
-      )}
-      
-      {/* MGA View Mode Toggle */}
-      {userRole === 'MGA' && (
-        <div className="mga-view-toggle" style={{ 
-          marginBottom: '20px', 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '10px' 
-        }}>
-          <span style={{ fontWeight: 'bold', marginRight: '10px' }}>View Mode:</span>
-          <button
-            className={`time-button ${mgaViewMode === 'personal' ? 'active' : ''}`}
-            onClick={() => {
-              setMgaViewMode('personal');
-            }}
-            style={{ 
-              fontSize: '14px', 
-              padding: '8px 16px',
-              minWidth: '80px'
-            }}
-          >
-            Personal
-          </button>
-          <button
-            className={`time-button ${mgaViewMode === 'team' ? 'active' : ''}`}
-            onClick={() => {
-              setMgaViewMode('team');
-            }}
+            className={`time-button ${viewScope === 'team' ? 'active' : ''}`}
+            onClick={() => setViewScope('team')}
             style={{ 
               fontSize: '14px', 
               padding: '8px 16px',
@@ -885,7 +795,7 @@ const UnifiedDashboard = ({ userRole, user }) => {
       
       {/* RGA View Mode Toggle */}
       {userRole === 'RGA' && (
-        <div className="rga-view-toggle" style={{ 
+        <div className="view-mode-toggle" style={{ 
           marginBottom: '20px', 
           display: 'flex', 
           alignItems: 'center', 
@@ -893,10 +803,8 @@ const UnifiedDashboard = ({ userRole, user }) => {
         }}>
           <span style={{ fontWeight: 'bold', marginRight: '10px' }}>View Mode:</span>
           <button
-            className={`time-button ${rgaViewMode === 'personal' ? 'active' : ''}`}
-            onClick={() => {
-              setRgaViewMode('personal');
-            }}
+            className={`time-button ${viewScope === 'personal' ? 'active' : ''}`}
+            onClick={() => setViewScope('personal')}
             style={{ 
               fontSize: '14px', 
               padding: '8px 16px',
@@ -906,10 +814,8 @@ const UnifiedDashboard = ({ userRole, user }) => {
             Personal
           </button>
           <button
-            className={`time-button ${rgaViewMode === 'mga' ? 'active' : ''}`}
-            onClick={() => {
-              setRgaViewMode('mga');
-            }}
+            className={`time-button ${viewScope === 'mga' ? 'active' : ''}`}
+            onClick={() => setViewScope('mga')}
             style={{ 
               fontSize: '14px', 
               padding: '8px 16px',
@@ -919,10 +825,8 @@ const UnifiedDashboard = ({ userRole, user }) => {
             MGA
           </button>
           <button
-            className={`time-button ${rgaViewMode === 'rga' ? 'active' : ''}`}
-            onClick={() => {
-              setRgaViewMode('rga');
-            }}
+            className={`time-button ${viewScope === 'rga' ? 'active' : ''}`}
+            onClick={() => setViewScope('rga')}
             style={{ 
               fontSize: '14px', 
               padding: '8px 16px',

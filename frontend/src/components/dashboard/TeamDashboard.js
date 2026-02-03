@@ -5,26 +5,32 @@
  * This is a parent component that will host various child components.
  */
 
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import CompetitionsDisplay from '../competitions/CompetitionsDisplay';
 import CommitsWidget from '../OneOnOne/CommitsWidget';
 import YTDSummaryWidget from '../OneOnOne/YTDSummaryWidget';
 import ActivityWidget from '../OneOnOne/ActivityWidget';
 import StatisticsWidget from '../OneOnOne/StatisticsWidget';
 import Leaderboard from '../utils/Leaderboard';
+import WidgetCard from '../utils/WidgetCard';
 import TeamLeaderboard from './TeamLeaderboard';
 import DateRangeSelector from './DateRangeSelector';
 import ThemeContext from '../../context/ThemeContext';
 import { useHeader } from '../../context/HeaderContext';
+import { FiPhone, FiCalendar, FiUsers, FiTrendingUp, FiDollarSign, FiUserPlus, FiEdit2, FiToggleLeft, FiToggleRight, FiX, FiSave } from 'react-icons/fi';
 import api from '../../api';
+import { parseLocalDate, calculateStatsDateRange } from '../../utils/dateRangeUtils';
 import '../../pages/Dashboard.css';
 import '../../pages/OneOnOne.css';
 import './TeamDashboard.css';
 
 const TeamDashboard = ({ userRole, user }) => {
-  console.log('📊 [TeamDashboard] Rendering for:', { userRole, userId: user?.userId, lagnname: user?.lagnname });
   const { theme } = useContext(ThemeContext);
   const { setHeaderContent } = useHeader();
+
+  // Abort controllers to prevent stacked requests when user changes date/view quickly
+  const teamLeaderboardAbortRef = useRef(null);
+  const leaderboardAbortRef = useRef(null);
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -37,11 +43,14 @@ const TeamDashboard = ({ userRole, user }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // View mode states for different roles
-  const [saViewMode, setSaViewMode] = useState('team'); // 'personal' or 'team' for SA users
-  const [gaViewMode, setGaViewMode] = useState('team'); // 'personal' or 'team' for GA users
-  const [mgaViewMode, setMgaViewMode] = useState('team'); // 'personal' or 'team' for MGA users
-  const [rgaViewMode, setRgaViewMode] = useState('mga'); // 'personal', 'mga', or 'rga' for RGA users
+  // Unified view scope state - consolidates saViewMode, gaViewMode, mgaViewMode, rgaViewMode
+  // 'personal' | 'team' (for SA/GA/MGA) | 'mga' | 'rga' (for RGA)
+  const [viewScope, setViewScope] = useState(() => {
+    // Initialize based on user role
+    if (['SA', 'GA', 'MGA'].includes(userRole)) return 'team';
+    if (userRole === 'RGA') return 'mga';
+    return 'personal'; // AGT default
+  });
 
   // Date range selection
   const [viewMode, setViewMode] = useState('month'); // 'week', 'month', 'year'
@@ -56,7 +65,28 @@ const TeamDashboard = ({ userRole, user }) => {
   });
   
   // Keep timePeriod for backward compatibility with existing code
-  const [timePeriod, setTimePeriod] = useState('thisMonth'); // 'thisMonth', 'lastMonth', 'ytd'
+  // Calculate timePeriod based on viewMode and date range for CommitsWidget title
+  const getTimePeriod = () => {
+    if (viewMode === 'year') return 'ytd';
+    if (viewMode === 'month') {
+      const now = new Date();
+      const rangeStart = parseLocalDate(dateRangeState.start);
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      const rangeMonth = rangeStart.getMonth();
+      const rangeYear = rangeStart.getFullYear();
+      
+      // Check if it's the current month AND year
+      if (rangeMonth === currentMonth && rangeYear === currentYear) {
+        return 'thisMonth';
+      }
+      // Any other month (previous or future) should use Monthly_ALP
+      return 'previousMonth';
+    }
+    return 'thisMonth';
+  };
+  
+  const timePeriod = getTimePeriod();
 
   // Org Metrics state (for CommitsWidget)
   const [orgMetrics, setOrgMetrics] = useState(null);
@@ -85,85 +115,81 @@ const TeamDashboard = ({ userRole, user }) => {
   // Activity Widget state
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityData, setActivityData] = useState(null);
-  const [selectedPeriod, setSelectedPeriod] = useState('week'); // week, month, ytd
-  const [currentDate, setCurrentDate] = useState(new Date());
+  // Removed redundant selectedPeriod and currentDate - now uses main viewMode and dateRangeState
   const [activityViewMode, setActivityViewMode] = useState('reported'); // reported, official
   const [comparisonData, setComparisonData] = useState(null);
   const [officialYtdAlp, setOfficialYtdAlp] = useState(null);
   const [activityError, setActivityError] = useState('');
   
-  // Statistics Widget state
-  const [statisticsData, setStatisticsData] = useState(null);
+  // Consolidated stats state - removed redundant personalStatsData/statsData duplication
+  const [statsData, setStatsData] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
-  const [statsTimeframe, setStatsTimeframe] = useState('this_month'); // this_month, last_month, six_months, all_time
+  const [personalStatsTimeframe, setPersonalStatsTimeframe] = useState('thisMonth'); // thisMonth, lastMonth, sixMonths, allTime
+  
+  // Personal metrics comparison state (for showing vs last year / prev month)
+  const [personalComparison, setPersonalComparison] = useState(null);
+  
+  // Personal ALP state (for goal editing and official/reported toggle)
+  const [personalAlpMode, setPersonalAlpMode] = useState('reported'); // 'reported' or 'official'
+  const [editingPersonalGoal, setEditingPersonalGoal] = useState(false);
+  const [personalGoalInput, setPersonalGoalInput] = useState('');
+  const [personalGoal, setPersonalGoal] = useState(null);
+  const [personalOfficialAlp, setPersonalOfficialAlp] = useState(null); // Official ALP from Weekly_ALP
+  const [hasOfficialAlpData, setHasOfficialAlpData] = useState(false); // Whether official data exists
 
-  // Leaderboard state
-  const [leaderboardData, setLeaderboardData] = useState([]);
-  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
-  const [leaderboardPeriod, setLeaderboardPeriod] = useState('week'); // week, month, ytd
-  const [leaderboardAsOfDate, setLeaderboardAsOfDate] = useState('');
+  // MGA/RGA ALP state (for official/reported toggle in team views)
+  const [mgaAlpMode, setMgaAlpMode] = useState('reported'); // 'reported' or 'official'
+  const [rgaAlpMode, setRgaAlpMode] = useState('reported'); // 'reported' or 'official'
+  const [mgaOfficialAlp, setMgaOfficialAlp] = useState(null); // Official ALP from Weekly_ALP/Monthly_ALP for MGA
+  const [rgaOfficialAlp, setRgaOfficialAlp] = useState(null); // Official ALP from Weekly_ALP/Monthly_ALP for RGA
+  const [hasMgaOfficialAlpData, setHasMgaOfficialAlpData] = useState(false);
+  const [hasRgaOfficialAlpData, setHasRgaOfficialAlpData] = useState(false);
+
+  // NOTE: TeamDashboard does not render the compact "Top 10" leaderboard widget.
+  // Avoid fetching it here to reduce load/errors (UnifiedDashboard handles that UI separately).
 
   // Team Leaderboard state
   const [teamLeaderboardData, setTeamLeaderboardData] = useState([]);
   const [teamLeaderboardLoading, setTeamLeaderboardLoading] = useState(false);
+  const [leaderboardPage, setLeaderboardPage] = useState(1);
+  const [leaderboardHasMore, setLeaderboardHasMore] = useState(true);
+  const [leaderboardAllUsers, setLeaderboardAllUsers] = useState([]); // Store all users for pagination
+  const [leaderboardAlpDataMap, setLeaderboardAlpDataMap] = useState(new Map()); // Store fetched ALP data for pagination
+  const [leaderboardAlpField, setLeaderboardAlpField] = useState('LVL_1_NET'); // Store which ALP field to use
+  const LEADERBOARD_PAGE_SIZE = 50;
 
-  // Determine the current view scope based on role and view mode
-  const getViewScope = () => {
-    if (userRole === 'SA') return saViewMode;
-    if (userRole === 'GA') return gaViewMode;
-    if (userRole === 'MGA') return mgaViewMode;
-    if (userRole === 'RGA') return rgaViewMode;
-    return 'personal'; // AGT default
+  // Helper function to validate and set view scope based on user role
+  const handleViewScopeChange = (newScope) => {
+    const validScopes = {
+      'AGT': ['personal'],
+      'SA': ['personal', 'team'],
+      'GA': ['personal', 'team'],
+      'MGA': ['personal', 'team'],
+      'RGA': ['personal', 'mga', 'rga']
+    };
+    
+    if (validScopes[userRole]?.includes(newScope)) {
+      setViewScope(newScope);
+    }
   };
-
-  const viewScope = getViewScope();
 
   // Handle date range change from DateRangeSelector
   const handleDateRangeChange = (newRange) => {
     setDateRangeState(newRange);
-    
-    // Update timePeriod based on the date range (for backward compatibility)
-    const start = new Date(newRange.start);
-    const end = new Date(newRange.end);
-    const now = new Date();
-    
-    // Check if it's year-to-date
-    const yearStart = new Date(now.getFullYear(), 0, 1);
-    if (start.toDateString() === yearStart.toDateString() && viewMode === 'year') {
-      setTimePeriod('ytd');
-    } else if (viewMode === 'month') {
-      // Check if current month
-      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      if (start.toDateString() === currentMonthStart.toDateString()) {
-        setTimePeriod('thisMonth');
-      } else {
-        setTimePeriod('lastMonth');
-      }
-    } else if (viewMode === 'week') {
-      setTimePeriod('thisWeek');
-    }
   };
 
   // Handle view mode change
   const handleViewModeChange = (mode) => {
     setViewMode(mode);
-    
-    // Sync with timePeriod for backward compatibility
-    if (mode === 'year') {
-      setTimePeriod('ytd');
-    } else if (mode === 'month') {
-      setTimePeriod('thisMonth');
-    } else if (mode === 'week') {
-      setTimePeriod('thisWeek');
-    }
   };
 
   // Get date range based on selected time period or dateRangeState
   const getDateRange = () => {
     // If we have dateRangeState from DateRangeSelector, use it
     if (dateRangeState && dateRangeState.start && dateRangeState.end) {
-      const start = new Date(dateRangeState.start);
-      const end = new Date(dateRangeState.end);
+      const start = parseLocalDate(dateRangeState.start);
+      const end = parseLocalDate(dateRangeState.end);
+      
       return {
         startDate: start,
         endDate: end,
@@ -264,167 +290,12 @@ const TeamDashboard = ({ userRole, user }) => {
     return new Intl.NumberFormat('en-US').format(value);
   };
 
-  // Activity Widget helper functions
-  const getActivityDateRange = () => {
-    if (selectedPeriod === 'week') {
-      const dayOfWeek = currentDate.getDay();
-      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-      const monday = new Date(currentDate);
-      monday.setDate(currentDate.getDate() + mondayOffset);
-      monday.setHours(0, 0, 0, 0);
-      
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      sunday.setHours(23, 59, 59, 999);
-      
-      return {
-        startDate: monday.toISOString().split('T')[0],
-        endDate: sunday.toISOString().split('T')[0],
-        start: monday,
-        end: sunday
-      };
-    } else if (selectedPeriod === 'month') {
-      const year = currentDate.getFullYear();
-      const month = currentDate.getMonth();
-      const start = new Date(year, month, 1);
-      const end = new Date(year, month + 1, 0);
-      end.setHours(23, 59, 59, 999);
-      
-      return {
-        startDate: start.toISOString().split('T')[0],
-        endDate: end.toISOString().split('T')[0],
-        start,
-        end
-      };
-    } else if (selectedPeriod === 'ytd') {
-      const year = currentDate.getFullYear();
-      const start = new Date(year, 0, 1);
-      const end = new Date();
-      end.setHours(23, 59, 59, 999);
-      
-      return {
-        startDate: start.toISOString().split('T')[0],
-        endDate: end.toISOString().split('T')[0],
-        start,
-        end
-      };
-    }
-    return null;
-  };
+  // Activity Widget now uses main dateRangeState - no separate date range calculation needed
 
-  const getPeriodOptions = (period) => {
-    const options = [];
-    const today = new Date();
-    
-    if (period === 'week') {
-      // Generate last 12 weeks
-      for (let i = 0; i < 12; i++) {
-        const d = new Date(today);
-        d.setDate(d.getDate() - (i * 7));
-        const dayOfWeek = d.getDay();
-        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-        const monday = new Date(d);
-        monday.setDate(d.getDate() + mondayOffset);
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        
-        options.push({
-          value: monday.toISOString().split('T')[0],
-          label: `${monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${sunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-        });
-      }
-    } else if (period === 'month') {
-      // Generate last 12 months
-      for (let i = 0; i < 12; i++) {
-        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-        const monthKey = `${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-        options.push({
-          value: monthKey,
-          label: d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-        });
-      }
-    } else if (period === 'ytd') {
-      // Generate last 3 years
-      for (let i = 0; i < 3; i++) {
-        const year = today.getFullYear() - i;
-        options.push({
-          value: String(year),
-          label: `YTD ${year}`
-        });
-      }
-    }
-    
-    return options;
-  };
+  // Removed getPeriodOptions and getPeriodKeyForDate - activity widget now uses main date controls
 
-  const getPeriodKeyForDate = (period, date) => {
-    if (period === 'week') {
-      const dayOfWeek = date.getDay();
-      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-      const monday = new Date(date);
-      monday.setDate(date.getDate() + mondayOffset);
-      return monday.toISOString().split('T')[0];
-    } else if (period === 'month') {
-      return `${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
-    } else if (period === 'ytd') {
-      return String(date.getFullYear());
-    }
-    return '';
-  };
-
-  // Statistics Widget helper function
-  const getStatsDateRange = () => {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-    
-    switch (statsTimeframe) {
-      case 'this_month': {
-        const start = new Date(currentYear, currentMonth, 1);
-        const end = new Date(currentYear, currentMonth + 1, 0);
-        end.setHours(23, 59, 59, 999);
-        return {
-          startDate: start.toISOString().split('T')[0],
-          endDate: end.toISOString().split('T')[0]
-        };
-      }
-      case 'last_month': {
-        const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-        const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-        const start = new Date(lastMonthYear, lastMonth, 1);
-        const end = new Date(lastMonthYear, lastMonth + 1, 0);
-        end.setHours(23, 59, 59, 999);
-        return {
-          startDate: start.toISOString().split('T')[0],
-          endDate: end.toISOString().split('T')[0]
-        };
-      }
-      case 'six_months': {
-        const sixMonthsAgo = new Date(currentYear, currentMonth - 6, 1);
-        const end = new Date();
-        end.setHours(23, 59, 59, 999);
-        return {
-          startDate: sixMonthsAgo.toISOString().split('T')[0],
-          endDate: end.toISOString().split('T')[0]
-        };
-      }
-      case 'all_time': {
-        // Use a far back date
-        const start = new Date(2020, 0, 1);
-        const end = new Date();
-        end.setHours(23, 59, 59, 999);
-        return {
-          startDate: start.toISOString().split('T')[0],
-          endDate: end.toISOString().split('T')[0]
-        };
-      }
-      default:
-        return {
-          startDate: new Date(currentYear, currentMonth, 1).toISOString().split('T')[0],
-          endDate: new Date().toISOString().split('T')[0]
-        };
-    }
-  };
+  // Use centralized stats date range utility
+  const getStatsDateRange = () => calculateStatsDateRange(personalStatsTimeframe);
 
   // Save commit function (from OneOnOne.js)
   const saveCommit = async (type) => {
@@ -484,6 +355,46 @@ const TeamDashboard = ({ userRole, user }) => {
   };
 
   // Save ALP goal function (from OneOnOne.js)
+  // Save personal ALP goal
+  const savePersonalAlpGoal = async () => {
+    try {
+      const val = parseFloat(personalGoalInput);
+      if (isNaN(val) || val < 0) {
+        alert('Please enter a valid number');
+        return;
+      }
+      
+      // Get month/year from date range selector
+      const rangeStart = parseLocalDate(dateRangeState.start);
+      const month = rangeStart.getMonth() + 1;
+      const year = rangeStart.getFullYear();
+      
+      const totalDaysInMonth = new Date(year, month, 0).getDate();
+      const workingDays = Array.from({ length: totalDaysInMonth }, (_, i) => i + 1);
+      
+      const goalPayload = {
+        userId: user.userId,
+        year: year,
+        month: month,
+        monthlyAlpGoal: val,
+        goalType: 'personal',
+        workingDays: workingDays,
+        rateSource: 'default',
+        customRates: null
+      };
+      
+      await api.post('/goals', goalPayload);
+      setPersonalGoal(val);
+      setEditingPersonalGoal(false);
+      
+      // Refresh activity data to show updated goal progress
+      fetchActivityData();
+    } catch (error) {
+      console.error('Error saving personal goal:', error);
+      alert('Failed to save goal. Please try again.');
+    }
+  };
+
   const saveAlpGoal = async () => {
     try {
       const val = parseFloat(commitInput);
@@ -603,7 +514,7 @@ const TeamDashboard = ({ userRole, user }) => {
             alpGoal = parseFloat(alpGoalRes.data.monthlyAlpGoal);
           }
         } catch (alpError) {
-          console.log('No ALP goal found');
+          // No ALP goal found
         }
         
         setCommits({
@@ -722,60 +633,241 @@ const TeamDashboard = ({ userRole, user }) => {
       try {
         const now = new Date();
         
-        if (timePeriod === 'lastMonth') {
-          // Use Monthly_ALP table for last month
-          const lastMonth = startDate.getMonth() + 1; // +1 because getMonth() is 0-indexed
-          const lastMonthYear = startDate.getFullYear();
-          const monthKey = `${String(lastMonth).padStart(2, '0')}/${lastMonthYear}`;
+        if (timePeriod === 'previousMonth') {
+          // Use Monthly_ALP table for any previous month
+          const selectedMonth = startDate.getMonth() + 1; // +1 because getMonth() is 0-indexed
+          const selectedYear = startDate.getFullYear();
+          const monthKey = `${String(selectedMonth).padStart(2, '0')}/${selectedYear}`;
           
-          const alpRes = await api.get('/alp/mga/monthly-alp', {
+          console.log('💰 [OrgMetrics ALP Card] Using Monthly_ALP for previous month:', {
+            monthKey,
+            lagnname: user.lagnname,
+            viewScope
+          });
+          
+          // Determine endpoint based on viewScope
+          let alpEndpoint;
+          if (viewScope === 'mga') {
+            alpEndpoint = '/alp/getmonthlymga';
+          } else if (viewScope === 'rga') {
+            alpEndpoint = '/alp/getmonthlyrga';
+          } else {
+            alpEndpoint = '/alp/getmonthlyall';
+          }
+          
+          const alpRes = await api.get(alpEndpoint, {
             params: {
-              lagnName: user.lagnname,
-              month: monthKey,
-              viewMode: viewScope
-            },
-            headers: {
-              'user-role': userRole
+              month: monthKey
             }
           });
           
-          if (alpRes?.data?.success && alpRes.data.data && alpRes.data.data.length > 0) {
-            alpMTD = parseFloat(alpRes.data.data[0].LVL_3_NET) || 0;
-            // Set a generic date label for last month
-            setAlpAsOfDate(`${lastMonth}/${lastMonthYear}`);
+          if (alpRes?.data?.success && Array.isArray(alpRes.data.data)) {
+            // Filter to get this user's data
+            let userDataRows = alpRes.data.data.filter(row => 
+              row.LagnName && user.lagnname && 
+              row.LagnName.trim().toLowerCase() === user.lagnname.trim().toLowerCase()
+            );
+            
+            if (userDataRows.length > 0) {
+              // Apply CL_Name filtering for MGA/RGA views (same logic as weekly)
+              let filteredRows = userDataRows;
+              if (viewScope === 'mga' || viewScope === 'rga') {
+                filteredRows = userDataRows.filter(item => {
+                  // Check if there's a paired row (different CL_Name)
+                  const pairedRows = userDataRows.filter(r => 
+                    r.CTLNO === item.CTLNO // Same code
+                  );
+                  
+                  const hasMgaRow = pairedRows.some(r => r.CL_Name === 'MGA');
+                  const hasBlankRow = pairedRows.some(r => !r.CL_Name || r.CL_Name === '');
+                  
+                  if (pairedRows.length >= 2 && hasMgaRow && hasBlankRow) {
+                    // Two rows exist: filter by viewScope
+                    if (viewScope === 'mga') return item.CL_Name === 'MGA';
+                    if (viewScope === 'rga') return !item.CL_Name || item.CL_Name === '';
+                  } else {
+                    // Single row: include in MGA view, exclude from RGA view
+                    return viewScope === 'mga';
+                  }
+                  return true;
+                });
+              }
+              
+              // Deduplicate rows with identical LVL_3_NET values for same REPORT
+              const seenValues = new Set();
+              const deduplicatedRows = filteredRows.filter(row => {
+                const lvl3NetValue = parseFloat(row.LVL_3_NET) || 0;
+                const dedupeKey = `${row.REPORT}|${lvl3NetValue}`;
+                
+                if (seenValues.has(dedupeKey)) {
+                  return false; // Skip duplicate
+                }
+                seenValues.add(dedupeKey);
+                return true;
+              });
+              
+              // Sum all LVL_3_NET values across deduplicated rows
+              alpMTD = deduplicatedRows.reduce((sum, row) => sum + (parseFloat(row.LVL_3_NET) || 0), 0);
+              
+              console.log('💰 [OrgMetrics ALP Card] Monthly_ALP data aggregated:', {
+                lagnname: user.lagnname,
+                totalRows: userDataRows.length,
+                filteredRows: filteredRows.length,
+                viewScope,
+                totalLVL_3_NET: alpMTD
+              });
+            }
+            
+            // Set as of date to month key
+            setAlpAsOfDate(monthKey);
           }
-        } else if (timePeriod === 'ytd') {
-          // Use Weekly_ALP with REPORT = 'YTD Recap' for YTD
-          const currentYear = now.getFullYear();
+        } else if (timePeriod === 'ytd' || viewMode === 'year' || viewMode === 'week') {
+          // Use Weekly_ALP for YTD/Year/Week views
+          const selectedYear = startDate.getFullYear();
           
-          let clNameFilter = '';
-          if (userRole === 'RGA') {
-            clNameFilter = viewScope === 'mga' ? 'MGA' : 'NOT_MGA';
-          } else if (userRole === 'MGA') {
-            clNameFilter = 'MGA';
-          } else if (userRole === 'GA') {
-            clNameFilter = 'GA';
-          } else if (userRole === 'SA') {
-            clNameFilter = 'SA';
+          console.log('💰 [OrgMetrics ALP Card] Week/Year view data:', {
+            viewMode,
+            timePeriod,
+            selectedYear,
+            startDate,
+            endDate,
+            userLagnname: user.lagnname,
+            userRole,
+            viewScope
+          });
+          
+          // Adjust date range for week view (reports come out AFTER the week)
+          let queryStartDate = startDate;
+          let queryEndDate = endDate;
+          if (viewMode === 'week') {
+            // Reports for week Mon-Sun come out 3-10 days after Sunday
+            const sunday = new Date(endDate);
+            queryStartDate = new Date(sunday);
+            queryStartDate.setDate(sunday.getDate() + 1);
+            queryEndDate = new Date(sunday);
+            queryEndDate.setDate(sunday.getDate() + 10);
           }
           
-          const alpRes = await api.get('/alp/mga/weekly-ytd', {
+          const formattedStartDate = formatToMMDDYYYY(queryStartDate);
+          const formattedEndDate = formatToMMDDYYYY(queryEndDate);
+          const reportType = viewMode === 'week' ? 'Weekly Recap' : 'YTD Recap';
+          
+          // Determine endpoint based on viewScope
+          let alpEndpoint;
+          if (viewScope === 'mga') {
+            alpEndpoint = '/alp/getweeklymga';
+          } else if (viewScope === 'rga') {
+            alpEndpoint = '/alp/getweeklyrga';
+          } else {
+            alpEndpoint = '/alp/getweeklyall';
+          }
+          
+          const alpRes = await api.get(alpEndpoint, {
             params: {
-              lagnName: user.lagnname,
-              viewMode: viewScope
-            },
-            headers: {
-              'user-role': userRole
+              startDate: formattedStartDate,
+              endDate: formattedEndDate,
+              report: reportType
             }
           });
           
-          if (alpRes?.data?.success && Array.isArray(alpRes.data.data) && alpRes.data.data.length > 0) {
-            const row = alpRes.data.data[0];
-            alpMTD = parseFloat(row.LVL_3_NET || row.lvl_3_net || 0);
-            if (row.reportdate) {
-              setAlpAsOfDate(row.reportdate);
+          console.log('💰 [OrgMetrics ALP Card] API response:', {
+            endpoint: alpEndpoint,
+            params: { startDate: formattedStartDate, endDate: formattedEndDate, report: reportType },
+            success: alpRes?.data?.success,
+            dataLength: alpRes?.data?.data?.length,
+            sampleRow: alpRes?.data?.data?.[0]
+          });
+          
+          // Complex aggregation: Sum LVL_3_NET across:
+          // 1. All CTLNO codes for this user
+          // 2. All reportdates within 3 days of max (Arias Main + New York)
+          // 3. Apply CL_Name filtering for MGA/RGA views
+          if (alpRes?.data?.success && Array.isArray(alpRes.data.data)) {
+            let userDataRows = alpRes.data.data.filter(row => 
+              row.LagnName && user.lagnname && 
+              row.LagnName.trim().toLowerCase() === user.lagnname.trim().toLowerCase()
+            );
+            
+            if (userDataRows.length > 0) {
+              // Find the most recent reportdate
+              const maxDate = userDataRows.reduce((max, row) => {
+                if (!row.reportdate) return max;
+                const rowDate = new Date(row.reportdate);
+                return !max || rowDate > max ? rowDate : max;
+              }, null);
+              
+              // Filter to rows within 3 days of max reportdate
+              const rowsWithin3Days = userDataRows.filter(row => {
+                if (!row.reportdate || !maxDate) return false;
+                const rowDate = new Date(row.reportdate);
+                const daysDiff = (maxDate - rowDate) / (1000 * 60 * 60 * 24);
+                return daysDiff <= 3;
+              });
+              
+              // Apply CL_Name filtering for MGA/RGA views
+              let filteredRows = rowsWithin3Days;
+              if (viewScope === 'mga' || viewScope === 'rga') {
+                filteredRows = rowsWithin3Days.filter(item => {
+                  // Check if there's a paired row (same reportdate, REPORT, different CL_Name)
+                  const pairedRows = rowsWithin3Days.filter(r => 
+                    r.reportdate === item.reportdate && 
+                    r.REPORT === item.REPORT
+                  );
+                  
+                  const hasMgaRow = pairedRows.some(r => r.CL_Name === 'MGA');
+                  const hasBlankRow = pairedRows.some(r => !r.CL_Name || r.CL_Name === '');
+                  
+                  if (pairedRows.length >= 2 && hasMgaRow && hasBlankRow) {
+                    // Two rows exist: filter by viewScope
+                    if (viewScope === 'mga') return item.CL_Name === 'MGA';
+                    if (viewScope === 'rga') return !item.CL_Name || item.CL_Name === '';
+                  } else {
+                    // Single row: include in MGA view, exclude from RGA view
+                    return viewScope === 'mga';
+                  }
+                  return true;
+                });
+              }
+              
+              // Deduplicate rows with identical LVL_3_NET values for same reportdate and REPORT
+              const seenValues = new Set();
+              const deduplicatedRows = filteredRows.filter(row => {
+                const lvl3NetValue = parseFloat(row.LVL_3_NET) || 0;
+                const dedupeKey = `${row.reportdate}|${row.REPORT}|${lvl3NetValue}`;
+                
+                if (seenValues.has(dedupeKey)) {
+                  return false; // Skip duplicate
+                }
+                seenValues.add(dedupeKey);
+                return true;
+              });
+              
+              // Sum all LVL_3_NET values across deduplicated rows
+              alpMTD = deduplicatedRows.reduce((sum, row) => sum + (parseFloat(row.LVL_3_NET) || 0), 0);
+              
+              if (maxDate) {
+                setAlpAsOfDate(maxDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }));
+              } else {
+                setAlpAsOfDate(`YTD ${selectedYear}`);
+              }
+              
+              console.log('💰 [OrgMetrics ALP Card] User data aggregated:', {
+                lagnname: user.lagnname,
+                totalRows: userDataRows.length,
+                maxDate: maxDate?.toLocaleDateString(),
+                rowsWithin3Days: rowsWithin3Days.length,
+                filteredRows: filteredRows.length,
+                viewScope,
+                breakdown: filteredRows.map(r => ({ 
+                  CTLNO: r.CTLNO, 
+                  CL_Name: r.CL_Name,
+                  LVL_3_NET: r.LVL_3_NET, 
+                  reportdate: r.reportdate 
+                })),
+                totalLVL_3_NET: alpMTD
+              });
             } else {
-              setAlpAsOfDate(`YTD ${currentYear}`);
+              console.log('💰 [OrgMetrics ALP Card] No user data found for:', user.lagnname);
             }
           }
         } else {
@@ -1245,6 +1337,205 @@ const TeamDashboard = ({ userRole, user }) => {
     }
   };
 
+  // Fetch Official ALP from Weekly_ALP or Monthly_ALP for Personal View
+  const fetchPersonalOfficialAlp = async () => {
+    try {
+      if (!user?.lagnname || viewScope !== 'personal') {
+        setPersonalOfficialAlp(null);
+        setHasOfficialAlpData(false);
+        return;
+      }
+
+      // Get date range
+      const startDate = parseLocalDate(dateRangeState.start);
+      const endDate = parseLocalDate(dateRangeState.end);
+      
+      // Determine if we should use Monthly_ALP or Weekly_ALP
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      const selectedMonth = startDate.getMonth();
+      const selectedYear = startDate.getFullYear();
+      
+      // Calculate how many months ago the selected month is
+      const monthsAgo = (currentYear - selectedYear) * 12 + (currentMonth - selectedMonth);
+      
+      // Only use Monthly_ALP if the month is at least 2 months old
+      const isPreviousMonth = viewMode === 'month' && monthsAgo >= 2;
+      
+      let officialAlp = 0;
+      let hasData = false;
+
+      if (isPreviousMonth) {
+        // Use Monthly_ALP for previous months
+        const monthParam = `${String(selectedMonth + 1).padStart(2, '0')}/${selectedYear}`;
+        
+        try {
+          const response = await api.get('/alp/getmonthlyall', {
+            params: { month: monthParam }
+          });
+          
+          if (response.data.success) {
+            // Filter to user's rows
+            const userDataRows = response.data.data.filter(row => 
+              row.LagnName && user.lagnname && 
+              row.LagnName.trim().toLowerCase() === user.lagnname.trim().toLowerCase()
+            );
+            
+            // Deduplicate and sum all CTLNO codes for this user (Monthly_ALP can also have multiple CTLNO)
+            if (userDataRows.length > 0) {
+              // Deduplicate rows with identical LVL_1_NET values for same REPORT
+              const seenValues = new Set();
+              const deduplicatedRows = userDataRows.filter(row => {
+                const lvl1NetValue = parseFloat(row.LVL_1_NET) || 0;
+                const dedupeKey = `${row.REPORT}|${lvl1NetValue}`;
+                
+                if (seenValues.has(dedupeKey)) {
+                  return false; // Skip duplicate
+                }
+                seenValues.add(dedupeKey);
+                return true;
+              });
+              
+              officialAlp = deduplicatedRows.reduce((sum, row) => {
+                return sum + (parseFloat(row.LVL_1_NET) || 0);
+              }, 0);
+              hasData = true;
+            }
+          }
+        } catch (error) {
+          // No Monthly_ALP data found
+        }
+      } else {
+        // Use Weekly_ALP for current period or weeks
+        let queryStartDate, queryEndDate;
+        if (viewMode === 'year') {
+          // Force full year range to avoid picking up previous year's YTD
+          queryStartDate = new Date(startDate.getFullYear(), 0, 1);
+          queryEndDate = new Date(startDate.getFullYear(), 11, 31);
+        } else if (viewMode === 'week') {
+          // For week view, shift date range forward since reports come out AFTER the week
+          // Reports for week Mon-Sun come out 3-10 days after Sunday
+          const sunday = new Date(endDate); // endDate should be the Sunday
+          queryStartDate = new Date(sunday);
+          queryStartDate.setDate(sunday.getDate() + 1); // Day after week ends
+          queryEndDate = new Date(sunday);
+          queryEndDate.setDate(sunday.getDate() + 10); // Up to 10 days after week ends
+        } else if (viewMode === 'month') {
+          // For MTD Recap, avoid querying the entire month (can be very heavy).
+          // Use the backend-provided +/- 3 day range around the latest reportdate.
+          try {
+            const reportDatesResponse = await api.getCached('/alp/getReportDates', { reportType: 'MTD Recap' });
+            const rangeStart = reportDatesResponse?.data?.range?.start;
+            const rangeEnd = reportDatesResponse?.data?.range?.end;
+            if (rangeStart && rangeEnd) {
+              queryStartDate = new Date(rangeStart);
+              queryEndDate = new Date(rangeEnd);
+            } else {
+              queryStartDate = startDate;
+              queryEndDate = endDate;
+            }
+          } catch {
+            queryStartDate = startDate;
+            queryEndDate = endDate;
+          }
+        } else {
+          queryStartDate = startDate;
+          queryEndDate = endDate;
+        }
+        
+        const formattedStartDate = formatToMMDDYYYY(queryStartDate);
+        const formattedEndDate = formatToMMDDYYYY(queryEndDate);
+        
+        // Determine report type based on viewMode
+        let reportType = 'Weekly Recap';
+        if (viewMode === 'month') {
+          reportType = 'MTD Recap';
+        } else if (viewMode === 'year') {
+          reportType = 'YTD Recap';
+        }
+        
+        try {
+          const response = await api.get('/alp/getweeklyall', {
+            params: {
+              startDate: formattedStartDate,
+              endDate: formattedEndDate,
+              report: reportType
+            }
+          });
+          
+          if (response.data.success && response.data.data.length > 0) {
+            // Filter to only records matching the user
+            let userDataRows = response.data.data.filter(row => 
+              row.LagnName && user.lagnname && 
+              row.LagnName.trim().toLowerCase() === user.lagnname.trim().toLowerCase()
+            );
+            
+            // For year view, ensure we only get data from the selected year
+            if (viewMode === 'year' && userDataRows.length > 0) {
+              const targetYear = startDate.getFullYear();
+              userDataRows = userDataRows.filter(row => {
+                if (!row.reportdate) return false;
+                // Parse reportdate (format: MM/DD/YYYY)
+                const reportParts = row.reportdate.split('/');
+                if (reportParts.length !== 3) return false;
+                const reportYear = parseInt(reportParts[2]);
+                return reportYear === targetYear;
+              });
+            }
+            
+            if (userDataRows.length > 0) {
+              // Apply 3-day aggregation logic (same as leaderboard)
+              // 1. Find the most recent reportdate
+              const maxDate = userDataRows.reduce((max, row) => {
+                if (!row.reportdate) return max;
+                const rowDate = new Date(row.reportdate);
+                return !max || rowDate > max ? rowDate : max;
+              }, null);
+              
+              // 2. Filter to rows within 3 days of max reportdate
+              const rowsWithin3Days = userDataRows.filter(row => {
+                if (!row.reportdate || !maxDate) return false;
+                const rowDate = new Date(row.reportdate);
+                const daysDiff = (maxDate - rowDate) / (1000 * 60 * 60 * 24);
+                return daysDiff <= 3;
+              });
+              
+              // 3. Deduplicate and sum LVL_1_NET across all CTLNO codes within 3-day window
+              const seenValues = new Set();
+              const deduplicatedRows = rowsWithin3Days.filter(row => {
+                const lvl1NetValue = parseFloat(row.LVL_1_NET) || 0;
+                const dedupeKey = `${row.reportdate}|${row.REPORT}|${lvl1NetValue}`;
+                
+                if (seenValues.has(dedupeKey)) {
+                  return false; // Skip duplicate
+                }
+                seenValues.add(dedupeKey);
+                return true;
+              });
+              
+              officialAlp = deduplicatedRows.reduce((sum, row) => {
+                return sum + (parseFloat(row.LVL_1_NET) || 0);
+              }, 0);
+              
+              hasData = deduplicatedRows.length > 0;
+            }
+          }
+        } catch (error) {
+          // No Weekly_ALP data found
+        }
+      }
+      
+      setPersonalOfficialAlp(officialAlp);
+      setHasOfficialAlpData(hasData);
+      
+    } catch (error) {
+      console.error('[TeamDashboard] Error fetching official ALP:', error);
+      setPersonalOfficialAlp(null);
+      setHasOfficialAlpData(false);
+    }
+  };
+
   // Fetch Activity Data
   const fetchActivityData = async () => {
     try {
@@ -1256,8 +1547,13 @@ const TeamDashboard = ({ userRole, user }) => {
         return;
       }
 
-      const dateRange = getActivityDateRange();
-      if (!dateRange) {
+      // Use main date range selector for all views
+      const dateRange = {
+        startDate: dateRangeState.start,
+        endDate: dateRangeState.end
+      };
+      
+      if (!dateRange.startDate || !dateRange.endDate) {
         setActivityError('Invalid date range');
         return;
       }
@@ -1276,13 +1572,6 @@ const TeamDashboard = ({ userRole, user }) => {
       } else {
         endpoint = `/dailyActivity/user-summary?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&userId=${uid}`;
       }
-      
-      console.log('[TeamDashboard] Fetching activity data:', {
-        userRole,
-        viewScope,
-        endpoint,
-        dateRange
-      });
       
       const activityResponse = await api.get(endpoint);
       
@@ -1307,6 +1596,9 @@ const TeamDashboard = ({ userRole, user }) => {
         });
 
         setActivityData(aggregated);
+        
+        // Personal cards default to Reported ALP (Daily Activity).
+        // Only fetch Official ALP (Weekly/Monthly_ALP) when user explicitly switches to it.
       } else {
         throw new Error('Failed to fetch activity data');
       }
@@ -1324,6 +1616,325 @@ const TeamDashboard = ({ userRole, user }) => {
       setActivityLoading(false);
     }
   };
+
+  // Fetch official ALP lazily:
+  // In Personal view, the cards render immediately using Reported ALP from Daily Activity.
+  // Only hit Weekly/Monthly_ALP when the user switches the card to "Official".
+  useEffect(() => {
+    if (viewScope !== 'personal') return;
+    if (personalAlpMode !== 'official') return;
+    fetchPersonalOfficialAlp();
+  }, [viewScope, personalAlpMode, dateRangeState, viewMode, user?.lagnname]);
+
+  // Fetch MGA Official ALP (from Weekly_ALP or Monthly_ALP)
+  const fetchMgaOfficialAlp = async () => {
+    try {
+      if (!user?.lagnname) return;
+      if (viewScope !== 'mga') return;
+      
+      const dateRange = getDateRange();
+      const startDate = dateRange.startDate;
+      const endDate = dateRange.endDate;
+      
+      let officialAlp = 0;
+      let hasData = false;
+      
+      // Determine if using Monthly_ALP (previous month) or Weekly_ALP (current period)
+      const isPreviousMonth = timePeriod === 'previousMonth' || timePeriod === 'lastMonth';
+      
+      if (isPreviousMonth) {
+        // Use Monthly_ALP
+        const monthParam = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
+        
+        try {
+          const response = await api.get('/alp/getmonthlymga', { params: { month: monthParam } });
+          
+          if (response.data.success && response.data.data.length > 0) {
+            // Aggregate LVL_3_NET for all MGAs (team production)
+            officialAlp = response.data.data.reduce((sum, row) => {
+              return sum + (parseFloat(row.LVL_3_NET) || 0);
+            }, 0);
+            hasData = response.data.data.length > 0;
+          }
+        } catch (error) {
+          // No Monthly_ALP data found
+        }
+      } else {
+        // Use Weekly_ALP for current period
+        let queryStartDate, queryEndDate;
+        if (viewMode === 'year') {
+          queryStartDate = new Date(startDate.getFullYear(), 0, 1);
+          queryEndDate = new Date(startDate.getFullYear(), 11, 31);
+        } else if (viewMode === 'week') {
+          const sunday = new Date(endDate);
+          queryStartDate = new Date(sunday);
+          queryStartDate.setDate(sunday.getDate() + 1);
+          queryEndDate = new Date(sunday);
+          queryEndDate.setDate(sunday.getDate() + 10);
+        } else if (viewMode === 'month') {
+          try {
+            const reportDatesResponse = await api.getCached('/alp/getReportDates', { reportType: 'MTD Recap' });
+            const rangeStart = reportDatesResponse?.data?.range?.start;
+            const rangeEnd = reportDatesResponse?.data?.range?.end;
+            if (rangeStart && rangeEnd) {
+              queryStartDate = new Date(rangeStart);
+              queryEndDate = new Date(rangeEnd);
+            } else {
+              queryStartDate = startDate;
+              queryEndDate = endDate;
+            }
+          } catch {
+            queryStartDate = startDate;
+            queryEndDate = endDate;
+          }
+        } else {
+          queryStartDate = startDate;
+          queryEndDate = endDate;
+        }
+        
+        const formattedStartDate = formatToMMDDYYYY(queryStartDate);
+        const formattedEndDate = formatToMMDDYYYY(queryEndDate);
+        
+        let reportType = 'Weekly Recap';
+        if (viewMode === 'month') reportType = 'MTD Recap';
+        else if (viewMode === 'year') reportType = 'YTD Recap';
+        
+        try {
+          const response = await api.get('/alp/getweeklymga', {
+            params: { startDate: formattedStartDate, endDate: formattedEndDate, report: reportType }
+          });
+          
+          if (response.data.success && response.data.data.length > 0) {
+            // Aggregate LVL_3_NET for all MGAs (team production)
+            officialAlp = response.data.data.reduce((sum, row) => {
+              return sum + (parseFloat(row.LVL_3_NET) || 0);
+            }, 0);
+            hasData = response.data.data.length > 0;
+          }
+        } catch (error) {
+          // No Weekly_ALP data found
+        }
+      }
+      
+      setMgaOfficialAlp(officialAlp);
+      setHasMgaOfficialAlpData(hasData);
+      
+    } catch (error) {
+      console.error('[TeamDashboard] Error fetching MGA official ALP:', error);
+      setMgaOfficialAlp(null);
+      setHasMgaOfficialAlpData(false);
+    }
+  };
+
+  // Fetch RGA Official ALP (from Weekly_ALP or Monthly_ALP)
+  const fetchRgaOfficialAlp = async () => {
+    try {
+      if (!user?.lagnname) return;
+      if (viewScope !== 'rga') return;
+      
+      const dateRange = getDateRange();
+      const startDate = dateRange.startDate;
+      const endDate = dateRange.endDate;
+      
+      let officialAlp = 0;
+      let hasData = false;
+      
+      const isPreviousMonth = timePeriod === 'previousMonth' || timePeriod === 'lastMonth';
+      
+      if (isPreviousMonth) {
+        const monthParam = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
+        
+        try {
+          const response = await api.get('/alp/getmonthlyrga', { params: { month: monthParam } });
+          
+          if (response.data.success && response.data.data.length > 0) {
+            // Aggregate LVL_3_NET for all RGAs (team production)
+            officialAlp = response.data.data.reduce((sum, row) => {
+              return sum + (parseFloat(row.LVL_3_NET) || 0);
+            }, 0);
+            hasData = response.data.data.length > 0;
+          }
+        } catch (error) {
+          // No Monthly_ALP data found
+        }
+      } else {
+        let queryStartDate, queryEndDate;
+        if (viewMode === 'year') {
+          queryStartDate = new Date(startDate.getFullYear(), 0, 1);
+          queryEndDate = new Date(startDate.getFullYear(), 11, 31);
+        } else if (viewMode === 'week') {
+          const sunday = new Date(endDate);
+          queryStartDate = new Date(sunday);
+          queryStartDate.setDate(sunday.getDate() + 1);
+          queryEndDate = new Date(sunday);
+          queryEndDate.setDate(sunday.getDate() + 10);
+        } else if (viewMode === 'month') {
+          try {
+            const reportDatesResponse = await api.getCached('/alp/getReportDates', { reportType: 'MTD Recap' });
+            const rangeStart = reportDatesResponse?.data?.range?.start;
+            const rangeEnd = reportDatesResponse?.data?.range?.end;
+            if (rangeStart && rangeEnd) {
+              queryStartDate = new Date(rangeStart);
+              queryEndDate = new Date(rangeEnd);
+            } else {
+              queryStartDate = startDate;
+              queryEndDate = endDate;
+            }
+          } catch {
+            queryStartDate = startDate;
+            queryEndDate = endDate;
+          }
+        } else {
+          queryStartDate = startDate;
+          queryEndDate = endDate;
+        }
+        
+        const formattedStartDate = formatToMMDDYYYY(queryStartDate);
+        const formattedEndDate = formatToMMDDYYYY(queryEndDate);
+        
+        let reportType = 'Weekly Recap';
+        if (viewMode === 'month') reportType = 'MTD Recap';
+        else if (viewMode === 'year') reportType = 'YTD Recap';
+        
+        try {
+          const response = await api.get('/alp/getweeklyrga', {
+            params: { startDate: formattedStartDate, endDate: formattedEndDate, report: reportType }
+          });
+          
+          if (response.data.success && response.data.data.length > 0) {
+            // Aggregate LVL_3_NET for all RGAs (team production)
+            officialAlp = response.data.data.reduce((sum, row) => {
+              return sum + (parseFloat(row.LVL_3_NET) || 0);
+            }, 0);
+            hasData = response.data.data.length > 0;
+          }
+        } catch (error) {
+          // No Weekly_ALP data found
+        }
+      }
+      
+      setRgaOfficialAlp(officialAlp);
+      setHasRgaOfficialAlpData(hasData);
+      
+    } catch (error) {
+      console.error('[TeamDashboard] Error fetching RGA official ALP:', error);
+      setRgaOfficialAlp(null);
+      setHasRgaOfficialAlpData(false);
+    }
+  };
+
+  // Fetch MGA official ALP when toggled
+  useEffect(() => {
+    if (viewScope !== 'mga') return;
+    if (mgaAlpMode !== 'official') return;
+    fetchMgaOfficialAlp();
+  }, [viewScope, mgaAlpMode, dateRangeState, viewMode, user?.lagnname]);
+
+  // Fetch RGA official ALP when toggled
+  useEffect(() => {
+    if (viewScope !== 'rga') return;
+    if (rgaAlpMode !== 'official') return;
+    fetchRgaOfficialAlp();
+  }, [viewScope, rgaAlpMode, dateRangeState, viewMode, user?.lagnname]);
+
+  // Fetch Personal Goal
+  const fetchPersonalGoal = async () => {
+    try {
+      if (!user?.userId) return;
+      
+      // Get month/year from date range selector
+      const rangeStart = parseLocalDate(dateRangeState.start);
+      const month = rangeStart.getMonth() + 1;
+      const year = rangeStart.getFullYear();
+      
+      const response = await api.get(`/goals/${user.userId}/${year}/${month}`, {
+        params: { goalType: 'personal' }
+      });
+      
+      if (response.data?.monthlyAlpGoal) {
+        setPersonalGoal(parseFloat(response.data.monthlyAlpGoal));
+      } else {
+        setPersonalGoal(null);
+      }
+    } catch (error) {
+      console.error('Error fetching personal goal:', error);
+      setPersonalGoal(null);
+    }
+  };
+
+  // Fetch Personal Comparison Data (for card comparisons)
+  const fetchPersonalComparison = async () => {
+    try {
+      if (!user?.userId) return;
+      
+      const now = new Date();
+      const rangeStart = parseLocalDate(dateRangeState.start);
+      const rangeEnd = parseLocalDate(dateRangeState.end);
+      
+      // Calculate comparison period (prefer same period last year, fall back to previous month)
+      let comparisonStart, comparisonEnd, comparisonLabel;
+      
+      if (viewMode === 'year') {
+        // YTD: Compare to full previous year
+        comparisonStart = new Date(rangeStart.getFullYear() - 1, 0, 1);
+        comparisonEnd = new Date(rangeStart.getFullYear() - 1, 11, 31);
+        comparisonLabel = 'vs last year';
+      } else if (viewMode === 'month') {
+        // Month: Compare to same month last year
+        comparisonStart = new Date(rangeStart.getFullYear() - 1, rangeStart.getMonth(), 1);
+        comparisonEnd = new Date(rangeStart.getFullYear() - 1, rangeStart.getMonth() + 1, 0);
+        comparisonLabel = 'vs last year';
+      } else {
+        // Week: Compare to previous month's similar period
+        const daysDiff = Math.ceil((rangeEnd - rangeStart) / (1000 * 60 * 60 * 24));
+        comparisonEnd = new Date(rangeStart);
+        comparisonEnd.setDate(comparisonEnd.getDate() - 1);
+        comparisonStart = new Date(comparisonEnd);
+        comparisonStart.setDate(comparisonStart.getDate() - daysDiff);
+        comparisonLabel = 'vs prev period';
+      }
+      
+      const uid = encodeURIComponent(String(user?.userId || ''));
+      const currentEndpoint = `/dailyActivity/user-summary?startDate=${dateRangeState.start}&endDate=${dateRangeState.end}&userId=${uid}`;
+      const comparisonEndpoint = `/dailyActivity/user-summary?startDate=${comparisonStart.toISOString().split('T')[0]}&endDate=${comparisonEnd.toISOString().split('T')[0]}&userId=${uid}`;
+      
+      const [currentResponse, comparisonResponse] = await Promise.all([
+        api.get(currentEndpoint),
+        api.get(comparisonEndpoint)
+      ]);
+      
+      const aggregateDailyData = (data) => {
+        return (data || []).reduce((acc, day) => {
+          acc.calls += parseFloat(day.calls) || 0;
+          acc.appts += parseFloat(day.appts) || 0;
+          acc.sits += parseFloat(day.sits) || 0;
+          acc.sales += parseFloat(day.sales) || 0;
+          acc.alp += parseFloat(day.alp) || 0;
+          acc.refs += parseFloat(day.refs) || 0;
+          return acc;
+        }, { calls: 0, appts: 0, sits: 0, sales: 0, alp: 0, refs: 0 });
+      };
+      
+      const currentData = aggregateDailyData(currentResponse.data?.data);
+      const comparisonData = aggregateDailyData(comparisonResponse.data?.data);
+      
+      setPersonalComparison({
+        calls: currentData.calls - comparisonData.calls,
+        appts: currentData.appts - comparisonData.appts,
+        sits: currentData.sits - comparisonData.sits,
+        sales: currentData.sales - comparisonData.sales,
+        alp: currentData.alp - comparisonData.alp,
+        refs: currentData.refs - comparisonData.refs,
+        label: comparisonLabel
+      });
+    } catch (error) {
+      console.error('Error fetching personal comparison data:', error);
+      setPersonalComparison(null);
+    }
+  };
+
+  // Fetch Personal Stats Data (for card ratios)
+  // Removed - consolidated into fetchStatsData to eliminate duplicate API call
 
   // Fetch Statistics Data
   const fetchStatsData = async () => {
@@ -1370,7 +1981,7 @@ const TeamDashboard = ({ userRole, user }) => {
         const refsPerSit = aggregated.sits > 0 ? (aggregated.refs / aggregated.sits).toFixed(2) : 0;
         const refAlpPerRef = aggregated.refs > 0 ? (aggregated.refAlp / aggregated.refs).toFixed(2) : 0;
 
-        setStatisticsData({
+        setStatsData({
           callsToAppt: parseFloat(callsToAppt),
           callsToSit: parseFloat(callsToSit),
           showRatio: parseFloat(showRatio),
@@ -1411,13 +2022,23 @@ const TeamDashboard = ({ userRole, user }) => {
     return sunday;
   };
 
-  const calculateDateRange = (date) => {
-    const reportDate = new Date(date);
-    const startDate = new Date(reportDate);
-    startDate.setDate(reportDate.getDate() - 3);
+  const calculateDateRange = (mondayDateStr) => {
+    // Since reportdate represents when the report was submitted (not the week it covers),
+    // reports for a given week come out 3-10 days AFTER the week ends (Sunday).
+    // For week Jan 26 - Feb 1, reports would have reportdate around Feb 5-11.
     
-    const endDate = new Date(reportDate);
-    endDate.setDate(reportDate.getDate() + 3);
+    const monday = new Date(mondayDateStr);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6); // Get Sunday of the week
+    
+    // Query for reportdates from (Sunday + 1 day) to (Sunday + 10 days)
+    // This catches both Arias Main (typically Wed, ~3-4 days after) 
+    // and New York (typically Fri-Sat, ~5-7 days after)
+    const startDate = new Date(sunday);
+    startDate.setDate(sunday.getDate() + 1); // Day after week ends
+    
+    const endDate = new Date(sunday);
+    endDate.setDate(sunday.getDate() + 10); // Up to 10 days after week ends
     
     return {
       startDate: formatToMMDDYYYY(startDate),
@@ -1425,158 +2046,203 @@ const TeamDashboard = ({ userRole, user }) => {
     };
   };
 
-  // Format the "as of" date based on period type and report date
-  const formatAsOfDate = (reportDate, period, startDateStr, endDateStr) => {
-    if (period === 'week') {
-      // For week: show range like "12/16/24 - 12/22/24"
-      const start = new Date(startDateStr);
-      const end = new Date(endDateStr);
-      const formatShort = (d) => {
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        const yy = String(d.getFullYear()).slice(-2);
-        return `${mm}/${dd}/${yy}`;
-      };
-      return `${formatShort(start)} - ${formatShort(end)}`;
-    } else if (period === 'month' || period === 'ytd') {
-      // For month/YTD: use the actual reportdate from the data
-      if (reportDate) {
-        const date = new Date(reportDate);
-        const mm = String(date.getMonth() + 1).padStart(2, '0');
-        const dd = String(date.getDate()).padStart(2, '0');
-        const yy = String(date.getFullYear()).slice(-2);
-        return `${mm}/${dd}/${yy}`;
-      }
-    }
-    return '';
+  // Match LeaderboardPage behavior: query a tight +/- 3 day window around a specific report publish date
+  const calculatePlusMinus3Range = (reportDateIso) => {
+    const reportDate = new Date(reportDateIso);
+    const startDate = new Date(reportDate);
+    startDate.setDate(reportDate.getDate() - 3);
+    const endDate = new Date(reportDate);
+    endDate.setDate(reportDate.getDate() + 3);
+    return {
+      startDate: formatToMMDDYYYY(startDate),
+      endDate: formatToMMDDYYYY(endDate),
+      reportDateIso: reportDate.toISOString().split('T')[0]
+    };
   };
 
-  // Fetch Leaderboard Data (using LVL_1_NET for personal/AGT view)
-  const fetchLeaderboardData = async () => {
-    try {
-      setLeaderboardLoading(true);
+  const pickReportDateForWeek = (reportDatesIso = [], weekStartDate, weekEndDate) => {
+    if (!Array.isArray(reportDatesIso) || reportDatesIso.length === 0) return null;
+    const weekEnd = new Date(weekEndDate);
+    const windowStart = new Date(weekEnd);
+    windowStart.setDate(weekEnd.getDate() + 1);
+    const windowEnd = new Date(weekEnd);
+    windowEnd.setDate(weekEnd.getDate() + 10);
 
-      let startDate, endDate, reportType;
-      
-      if (leaderboardPeriod === 'week') {
-        // Get report dates from backend for Weekly Recap
-        const reportDatesResponse = await api.get('/alp/getReportDates', {
-          params: { reportType: 'Weekly Recap' }
-        });
-        
-        let selectedDate;
-        if (reportDatesResponse.data.success && reportDatesResponse.data.defaultDate) {
-          selectedDate = reportDatesResponse.data.defaultDate;
-        } else {
-          // Fallback: use current week's Monday
-          const today = new Date();
-          selectedDate = getMondayOfWeek(today).toISOString().split('T')[0];
-        }
-        
-        // Calculate week range from the selected date (±3 days like LeaderboardPage)
-        const dateRange = calculateDateRange(selectedDate);
-        startDate = dateRange.startDate;
-        endDate = dateRange.endDate;
-        reportType = 'Weekly Recap';
-      } else if (leaderboardPeriod === 'month') {
-        // Current month
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = today.getMonth();
-        const firstDay = new Date(year, month, 1);
-        const lastDay = new Date(year, month + 1, 0);
-        
-        startDate = formatToMMDDYYYY(firstDay);
-        endDate = formatToMMDDYYYY(lastDay);
-        reportType = 'MTD Recap';
-      } else if (leaderboardPeriod === 'ytd') {
-        // Year to date
-        const today = new Date();
-        const year = today.getFullYear();
-        const firstDay = new Date(year, 0, 1);
-        
-        startDate = formatToMMDDYYYY(firstDay);
-        endDate = formatToMMDDYYYY(today);
-        reportType = 'YTD Recap';
-      }
+    // reportDatesIso is usually newest-first; pick the first one that falls in the publish window
+    const inWindow = reportDatesIso.find((d) => {
+      const dt = new Date(d);
+      return dt >= windowStart && dt <= windowEnd;
+    });
+    if (inWindow) return inWindow;
 
-      // Fetch leaderboard data - use 'getweeklyall' for top producers
-      const response = await api.get('/alp/getweeklyall', {
-        params: { 
-          startDate: startDate,
-          endDate: endDate,
-          report: reportType
-        }
-      });
-
-      if (response.data.success) {
-        const rawData = response.data.data || [];
-        
-        // Get the report date - for YTD, find the most recent reportdate
-        let reportDate = null;
-        if (rawData.length > 0) {
-          if (leaderboardPeriod === 'ytd') {
-            // For YTD, find the maximum (most recent) reportdate from all items
-            const reportDates = rawData
-              .map(item => item.reportdate)
-              .filter(date => date)
-              .map(date => new Date(date).getTime())
-              .filter(timestamp => !isNaN(timestamp));
-            
-            if (reportDates.length > 0) {
-              const maxTimestamp = Math.max(...reportDates);
-              reportDate = new Date(maxTimestamp).toISOString().split('T')[0];
-            }
-          } else {
-            // For week/month, use the first item's reportdate (they should all be the same)
-            reportDate = rawData[0].reportdate;
-          }
-        }
-        
-        // Set the "as of" date for display using the actual reportdate
-        setLeaderboardAsOfDate(formatAsOfDate(reportDate, leaderboardPeriod, startDate, endDate));
-        
-        // Process leaderboard data - use LVL_1_NET
-        const processedData = rawData
-          .map((item, index) => ({
-            rank: index + 1,
-            name: item.LagnName || item.lagnname || 'Unknown',
-            value: parseFloat(item.LVL_1_NET || item.lvl_1_net || 0),
-            profile_picture: item.profpic || null,
-            clname: item.clname || null,
-            mga: item.mga || null,
-            rga: item.rga || null
-          }))
-          .filter(item => item.value > 0)
-          .sort((a, b) => b.value - a.value)
-          .slice(0, 10); // Top 10
-
-        setLeaderboardData(processedData);
-      }
-
-    } catch (err) {
-      console.error('Error fetching leaderboard data:', err);
-    } finally {
-      setLeaderboardLoading(false);
-    }
+    // Fallback: pick latest date not too far after the week ends
+    const looseEnd = new Date(weekEnd);
+    looseEnd.setDate(weekEnd.getDate() + 14);
+    const looseStart = new Date(weekStartDate);
+    looseStart.setDate(looseStart.getDate() - 7);
+    const near = reportDatesIso.find((d) => {
+      const dt = new Date(d);
+      return dt >= looseStart && dt <= looseEnd;
+    });
+    return near || reportDatesIso[0];
   };
+
+  const pickReportDateForYear = (reportDatesIso = [], year) => {
+    if (!Array.isArray(reportDatesIso) || reportDatesIso.length === 0) return null;
+    const match = reportDatesIso.find((d) => new Date(d).getFullYear() === year);
+    return match || reportDatesIso[0];
+  };
+
+  // NOTE: Removed the compact "Top 10" leaderboard fetch from TeamDashboard.
 
   // Fetch Team Leaderboard Data (for team view)
+  // Load more leaderboard data (for frontend pagination in Personal view)
+  // No backend fetching needed - we already have all ALP data
+  const loadMoreLeaderboardData = () => {
+    try {
+      if (!leaderboardHasMore || teamLeaderboardLoading) return;
+      if (leaderboardAllUsers.length === 0) return;
+      if (leaderboardAlpDataMap.size === 0) return;
+      
+      setTeamLeaderboardLoading(true);
+      
+      const nextPage = leaderboardPage + 1;
+      const startIdx = (nextPage - 1) * LEADERBOARD_PAGE_SIZE;
+      const endIdx = startIdx + LEADERBOARD_PAGE_SIZE;
+      const pageUsers = leaderboardAllUsers.slice(startIdx, endIdx);
+      
+      if (pageUsers.length === 0) {
+        setLeaderboardHasMore(false);
+        setTeamLeaderboardLoading(false);
+        return;
+      }
+      
+      // Helper functions (same as in main fetch)
+      const formatAgentName = (lagnname) => {
+        if (!lagnname || typeof lagnname !== 'string') return '';
+        const parts = lagnname.trim().split(/\s+/);
+        if (parts.length < 2) return parts[0] || '';
+        const last = parts[0];
+        const first = parts[1];
+        let middle = '';
+        let suffix = '';
+        if (parts.length === 3) {
+          const thirdPart = parts[2];
+          if (thirdPart.length === 1) {
+            middle = thirdPart;
+          } else {
+            suffix = thirdPart;
+          }
+        } else if (parts.length >= 4) {
+          middle = parts[2];
+          suffix = parts.slice(3).join(' ');
+        }
+        let formattedName = first;
+        if (middle) formattedName += ` ${middle}`;
+        formattedName += ` ${last}`;
+        if (suffix) formattedName += ` ${suffix}`;
+        return formattedName;
+      };
+      
+      const getMgaLastName = (mgaName, agentName) => {
+        if (mgaName && typeof mgaName === 'string' && mgaName.trim()) {
+          const parts = mgaName.trim().split(/\s+/);
+          return parts[0] || '';
+        }
+        if (agentName && typeof agentName === 'string') {
+          const parts = agentName.trim().split(/\s+/);
+          return parts[0] || '';
+        }
+        return '';
+      };
+      
+      // Map page users to ALP data (using stored alpDataMap and alpField)
+      const newAgents = pageUsers.map(user => {
+        const alpData = leaderboardAlpDataMap.get(user.lagnname);
+        const premium = alpData ? parseFloat(alpData[leaderboardAlpField] || 0) : 0;
+        
+        return {
+          id: user.id,
+          agent_name: formatAgentName(user.lagnname),
+          mga_name: getMgaLastName(alpData?.MGA_NAME || user.mga, user.lagnname),
+          email: user.email || '',
+          policy_count: alpData?.policy_count || 0,
+          total_premium: premium,
+          lagnname: user.lagnname,
+          userId: user.id,
+          hasProduction: premium > 0,
+          profile_picture: user.profpic || null,
+          esid: user.esid || null,
+          reported_alp: 0,
+          report_days: 0
+        };
+      });
+      
+      // Append new agents to existing leaderboard
+      setTeamLeaderboardData(prev => [...prev, ...newAgents]);
+      setLeaderboardPage(nextPage);
+      setLeaderboardHasMore(endIdx < leaderboardAllUsers.length);
+      setTeamLeaderboardLoading(false);
+      
+    } catch (error) {
+      console.error('🏆 [TeamLeaderboard] Error loading more data:', error);
+      setTeamLeaderboardLoading(false);
+    }
+  };
+
   const fetchTeamLeaderboardData = async () => {
     try {
-      console.log('🏆 [TeamLeaderboard] Fetching data...', { viewMode, timePeriod, viewScope, userRole });
       setTeamLeaderboardLoading(true);
+
+      const isCanceledError = (err) =>
+        err?.name === 'CanceledError' ||
+        err?.code === 'ERR_CANCELED' ||
+        err?.message === 'canceled';
+
+      // Cancel any in-flight team leaderboard request
+      if (teamLeaderboardAbortRef.current) {
+        teamLeaderboardAbortRef.current.abort();
+      }
+      const controller = new AbortController();
+      teamLeaderboardAbortRef.current = controller;
+
+      // Start fetching active users ASAP (do not block the initial official ALP render on this)
+      // IMPORTANT: attach a handler immediately so aborts don't surface as unhandled promise rejections.
+      const usersPromise = api
+        .getCached('/users/active', {}, { signal: controller.signal })
+        .catch((err) => {
+          if (isCanceledError(err)) return null;
+          throw err;
+        });
 
       // Get date range based on time period
       const dateRange = getDateRange();
-      const { startDate, endDate } = dateRange;
+      let { startDate, endDate } = dateRange;
+      
+      // Determine if we should use Monthly_ALP or Weekly_ALP
+      // Use Monthly_ALP for month view when looking at a previous month
+      // BUT: Only use Monthly_ALP if the month is at least 2 months old (to give time for data population)
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      const selectedMonth = startDate.getMonth();
+      const selectedYear = startDate.getFullYear();
+      
+      // Calculate how many months ago the selected month is
+      const monthsAgo = (currentYear - selectedYear) * 12 + (currentMonth - selectedMonth);
+      
+      // Only use Monthly_ALP if the month is at least 2 months old
+      const isPreviousMonth = viewMode === 'month' && monthsAgo >= 2;
+      
+      // Format for Monthly_ALP: MM/YYYY
+      const monthParam = `${String(selectedMonth + 1).padStart(2, '0')}/${selectedYear}`;
       
       // Map view mode to Weekly_ALP.REPORT type
       let reportType;
       if (viewMode === 'week') {
         reportType = 'Weekly Recap';
       } else if (viewMode === 'month') {
-        reportType = 'MTD Recap'; // Will use max MTD Recap
+        reportType = isPreviousMonth ? 'MONTH RECAP' : 'MTD Recap'; // Monthly_ALP uses 'MONTH RECAP'
       } else if (viewMode === 'year') {
         reportType = 'YTD Recap'; // Will use max YTD Recap
       } else {
@@ -1584,260 +2250,631 @@ const TeamDashboard = ({ userRole, user }) => {
         reportType = timePeriod === 'ytd' ? 'YTD Recap' : 'MTD Recap';
       }
 
-      const formattedStartDate = formatToMMDDYYYY(startDate);
-      const formattedEndDate = formatToMMDDYYYY(endDate);
-      
-      console.log('🏆 [TeamLeaderboard] API params:', {
-        viewMode,
-        startDate: formattedStartDate,
-        endDate: formattedEndDate,
-        report: reportType
-      });
+      // LeaderboardPage strategy:
+      // pick the report publish date and query only +/- 3 days around it (much smaller + faster).
+      let formattedStartDate, formattedEndDate;
+      if (viewMode === 'week' || viewMode === 'year') {
+        try {
+          const reportDatesRes = await api.getCached('/alp/getReportDates', { reportType });
+          const reportDatesIso = reportDatesRes?.data?.type === 'grouped'
+            ? (reportDatesRes?.data?.reportDates || []).filter(d => d && !d.isHeader).map(d => d.value)
+            : (reportDatesRes?.data?.reportDates || []);
 
-      // Fetch all active users first
-      const usersResponse = await api.get('/users/active');
-      const allUsers = usersResponse.data || [];
-      console.log('🏆 [TeamLeaderboard] All active users count:', allUsers.length);
+          let chosenReportDate;
+          if (viewMode === 'week') {
+            chosenReportDate = pickReportDateForWeek(reportDatesIso, startDate, endDate);
+          } else {
+            chosenReportDate = pickReportDateForYear(reportDatesIso, selectedYear);
+          }
 
-      // Fetch from Weekly_ALP using existing endpoint
-      const response = await api.get('/alp/getweeklyall', {
-        params: {
-          startDate: formattedStartDate,
-          endDate: formattedEndDate,
-          report: reportType
+          if (chosenReportDate) {
+            const pm3 = calculatePlusMinus3Range(chosenReportDate);
+            formattedStartDate = pm3.startDate;
+            formattedEndDate = pm3.endDate;
+          } else {
+            // Fallback to narrow window around period end
+            const pm3 = calculatePlusMinus3Range(endDate.toISOString().split('T')[0]);
+            formattedStartDate = pm3.startDate;
+            formattedEndDate = pm3.endDate;
+          }
+        } catch {
+          const pm3 = calculatePlusMinus3Range(endDate.toISOString().split('T')[0]);
+          formattedStartDate = pm3.startDate;
+          formattedEndDate = pm3.endDate;
         }
-      });
+      } else if (viewMode === 'month' && !isPreviousMonth) {
+        // For MTD Recap, avoid querying the entire month (can be very heavy).
+        // Use the backend-provided +/- 3 day range around the latest reportdate.
+        try {
+          const reportDatesResponse = await api.getCached('/alp/getReportDates', { reportType: 'MTD Recap' });
+          const rangeStart = reportDatesResponse?.data?.range?.start;
+          const rangeEnd = reportDatesResponse?.data?.range?.end;
+          if (rangeStart && rangeEnd) {
+            formattedStartDate = formatToMMDDYYYY(new Date(rangeStart));
+            formattedEndDate = formatToMMDDYYYY(new Date(rangeEnd));
+          } else {
+            formattedStartDate = formatToMMDDYYYY(startDate);
+            formattedEndDate = formatToMMDDYYYY(endDate);
+          }
+        } catch {
+          formattedStartDate = formatToMMDDYYYY(startDate);
+          formattedEndDate = formatToMMDDYYYY(endDate);
+        }
+      } else {
+        // For month/year views, use exact date ranges
+        formattedStartDate = formatToMMDDYYYY(startDate);
+        formattedEndDate = formatToMMDDYYYY(endDate);
+      }
 
-      console.log('🏆 [TeamLeaderboard] API response:', response.data);
+      // Determine which endpoint to use based on viewScope and whether we're looking at previous month
+      // Following LeaderboardPage.js pattern
+      let endpoint;
+      
+      if (viewScope === 'personal') {
+        // Personal view - show all agents
+        endpoint = isPreviousMonth ? '/alp/getmonthlyall' : '/alp/getweeklyall_simple';
+      } else if (viewScope === 'mga') {
+        // MGA view - show MGAs and RGAs (RGAs are also MGAs)
+        // Filter out MGAs/RGAs where hide='y' or active='n' (from MGAs table)
+        endpoint = isPreviousMonth ? '/alp/getmonthlymga' : '/alp/getweeklymga';
+      } else if (viewScope === 'rga') {
+        // RGA view - show only RGAs
+        // Filter out RGAs where hide='y' or active='n' (from MGAs table)
+        endpoint = isPreviousMonth ? '/alp/getmonthlyrga' : '/alp/getweeklyrga';
+      } else if (viewScope === 'team') {
+        // Team view for SA/GA - show all agents in their team
+        endpoint = isPreviousMonth ? '/alp/getmonthlyall' : '/alp/getweeklyall';
+      } else {
+        // Default to all
+        endpoint = isPreviousMonth ? '/alp/getmonthlyall' : '/alp/getweeklyall';
+      }
+
+      // Log API call parameters for year view
+      if (viewMode === 'year') {
+        console.log('📡 [TeamLeaderboard] Year view - API request:', {
+          endpoint,
+          viewMode,
+          viewScope,
+          year: selectedYear,
+          isPreviousMonth,
+          params: isPreviousMonth ? {
+            month: monthParam
+          } : {
+            startDate: formattedStartDate,
+            endDate: formattedEndDate,
+            report: reportType
+          }
+        });
+      }
+
+      // Build params for Weekly_ALP or Monthly_ALP
+      const alpParams = isPreviousMonth
+        ? { month: monthParam }
+        : { startDate: formattedStartDate, endDate: formattedEndDate, report: reportType };
+
+      // Start ALP fetch (cached) - always fetch all ALP data without userIds filter
+      // The backend can handle fetching all ALP data; it's the large userIds IN clause that causes timeouts
+      const alpPromise = api.getCached(endpoint, alpParams, { signal: controller.signal });
+
+      // Wait for ALP data (official) to render the main leaderboard ordering
+      const response = await alpPromise;
+      
+      // Log raw response for year view
+      if (viewMode === 'year') {
+        console.log('📥 [TeamLeaderboard] Year view - Raw API response:', {
+          endpoint,
+          success: response?.data?.success,
+          totalRows: response?.data?.data?.length,
+          firstFewRows: response?.data?.data?.slice(0, 3),
+          allReportDates: [...new Set(response?.data?.data?.map(r => r.reportdate || r.month))].sort(),
+          bratinRows: response?.data?.data?.filter(r => 
+            r.LagnName && r.LagnName.toLowerCase().includes('bratin')
+          )
+        });
+      }
+
+      // We'll compute ALP aggregation once and reuse it for both the quick render and the final (filtered) render.
+      let alpDataMap = new Map();
+      let alpField = 'LVL_1_NET';
+
+      // Helper function to extract last name from MGA_NAME (format: "LAST FIRST MIDDLE SUFFIX")
+      const getMgaLastName = (mgaName, agentName) => {
+        if (mgaName && typeof mgaName === 'string' && mgaName.trim()) {
+          const parts = mgaName.trim().split(/\s+/);
+          return parts[0] || ''; // Return first part (LAST name)
+        }
+
+        // If MGA is blank, use agent's last name (first part of LagnName)
+        if (agentName && typeof agentName === 'string') {
+          const parts = agentName.trim().split(/\s+/);
+          return parts[0] || ''; // Return first part (LAST name)
+        }
+
+        return '';
+      };
+
+      // Helper function to format name to "FIRST MIDDLE LAST SUFFIX" from "LAST FIRST MIDDLE SUFFIX"
+      const formatAgentName = (lagnname) => {
+        if (!lagnname || typeof lagnname !== 'string') {
+          return '';
+        }
+
+        const parts = lagnname.trim().split(/\s+/);
+
+        if (parts.length < 2) {
+          return parts[0] || '';
+        }
+
+        const last = parts[0];
+        const first = parts[1];
+        let middle = '';
+        let suffix = '';
+
+        if (parts.length === 3) {
+          const thirdPart = parts[2];
+          if (thirdPart.length === 1) {
+            middle = thirdPart;
+          } else {
+            suffix = thirdPart;
+          }
+        } else if (parts.length >= 4) {
+          middle = parts[2];
+          suffix = parts.slice(3).join(' ');
+        }
+
+        // Build "FIRST MIDDLE LAST SUFFIX"
+        let formattedName = first;
+        if (middle) formattedName += ` ${middle}`;
+        formattedName += ` ${last}`;
+        if (suffix) formattedName += ` ${suffix}`;
+
+        return formattedName;
+      };
 
       if (response.data.success) {
         const rawData = response.data.data || [];
-        console.log('🏆 [TeamLeaderboard] Weekly ALP data count:', rawData.length);
         
-        // Helper function to extract last name from MGA_NAME (format: "LAST FIRST MIDDLE SUFFIX")
-        const getMgaLastName = (mgaName, agentName) => {
-          if (mgaName && typeof mgaName === 'string' && mgaName.trim()) {
-            const parts = mgaName.trim().split(/\s+/);
-            return parts[0] || ''; // Return first part (LAST name)
-          }
-          
-          // If MGA is blank, use agent's last name (first part of LagnName)
-          if (agentName && typeof agentName === 'string') {
-            const parts = agentName.trim().split(/\s+/);
-            return parts[0] || ''; // Return first part (LAST name)
-          }
-          
-          return '';
-        };
-
-        // Helper function to format name to "FIRST MIDDLE LAST SUFFIX" from "LAST FIRST MIDDLE SUFFIX"
-        const formatAgentName = (lagnname) => {
-          if (!lagnname || typeof lagnname !== 'string') {
-            return '';
-          }
-
-          const parts = lagnname.trim().split(/\s+/);
-          
-          if (parts.length < 2) {
-            return parts[0] || '';
-          }
-
-          const last = parts[0];
-          const first = parts[1];
-          let middle = '';
-          let suffix = '';
-          
-          if (parts.length === 3) {
-            const thirdPart = parts[2];
-            if (thirdPart.length === 1) {
-              middle = thirdPart;
-            } else {
-              suffix = thirdPart;
+        // Log reportdates when viewing year data
+        if (viewMode === 'year') {
+          const uniqueReportDates = [...new Set(rawData.map(item => item.reportdate || item.month).filter(d => d))];
+          console.log('📅 [TeamLeaderboard] Year view - reportdates in data:', {
+            year: selectedYear,
+            viewMode,
+            reportType,
+            isPreviousMonth,
+            dateRange: `${formattedStartDate} to ${formattedEndDate}`,
+            totalRecords: rawData.length,
+            uniqueReportDates: uniqueReportDates.sort(),
+            sampleRecord: rawData[0] ? {
+              lagnname: rawData[0].LagnName,
+              reportdate: rawData[0].reportdate || rawData[0].month,
+              LVL_3_NET: rawData[0].LVL_3_NET,
+              LVL_1_NET: rawData[0].LVL_1_NET
+            } : null
+          });
+        }
+        
+        // Complex aggregation logic for Weekly_ALP/Monthly_ALP data:
+        // 1. Users can have multiple CTLNO codes (sum them)
+        // 2. Users can have reports from Arias Main + New York within 3 days (sum them)
+        // 3. CL_Name logic: For MGA/RGA views, filter by CL_Name
+        //    - If 2 rows exist for same (LagnName, reportdate, REPORT): one with CL_Name='MGA' is MGA, one with CL_Name='' is RGA
+        //    - If 1 row exists: it's the MGA row regardless of CL_Name
+        
+        // First, normalize the date field (reportdate for Weekly_ALP, month for Monthly_ALP)
+        const normalizedData = rawData.map(item => ({
+          ...item,
+          reportdate: item.reportdate || item.month // Use month field if reportdate doesn't exist
+        }));
+        
+        // Find the most recent reportdate for each user
+        const userMaxDates = new Map();
+        normalizedData.forEach(item => {
+          if (item.LagnName && item.reportdate) {
+            const existing = userMaxDates.get(item.LagnName);
+            const itemDate = new Date(item.reportdate);
+            if (!existing || itemDate > existing) {
+              userMaxDates.set(item.LagnName, itemDate);
             }
-          } else if (parts.length >= 4) {
-            middle = parts[2];
-            suffix = parts.slice(3).join(' ');
           }
-
-          // Build "FIRST MIDDLE LAST SUFFIX"
-          let formattedName = first;
-          if (middle) formattedName += ` ${middle}`;
-          formattedName += ` ${last}`;
-          if (suffix) formattedName += ` ${suffix}`;
-
-          return formattedName;
-        };
-
-        // Create a map of ALP data by lagnname for easy lookup
-        const alpDataMap = new Map();
-        rawData.forEach(item => {
+        });
+        
+        // Now aggregate data: include rows within 3 days of max reportdate (or all rows for Monthly_ALP)
+        // IMPORTANT: use the outer alpDataMap so we can reuse it in the "finalize" phase.
+        alpDataMap = new Map();
+        const seenRows = new Map(); // Track seen row combinations to deduplicate
+        
+        normalizedData.forEach(item => {
           if (item.LagnName) {
-            alpDataMap.set(item.LagnName, item);
+            const maxDate = userMaxDates.get(item.LagnName);
+            const itemDate = item.reportdate ? new Date(item.reportdate) : null;
+            
+            // Skip if no date
+            if (!itemDate) {
+              return;
+            }
+            
+            // For Weekly_ALP, skip if more than 3 days before max date
+            // For Monthly_ALP (isPreviousMonth), include all rows from the month
+            if (!isPreviousMonth && maxDate) {
+              const daysDiff = (maxDate - itemDate) / (1000 * 60 * 60 * 24);
+              if (daysDiff > 3) {
+                return;
+              }
+            }
+            
+            // For MGA/RGA views, apply CL_Name filtering
+            // viewScope: 'mga' = show MGA rows (CL_Name='MGA' or single row)
+            // viewScope: 'rga' = show RGA rows (CL_Name='' when paired with MGA row)
+            if (viewScope === 'mga' || viewScope === 'rga') {
+              // Check if there's a paired row (same LagnName, reportdate, REPORT, different CL_Name)
+              const pairedRows = normalizedData.filter(r => 
+                r.LagnName === item.LagnName && 
+                r.reportdate === item.reportdate && 
+                r.REPORT === item.REPORT
+              );
+              
+              const hasMgaRow = pairedRows.some(r => r.CL_Name === 'MGA');
+              const hasBlankRow = pairedRows.some(r => !r.CL_Name || r.CL_Name === '');
+              
+              if (pairedRows.length >= 2 && hasMgaRow && hasBlankRow) {
+                // Two rows exist: one MGA, one RGA
+                if (viewScope === 'mga' && item.CL_Name !== 'MGA') {
+                  return; // Skip non-MGA rows in MGA view
+                }
+                if (viewScope === 'rga' && item.CL_Name === 'MGA') {
+                  return; // Skip MGA rows in RGA view
+                }
+              }
+              // If single row exists, include it in both MGA and RGA views
+              // (it represents the MGA's production, which rolls up to the RGA)
+            }
+            
+            // Check for duplicates: rows with same LagnName, reportdate, REPORT, and ALP values
+            // These are database duplicates and should only be counted once
+            const lvl1NetValue = parseFloat(item.LVL_1_NET) || 0;
+            const lvl3NetValue = parseFloat(item.LVL_3_NET) || 0;
+            const dedupeKey = `${item.LagnName}|${item.reportdate}|${item.REPORT}|${lvl1NetValue}|${lvl3NetValue}`;
+            
+            if (seenRows.has(dedupeKey)) {
+              // This is a duplicate row - skip it
+              return;
+            }
+            seenRows.set(dedupeKey, true);
+            
+            const existing = alpDataMap.get(item.LagnName);
+            if (existing) {
+              // User already exists - aggregate the ALP values (across reportdates and CTLNO codes)
+              existing.LVL_1_NET = (parseFloat(existing.LVL_1_NET) || 0) + lvl1NetValue;
+              existing.LVL_1_GROSS = (parseFloat(existing.LVL_1_GROSS) || 0) + (parseFloat(item.LVL_1_GROSS) || 0);
+              existing.LVL_3_NET = (parseFloat(existing.LVL_3_NET) || 0) + lvl3NetValue;
+              existing.LVL_3_GROSS = (parseFloat(existing.LVL_3_GROSS) || 0) + (parseFloat(item.LVL_3_GROSS) || 0);
+              existing.policy_count = (existing.policy_count || 0) + (item.policy_count || 0);
+              // Keep the most recent reportdate
+              if (itemDate && (!existing.reportdate || itemDate > new Date(existing.reportdate))) {
+                existing.reportdate = item.reportdate;
+              }
+            } else {
+              // First entry for this user - clone the item
+              alpDataMap.set(item.LagnName, {
+                ...item,
+                LVL_1_NET: lvl1NetValue,
+                LVL_1_GROSS: parseFloat(item.LVL_1_GROSS) || 0,
+                LVL_3_NET: lvl3NetValue,
+                LVL_3_GROSS: parseFloat(item.LVL_3_GROSS) || 0
+              });
+            }
           }
         });
 
-        // Transform ALL active users, merging with ALP data if available
-        let transformedData = allUsers.map(user => {
-          const alpData = alpDataMap.get(user.lagnname);
-          const premium = alpData ? parseFloat(alpData.LVL_1_NET || 0) : 0;
+        // Log alpDataMap aggregation details for year view
+        if (viewMode === 'year') {
+          const sampleEntries = Array.from(alpDataMap.entries()).slice(0, 5);
+          console.log('🗺️ [TeamLeaderboard] Year view - alpDataMap aggregated:', {
+            totalEntries: alpDataMap.size,
+            viewScope,
+            aggregationRules: '3-day reportdate window + CL_Name filtering + CTLNO summing',
+            sampleUsers: sampleEntries.map(([lagnname, data]) => {
+              // Get raw rows for this user to show what was aggregated
+              const userRawRows = rawData.filter(r => r.LagnName === lagnname);
+              // Get normalized rows for this user to show what was aggregated
+              const userNormalizedRows = normalizedData.filter(r => r.LagnName === lagnname);
+              return {
+                lagnname,
+                aggregatedData: {
+                  reportdate: data.reportdate,
+                  LVL_1_NET: data.LVL_1_NET,
+                  LVL_3_NET: data.LVL_3_NET
+                },
+                rawRowCount: userNormalizedRows.length,
+                rawRows: userNormalizedRows.map(r => ({
+                  CTLNO: r.CTLNO,
+                  CL_Name: r.CL_Name,
+                  reportdate: r.reportdate,
+                  LVL_3_NET: r.LVL_3_NET
+                }))
+              };
+            })
+          });
+        }
+
+        // Determine which ALP level to use based on viewScope
+        // Following LeaderboardPage.js logic:
+        // - personal: LVL_1_NET (personal production)
+        // - mga/rga/team: LVL_3_NET (includes team production)
+        if (viewScope === 'personal') {
+          alpField = 'LVL_1_NET';
+        } else if (viewScope === 'mga' || viewScope === 'rga' || viewScope === 'team') {
+          alpField = 'LVL_3_NET';
+        } else {
+          alpField = 'LVL_1_NET';
+        }
+
+        // QUICK RENDER: Show official ALP rows immediately (even before we finish filtering inactive users).
+        // This keeps personal view feeling responsive.
+        const quickData = Array.from(alpDataMap.entries())
+          .map(([lagnname, data]) => {
+            const premium = parseFloat(data?.[alpField] || 0);
+            return {
+              id: null,
+              agent_name: formatAgentName(lagnname),
+              mga_name: getMgaLastName(data?.MGA_NAME, lagnname),
+              email: '',
+              policy_count: data?.policy_count || 0,
+              total_premium: premium,
+              lagnname,
+              userId: null,
+              hasProduction: premium > 0,
+              profile_picture: null,
+              esid: null
+            };
+          })
+          .sort((a, b) => {
+            if (b.total_premium !== a.total_premium) return b.total_premium - a.total_premium;
+            return (a.lagnname || '').localeCompare(b.lagnname || '');
+          });
+        
+        // Log leaderboard data for year view (use quickData; transformedData isn't built in this phase)
+        if (viewMode === 'year') {
+          const loggedInUserData = quickData.find(agent =>
+            agent.lagnname && user?.lagnname &&
+            agent.lagnname.trim().toLowerCase() === user.lagnname.trim().toLowerCase()
+          );
+          console.log('📊 [TeamLeaderboard] Year view - quick data:', {
+            totalAgents: quickData.length,
+            viewScope,
+            alpField,
+            loggedInUser: loggedInUserData ? {
+              lagnname: loggedInUserData.lagnname,
+              total_premium: loggedInUserData.total_premium
+            } : 'Not found',
+            top5: quickData.slice(0, 5).map(agent => ({
+              lagnname: agent.lagnname,
+              total_premium: agent.total_premium
+            }))
+          });
+        }
+        
+        // Set "as of" date from the leaderboard data
+        if (isPreviousMonth) {
+          // For Monthly_ALP, use the month parameter
+          setAlpAsOfDate(monthParam);
+        } else {
+          // For Weekly_ALP, find the most recent reportdate
+          const allReportDates = Array.from(alpDataMap.values())
+            .map(data => data.reportdate)
+            .filter(date => date);
           
+          if (allReportDates.length > 0) {
+            // Find the max date
+            const maxDate = allReportDates.reduce((max, dateStr) => {
+              const date = new Date(dateStr);
+              return !max || date > new Date(max) ? dateStr : max;
+            }, null);
+            
+            if (maxDate) {
+              // Format as MM/DD/YYYY
+              const date = new Date(maxDate);
+              const formatted = `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`;
+              setAlpAsOfDate(formatted);
+            }
+          }
+        }
+        
+        setTeamLeaderboardData(quickData);
+        setTeamLeaderboardLoading(false);
+      } else {
+        setTeamLeaderboardData([]);
+      }
+
+      // FINALIZE: now apply active/hidden filtering and enrich rows with userId/profile, goals, reported ALP.
+      const usersResponse = await usersPromise;
+      if (!usersResponse) return;
+      const allUsers = usersResponse.data || [];
+
+      // Apply filtering rules to the active users list
+      let filteredUsers;
+      if (viewScope === 'personal') {
+        filteredUsers = allUsers;
+      } else if (viewScope === 'mga') {
+        filteredUsers = allUsers.filter(u => {
+          const isMgaOrRga = u.clname === 'MGA' || u.clname === 'RGA';
+          if (!isMgaOrRga) return false;
+          const isHidden = u.hide === 'y' || u.hide === 'Y';
+          const isInactive = u.active === 'n' || u.active === 'N';
+          return !isHidden && !isInactive;
+        });
+      } else if (viewScope === 'rga') {
+        filteredUsers = allUsers.filter(u => {
+          const isRga = u.clname === 'RGA';
+          if (!isRga) return false;
+          const isHidden = u.hide === 'y' || u.hide === 'Y';
+          const isInactive = u.active === 'n' || u.active === 'N';
+          return !isHidden && !isInactive;
+        });
+      } else {
+        filteredUsers = allUsers;
+      }
+
+      // For Personal view with many users, use frontend pagination to avoid overwhelming the backend
+      const usesFrontendPagination = viewScope === 'personal' && filteredUsers.length > LEADERBOARD_PAGE_SIZE;
+
+      // Store ALP data and field for pagination (only used in personal scope)
+      if (usesFrontendPagination) {
+        setLeaderboardAlpDataMap(alpDataMap);
+        setLeaderboardAlpField(alpField);
+      }
+
+      // IMPORTANT (personal pagination):
+      // Sort the full user list by official ALP FIRST so the initial 50 are the true top 50.
+      // Otherwise, ranks will "jump" as more pages load and the table re-sorts.
+      const usersSortedByOfficialAlp = (users) => {
+        return [...users].sort((a, b) => {
+          const aAlp = parseFloat(alpDataMap.get(a.lagnname)?.[alpField] || 0);
+          const bAlp = parseFloat(alpDataMap.get(b.lagnname)?.[alpField] || 0);
+          if (bAlp !== aAlp) return bAlp - aAlp;
+          return (a.lagnname || '').localeCompare(b.lagnname || '');
+        });
+      };
+
+      const paginationUsers = usesFrontendPagination
+        ? usersSortedByOfficialAlp(filteredUsers)
+        : filteredUsers;
+
+      // Setup pagination state
+      if (usesFrontendPagination) {
+        setLeaderboardAllUsers(paginationUsers);
+        setLeaderboardPage(1);
+        setLeaderboardHasMore(true);
+      } else {
+        setLeaderboardAllUsers([]);
+        setLeaderboardPage(1);
+        setLeaderboardHasMore(false);
+      }
+
+      const usersToDisplay = usesFrontendPagination
+        ? paginationUsers.slice(0, LEADERBOARD_PAGE_SIZE)
+        : paginationUsers;
+
+      const transformedData = usersToDisplay
+        .map(u => {
+          const alpData = alpDataMap.get(u.lagnname);
+          const premium = alpData ? parseFloat(alpData[alpField] || 0) : 0;
           return {
-            id: user.id,
-            agent_name: formatAgentName(user.lagnname),
-            mga_name: getMgaLastName(alpData?.MGA_NAME || user.mga, user.lagnname),
-            email: user.email || '',
+            id: u.id,
+            agent_name: formatAgentName(u.lagnname),
+            mga_name: getMgaLastName(alpData?.MGA_NAME || u.mga, u.lagnname),
+            email: u.email || '',
             policy_count: alpData?.policy_count || 0,
             total_premium: premium,
-            lagnname: user.lagnname,
-            userId: user.id,
-            hasProduction: premium > 0
+            lagnname: u.lagnname,
+            userId: u.id,
+            hasProduction: premium > 0,
+            profile_picture: u.profpic || null,
+            esid: u.esid || null
           };
         })
         .sort((a, b) => {
-          // Sort by premium descending, then by name ascending for those with $0
-          if (b.total_premium !== a.total_premium) {
-            return b.total_premium - a.total_premium;
-          }
+          if (b.total_premium !== a.total_premium) return b.total_premium - a.total_premium;
           return a.lagnname.localeCompare(b.lagnname);
-        })
-        .slice(0, 50); // Show top 50 (includes those with and without production)
+        });
 
-        console.log('🏆 [TeamLeaderboard] Transformed data:', transformedData.length, 'agents');
-        console.log('🏆 [TeamLeaderboard] Sample agent:', transformedData[0]);
-        console.log('🏆 [TeamLeaderboard] Users with production:', transformedData.filter(a => a.hasProduction).length);
-        console.log('🏆 [TeamLeaderboard] Users without production:', transformedData.filter(a => !a.hasProduction).length);
-        
-        // Set initial data immediately so UI displays quickly
-        setTeamLeaderboardData(transformedData);
-        setTeamLeaderboardLoading(false); // Stop loading spinner now that we have initial data
-        
-        // Fetch goals and reported ALP in parallel (non-blocking)
-        // Each updates the state independently when ready
-        
-        // Fetch goals asynchronously
-        (async () => {
-          try {
-            // Get the month/year from the dateRange
-            const startDateObj = new Date(startDate);
-            const month = startDateObj.getMonth() + 1;
-            const year = startDateObj.getFullYear();
-            
-            console.log('🎯 [TeamLeaderboard] Fetching goals for:', { 
-              year, 
-              month, 
-              viewMode,
-              agentCount: transformedData.length 
-            });
-            
-            // Collect userIds for batch goals fetch (filter out entries without userId)
-            const userIds = transformedData
-              .map(agent => agent.userId)
-              .filter(id => id); // Filter out null/undefined
-            
-            console.log('🎯 [TeamLeaderboard] UserIds to fetch goals for:', userIds.length);
-            
-            if (userIds.length > 0) {
-              // Fetch goals using batch endpoint
-              const goalsResponse = await api.post('/goals/batch', {
-                userIds: userIds,
-                year: year,
-                month: month,
-                goalType: 'personal'
-              });
-              
-              const goalsByUserId = goalsResponse.data?.goalsByUserId || {};
-              console.log('🎯 [TeamLeaderboard] Goals fetched:', Object.keys(goalsByUserId).length);
-              
-              // Update data with goals
-              setTeamLeaderboardData(prevData => prevData.map(agent => {
-                if (!agent.userId) {
-                  return agent;
-                }
-                
-                const goalKey = `${agent.userId}_personal`;
-                const goal = goalsByUserId[goalKey];
-                
-                if (!goal || !goal.monthlyAlpGoal) {
-                  return agent;
-                }
-                
-                const monthlyGoal = parseFloat(goal.monthlyAlpGoal);
-                const goalProgress = Math.round((agent.total_premium / monthlyGoal) * 100);
-                const goalRemaining = Math.max(0, monthlyGoal - agent.total_premium);
-                
-                return {
-                  ...agent,
-                  monthlyGoal: monthlyGoal,
-                  goalProgress: goalProgress,
-                  goalRemaining: goalRemaining
-                };
-              }));
-              
-              console.log('🎯 [TeamLeaderboard] Goals data updated');
-            } else {
-              console.log('⚠️ [TeamLeaderboard] No userIds found for goals lookup');
-            }
-          } catch (error) {
-            console.error('❌ [TeamLeaderboard] Error fetching goals:', error);
-            console.error('❌ [TeamLeaderboard] Error details:', {
-              message: error.message,
-              response: error.response?.data
-            });
-            // Continue without goals data
+      setTeamLeaderboardData(transformedData);
+
+      // Start goals + reported ALP in parallel (requires userIds)
+      const personalMonth = startDate.getMonth() + 1;
+      const personalYear = startDate.getFullYear();
+      const allUserIds = filteredUsers.map(u => u.id).filter(Boolean);
+
+      const goalsPromise = (async () => {
+        try {
+          if (!allUserIds.length) return null;
+
+          let goalType = 'personal';
+          if (viewScope === 'mga') goalType = 'mga';
+          if (viewScope === 'rga') goalType = 'rga';
+          if (viewScope === 'team') goalType = 'mga';
+
+          const chunkSize = 250;
+          const chunks = [];
+          for (let i = 0; i < allUserIds.length; i += chunkSize) {
+            chunks.push(allUserIds.slice(i, i + chunkSize));
           }
-        })();
-        
-        // Fetch reported ALP asynchronously
-        (async () => {
-          try {
-            console.log('📊 [TeamLeaderboard] Fetching reported ALP data...');
-            
-            const userIds = transformedData.map(agent => agent.userId).filter(id => id);
-            
-            if (userIds.length > 0) {
-              const reportedAlpResponse = await api.get('/dailyActivity/reported-alp-summary', {
-                params: {
-                  startDate: startDate.toISOString().split('T')[0],
-                  endDate: endDate.toISOString().split('T')[0],
-                  userIds: userIds.join(',')
-                }
-              });
-              
-              if (reportedAlpResponse.data.success) {
-                const reportedAlpData = reportedAlpResponse.data.data || [];
-                console.log('📊 [TeamLeaderboard] Reported ALP data:', reportedAlpData.length, 'users');
-                
-                // Create a map of reported ALP by userId
-                const reportedAlpMap = {};
-                reportedAlpData.forEach(item => {
-                  if (item.userId) {
-                    reportedAlpMap[item.userId] = {
-                      reported_alp: parseFloat(item.reported_alp) || 0,
-                      report_days: item.report_days || 0
-                    };
-                  }
-                });
-                
-                // Update data with reported ALP
-                setTeamLeaderboardData(prevData => prevData.map(agent => ({
-                  ...agent,
-                  reported_alp: reportedAlpMap[agent.userId]?.reported_alp || 0,
-                  report_days: reportedAlpMap[agent.userId]?.report_days || 0
-                })));
-                
-                console.log('📊 [TeamLeaderboard] Reported ALP data updated');
-              }
-            }
-          } catch (error) {
-            console.error('❌ [TeamLeaderboard] Error fetching reported ALP:', error);
-            // Continue without reported ALP data
+
+          const combinedGoalsByUserId = {};
+          for (const chunk of chunks) {
+            const res = await api.post('/goals/batch', {
+              userIds: chunk,
+              year: personalYear,
+              month: personalMonth,
+              goalType
+            });
+            Object.assign(combinedGoalsByUserId, res.data?.goalsByUserId || {});
           }
-        })();
-      } else {
-        console.log('🏆 [TeamLeaderboard] API returned success=false');
-        setTeamLeaderboardData([]);
-      }
+
+          return { goalsByUserId: combinedGoalsByUserId, goalType };
+        } catch (e) {
+          console.error('❌ [TeamLeaderboard] Error fetching goals:', e);
+          return null;
+        }
+      })();
+
+      const reportedPromise = (async () => {
+        try {
+          const params = {
+            startDate: startDate.toISOString().split('T')[0],
+            endDate: endDate.toISOString().split('T')[0],
+          };
+
+          const shouldOmitUserIds = viewScope === 'personal' || allUserIds.length > 250;
+          if (!shouldOmitUserIds) {
+            params.userIds = allUserIds.join(',');
+          }
+
+          const res = await api.get('/dailyActivity/reported-alp-summary', { params });
+          if (!res.data?.success) return [];
+          return res.data.data || [];
+        } catch (e) {
+          console.error('❌ [TeamLeaderboard] Error fetching reported ALP:', e);
+          return [];
+        }
+      })();
+
+      goalsPromise.then(result => {
+        if (!result?.goalsByUserId) return;
+        const { goalsByUserId, goalType } = result;
+        setTeamLeaderboardData(prev => prev.map(agent => {
+          if (!agent.userId) return agent;
+          const goalKey = `${agent.userId}_${goalType}`;
+          const goal = goalsByUserId[goalKey];
+          if (!goal || !goal.monthlyAlpGoal) return agent;
+          const monthlyGoal = parseFloat(goal.monthlyAlpGoal);
+          const goalProgress = monthlyGoal > 0 ? Math.round((agent.total_premium / monthlyGoal) * 100) : 0;
+          const goalRemaining = Math.max(0, monthlyGoal - agent.total_premium);
+          return { ...agent, monthlyGoal, goalProgress, goalRemaining };
+        }));
+      });
+
+      reportedPromise.then(reportedAlpData => {
+        if (!Array.isArray(reportedAlpData) || reportedAlpData.length === 0) return;
+        const reportedAlpMap = {};
+        reportedAlpData.forEach(item => {
+          if (item.userId) {
+            reportedAlpMap[item.userId] = {
+              reported_alp: parseFloat(item.reported_alp) || 0,
+              report_days: item.report_days || 0
+            };
+          }
+        });
+        setTeamLeaderboardData(prev => prev.map(agent => ({
+          ...agent,
+          reported_alp: reportedAlpMap[agent.userId]?.reported_alp || 0,
+          report_days: reportedAlpMap[agent.userId]?.report_days || 0
+        })));
+      });
     } catch (error) {
+      // Ignore abort/cancel errors (user changed filters quickly)
+      if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') return;
       console.error('🏆 [TeamLeaderboard] Error fetching data:', error);
       setTeamLeaderboardData([]);
     } finally {
@@ -1886,13 +2923,11 @@ const TeamDashboard = ({ userRole, user }) => {
           viewMode={viewMode}
           onViewModeChange={handleViewModeChange}
           viewScope={viewScope}
-          onViewScopeChange={(newScope) => {
-            if (userRole === 'SA') setSaViewMode(newScope);
-            else if (userRole === 'GA') setGaViewMode(newScope);
-            else if (userRole === 'MGA') setMgaViewMode(newScope);
-            else if (userRole === 'RGA') setRgaViewMode(newScope);
-          }}
+          onViewScopeChange={handleViewScopeChange}
           userRole={userRole}
+          statsTimeframe={personalStatsTimeframe}
+          onStatsTimeframeChange={setPersonalStatsTimeframe}
+          asOfDate={alpAsOfDate}
         />
       );
     } else {
@@ -1904,7 +2939,7 @@ const TeamDashboard = ({ userRole, user }) => {
     return () => {
       setHeaderContent(null);
     };
-  }, [isMobile, userRole, dateRangeState, viewMode, viewScope, saViewMode, gaViewMode, mgaViewMode, rgaViewMode, setHeaderContent]);
+  }, [isMobile, userRole, dateRangeState, viewMode, viewScope, setHeaderContent]);
 
   // Fetch data on mount and when viewScope, timePeriod, or dateRangeState changes
   useEffect(() => {
@@ -1914,125 +2949,43 @@ const TeamDashboard = ({ userRole, user }) => {
       fetchYTDSummaryData();
     }
     
-    // Fetch team leaderboard for team view
-    if (['MGA', 'RGA', 'GA', 'SA'].includes(userRole) && viewScope !== 'personal') {
+    // Fetch team leaderboard for all views (including personal and AGT)
+    if (['MGA', 'RGA', 'GA', 'SA', 'AGT'].includes(userRole) || viewScope === 'personal') {
       fetchTeamLeaderboardData();
     }
   }, [userRole, user?.lagnname, viewScope, timePeriod, dateRangeState, viewMode]);
 
-  // Fetch activity data when selectedPeriod or currentDate changes
+  // Fetch activity data when date range changes
   useEffect(() => {
     if (userRole === 'AGT' || viewScope === 'personal') {
       fetchActivityData();
+    } else if (viewScope === 'team' || viewScope === 'mga' || viewScope === 'rga') {
+      fetchActivityData();
     }
-  }, [userRole, viewScope, selectedPeriod, currentDate, user?.userId]);
+  }, [userRole, viewScope, dateRangeState, user?.userId]);
 
-  // Fetch statistics data when statsTimeframe changes
+  // Fetch statistics data when personalStatsTimeframe changes (consolidated - no duplicate fetch)
   useEffect(() => {
     if (userRole === 'AGT' || viewScope === 'personal') {
       fetchStatsData();
     }
-  }, [userRole, viewScope, statsTimeframe, user?.userId]);
+  }, [userRole, viewScope, personalStatsTimeframe, user?.userId]);
 
-  // Fetch leaderboard data on mount for AGT/personal view
+  // Fetch personal comparison data when date range changes
   useEffect(() => {
     if (userRole === 'AGT' || viewScope === 'personal') {
-      fetchLeaderboardData();
+      fetchPersonalComparison();
     }
-  }, [userRole, viewScope, leaderboardPeriod]);
+  }, [userRole, viewScope, dateRangeState, viewMode, user?.userId]);
 
-  // Render view mode toggle buttons based on user role
-  const renderViewModeToggle = () => {
-    if (userRole === 'SA') {
-      return (
-        <div className="view-mode-toggle">
-          <button
-            className={`nav-tab ${saViewMode === 'personal' ? 'active' : ''}`}
-            onClick={() => setSaViewMode('personal')}
-          >
-            Personal
-          </button>
-          <span className="nav-separator">|</span>
-          <button
-            className={`nav-tab ${saViewMode === 'team' ? 'active' : ''}`}
-            onClick={() => setSaViewMode('team')}
-          >
-            Team
-          </button>
-        </div>
-      );
+  // Fetch personal goal when date range changes
+  useEffect(() => {
+    if (userRole === 'AGT' || viewScope === 'personal') {
+      fetchPersonalGoal();
     }
+  }, [userRole, viewScope, dateRangeState, user?.userId]);
 
-    if (userRole === 'GA') {
-      return (
-        <div className="view-mode-toggle">
-          <button
-            className={`nav-tab ${gaViewMode === 'personal' ? 'active' : ''}`}
-            onClick={() => setGaViewMode('personal')}
-          >
-            Personal
-          </button>
-          <span className="nav-separator">|</span>
-          <button
-            className={`nav-tab ${gaViewMode === 'team' ? 'active' : ''}`}
-            onClick={() => setGaViewMode('team')}
-          >
-            Team
-          </button>
-        </div>
-      );
-    }
-
-    if (userRole === 'MGA') {
-      return (
-        <div className="view-mode-toggle">
-          <button
-            className={`nav-tab ${mgaViewMode === 'personal' ? 'active' : ''}`}
-            onClick={() => setMgaViewMode('personal')}
-          >
-            Personal
-          </button>
-          <span className="nav-separator">|</span>
-          <button
-            className={`nav-tab ${mgaViewMode === 'team' ? 'active' : ''}`}
-            onClick={() => setMgaViewMode('team')}
-          >
-            Team
-          </button>
-        </div>
-      );
-    }
-
-    if (userRole === 'RGA') {
-      return (
-        <div className="view-mode-toggle">
-          <button
-            className={`nav-tab ${rgaViewMode === 'personal' ? 'active' : ''}`}
-            onClick={() => setRgaViewMode('personal')}
-          >
-            Personal
-          </button>
-          <span className="nav-separator">|</span>
-          <button
-            className={`nav-tab ${rgaViewMode === 'mga' ? 'active' : ''}`}
-            onClick={() => setRgaViewMode('mga')}
-          >
-            MGA
-          </button>
-          <span className="nav-separator">|</span>
-          <button
-            className={`nav-tab ${rgaViewMode === 'rga' ? 'active' : ''}`}
-            onClick={() => setRgaViewMode('rga')}
-          >
-            RGA
-          </button>
-        </div>
-      );
-    }
-
-    // AGT users don't need a toggle
-    return null;
-  };
+  // NOTE: Removed compact "Top 10" leaderboard fetch from TeamDashboard (not rendered here).
 
   return (
     <div className="dashboard-container padded-content-sm">
@@ -2040,6 +2993,7 @@ const TeamDashboard = ({ userRole, user }) => {
       <div>
         <CompetitionsDisplay />
       </div>
+      
 
       {/* Date Range Selector - Mobile only (desktop shows in header) */}
       {isMobile && ['MGA', 'RGA', 'GA', 'SA'].includes(userRole) && (
@@ -2049,13 +3003,11 @@ const TeamDashboard = ({ userRole, user }) => {
           viewMode={viewMode}
           onViewModeChange={handleViewModeChange}
           viewScope={viewScope}
-          onViewScopeChange={(newScope) => {
-            if (userRole === 'SA') setSaViewMode(newScope);
-            else if (userRole === 'GA') setGaViewMode(newScope);
-            else if (userRole === 'MGA') setMgaViewMode(newScope);
-            else if (userRole === 'RGA') setRgaViewMode(newScope);
-          }}
+          onViewScopeChange={handleViewScopeChange}
           userRole={userRole}
+          statsTimeframe={personalStatsTimeframe}
+          onStatsTimeframeChange={setPersonalStatsTimeframe}
+          asOfDate={alpAsOfDate}
         />
       )}
 
@@ -2084,14 +3036,24 @@ const TeamDashboard = ({ userRole, user }) => {
             formatNumber={formatNumber}
             userClname={userRole}
             timePeriod={timePeriod}
+            viewMode={viewMode}
             orgMetricsHistory={orgMetricsHistory}
             showSectionBackground={false}
+            // MGA/RGA Official ALP toggle props
+            mgaAlpMode={mgaAlpMode}
+            setMgaAlpMode={setMgaAlpMode}
+            rgaAlpMode={rgaAlpMode}
+            setRgaAlpMode={setRgaAlpMode}
+            mgaOfficialAlp={mgaOfficialAlp}
+            rgaOfficialAlp={rgaOfficialAlp}
+            hasMgaOfficialAlpData={hasMgaOfficialAlpData}
+            hasRgaOfficialAlpData={hasRgaOfficialAlpData}
           />
         </div>
       )}
 
-      {/* Team Leaderboard - Only show for MGA, RGA, GA, SA in team view */}
-      {(['MGA', 'RGA', 'GA', 'SA'].includes(userRole) && viewScope !== 'personal') && (
+      {/* Team Leaderboard - Show for team views only (not personal) */}
+      {viewScope !== 'personal' && (
         <div style={{ marginTop: '2rem' }}>
           <TeamLeaderboard
             agents={teamLeaderboardData}
@@ -2105,104 +3067,268 @@ const TeamDashboard = ({ userRole, user }) => {
             showDetails={true}
             showGoals={viewMode === 'month'}
             formatCurrency={formatCurrency}
+            viewScope={viewScope}
+            currentUser={user}
+            onLoadMore={null}
+            hasMore={false}
           />
         </div>
       )}
 
-      {/* Activity, Statistics & Leaderboard Widgets - Show for AGT or any role in personal view */}
+      {/* Personal Metrics Cards and Statistics - Show for AGT or any role in personal view */}
       {(userRole === 'AGT' || viewScope === 'personal') && (
-        <div style={{ 
-          marginTop: '1rem',
+        <>
+          <div style={{ marginTop: '1rem' }}>
+            <div className="metric-row" style={{ 
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
           gap: '1rem'
         }}>
-          <div>
-            <ActivityWidget
-              activityData={activityData}
-              activityLoading={activityLoading}
-              selectedPeriod={selectedPeriod}
-              setSelectedPeriod={setSelectedPeriod}
-              viewMode={activityViewMode}
-              setViewMode={setActivityViewMode}
-              currentDate={currentDate}
-              setCurrentDate={setCurrentDate}
-              getPeriodOptions={getPeriodOptions}
-              getPeriodKeyForDate={getPeriodKeyForDate}
-              comparisonData={comparisonData}
-              officialYtdAlp={officialYtdAlp}
-              error={activityError}
-              formatCurrency={formatCurrency}
-              formatNumber={formatNumber}
-            />
-          </div>
-
-          <div>
-            <StatisticsWidget
-              statsTimeframe={statsTimeframe}
-              setStatsTimeframe={setStatsTimeframe}
-              statsLoading={statsLoading}
-              statisticsData={statisticsData}
-              formatCurrency={formatCurrency}
-            />
-          </div>
-
-          <div>
-            <div className="oneonone-section">
-              {/* Header with "as of" date */}
-              <div className="section-header">
-                <h2>
-                  Top Producers
-                  {leaderboardAsOfDate && (
-                    <span style={{ fontSize: '0.85em', fontWeight: 'normal', marginLeft: '0.5rem', opacity: 0.8 }}>
-                      - as of {leaderboardAsOfDate}
+              <WidgetCard
+                title="Calls"
+                value={activityLoading ? <span className="spinner"></span> : formatNumber(activityData?.calls || 0)}
+                icon={FiPhone}
+                color="#3b82f6"
+                loading={activityLoading}
+                subText={statsLoading ? '' : `${statsData?.callsToAppt || 0} calls to appt`}
+                showComparison={!!personalComparison}
+                comparisonValue={personalComparison?.calls}
+                comparisonLabel={personalComparison?.label}
+                comparisonFormat="number"
+              />
+              <WidgetCard
+                title="Appointments"
+                value={activityLoading ? <span className="spinner"></span> : formatNumber(activityData?.appts || 0)}
+                icon={FiCalendar}
+                color="#8b5cf6"
+                loading={activityLoading}
+                subText={statsLoading ? '' : `${statsData?.showRatio || 0}% show ratio`}
+                showComparison={!!personalComparison}
+                comparisonValue={personalComparison?.appts}
+                comparisonLabel={personalComparison?.label}
+                comparisonFormat="number"
+              />
+              <WidgetCard
+                title="Sits"
+                value={activityLoading ? <span className="spinner"></span> : formatNumber(activityData?.sits || 0)}
+                icon={FiUsers}
+                color="#f59e0b"
+                loading={activityLoading}
+                subText={statsLoading ? '' : `${statsData?.closeRatio || 0}% close ratio`}
+                showComparison={!!personalComparison}
+                comparisonValue={personalComparison?.sits}
+                comparisonLabel={personalComparison?.label}
+                comparisonFormat="number"
+              />
+              <WidgetCard
+                title="Sales"
+                value={activityLoading ? <span className="spinner"></span> : formatNumber(activityData?.sales || 0)}
+                icon={FiTrendingUp}
+                color="#10b981"
+                loading={activityLoading}
+                subText={statsLoading ? '' : `${formatCurrency(statsData?.alpPerSit || 0)} ALP per sit`}
+                showComparison={!!personalComparison}
+                comparisonValue={personalComparison?.sales}
+                comparisonLabel={personalComparison?.label}
+                comparisonFormat="number"
+              />
+              <WidgetCard
+                title={
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span>ALP</span>
+                    {hasOfficialAlpData && (
+                      <span style={{
+                        fontSize: '0.75rem',
+                        padding: '0.125rem 0.375rem',
+                        borderRadius: '0.25rem',
+                        background: personalAlpMode === 'official' ? '#06b6d420' : '#8b5cf620',
+                        color: personalAlpMode === 'official' ? '#06b6d4' : '#8b5cf6',
+                        fontWeight: '500'
+                      }}>
+                        {personalAlpMode === 'official' ? 'Official' : 'Reported'}
                     </span>
                   )}
-                </h2>
               </div>
-              
-              {/* Period selector tabs for leaderboard */}
-              <div className="oneonone-period-tabs" style={{ marginBottom: '1rem' }}>
-                <span 
-                  className={leaderboardPeriod === "week" ? "selected" : "unselected"} 
-                  onClick={() => setLeaderboardPeriod("week")}
-                >
-                  Week
-                </span>
-                <span className="separator">|</span>
-                <span 
-                  className={leaderboardPeriod === "month" ? "selected" : "unselected"} 
-                  onClick={() => setLeaderboardPeriod("month")}
-                >
-                  Month
-                </span>
-                <span className="separator">|</span>
-                <span 
-                  className={leaderboardPeriod === "ytd" ? "selected" : "unselected"} 
-                  onClick={() => setLeaderboardPeriod("ytd")}
-                >
-                  YTD
-                </span>
+                }
+                value={activityLoading ? <span className="spinner"></span> : formatCurrency(
+                  personalAlpMode === 'official' && hasOfficialAlpData
+                    ? personalOfficialAlp || 0
+                    : activityData?.alp || 0
+                )}
+                icon={FiDollarSign}
+                color="#06b6d4"
+                loading={activityLoading}
+                subText={statsLoading ? '' : `${formatCurrency(statsData?.alpPerSale || 0)} ALP per sale`}
+                showComparison={!!personalComparison}
+                comparisonValue={personalComparison?.alp}
+                comparisonLabel={personalComparison?.label}
+                comparisonFormat="currency"
+                // Hide goal/progress in week view (and year view); only show in month view.
+                showProgress={viewMode === 'month' && !!personalGoal}
+                currentValue={
+                  personalAlpMode === 'official' && hasOfficialAlpData
+                    ? personalOfficialAlp || 0
+                    : activityData?.alp || 0
+                }
+                goalValue={personalGoal}
+                topRightAction={
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {/* Toggle between reported and official ALP - only show if official data exists */}
+                    {hasOfficialAlpData && (
+                      <button
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          setPersonalAlpMode(personalAlpMode === 'reported' ? 'official' : 'reported');
+                        }}
+                        style={{ 
+                          padding: '6px', 
+                          borderRadius: '6px', 
+                          background: 'transparent', 
+                          color: '#06b6d4', 
+                          border: 'none', 
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'background 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#06b6d420'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        title={`Switch to ${personalAlpMode === 'reported' ? 'official' : 'reported'} ALP`}
+                      >
+                        {personalAlpMode === 'reported' ? <FiToggleRight size={18} /> : <FiToggleLeft size={18} />}
+                      </button>
+                    )}
+                    {/* Edit/Save/Cancel goal controls */}
+                    {editingPersonalGoal ? (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            savePersonalAlpGoal();
+                          }}
+                          style={{
+                            padding: '6px',
+                            borderRadius: '6px',
+                            background: 'transparent',
+                            color: '#06b6d4',
+                            border: 'none',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = '#06b6d420')}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                          title="Save goal"
+                        >
+                          <FiSave size={18} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingPersonalGoal(false);
+                          }}
+                          style={{
+                            padding: '6px',
+                            borderRadius: '6px',
+                            background: 'transparent',
+                            color: '#06b6d4',
+                            border: 'none',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = '#06b6d420')}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                          title="Cancel editing"
+                        >
+                          <FiX size={18} />
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingPersonalGoal(true);
+                          setPersonalGoalInput(personalGoal ? String(personalGoal) : '');
+                        }}
+                        style={{
+                          padding: '6px',
+                          borderRadius: '6px',
+                          background: 'transparent',
+                          color: '#06b6d4',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'background 0.2s'
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = '#06b6d420')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                        title={personalGoal ? 'Edit Goal' : 'Set Goal'}
+                      >
+                        <FiEdit2 size={18} />
+                      </button>
+                    )}
+                  </div>
+                }
+              >
+                {editingPersonalGoal && (
+                  <div className="alp-goal-edit-row">
+                    <input
+                      type="number"
+                      value={personalGoalInput}
+                      onChange={(e) => setPersonalGoalInput(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="alp-goal-input"
+                      placeholder="Enter goal amount"
+                      autoFocus
+                    />
               </div>
-              
-              <Leaderboard
-                data={leaderboardData}
-                title=""
-                nameField="name"
-                valueField="value"
-                formatValue={formatCurrency}
-                loading={leaderboardLoading}
-                variant="compact"
-                showProfilePicture={true}
-                profilePictureField="profile_picture"
-                showLevelBadge={true}
-                showMGA={true}
-                hierarchyLevel="all"
-                currentUser={user}
-                showScrollButtons={true}
+                )}
+              </WidgetCard>
+              <WidgetCard
+                title="Refs"
+                value={activityLoading ? <span className="spinner"></span> : formatNumber(activityData?.refs || 0)}
+                icon={FiUserPlus}
+                color="#ec4899"
+                loading={activityLoading}
+                subText={statsLoading ? '' : `${statsData?.refsPerSit || 0} refs per sit`}
+                showComparison={!!personalComparison}
+                comparisonValue={personalComparison?.refs}
+                comparisonLabel={personalComparison?.label}
+                comparisonFormat="number"
               />
             </div>
           </div>
+        </>
+      )}
+
+      {/* Team Leaderboard - Show for personal view below Activity & Stats */}
+      {(userRole === 'AGT' || viewScope === 'personal') && (
+        <div style={{ marginTop: '1rem' }}>
+          <TeamLeaderboard
+            agents={teamLeaderboardData}
+            title="Team Performance Leaderboard"
+            dateRange={{
+              start: getDateRange().startDate.toISOString().split('T')[0],
+              end: getDateRange().endDate.toISOString().split('T')[0]
+            }}
+            loading={teamLeaderboardLoading}
+            onAgentClick={handleTeamLeaderboardAgentClick}
+            showDetails={true}
+            showGoals={viewMode === 'month'}
+            formatCurrency={formatCurrency}
+            viewScope={viewScope}
+            currentUser={user}
+            onLoadMore={leaderboardHasMore ? loadMoreLeaderboardData : null}
+            hasMore={leaderboardHasMore}
+          />
         </div>
       )}
 

@@ -1,3 +1,18 @@
+// Simple debug logger to prevent noisy backend logs.
+// Enable by setting DEBUG_LOGS=true in the backend environment.
+
+const DEBUG_LOGS = String(process.env.DEBUG_LOGS || '').toLowerCase() === 'true';
+
+function debug(...args) {
+  if (DEBUG_LOGS) console.log(...args);
+}
+
+function debugWarn(...args) {
+  if (DEBUG_LOGS) console.warn(...args);
+}
+
+module.exports = { debug, debugWarn, DEBUG_LOGS };
+
 /**
  * Simple logger utility
  */
