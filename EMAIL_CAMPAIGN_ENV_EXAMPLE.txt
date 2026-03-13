@@ -1,0 +1,62 @@
+# Email Campaign System - Environment Variables
+# Add these to your .env file
+
+# ============================================
+# SMTP Configuration for Email Campaigns
+# ============================================
+
+# SMTP Server Host
+# Examples:
+#   Gmail: smtp.gmail.com
+#   Outlook: smtp.office365.com
+#   SendGrid: smtp.sendgrid.net
+#   Mailgun: smtp.mailgun.org
+SMTP_HOST=smtp.gmail.com
+
+# SMTP Server Port
+# Common ports:
+#   587 - TLS (recommended)
+#   465 - SSL
+#   25  - Unencrypted (not recommended)
+SMTP_PORT=587
+
+# Use SSL/TLS
+# true for port 465, false for port 587
+SMTP_SECURE=false
+
+# SMTP Authentication Username
+# Usually your email address
+SMTP_USER=your-email@gmail.com
+
+# SMTP Authentication Password
+# For Gmail: Use an App Password, not your regular password
+# Generate at: https://myaccount.google.com/apppasswords
+SMTP_PASSWORD=your-app-password-here
+
+# Email "From" Display Name
+# This appears as the sender name
+SMTP_FROM_NAME=Atlas Admin
+
+# Email "From" Address
+# This appears as the sender email
+SMTP_FROM_EMAIL=your-email@gmail.com
+
+# ============================================
+# Gmail Setup Instructions
+# ============================================
+# 1. Enable 2-Factor Authentication on your Google Account
+# 2. Go to: https://myaccount.google.com/apppasswords
+# 3. Create an app password for "Mail"
+# 4. Use the 16-character password as SMTP_PASSWORD
+#
+# NOTE: Google deprecated "Less Secure Apps" access.
+# You MUST use an App Password for Gmail.
+
+# ============================================
+# Testing Configuration
+# ============================================
+# After setting these variables:
+# 1. Restart your server
+# 2. Test connection via: GET /api/email-campaigns/test-connection
+# 3. Check server logs for any SMTP errors
+

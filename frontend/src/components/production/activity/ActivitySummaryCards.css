@@ -1,0 +1,194 @@
+/* Main wrapper */
+.activity-summary-wrapper {
+  margin-top: 24px;
+  padding: 0;
+  font-family: Avenir Next LT Pro;
+}
+
+/* Header */
+.activity-summary-header {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+/* Top ALP Cards Container */
+.activity-alp-cards {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  justify-content: space-between;
+}
+
+/* Individual ALP Card */
+.activity-alp-card {
+  flex: 1;
+  background: var(--card-bg);
+  border-radius: 10px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: ease 0.3s;
+  box-sizing: border-box;
+}
+
+.activity-alp-card:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.activity-alp-card-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  padding-left: 5px;
+  padding-top: 10px;
+}
+
+.activity-alp-card-value {
+  font-size: 2.2rem;
+  font-weight: bold;
+  color: var(--text-primary);
+  padding-left: 5px;
+}
+
+/* Activity Metric Cards Grid - 4 columns */
+.activity-metric-cards-grid {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Individual Metric Card */
+.activity-metric-card {
+  flex: 1;
+  min-width: calc(25% - 10px);
+  max-width: calc(25% - 10px);
+  background: var(--card-bg);
+  border-radius: 10px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  box-sizing: border-box;
+  transition: ease 0.3s;
+  min-height: 120px;
+}
+
+.activity-metric-card:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Metric Card Content */
+.activity-metric-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 10px;
+  padding-left: 5px;
+}
+
+.activity-metric-card-title {
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.activity-metric-card-value {
+  font-size: 2.2rem;
+  font-weight: bold;
+  color: var(--text-primary);
+  margin-top: 5px;
+}
+
+/* Donut Chart Container - positioned absolutely in top right */
+.activity-donut-container {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+}
+
+.activity-donut-chart {
+  width: 60px;
+  height: 60px;
+}
+
+.donut-ring {
+  stroke-width: 3;
+}
+
+.donut-segment {
+  stroke-width: 3;
+  transition: stroke-dasharray 0.5s;
+}
+
+/* Responsive Breakpoints - matching Cards.css */
+@media (max-width: 1308px) {
+  .activity-metric-card {
+    min-width: calc(25% - 10px);
+    max-width: calc(25% - 10px);
+  }
+
+  .activity-metric-card-title {
+    font-size: 0.9rem;
+  }
+
+  .activity-metric-card-value {
+    font-size: 1.8rem;
+  }
+
+  .activity-donut-chart {
+    width: 50px;
+    height: 50px;
+  }
+
+  .activity-alp-card-value {
+    font-size: 1.8rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .activity-metric-cards-grid {
+    gap: 5px;
+  }
+
+  .activity-alp-cards {
+    gap: 5px;
+    flex-direction: column;
+  }
+
+  .activity-metric-card {
+    min-width: calc(50% - 5px);
+    max-width: calc(50% - 5px);
+  }
+
+  .activity-metric-card-title {
+    font-size: 0.8rem;
+  }
+
+  .activity-metric-card-value {
+    font-size: 1.5rem;
+  }
+
+  .activity-alp-card-value {
+    font-size: 1.8rem;
+  }
+
+  .activity-donut-container {
+    top: 10px;
+    right: 10px;
+  }
+
+  .activity-donut-chart {
+    width: 45px;
+    height: 45px;
+  }
+}
+
+@media (max-width: 600px) {
+  .activity-metric-card {
+    min-width: 100%;
+    max-width: 100%;
+  }
+}

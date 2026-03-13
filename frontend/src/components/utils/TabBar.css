@@ -1,0 +1,23 @@
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid #eee;
+  background: #f8f9fa;
+  padding: 0 1rem;
+}
+
+.tab {
+  padding: 1rem;
+  cursor: pointer;
+  color: #666;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.tab:hover {
+  color: #333;
+}
+
+.tab.active {
+  color: #007bff;
+  border-bottom-color: #007bff;
+} 

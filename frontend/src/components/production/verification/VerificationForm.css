@@ -1,0 +1,561 @@
+.verification-form-container {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.client-info-group h4 {
+    font-family: 'Avenir Next LT Pro', sans-serif;
+    font-weight: bold;
+    margin-top: 20px;
+    color: var(--hover-color);
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 10px;
+}
+
+.input-group label {
+    margin-bottom: 5px;
+    font-family: 'Calibri', sans-serif;
+    color: var(--text-primary);
+}
+
+.input-group input {
+    padding: 5px;
+    border: 1px solid var(--input-border);
+    border-radius: 5px;
+    font-size: 12px;
+    width: 100%;
+    box-sizing: border-box;
+    font-family: 'Calibri', sans-serif;
+    background-color: var(--input-bg);
+    color: var(--input-text);
+}
+
+.input-group input:focus {
+    outline: none;
+    border-color: var(--hover-color);
+}
+
+.input-group select {
+    padding: 5px;
+    border: 1px solid var(--input-border);
+    border-radius: 5px;
+    font-size: 12px;
+    width: 100%;
+    box-sizing: border-box;
+    font-family: 'Calibri', sans-serif;
+    background-color: var(--input-bg);
+    color: var(--input-text);
+}
+
+.input-group select:focus {
+    outline: none;
+    border-color: var(--hover-color);
+}
+
+.input-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 15px;
+}
+
+.input-row .input-group {
+    flex: 1;
+}
+
+.phone-number-container {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+}
+
+.phone-number-container input {
+    width: 33%;
+}
+
+.agent-info-group .input-row {
+    display: flex;
+    gap: 20px;
+}
+
+.agent-info-group .input-group {
+    flex: 1;
+}
+
+.insured-button-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 10px;
+    margin-top: 20px;
+}
+
+.insured-button {
+    background-color: var(--button-primary-bg);
+    color: var(--button-primary-text);
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 5px;
+    font-size: 12px;
+    margin: 0 5px;
+    font-family: 'Calibri', sans-serif;
+}
+
+.insured-button:hover {
+    opacity: 0.9;
+}
+
+.insured-label-checkboxes {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    gap: 10px;
+}
+
+.insured-label {
+    font-weight: bold;
+    flex-shrink: 0;
+    margin-right: 15px;
+    color: var(--text-primary);
+}
+
+.checkbox-group {
+    display: flex;
+    gap: 15px;
+}
+
+.checkbox-group label {
+    color: var(--text-primary);
+    font-size: 12px;
+}
+
+.insured-group .input-group {
+    display: flex;
+    gap: 10px;
+}
+
+.modern-input,
+.premium-input {
+    flex: 1;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid var(--input-border);
+    font-size: 14px;
+    background-color: var(--input-bg);
+    color: var(--input-text);
+}
+
+.modern-input:focus,
+.premium-input:focus {
+    outline: none;
+    border-color: var(--hover-color);
+}
+
+.premium-input {
+    max-width: 150px;
+}
+
+.premiums-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.premium-row {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 600px;
+}
+
+.premium-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    margin: 0 10px;
+}
+
+.premium-item label {
+    margin-bottom: 5px;
+    color: var(--text-primary);
+    font-size: 12px;
+}
+
+.premium-item input {
+    width: 100%;
+    text-align: center;
+    padding: 5px;
+    border-radius: 5px;
+    border: 1px solid var(--input-border);
+    font-size: 12px;
+    box-sizing: border-box;
+    font-family: 'Calibri', sans-serif;
+    background-color: var(--input-bg);
+    color: var(--input-text);
+}
+
+.premium-item input:focus {
+    outline: none;
+    border-color: var(--hover-color);
+}
+
+/* Links styling */
+.verification-form-container a {
+    color: var(--hover-color);
+    text-decoration: none;
+}
+
+.verification-form-container a:hover {
+    text-decoration: underline;
+}
+
+/* Submit button */
+.verification-form-container button[type="submit"] {
+    background-color: var(--button-primary-bg);
+    color: var(--button-primary-text);
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-size: 14px;
+    cursor: pointer;
+    margin-top: 20px;
+    font-family: 'Calibri', sans-serif;
+}
+
+.verification-form-container button[type="submit"]:hover {
+    opacity: 0.9;
+}
+
+/* Info text styling */
+.verification-form-container p {
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+/* Mobile styles for modal/panel display */
+@media (max-width: 767px) {
+    .verification-form-container {
+        max-width: 100%;
+        margin: 0;
+        padding: 10px;
+        height: calc(100vh - 80px);
+        overflow-y: auto;
+    }
+    
+    .input-row {
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .phone-number-container {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .phone-number-container input {
+        width: 100%;
+    }
+
+    .premium-row {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .premium-item {
+        margin: 0;
+    }
+    
+    .client-info-group h4 {
+        margin-top: 15px;
+        margin-bottom: 10px;
+        font-size: 1.1rem;
+    }
+    
+    .input-group {
+        margin-bottom: 8px;
+    }
+    
+    .input-group input,
+    .input-group select {
+        padding: 8px;
+        font-size: 14px;
+    }
+    
+    .modern-input,
+    .premium-input {
+        padding: 8px;
+        font-size: 14px;
+    }
+    
+    .insured-button-container {
+        margin: 15px 0 10px 0;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+    }
+    
+    .insured-button {
+        padding: 8px 12px;
+        font-size: 13px;
+        min-width: 80px;
+    }
+    
+    .insured-label-checkboxes {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .checkbox-group {
+        justify-content: flex-start;
+        gap: 12px;
+    }
+    
+    .verification-form-container button[type="submit"] {
+        width: 100%;
+        padding: 12px;
+        font-size: 16px;
+        margin-top: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .premiums-container {
+        margin-top: 15px;
+    }
+}
+
+/* Tablet-specific optimizations */
+@media (max-width: 1199px) and (min-width: 768px) {
+    .verification-form-container {
+        max-width: 100%;
+        padding: 15px;
+    }
+    
+    .input-row {
+        gap: 15px;
+    }
+    
+    .premium-row {
+        gap: 15px;
+    }
+}
+
+/* Medical Questions Styling */
+.insured-checkbox-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 20px;
+    padding: 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Individual question row styling */
+.question-row {
+    width: 100%;
+    margin-bottom: 5px;
+    padding: 10px;
+    border-radius: 8px;
+    box-sizing: border-box;
+}
+
+.question-content {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.insured-checkbox-row h4 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: var(--text-primary);
+    font-family: 'Avenir Next LT Pro', sans-serif;
+    font-weight: 600;
+}
+
+.question-label {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    font-family: 'Calibri', sans-serif;
+    flex: 1;
+    margin-right: 20px;
+    padding-top: 2px;
+}
+
+.radio-buttons {
+    display: flex;
+    gap: 25px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.question-label strong {
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+/* Radio button container for header row */
+.insured-checkbox-row > .secondary-button {
+    margin: 0;
+}
+
+.insured-checkbox-row label,
+.radio-buttons label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--text-primary);
+    font-family: 'Calibri', sans-serif;
+    cursor: pointer;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.insured-checkbox-row input[type="radio"],
+.insured-checkbox-row input[type="checkbox"],
+.radio-buttons input[type="radio"],
+.radio-buttons input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--button-primary-bg, #007bff);
+}
+
+/* Form group styling for medical questions */
+.form-group {
+    margin-bottom: 20px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.form-group .question-row {
+    margin-bottom: 0;
+}
+
+
+
+.form-group > div:last-child > div {
+    margin-bottom: 10px;
+}
+
+.form-group > div:last-child > div:last-child {
+    margin-bottom: 0;
+}
+
+.form-group > div:last-child label {
+    font-size: 14px;
+    color: var(--text-primary);
+    padding-left: 8px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+
+
+/* Questions container styling */
+.questions-container {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+
+/* Secondary button styling for "No to All" */
+.secondary-button {
+    background-color: var(--button-primary-bg, #007bff);
+    color: var(--button-primary-text, #ffffff);
+    border: 1px solid var(--button-primary-bg, #007bff);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: 'Calibri', sans-serif;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.secondary-button:hover {
+    background-color: var(--button-primary-hover-bg, #0056b3);
+    border-color: var(--button-primary-hover-bg, #0056b3);
+}
+
+/* Mobile responsiveness for medical questions */
+@media (max-width: 767px) {
+    .insured-checkbox-row {
+        flex-direction: column;
+        gap: 15px;
+        padding: 0;
+        width: 100%;
+    }
+
+    .question-row {
+        padding: 16px;
+        width: 100%;
+    }
+
+    .question-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+        width: 100%;
+    }
+
+    .question-label {
+        margin-right: 0;
+        margin-bottom: 0;
+        width: 100%;
+        padding-top: 0;
+    }
+
+    .radio-buttons {
+        gap: 35px;
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    .form-group > div:last-child {
+        margin-left: 20px;
+        margin-top: 12px;
+        padding: 12px;
+    }
+
+
+
+    .questions-container {
+        width: 100%;
+    }
+
+    .secondary-button {
+        padding: 10px 16px;
+        font-size: 14px;
+    }
+} 

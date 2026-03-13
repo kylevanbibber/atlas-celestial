@@ -1,0 +1,427 @@
+.objectives-container {
+  width: 100%;
+}
+
+.objectives-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.objectives-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.objectives-year-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.objectives-year-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.objectives-year-btn:hover {
+  background: var(--hover-bg);
+}
+
+.objectives-year-label {
+  font-size: 16px;
+  font-weight: 600;
+  min-width: 50px;
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.objectives-empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* MGA Card */
+.mga-card {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.mga-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--card-bg);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.mga-card-header:hover {
+  background: var(--hover-bg);
+}
+
+.mga-card-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mga-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.mga-tenure-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--hover-bg);
+  color: var(--text-secondary);
+}
+
+.mga-quarter-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.mga-card-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.mga-obj-value {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mga-met-count {
+  font-size: 12px;
+}
+
+.mga-card-body {
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.mga-detail-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.mga-calc-row {
+  padding: 8px 10px;
+  background: var(--hover-bg);
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+/* Table */
+.objectives-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.objectives-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.objectives-table thead th {
+  background: var(--card-bg);
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-bottom: 2px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.objectives-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* Quarter header row */
+.quarter-header-row td {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--hover-bg);
+  padding: 6px 12px;
+  letter-spacing: 0.3px;
+}
+
+/* Month rows — two rows per bonus month */
+.month-row:hover {
+  background: var(--hover-bg);
+}
+
+.month-row-first td {
+  border-bottom: none;
+}
+
+.month-row-second td {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.bonus-month-cell {
+  font-weight: 500;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.qual-month-cell {
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+/* Past qualifying months — greyed out */
+.qual-past {
+  color: var(--text-secondary);
+  opacity: 0.55;
+}
+
+/* Vertically center rowSpan cells */
+.month-row-first td[rowspan] {
+  vertical-align: middle;
+}
+
+.new-obj-marker {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+/* Progress colors */
+.obj-met {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.obj-behind {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.obj-missed {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+/* SGA grid table (uses team-leaderboard-table base) */
+.sga-table.team-leaderboard-table th {
+  white-space: nowrap;
+}
+
+.sga-mga-name {
+  white-space: nowrap;
+  position: sticky;
+  left: 0;
+  background: inherit;
+  z-index: 1;
+}
+
+.sga-cell {
+  text-align: center;
+  font-size: 12px;
+  white-space: nowrap;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.sga-cell:hover {
+  background: hsl(var(--accent) / 0.6) !important;
+}
+
+.sga-cell-active {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+/* SGA cell detail popover */
+.sga-popover-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.sga-popover {
+  position: fixed;
+  z-index: 50;
+  width: 280px;
+  background: var(--card-bg, hsl(var(--card)));
+  border: 1px solid var(--border-color, hsl(var(--border)));
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  animation: sga-pop-in 0.12s ease-out;
+}
+
+@keyframes sga-pop-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.sga-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color, hsl(var(--border)));
+}
+
+.sga-popover-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary, hsl(var(--foreground)));
+}
+
+.sga-popover-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  color: var(--text-secondary, hsl(var(--muted-foreground)));
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.sga-popover-close:hover {
+  background: var(--hover-bg, hsl(var(--accent)));
+}
+
+.sga-popover-body {
+  padding: 10px 12px;
+}
+
+.sga-popover-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.sga-popover-table th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-secondary, hsl(var(--muted-foreground)));
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border-color, hsl(var(--border)));
+}
+
+.sga-popover-table td {
+  padding: 5px 6px;
+  color: var(--text-primary, hsl(var(--foreground)));
+}
+
+.sga-popover-table tr.qual-past td {
+  color: var(--text-secondary, hsl(var(--muted-foreground)));
+  opacity: 0.55;
+}
+
+.sga-popover-summary {
+  border-top: 1px solid var(--border-color, hsl(var(--border)));
+  padding-top: 8px;
+}
+
+.sga-popover-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  padding: 3px 0;
+  color: var(--text-primary, hsl(var(--foreground)));
+}
+
+/* Loading and error states */
+.objectives-loading,
+.objectives-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.objectives-error {
+  color: #dc2626;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .objectives-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .mga-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .mga-card-stats {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .mga-detail-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .objectives-table {
+    font-size: 12px;
+  }
+
+  .objectives-table thead th,
+  .objectives-table td {
+    padding: 5px 8px;
+  }
+}

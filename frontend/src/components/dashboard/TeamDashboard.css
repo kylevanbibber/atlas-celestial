@@ -1,0 +1,412 @@
+/* Team Dashboard Styles */
+
+/* Two-column layout: main content + activity feed sidebar */
+.dashboard-with-feed {
+  display: flex;
+  align-items: flex-start;
+  min-height: 100%;
+}
+
+.dashboard-with-feed .dashboard-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Re-open button shown when sidebar is collapsed */
+@keyframes feedBtnFadeIn {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.dashboard-feed-reopen-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  position: sticky;
+  top: 60px;
+  height: fit-content;
+  align-self: flex-start;
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 6px 0 0 6px;
+  background: var(--card-bg, #fff);
+  color: var(--text-secondary, #6c757d);
+  cursor: pointer;
+  padding: 10px 4px;
+  border-right: none;
+  transition: background 0.12s ease, color 0.12s ease;
+  animation: feedBtnFadeIn 0.2s ease 0.2s both;
+}
+
+.dashboard-feed-reopen-btn:hover {
+  background: var(--bg-secondary, #f8f9fa);
+  color: var(--text-primary, #1a1a2e);
+}
+
+.dashboard-feed-sidebar.collapsed {
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+  padding: 0;
+  border: none;
+}
+
+.dashboard-feed-sidebar {
+  width: 320px;
+  flex-shrink: 0;
+  position: sticky;
+  max-height: calc(100vh - 60px);
+  transition: width 0.28s ease, opacity 0.2s ease;
+  overflow-y: auto;
+  padding: 0 10px 14px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color, #e0e0e0) transparent;
+}
+
+.dashboard-feed-sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+.dashboard-feed-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dashboard-feed-sidebar::-webkit-scrollbar-thumb {
+  background: var(--border-color, #e0e0e0);
+  border-radius: 4px;
+}
+
+.dashboard-feed-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0 7px;
+  margin-bottom: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  gap: 6px;
+}
+
+.dashboard-feed-tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.dashboard-feed-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #6c757d);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.12s ease;
+}
+
+.dashboard-feed-tab:hover {
+  background: var(--bg-secondary, #f8f9fa);
+  color: var(--text-primary, #1a1a2e);
+}
+
+.dashboard-feed-tab.active {
+  background: var(--primary-color, #007bff);
+  color: #fff;
+  border-color: var(--primary-color, #007bff);
+}
+
+.dashboard-feed-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #6c757d);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.12s ease;
+}
+
+.dashboard-feed-add-btn:hover {
+  background: var(--primary-color, #007bff);
+  border-color: var(--primary-color, #007bff);
+  color: #fff;
+}
+
+/* Compact card styles in sidebar */
+.dashboard-feed-sidebar .close-card {
+  padding: 10px 12px;
+  gap: 10px;
+  border-radius: 8px;
+}
+
+.dashboard-feed-sidebar .close-card-avatar,
+.dashboard-feed-sidebar .close-card-avatar-img,
+.dashboard-feed-sidebar .close-card-avatar-fallback {
+  width: 34px;
+  height: 34px;
+}
+
+.dashboard-feed-sidebar .close-card-avatar-fallback {
+  font-size: 14px;
+}
+
+.dashboard-feed-sidebar .close-card-name {
+  font-size: 13px;
+}
+
+.dashboard-feed-sidebar .close-card-action {
+  font-size: 12px;
+}
+
+.dashboard-feed-sidebar .close-card-alp {
+  font-size: 13px;
+}
+
+.dashboard-feed-sidebar .close-card-image {
+  max-height: 140px;
+}
+
+.dashboard-feed-sidebar .close-card-stats {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.dashboard-feed-sidebar .close-card-reactions {
+  margin-top: 8px;
+  padding-top: 8px;
+  gap: 4px;
+}
+
+.dashboard-feed-sidebar .activity-feed-list {
+  gap: 6px;
+}
+
+.dashboard-feed-sidebar .activity-feed-date-separator {
+  padding: 2px 0;
+  margin: 2px 0;
+}
+
+.dashboard-feed-sidebar .activity-feed-date-label {
+  font-size: 11px;
+}
+
+.dashboard-feed-sidebar .milestone-card {
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.dashboard-feed-sidebar .activity-feed-load-more {
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .dashboard-feed-sidebar,
+  .dashboard-feed-reopen-btn {
+    display: none !important;
+  }
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.dashboard-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+}
+
+.view-mode-toggle {
+  display: inline-flex;
+  gap: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.view-mode-toggle .toggle-btn {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #666);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.view-mode-toggle .toggle-btn:hover {
+  background: var(--hover-background, #e8eaf0);
+  color: var(--text-primary, #333);
+}
+
+.view-mode-toggle .toggle-btn.active {
+  background: var(--primary-color, #007bff);
+  color: white;
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);
+}
+
+/* Time Period Selector */
+.time-period-selector {
+  display: inline-flex;
+  gap: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.period-btn {
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #666);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.period-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary, #333);
+}
+
+.period-btn.active {
+  background: var(--primary-color, #007bff);
+  color: white;
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.15);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .time-period-selector {
+    width: 100%;
+  }
+
+  .period-btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  .view-mode-toggle {
+    width: 100%;
+  }
+
+  .view-mode-toggle .toggle-btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  .dashboard-title {
+    font-size: 24px;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .dashboard-title {
+    color: var(--text-primary, #e0e0e0);
+  }
+
+  .time-period-selector {
+    background: transparent;
+    border-color: transparent;
+  }
+
+  .period-btn {
+    color: var(--text-secondary, #aaa);
+  }
+
+  .period-btn:hover {
+    background: var(--hover-background, #3a3a3a);
+    color: var(--text-primary, #e0e0e0);
+  }
+
+  .view-mode-toggle {
+    background: transparent;
+    border-color: transparent;
+  }
+
+  .view-mode-toggle .toggle-btn {
+    color: var(--text-secondary, #aaa);
+  }
+
+  .view-mode-toggle .toggle-btn:hover {
+    background: var(--hover-background, #3a3a3a);
+    color: var(--text-primary, #e0e0e0);
+  }
+}
+
+/* Personal ALP goal editor (inside WidgetCard) */
+.alp-goal-edit-row {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.alp-goal-input {
+  flex: 1 1 160px;
+  min-width: 140px;
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-color);
+}
+
+.alp-goal-btn {
+  flex: 0 0 auto;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.alp-goal-btn-save {
+  background: #06b6d4;
+  color: white;
+  border: none;
+}
+
+.alp-goal-btn-cancel {
+  background: transparent;
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+}
+
+@media (max-width: 420px) {
+  .alp-goal-btn {
+    flex: 1 1 100%;
+    text-align: center;
+  }
+}
+

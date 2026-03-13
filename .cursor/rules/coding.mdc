@@ -1,0 +1,90 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+1. Awareness of Existing Structure
+
+Cursor must inspect the current project layout before generating code:
+
+/src/components for stateful & domain-level components
+
+/src/components/ui for shared presentational components
+
+/src/pages for route-based pages
+
+/src/styles for global style files and variables
+
+Always search for existing modules or patterns to integrate with.
+
+2. Component Reuse
+
+Favor composition over duplication:
+
+Identify existing UI components (e.g., Button, Card, Input) and import rather than recreate.
+
+Extend or wrap existing components when customizing behavior or styles.
+
+When introducing a new pattern, extract it into a reusable component in /src/components/ui.
+
+3. Directory Organization
+
+Adhere to the following folder structure:
+
+/components (feature-specific / stateful)
+
+/components/ui (generic, reusable presentational components)
+
+/hooks (custom React hooks)
+
+/utils (helper functions and constants)
+
+/styles (global CSS, theming variables, CSS modules)
+
+Place new files in the most semantically appropriate location.
+
+4. Centralized Styling
+
+Keep global styles and design tokens in styles/global.css or CSS modules under /styles.
+
+Use CSS variables for colors, spacing, typography, and themes.
+
+Avoid scattered inline styles; prefer class-based styling or CSS-in-JS following project conventions.
+
+5. Theming: Light & Dark Mode
+
+Maintain theme variables in styles/themes.css or global.css:
+
+:root.light { --color-bg: #ffffff; --color-text: #000000; }
+:root.dark  { --color-bg: #121212; --color-text: #ffffff; }
+
+Generated components must reference theme variables (e.g., bg-[var(--color-bg)], text-[var(--color-text)]).
+
+Use Tailwind’s dark: variants when applicable.
+
+6. Naming Conventions
+
+Components: PascalCase (e.g., UserProfile.js).
+
+Hooks: useCamelCase (e.g., useFetchData.js).
+
+Utilities: camelCase (e.g., formatDate.js).
+
+Files: Match the exported entity (e.g., Button.js, button.module.css).
+
+7. Code Generation Rules
+
+Duplication Check: Before creating a new component, search existing codebase for similar functionality:
+
+If found, prompt to reuse or extend.
+
+If not, scaffold new component with boilerplate, tests, and Storybook story.
+
+Scaffolding: Generate:
+
+Component file (.js)
+
+CSS module or styled file
+
+
+

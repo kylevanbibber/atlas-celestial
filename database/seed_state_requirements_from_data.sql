@@ -1,0 +1,31 @@
+-- ============================================================
+-- State Requirements Seed Data
+-- ============================================================
+-- 
+-- ⚠️ THIS FILE NEEDS TO BE REGENERATED WITH CORRECT DATA
+--
+-- The initial version of this file contained incorrect mappings.
+-- Please use ChatGPT to generate the correct SQL from your Excel data.
+--
+-- Instructions:
+-- 1. Open: atlas/CHATGPT_PROMPT.txt
+-- 2. Copy contents and paste into ChatGPT
+-- 3. Provide your Excel spreadsheet data
+-- 4. ChatGPT will generate the correct SQL
+-- 5. Replace this file with the generated output
+-- 6. Run: mysql < seed_state_requirements_from_data.sql
+--
+-- See: atlas/HOW_TO_GENERATE_STATE_SQL.md for detailed instructions
+--
+-- ============================================================
+
+-- DO NOT RUN THIS FILE YET - Generate correct data first!
+
+-- Example of correct format (for reference):
+-- INSERT INTO pipeline_state_requirements (
+--   state, stage_name, action, target_item_name, override_description, notes
+-- ) VALUES (
+--   'CA', 'Licensing', 'modify', 'Background Check',
+--   'California requires Live Scan fingerprinting through certified providers.',
+--   'Live Scan fingerprinting'
+-- );

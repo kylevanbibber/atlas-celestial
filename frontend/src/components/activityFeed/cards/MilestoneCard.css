@@ -1,0 +1,339 @@
+.milestone-card {
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  transition: box-shadow 0.15s ease;
+}
+
+.milestone-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Banner strip at top */
+.milestone-card-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Accent variants */
+.milestone-gold .milestone-card-banner {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+}
+
+.milestone-blue .milestone-card-banner {
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  color: #1e40af;
+}
+
+.milestone-fire .milestone-card-banner {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  color: #991b1b;
+}
+
+.milestone-card-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.milestone-card-label {
+  font-size: 12px;
+}
+
+/* Main content area */
+.milestone-card-main {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+/* Avatar (same style as CloseCard) */
+.milestone-card-avatar {
+  flex-shrink: 0;
+  position: relative;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+}
+
+.milestone-card-avatar:hover {
+  opacity: 0.85;
+}
+
+.milestone-card-avatar-img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.milestone-card-avatar-fallback {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--primary-color, #4f46e5);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.milestone-card-avatar.online .milestone-card-avatar-img,
+.milestone-card-avatar.online .milestone-card-avatar-fallback {
+  box-shadow: 0 0 0 2.5px var(--card-bg, #fff), 0 0 0 4.5px #22c55e;
+}
+
+.milestone-card-avatar.online::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  background: #22c55e;
+  border: 2px solid var(--card-bg, #fff);
+  border-radius: 50%;
+}
+
+/* Content */
+.milestone-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.milestone-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.milestone-card-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-primary, #111827);
+}
+
+.milestone-card-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--bg-secondary, #f3f4f6);
+  color: var(--text-secondary, #6b7280);
+}
+
+.milestone-card-time {
+  font-size: 13px;
+  color: var(--text-secondary, #9ca3af);
+  margin-left: auto;
+}
+
+/* Amount */
+.milestone-card-amount {
+  font-size: 24px;
+  font-weight: 800;
+  margin-top: 6px;
+  line-height: 1.2;
+}
+
+.milestone-gold .milestone-card-amount {
+  color: #b45309;
+}
+
+.milestone-blue .milestone-card-amount {
+  color: #1d4ed8;
+}
+
+.milestone-fire .milestone-card-amount {
+  color: #dc2626;
+}
+
+.milestone-card-detail {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  margin-top: 2px;
+}
+
+.milestone-card-week {
+  font-size: 13px;
+  color: var(--text-secondary, #9ca3af);
+  margin-top: 4px;
+}
+
+/* Reactions (shared pattern with CloseCard) */
+.milestone-card-reactions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.milestone-card-heart-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 20px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.milestone-card-heart-btn:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+.milestone-card-heart-btn.active {
+  background: #fef2f2;
+  border-color: #f87171;
+}
+
+.milestone-card-heart-btn.active:active {
+  transform: scale(0.92);
+}
+
+.milestone-card-heart-btn .heart-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary, #9ca3af);
+  transition: color 0.15s ease;
+}
+
+.milestone-card-heart-btn:hover .heart-icon {
+  color: #f87171;
+}
+
+.milestone-card-heart-btn .heart-icon.filled {
+  color: #ef4444;
+}
+
+.milestone-card-reaction-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 20px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.milestone-card-reaction-btn:hover {
+  background: var(--bg-secondary, #f3f4f6);
+  border-color: var(--text-secondary, #9ca3af);
+}
+
+.milestone-card-reaction-btn.active {
+  background: var(--primary-color-light, #eef2ff);
+  border-color: var(--primary-color, #4f46e5);
+}
+
+.milestone-card-heart-btn .reaction-count,
+.milestone-card-reaction-btn .reaction-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+}
+
+.milestone-card-heart-btn.active .reaction-count {
+  color: #ef4444;
+}
+
+.milestone-card-reaction-btn.active .reaction-count {
+  color: var(--primary-color, #4f46e5);
+}
+
+/* Picker (same as CloseCard) */
+.milestone-card-picker-wrapper {
+  position: relative;
+}
+
+.milestone-card-plus-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-secondary, #9ca3af);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.milestone-card-plus-btn:hover {
+  background: var(--bg-secondary, #f3f4f6);
+  color: var(--text-primary, #111827);
+  border-color: var(--text-secondary, #9ca3af);
+}
+
+.milestone-card-plus-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.milestone-card-picker {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 10;
+  white-space: nowrap;
+}
+
+.milestone-card-picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  font-size: 20px;
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+
+.milestone-card-picker-item:hover {
+  background: var(--bg-secondary, #f3f4f6);
+  transform: scale(1.2);
+}
+
+.milestone-card-picker-item.active {
+  background: var(--primary-color-light, #eef2ff);
+}
+
+/* Footer */
+.milestone-card-footer {
+  margin-top: 8px;
+}
+
+.milestone-card-full-date {
+  font-size: 11px;
+  color: var(--text-secondary, #9ca3af);
+}

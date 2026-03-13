@@ -1,0 +1,120 @@
+/* VIPs Page Styles */
+
+/* Page Layout - when standalone (access control) */
+.vips-page-container {
+  min-height: 100vh;
+  background-color: var(--bg-secondary, #f9fafb);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vips-access-denied {
+  max-width: 28rem;
+  width: 100%;
+  background-color: white;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+}
+
+.vips-access-denied-content {
+  text-align: center;
+}
+
+.vips-access-denied-icon {
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 3rem;
+  width: 3rem;
+  border-radius: 50%;
+  background-color: #fef2f2;
+}
+
+.vips-access-denied-title {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.vips-access-denied-message {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+/* Tab Navigation */
+.vips-tabs-container {
+  margin-bottom: 1.5rem;
+}
+
+.vips-tabs-border {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.vips-tabs-nav {
+  margin-bottom: -1px;
+  display: flex;
+  gap: 2rem;
+}
+
+.vips-tab-button {
+  white-space: nowrap;
+  padding: 0.5rem 0.25rem;
+  border-bottom: 2px solid transparent;
+  font-weight: 500;
+  font-size: 0.875rem;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.vips-tab-button.active {
+  border-bottom-color: #3b82f6;
+  color: #2563eb;
+}
+
+.vips-tab-button.inactive {
+  border-bottom-color: transparent;
+  color: var(--text-secondary);
+}
+
+.vips-tab-button.inactive:hover {
+  color: var(--text-primary);
+  border-bottom-color: var(--border-color);
+}
+
+/* Tab Content */
+.vips-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Search Icon States */
+.search-icon.searching {
+  color: #00558c !important;
+  opacity: 0.8;
+}
+
+/* Search Input States */
+.search-input.searching {
+  border-color: #00558c !important;
+  transition: border-color 0.2s ease;
+}
+
+/* Search Status Indicator */
+.search-status {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #00558c;
+  font-size: 12px;
+}

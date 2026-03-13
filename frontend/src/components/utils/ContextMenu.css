@@ -1,0 +1,381 @@
+/* src/components/utils/ContextMenu.css */
+.context-menu {
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 4px 15px var(--shadow-color);
+    min-width: 150px;
+    z-index: 1000;
+    overflow: hidden;
+    position: absolute;
+    border: 1px solid var(--border-color);
+}
+
+/* For dropdown menus at the top of the page (like header) */
+.context-menu.dropdown {
+    position: absolute;
+    top: 43px;
+    right: 8px;
+    max-height: 60vh;
+    min-width: 250px;
+}
+
+/* For hamburger menu */
+.context-menu.hamburger-menu {
+    position: absolute;
+}
+
+.menu-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-primary);
+    transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+}
+
+.menu-item:hover {
+    background-color: var(--sidebar-hover);
+}
+
+.menu-item:not(:last-child) {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.menu-icon {
+    margin-right: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+.menu-item.menu-item-logout {
+    color: #d32f2f;
+}
+
+.menu-item.menu-item-impersonating {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    font-weight: 500;
+}
+
+.menu-item.menu-item-impersonating:hover {
+    background: linear-gradient(135deg, #d97706, #b45309);
+}
+
+.context-menu-search {
+    padding: 12px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--sidebar-hover);
+}
+
+.context-menu-search-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 14px;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    transition: all 0.2s;
+}
+
+.context-menu-search-input:focus {
+    outline: none;
+    border-color: var(--primary-color, #3b82f6);
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.1);
+}
+
+.context-menu-search-input::placeholder {
+    color: var(--text-secondary);
+}
+
+.context-menu-items {
+    max-height: 450px;
+    overflow-y: auto;
+}
+
+.context-menu-items.with-search {
+    max-height: 400px;
+}
+
+.context-menu-items::-webkit-scrollbar {
+    width: 6px;
+}
+
+.context-menu-items::-webkit-scrollbar-track {
+    background: var(--card-bg);
+}
+
+.context-menu-items::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.context-menu-items::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+.menu-item.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.menu-item.disabled:hover {
+    background-color: transparent;
+}
+
+.menu-item.menu-item-hint {
+    background: var(--sidebar-hover);
+    font-style: italic;
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 8px 15px;
+}
+
+.menu-item.menu-item-hint:hover {
+    background: var(--sidebar-hover);
+}
+
+/* Role filter buttons */
+.context-menu-role-filters {
+    display: flex;
+    gap: 4px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.role-filter-btn {
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    color: var(--text-primary);
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.role-filter-btn:hover {
+    background: var(--sidebar-hover);
+    border-color: var(--primary-color, #3b82f6);
+}
+
+.role-filter-btn.active {
+    background: var(--primary-color, #3b82f6);
+    color: white;
+    border-color: var(--primary-color, #3b82f6);
+}
+
+.role-filter-btn.active:hover {
+    background: var(--primary-dark, #2563eb);
+    border-color: var(--primary-dark, #2563eb);
+}
+
+/* Archive menu item styling */
+.menu-item-archive {
+    color: #f59e0b;
+}
+
+.menu-item-archive:hover {
+    background-color: rgba(245, 158, 11, 0.1);
+    color: #d97706;
+}
+
+/* Unarchive menu item styling */
+.menu-item-unarchive {
+    color: #10b981;
+}
+
+.menu-item-unarchive:hover {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: #059669;
+}
+
+/* Send Early menu item styling */
+.menu-item-send-early {
+    color: #3b82f6;
+}
+
+.menu-item-send-early:hover {
+    background-color: rgba(59, 130, 246, 0.1);
+    color: #2563eb;
+}
+
+/* Resend menu item styling */
+.menu-item-resend {
+    color: #8b5cf6;
+}
+
+.menu-item-resend:hover {
+    background-color: rgba(139, 92, 246, 0.1);
+    color: #7c3aed;
+}
+
+/* Copy Details menu item styling */
+.menu-item-copy {
+    color: #06b6d4;
+}
+
+.menu-item-copy:hover {
+    background-color: rgba(6, 182, 212, 0.1);
+    color: #0891b2;
+}
+
+/* Danger action menu item styling */
+.menu-item.danger-action {
+    color: #dc2626;
+}
+
+.menu-item.danger-action:hover {
+    background-color: rgba(220, 38, 38, 0.1);
+    color: #b91c1c;
+}
+
+/* Remove action menu item styling */
+.menu-item.remove-action {
+    color: #ef4444;
+}
+
+.menu-item.remove-action:hover {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
+}
+
+/* Submenu Styles */
+.menu-item.has-submenu {
+    position: relative;
+    justify-content: space-between;
+}
+
+.submenu-arrow {
+    margin-left: auto;
+    font-size: 14px;
+    color: var(--text-secondary);
+    transition: color 0.2s;
+    transform: rotate(180deg); /* Point left instead of right */
+}
+
+.menu-item.has-submenu:hover .submenu-arrow {
+    color: var(--text-primary);
+}
+
+.context-submenu {
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: 0 4px 15px var(--shadow-color);
+    min-width: 180px;
+    overflow: visible;
+    border: 1px solid var(--border-color);
+    /* No transition - instant appearance */
+}
+
+/* Cone-of-safety bridges on both sides so the submenu stays open
+   regardless of whether it opens to the left or right of the parent. */
+.context-submenu::before {
+    content: "";
+    position: absolute;
+    top: -30px;
+    bottom: -30px;
+    left: -30px;
+    width: 30px;
+    background: transparent;
+}
+
+.context-submenu::after {
+    content: "";
+    position: absolute;
+    top: -30px;
+    bottom: -30px;
+    right: -30px;
+    width: 30px;
+    background: transparent;
+}
+
+.context-submenu .context-menu-items {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+/* Nested submenu styling */
+.context-nested-submenu {
+    border: 1px solid var(--border-color);
+    box-shadow: 0 6px 20px var(--shadow-color);
+}
+
+.context-nested-submenu .context-menu-items {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* Menu separator styling */
+.menu-item.menu-separator {
+    color: var(--text-secondary);
+    font-size: 12px;
+    text-align: center;
+    padding: 8px 15px;
+    background: var(--bg-secondary);
+    cursor: default;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+.menu-item.menu-separator:hover {
+    background: var(--bg-secondary);
+}
+
+/* Mobile responsive styles for header menus */
+@media (max-width: 768px) {
+    /* Make dropdown menus smaller on mobile */
+    .context-menu.dropdown {
+        min-width: 180px; /* Reduced from 250px */
+        max-height: 50vh; /* Reduce height for smaller screens */
+    }
+    
+    /* Smaller font size for menu items on mobile */
+    .menu-item {
+        padding: 8px 12px; /* Reduced padding from 10px 15px */
+        font-size: 12px; /* Reduced from 14px */
+    }
+    
+    /* Smaller icons on mobile */
+    .menu-icon {
+        margin-right: 8px; /* Reduced from 10px */
+        font-size: 14px; /* Reduced from 16px */
+    }
+    
+    /* Smaller submenus on mobile */
+    .context-submenu {
+        min-width: 150px; /* Reduced from 180px */
+    }
+    
+    /* Smaller nested submenu on mobile */
+    .context-nested-submenu .context-menu-items {
+        max-height: 150px; /* Reduced from 200px */
+    }
+    
+    /* Smaller search input on mobile */
+    .context-menu-search-input {
+        font-size: 12px; /* Reduced from 14px */
+        padding: 6px 10px; /* Reduced from 8px 12px */
+    }
+    
+    /* Smaller role filter buttons on mobile */
+    .role-filter-btn {
+        font-size: 10px; /* Reduced from 11px */
+        padding: 3px 6px; /* Reduced from 4px 8px */
+    }
+    
+    /* Smaller submenu arrow on mobile */
+    .submenu-arrow {
+        font-size: 12px; /* Reduced from 14px */
+    }
+    
+    /* Smaller hint text on mobile */
+    .menu-item.menu-item-hint {
+        font-size: 11px; /* Reduced from 12px */
+        padding: 6px 12px; /* Reduced from 8px 15px */
+    }
+}

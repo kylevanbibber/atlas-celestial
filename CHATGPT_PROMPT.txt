@@ -1,0 +1,77 @@
+I need you to generate SQL INSERT statements for a state requirements table based on my Excel spreadsheet data.
+
+DATABASE TABLE:
+```sql
+CREATE TABLE pipeline_state_requirements (
+  state VARCHAR(2) NOT NULL,                    -- Two-letter state code
+  stage_name VARCHAR(100) NOT NULL,             -- 'Licensing', 'Training', or 'On-boarding'
+  action ENUM('add', 'remove', 'modify', 'not_required') NOT NULL,
+  
+  target_item_name VARCHAR(255) NULL,           -- For modify/remove/not_required: which item to target
+  override_description TEXT NULL,               -- For modify: new description
+  override_required BOOLEAN NULL,               -- For modify: change required status
+  
+  item_name VARCHAR(255) NULL,                  -- For add: new item name
+  item_description TEXT NULL,                   -- For add: new item description
+  item_order INT NULL,                          -- For add: sort order
+  
+  notes TEXT NULL,
+  active BOOLEAN DEFAULT 1
+);
+```
+
+DEFAULT CHECKLIST ITEMS (these exist for all states):
+- Enroll in Pre-Licensing
+- Schedule Test
+- Pass Test
+- Background Check
+- Purchase License
+- Receive License Approval
+
+ACTION TYPES:
+1. "modify" - Change an existing default item (use target_item_name + override_description)
+2. "not_required" - Make an item optional (use target_item_name)
+3. "add" - Add new state-specific item (use item_name + item_description)
+4. "remove" - Remove an item completely (use target_item_name)
+
+RULES FOR MY DATA:
+
+1. BACKGROUND CHECK COLUMN:
+   - If contains "Fingerprinting" or "Live Scan" or "IdentGo" → CREATE modify for 'Background Check' with description
+   - If "No" or blank → CREATE not_required for 'Background Check'
+   - If standard/Yes with no details → SKIP (default is fine)
+
+2. EXAM VENDOR COLUMN:
+   - If NOT "Pearson VUE" → CREATE modify for 'Schedule Test' with vendor name and link
+   - If "Pearson VUE" → SKIP (default)
+
+3. EXAM REQUIRED (PRE-LICENSING):
+   - If "Yes" or "Required" → SKIP (default)
+   - If "No" or "Recommended" → CREATE modify for 'Enroll in Pre-Licensing' with override_required = 0
+
+OUTPUT FORMAT:
+```sql
+-- ============================================================
+-- STATE_NAME (XX)
+-- ============================================================
+
+INSERT INTO pipeline_state_requirements (
+  state, stage_name, action, target_item_name, override_description, notes
+) VALUES (
+  'XX', 'Licensing', 'modify', 'Background Check',
+  '[State-specific description from spreadsheet]',
+  '[Brief note]'
+);
+```
+
+REQUIREMENTS:
+- Use exact target_item_name: 'Background Check', 'Schedule Test', 'Enroll in Pre-Licensing'
+- stage_name is always 'Licensing' for these items
+- State codes must be 2-letter UPPERCASE (CA, TX, OH)
+- Include exam links in override_description when available
+- Order states alphabetically
+- Add comments for each state
+- Only create entries for DIFFERENCES from defaults
+
+I'll paste my Excel data next. Please generate the SQL.
+

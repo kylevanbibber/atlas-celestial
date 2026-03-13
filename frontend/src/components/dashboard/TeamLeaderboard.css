@@ -1,0 +1,332 @@
+/* TeamLeaderboard component-specific table styles */
+/* Overrides global DataTable.css styles */
+
+.team-leaderboard-table th,
+.team-leaderboard-table td {
+  /* Remove all borders between columns */
+  border: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-top: none !important;
+  
+  /* Remove background colors */
+  background: transparent !important;
+  
+  /* Reset cursor */
+  cursor: inherit;
+  
+  /* Allow text wrapping */
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* Keep only the border-bottom on rows */
+.team-leaderboard-table tbody tr {
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+/* Remove header background and extra borders */
+.team-leaderboard-table thead th {
+  background: transparent !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+  cursor: default !important;
+  position: static !important;
+  z-index: auto !important;
+}
+
+/* Remove hover effects that might come from global styles */
+.team-leaderboard-table td:hover {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Apply hover to entire row — subtle semi-transparent so it doesn't
+   wash out colored text (red/green metrics, career-stage rings, etc.) */
+.team-leaderboard-table tbody tr:hover td {
+  background-color: hsl(var(--accent) / 0.45) !important;
+}
+
+/* Search Input */
+.team-leaderboard-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.team-leaderboard-search-icon {
+  position: absolute;
+  left: 10px;
+  width: 14px;
+  height: 14px;
+  color: var(--text-secondary, var(--muted-foreground));
+  pointer-events: none;
+}
+
+.team-leaderboard-search-input {
+  padding: 6px 28px 6px 30px;
+  border: 1px solid var(--border-color, hsl(var(--border)));
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+  color: var(--text-primary, var(--foreground));
+  background: var(--input-bg, transparent);
+  outline: none;
+  width: 180px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, width 0.2s ease;
+}
+
+.team-leaderboard-search-input::placeholder {
+  color: var(--text-secondary, var(--muted-foreground));
+}
+
+.team-leaderboard-search-input:focus {
+  border-color: var(--primary, #00558c);
+  box-shadow: 0 0 0 2px rgba(0, 85, 140, 0.12);
+  width: 220px;
+}
+
+.team-leaderboard-search-clear {
+  position: absolute;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: none;
+  color: var(--text-secondary, var(--muted-foreground));
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+}
+
+.team-leaderboard-search-clear:hover {
+  background: var(--hover-background, var(--accent));
+  color: var(--text-primary, var(--foreground));
+}
+
+@media (max-width: 640px) {
+  .team-leaderboard-search-input {
+    width: 120px;
+  }
+  .team-leaderboard-search-input:focus {
+    width: 150px;
+  }
+}
+
+/* Filter Menu Styles */
+.team-leaderboard-filter-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  /* Dim the page behind the menu so it doesn't look transparent */
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.team-leaderboard-filter-menu {
+  position: absolute;
+  z-index: 50;
+  min-width: 280px;
+  max-width: 320px;
+  /* Use the same vars used across the app (Dashboard/WidgetCard) */
+  background-color: var(--card-bg, #ffffff);
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.12));
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.team-leaderboard-filter-menu-content {
+  padding: 1rem;
+}
+
+.team-leaderboard-filter-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary, var(--foreground));
+}
+
+.team-leaderboard-filter-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.team-leaderboard-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.team-leaderboard-filter-option:hover {
+  background-color: var(--hover-background, var(--accent));
+}
+
+.team-leaderboard-filter-option.active {
+  background-color: var(--hover-background, var(--accent));
+}
+
+.team-leaderboard-filter-option input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+.team-leaderboard-filter-option-text {
+  flex: 1;
+}
+
+.team-leaderboard-filter-option-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary, var(--foreground));
+}
+
+.team-leaderboard-filter-option-description {
+  font-size: 0.75rem;
+  color: var(--text-secondary, var(--muted-foreground));
+  margin-top: 0.125rem;
+}
+
+/* ============================================
+   Goal Edit Popover (inline goal entry)
+   ============================================ */
+
+.goal-dash-trigger {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.goal-dash-trigger:hover {
+  background-color: var(--accent, rgba(0, 85, 140, 0.08));
+  color: var(--primary, #00558c);
+}
+
+.goal-edit-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1000;
+  min-width: 200px;
+}
+
+/* Arrow pointing up toward the dash */
+.goal-edit-popover-arrow {
+  position: absolute;
+  bottom: 100%;
+  right: 12px;
+  width: 0;
+  height: 0;
+  border: 7px solid transparent;
+  border-bottom-color: var(--border-color, #e0e0e0);
+}
+
+.goal-edit-popover-arrow::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: -6px;
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+  border-bottom-color: var(--card-bg, #fff);
+}
+
+.goal-edit-popover-content {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.goal-edit-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--muted-foreground, #888);
+}
+
+.goal-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.goal-edit-prefix {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted-foreground, #888);
+  flex-shrink: 0;
+}
+
+.goal-edit-input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 6px;
+  background: var(--input-bg, var(--card-bg, #fff));
+  color: var(--foreground, #333);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.goal-edit-input:focus {
+  border-color: var(--primary, #00558c);
+  box-shadow: 0 0 0 2px rgba(0, 85, 140, 0.15);
+}
+
+.goal-edit-input::placeholder {
+  color: var(--muted-foreground, #aaa);
+  font-weight: 400;
+}
+
+/* Remove number input spinner arrows */
+.goal-edit-input::-webkit-outer-spin-button,
+.goal-edit-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.goal-edit-input[type=number] {
+  -moz-appearance: textfield;
+}
+
+.goal-edit-save {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: var(--primary, #00558c);
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.goal-edit-save:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.goal-edit-save:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

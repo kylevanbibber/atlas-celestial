@@ -1,0 +1,55 @@
+# .slugignore for FRONTEND Heroku app
+# NOTE: src/ and public/ are needed during build, removed by heroku-cleanup.js after
+
+# Exclude duplicate frontend directory
+frontend/
+atlas/
+
+# Exclude entire backend
+backend/
+bot/
+scripts/
+migrations/
+schedulers/
+services/
+sql/
+database/
+
+# Exclude all other directories
+downloads/
+temp/
+uploads/
+.cursor/
+.vscode/
+
+# Exclude git
+.git/
+.gitmodules
+*.pack
+*.idx
+
+# Exclude documentation
+*.md
+*.txt
+
+# Exclude config files
+.env*
+.gitignore
+.eslintignore
+*.example
+.code-workspace
+postcss.config.js
+tailwind.config.js
+tsconfig.json
+
+# Exclude all scripts except server.js and heroku-cleanup.js
+*.py
+*.sql
+*.db
+extract.js
+temp_*.js
+
+# Exclude maps
+*.map
+*.js.map
+*.css.map 

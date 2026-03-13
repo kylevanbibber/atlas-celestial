@@ -1,0 +1,200 @@
+.tally-card {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  background: var(--card-bg, #fff);
+  border-radius: 10px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-left: 3px solid #10b981;
+  transition: box-shadow 0.15s ease;
+}
+
+.tally-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Avatar */
+.tally-card-avatar {
+  flex-shrink: 0;
+  position: relative;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+}
+
+.tally-card-avatar:hover {
+  opacity: 0.85;
+}
+
+.tally-card-avatar-img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.tally-card-avatar-fallback {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #10b981;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.tally-card-avatar.online .tally-card-avatar-img,
+.tally-card-avatar.online .tally-card-avatar-fallback {
+  box-shadow: 0 0 0 2.5px var(--card-bg, #fff), 0 0 0 4.5px #22c55e;
+}
+
+.tally-card-avatar.online::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  background: #22c55e;
+  border: 2px solid var(--card-bg, #fff);
+  border-radius: 50%;
+}
+
+/* Milestone badge */
+.tally-card-milestone {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  margin-bottom: 4px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  border: 1px solid #10b981;
+  width: fit-content;
+}
+
+.tally-card-milestone-emoji {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.tally-card-milestone-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: #065f46;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Content */
+.tally-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.tally-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tally-card-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary, #111827);
+}
+
+.tally-card-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--primary-color, #4f46e5);
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.tally-card-time {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  margin-left: auto;
+}
+
+.tally-card-body {
+  margin-top: 2px;
+}
+
+.tally-card-action {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+}
+
+/* Stats */
+.tally-card-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.tally-card-dials {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #059669;
+}
+
+.tally-card-dials svg {
+  width: 14px;
+  height: 14px;
+}
+
+.tally-card-duration {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  font-weight: 500;
+}
+
+.tally-card-duration svg {
+  width: 13px;
+  height: 13px;
+}
+
+.tally-card-daily-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6366f1;
+  padding: 1px 8px;
+  border-radius: 12px;
+  background: #eef2ff;
+}
+
+/* Reactions - reuses close-card classes from CloseCard.css */
+.tally-card-reactions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+/* Footer */
+.tally-card-footer {
+  margin-top: 6px;
+}
+
+.tally-card-full-date {
+  font-size: 11px;
+  color: var(--text-secondary, #9ca3af);
+}

@@ -1,0 +1,472 @@
+.ref-dialer {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  font-size: 13px;
+  color: var(--text-primary, #333);
+  margin-bottom: 12px;
+}
+
+/* Main row layout */
+.ref-dialer-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  min-height: 52px;
+}
+
+/* Progress bar */
+.ref-dialer-progress {
+  height: 2px;
+  background: var(--bg-secondary, #e0e0e0);
+}
+
+.ref-dialer-progress-bar {
+  height: 100%;
+  background: #00558c;
+  transition: width 0.3s ease;
+}
+
+/* Device error */
+.ref-dialer-device-error {
+  padding: 4px 16px;
+  background: #fef2f2;
+  color: #dc2626;
+  font-size: 11px;
+  text-align: center;
+}
+
+/* Counter */
+.ref-dialer-counter {
+  font-size: 11px;
+  color: var(--text-secondary, #666);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+/* Contact info inline */
+.ref-dialer-contact-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ref-dialer-contact-name {
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ref-dialer-contact-phone {
+  font-size: 14px;
+  font-weight: 700;
+  color: #00558c;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.ref-dialer-contact-type {
+  display: inline-block;
+  padding: 1px 8px;
+  background: var(--bg-secondary, #f0f0f0);
+  border-radius: 10px;
+  font-size: 10px;
+  color: var(--text-secondary, #666);
+  white-space: nowrap;
+}
+
+.ref-dialer-contact-status {
+  font-size: 11px;
+  color: var(--text-secondary, #666);
+  white-space: nowrap;
+}
+
+/* Caller ID selector */
+.ref-dialer-from-select select {
+  font-size: 12px;
+  padding: 4px 22px 4px 8px;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 6px;
+  background: var(--card-bg, #fff);
+  color: var(--text-primary, #333);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  max-width: 160px;
+}
+
+.ref-dialer-from-select select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ref-dialer-from-select select:hover:not(:disabled) {
+  border-color: #00558c;
+}
+
+/* Auto-dial toggle */
+.ref-dialer-btn.auto-dial {
+  padding: 4px 10px;
+  font-size: 11px;
+  border: 1px solid var(--border-color, #ddd);
+  color: var(--text-secondary, #666);
+  background: var(--card-bg, #fff);
+  border-radius: 14px;
+  gap: 3px;
+}
+
+.ref-dialer-btn.auto-dial:hover:not(:disabled) {
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+
+.ref-dialer-btn.auto-dial.active {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #d97706;
+}
+
+/* Call state indicator */
+.ref-dialer-call-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ref-dialer-call-state-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  animation: ref-dialer-pulse 1.5s infinite;
+}
+
+.ref-dialer-call-state.connecting .ref-dialer-call-state-dot {
+  background: #f59e0b;
+}
+
+.ref-dialer-call-state.ringing .ref-dialer-call-state-dot {
+  background: #3b82f6;
+}
+
+.ref-dialer-call-state.connected .ref-dialer-call-state-dot {
+  background: #22c55e;
+  animation: none;
+}
+
+.ref-dialer-call-state.connecting { color: #f59e0b; }
+.ref-dialer-call-state.ringing { color: #3b82f6; }
+.ref-dialer-call-state.connected { color: #22c55e; }
+
+@keyframes ref-dialer-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* AMD badge */
+.ref-dialer-amd {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.ref-dialer-amd.human {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.ref-dialer-amd.machine {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+/* Buttons */
+.ref-dialer-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 6px;
+  transition: all 0.15s;
+  font-weight: 500;
+}
+
+.ref-dialer-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.ref-dialer-btn.prev,
+.ref-dialer-btn.skip {
+  width: 32px;
+  height: 32px;
+  color: var(--text-secondary, #666);
+  background: var(--bg-secondary, #f0f0f0);
+}
+
+.ref-dialer-btn.prev:hover:not(:disabled),
+.ref-dialer-btn.skip:hover:not(:disabled) {
+  background: #e0e0e0;
+  color: var(--text-primary, #333);
+}
+
+.ref-dialer-btn.dial {
+  height: 36px;
+  padding: 0 16px;
+  background: #27ae60;
+  color: #fff;
+  font-size: 13px;
+  border-radius: 18px;
+  gap: 5px;
+}
+
+.ref-dialer-btn.dial:hover:not(:disabled) {
+  background: #219a52;
+}
+
+.ref-dialer-btn.dial:disabled {
+  background: #999;
+}
+
+/* In-call actions */
+.ref-dialer-in-call-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ref-dialer-btn.mute {
+  width: 32px;
+  height: 32px;
+  background: var(--bg-secondary, #f0f0f0);
+  color: var(--text-primary, #333);
+  border-radius: 16px;
+}
+
+.ref-dialer-btn.mute:hover {
+  background: #e0e0e0;
+}
+
+.ref-dialer-btn.hangup {
+  height: 36px;
+  padding: 0 16px;
+  background: #e74c3c;
+  color: #fff;
+  border-radius: 18px;
+}
+
+.ref-dialer-btn.hangup:hover {
+  background: #c0392b;
+}
+
+/* Divider */
+.ref-dialer-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border-color, #e0e0e0);
+  flex-shrink: 0;
+}
+
+/* Outcome buttons inline */
+.ref-dialer-outcomes {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.ref-dialer-btn.outcome {
+  padding: 5px 10px;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color, #ddd);
+  color: var(--text-primary, #333);
+  background: var(--card-bg, #fff);
+  gap: 3px;
+}
+
+.ref-dialer-btn.outcome:hover {
+  border-color: #00558c;
+}
+
+.ref-dialer-btn.outcome.answered:hover {
+  background: #e8f5e9;
+  border-color: #27ae60;
+  color: #27ae60;
+}
+
+.ref-dialer-btn.outcome.no-answer:hover {
+  background: #fde8e8;
+  border-color: #e74c3c;
+  color: #e74c3c;
+}
+
+.ref-dialer-btn.outcome.scheduled:hover {
+  background: #fff3e0;
+  border-color: #f39c12;
+  color: #e67e22;
+}
+
+/* Summary inline */
+.ref-dialer-summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+}
+
+.ref-dialer-summary-item {
+  color: var(--text-secondary, #666);
+  white-space: nowrap;
+}
+
+.ref-dialer-summary-item.answered {
+  color: #27ae60;
+}
+
+.ref-dialer-summary-item.no-answer {
+  color: #e74c3c;
+}
+
+/* Log toggle button */
+.ref-dialer-log-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  color: var(--text-secondary, #666);
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.ref-dialer-log-btn:hover,
+.ref-dialer-log-btn.active {
+  background: var(--bg-secondary, #f0f0f0);
+  color: var(--text-primary, #333);
+}
+
+.ref-dialer-log-badge {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  background: #00558c;
+  color: #fff;
+  font-size: 8px;
+  min-width: 12px;
+  height: 12px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+/* Close button */
+.ref-dialer-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  color: var(--text-secondary, #666);
+  display: flex;
+  align-items: center;
+}
+
+.ref-dialer-close:hover {
+  background: var(--bg-secondary, #f0f0f0);
+}
+
+/* Call log dropdown */
+.ref-dialer-call-log {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border-color, #e0e0e0);
+}
+
+.ref-dialer-log-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
+}
+
+.ref-dialer-log-entry:last-child {
+  border-bottom: none;
+}
+
+.ref-dialer-log-name {
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ref-dialer-log-phone {
+  color: var(--text-secondary, #666);
+  font-size: 11px;
+}
+
+.ref-dialer-log-outcome {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ref-dialer-log-outcome.answered {
+  background: #e8f5e9;
+  color: #27ae60;
+}
+
+.ref-dialer-log-outcome.no-answer {
+  background: #fde8e8;
+  color: #e74c3c;
+}
+
+.ref-dialer-log-outcome.scheduled {
+  background: #fff3e0;
+  color: #e67e22;
+}
+
+.ref-dialer-log-duration {
+  color: var(--text-secondary, #999);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.ref-dialer-log-time {
+  color: var(--text-secondary, #999);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.ref-dialer-empty {
+  padding: 12px 16px;
+  text-align: center;
+  color: var(--text-secondary, #999);
+  font-size: 12px;
+}

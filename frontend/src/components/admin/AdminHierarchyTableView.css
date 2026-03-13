@@ -1,0 +1,948 @@
+/* Admin Hierarchy Table View Styles */
+
+.admin-hierarchy-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-hierarchy-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+  position: sticky; /* Keep controls visible when scrolling */
+  top: 0;
+  z-index: 1000;
+  background-color: var(--card-bg);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.controls-left-section {
+  display: flex;
+  align-items: center;
+  flex-grow: 1;
+  gap: 10px;
+}
+
+.controls-right-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+  flex: 1 0 auto;
+}
+
+/* Add responsive layout for larger screens */
+@media (min-width: 992px) {
+  .controls-left-section {
+    max-width: 70%; /* Limit left section width on larger screens */
+  }
+  
+  .controls-right-section {
+    flex: 1;
+    justify-content: flex-end; /* Push items to the right */
+  }
+  
+  .view-toggle {
+    flex: 1;
+    justify-content: flex-end;
+  }
+}
+
+.admin-controls-buttons {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.hierarchy-search {
+  flex-grow: 1;
+  margin-right: 8px;
+}
+
+.hierarchy-search-input {
+  width: 100%;
+  padding: 8px 35px 8px 35px;
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: var(--input-bg);
+  color: var(--input-text);
+}
+
+.search-clear-button {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-clear-button:hover {
+  color: var(--hover-color);
+}
+
+/* Table Styles */
+.hierarchy-table-container {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  margin-top: 10px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+/* Highlight search results similarly to card view */
+.hierarchy-table tbody tr.search-match {
+  background-color: rgba(0, 123, 255, 0.08);
+}
+
+.hierarchy-table tbody tr.search-upline {
+  background-color: var(--sidebar-hover);
+  border-left: 3px solid var(--button-primary-bg);
+}
+
+.hierarchy-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+  overflow: visible;
+}
+
+.hierarchy-table th,
+.hierarchy-table td {
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  position: relative;
+}
+
+.hierarchy-table th {
+  background-color: var(--bg-secondary);
+  font-weight: 500;
+  color: var(--text-primary);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.hierarchy-table tbody tr:hover {
+  background-color: var(--sidebar-hover);
+}
+
+.hierarchy-table tr.inactive {
+  opacity: 0.7;
+}
+
+.hierarchy-table tr.search-match {
+  background-color: rgba(0, 123, 255, 0.05);
+}
+
+.hierarchy-table tr.search-match:hover {
+  background-color: rgba(0, 123, 255, 0.1);
+}
+
+.hierarchy-table tr.search-upline {
+  background-color: var(--bg-secondary);
+}
+
+.hierarchy-table tr.search-upline:hover {
+  background-color: var(--sidebar-hover);
+}
+
+.hierarchy-table tr.hierarchy-card-current {
+  background-color: rgba(0, 123, 255, 0.03);
+  border-left: 3px solid var(--hover-color);
+}
+
+.hierarchy-table tr.hierarchy-card-current:hover {
+  background-color: rgba(0, 123, 255, 0.07);
+}
+
+/* Hierarchy depth styling - add left border to show parent relationship */
+.hierarchy-table tr.hierarchy-depth-0 {
+  font-weight: 500;
+  background-color: var(--card-bg);
+}
+
+.hierarchy-table tr.hierarchy-depth-1,
+.hierarchy-table tr.hierarchy-depth-2,
+.hierarchy-table tr.hierarchy-depth-3,
+.hierarchy-table tr.hierarchy-depth-4,
+.hierarchy-table tr.hierarchy-depth-5 {
+  border-left: 3px solid var(--border-color);
+  background-color: rgba(0, 0, 0, 0.015);
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .hierarchy-table tr.hierarchy-depth-1,
+  .hierarchy-table tr.hierarchy-depth-2,
+  .hierarchy-table tr.hierarchy-depth-3,
+  .hierarchy-table tr.hierarchy-depth-4,
+  .hierarchy-table tr.hierarchy-depth-5 {
+    background-color: rgba(255, 255, 255, 0.02);
+    border-left-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Border colors based on parent role - match the role badge colors */
+.hierarchy-table tr.parent-role-rga {
+  border-left-color: #00558c !important;
+  border-left-width: 3px;
+}
+
+.hierarchy-table tr.parent-role-mga {
+  border-left-color: rgb(104, 182, 117) !important;
+  border-left-width: 3px;
+}
+
+.hierarchy-table tr.parent-role-ga {
+  border-left-color: rgb(237, 114, 47) !important;
+  border-left-width: 3px;
+}
+
+.hierarchy-table tr.parent-role-sa {
+  border-left-color: rgb(178, 82, 113) !important;
+  border-left-width: 3px;
+}
+
+/* Strengthen the top-level row appearance */
+.hierarchy-table tr.hierarchy-role-rga.hierarchy-depth-0,
+.hierarchy-table tr.hierarchy-role-mga.hierarchy-depth-0 {
+  border-bottom: 2px solid var(--border-color);
+  font-weight: 600;
+}
+
+/* Hover states preserve hierarchy colors */
+.hierarchy-table tr.hierarchy-depth-1:hover,
+.hierarchy-table tr.hierarchy-depth-2:hover,
+.hierarchy-table tr.hierarchy-depth-3:hover,
+.hierarchy-table tr.hierarchy-depth-4:hover,
+.hierarchy-table tr.hierarchy-depth-5:hover {
+  background-color: var(--sidebar-hover);
+}
+
+/* Inline status badges with +X more indicator */
+.status-badges-inline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+  overflow: visible !important;
+  position: relative;
+}
+
+.status-badges-inline .status-badge {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.status-badge-more-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.status-badge-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  cursor: help;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.status-badge-more:hover {
+  background-color: var(--sidebar-hover);
+  color: var(--text-primary);
+  border-color: var(--hover-color);
+  transform: scale(1.05);
+}
+
+/* Tooltip for hidden badges */
+.status-badge-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px;
+  background-color: var(--card-bg);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 10000;
+  min-width: 140px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Dark mode enhanced shadow */
+@media (prefers-color-scheme: dark) {
+  .status-badge-tooltip {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  }
+}
+
+.status-badge-tooltip::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid var(--border-color);
+  z-index: 1;
+}
+
+.status-badge-tooltip::after {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 7px solid var(--card-bg);
+  z-index: 2;
+}
+
+.status-badge-more-wrapper:hover .status-badge-tooltip,
+.status-badge-more:hover + .status-badge-tooltip {
+  display: flex !important;
+  animation: fadeIn 0.2s ease;
+}
+
+.status-badge-tooltip .status-badge {
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+/* Ensure table cells don't clip the tooltip */
+.hierarchy-table tbody,
+.hierarchy-table tr,
+.hierarchy-table td {
+  overflow: visible !important;
+  position: relative;
+}
+
+/* Specific override for status column */
+.hierarchy-table td:has(.status-badges-inline) {
+  overflow: visible !important;
+  z-index: 1;
+}
+
+/* Grey out inactive or hidden MGAs/RGAs (from MGAs table) */
+.hierarchy-table tr.mga-inactive-hidden {
+  opacity: 0.5;
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+.hierarchy-table tr.mga-inactive-hidden:hover {
+  opacity: 0.65;
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .hierarchy-table tr.mga-inactive-hidden {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+  }
+  
+  .hierarchy-table tr.mga-inactive-hidden:hover {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+  }
+}
+
+.hierarchy-table .user-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+}
+
+.hierarchy-table .user-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: var(--sidebar-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--text-primary);
+}
+
+.hierarchy-table .profile-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.hierarchy-table .user-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.hierarchy-table .name-with-icon {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.hierarchy-table .you-badge {
+  font-size: 9px;
+  font-weight: bold;
+  color: white;
+  background-color: var(--hover-color);
+  padding: 1px 4px;
+  border-radius: 8px;
+}
+
+.hierarchy-table .role-badge {
+  display: inline-block;
+  padding: 3px 6px;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-align: center;
+  color: white;
+  white-space: nowrap;
+}
+
+/* Role colors */
+.hierarchy-table .role-RGA {
+  background-color: #00558c;
+  border: 1px solid #004372;
+}
+
+.hierarchy-table .role-MGA {
+  background-color: rgb(104, 182, 117);
+  border: 1px solid rgb(84, 152, 97);
+}
+
+.hierarchy-table .role-GA {
+  background-color: rgb(237, 114, 47);
+  border: 1px solid rgb(197, 94, 37);
+}
+
+.hierarchy-table .role-SA {
+  background-color: rgb(178, 82, 113);
+  border: 1px solid rgb(138, 62, 93);
+}
+
+.hierarchy-table .role-AGT {
+  background-color: lightgrey;
+  border: 1px solid grey;
+}
+
+/* status badge styles moved to App.css */
+
+.hierarchy-table .license-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.hierarchy-table .license-state-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  background-color: var(--sidebar-hover);
+  color: var(--text-primary);
+}
+
+/* Make status badges compact like license-state-badge */
+.hierarchy-table .table-status-badges,
+.hierarchy-table .table-status-badges .status-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.hierarchy-table .table-status-badges .status-badge {
+  display: inline-block !important;
+  font-size: 0.7rem !important;
+  padding: 1px 4px !important;
+  border-radius: 3px !important;
+  line-height: 1.2;
+  white-space: nowrap;
+  margin: 0 !important;
+}
+
+.hierarchy-table .license-state-badge.resident {
+  background-color: #d1ecf1;
+  color: #0c5460;
+  font-weight: 500;
+}
+
+/* Table-specific license badges for MGA view to avoid vertical gaps */
+.hierarchy-table .table-license-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+}
+
+.hierarchy-table .table-license-state-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  background-color: var(--sidebar-hover);
+  color: var(--text-primary);
+  line-height: 1.2;
+  margin: 0;
+}
+
+.hierarchy-table .table-license-state-badge.resident {
+  background-color: #d1ecf1;
+  color: #0c5460;
+  font-weight: 500;
+}
+
+.hierarchy-table .node-toggle {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+}
+
+.hierarchy-table .node-toggle:hover {
+  color: var(--hover-color);
+}
+
+.hierarchy-table .toggle-cell {
+  width: 30px;
+  text-align: center;
+}
+
+.hierarchy-table .indented {
+  position: relative;
+}
+
+.hierarchy-table .indented::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  margin-left: -10px;
+  width: 1px;
+  background-color: var(--border-color);
+  opacity: 0.5;
+}
+
+.hierarchy-table .indented-content {
+  display: flex;
+  align-items: center;
+  transition: margin-left 0.3s ease;
+}
+
+.rga-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--text-primary);
+  transition: background-color 0.2s;
+}
+
+.rga-section-header:hover {
+  background-color: var(--sidebar-hover);
+}
+
+.rga-section-header:first-child {
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+}
+
+.active-state-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  background-color: var(--bg-secondary);
+  border-radius: 4px;
+  color: var(--text-primary);
+}
+
+.active-state-filter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background-color: var(--sidebar-hover);
+  border-radius: 16px;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.remove-state-filter {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  padding: 0;
+}
+
+.remove-state-filter:hover {
+  color: var(--hover-color);
+}
+
+.clear-state-filters {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--button-primary-bg);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.clear-state-filters:hover {
+  color: var(--hover-color);
+}
+
+.search-results-status {
+  margin-bottom: 16px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Add style for search tip */
+.search-tip {
+  font-size: 0.9em;
+  font-style: italic;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+/* Responsive styles */
+@media (max-width: 992px) {
+  .hierarchy-table {
+    font-size: 0.85rem;
+  }
+  
+  .admin-hierarchy-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .admin-controls-buttons {
+    justify-content: space-between;
+  }
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+.hierarchy-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px;
+  color: var(--text-secondary);
+}
+
+.admin-hierarchy-empty {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.processing-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Table column widths */
+.hierarchy-table th.status-column,
+.hierarchy-table td.status-column {
+  min-width: 140px;
+  max-width: 180px;
+}
+
+.hierarchy-table th.license-column,
+.hierarchy-table td.license-column {
+  min-width: 120px;
+  max-width: 200px;
+}
+
+.hierarchy-table td {
+  vertical-align: middle;
+  word-break: break-word;
+}
+
+/* Hover tooltips for badges when they might be cut off */
+/* status badge tooltip styles moved to App.css */
+
+/* Add dynamic tooltips */
+@media (max-width: 768px) {
+  .dynamic-tooltip {
+    display: none !important;
+  }
+}
+
+.dynamic-tooltip {
+  position: fixed;
+  z-index: 10000;
+  background-color: var(--text-primary);
+  color: var(--card-bg);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  max-width: 250px;
+  pointer-events: none;
+}
+
+/* Checkbox column */
+.hierarchy-table th.checkbox-column,
+.hierarchy-table td.checkbox-column {
+  width: 30px;
+  padding: 0 5px;
+  text-align: center;
+}
+
+.hierarchy-table td.checkbox-column input[type="checkbox"],
+.hierarchy-table th.checkbox-column input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+
+/* Bulk Action Panel */
+.bulk-action-panel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 10px 16px;
+  margin: 0 0 15px 0;
+  box-shadow: 0 2px 4px var(--shadow-color);
+  transition: all 0.3s ease;
+  z-index: 10;
+  box-sizing: border-box;
+  width: 100%; /* Ensure full width at all times */
+}
+
+/* Sticky bulk action panel - default behavior */
+.bulk-action-panel.sticky {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: auto; /* Don't stretch to right edge */
+  z-index: 1000;
+  border-radius: 0;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  box-shadow: 0 2px 5px var(--shadow-color);
+  animation: fadeIn 0.3s ease-in-out;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  transform: translateY(0);
+  border-radius: 4px;
+
+  /* Removed width calculations to use JS-controlled width */
+  box-sizing: border-box !important; /* Ensure box sizing is consistent */
+}
+
+/* Special handling for settings-content container */
+.settings-content .bulk-action-panel.sticky {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: auto;
+  z-index: 999;
+  /* Width is now controlled by JavaScript */
+}
+
+/* For when any container has the sticky panel */
+.has-sticky-panel {
+  padding-top: 60px !important;
+  transition: padding-top 0.3s ease;
+}
+
+/* Container-specific adjustments */
+.settings-content.has-sticky-panel {
+  padding-top: 0 !important;
+}
+
+/* Placeholder to prevent content jump when panel becomes fixed */
+.bulk-action-placeholder {
+  height: 0;
+  opacity: 0;
+  transition: height 0.3s ease, opacity 0.3s ease, margin-bottom 0.3s ease;
+  margin-bottom: 0;
+}
+
+.bulk-action-placeholder.visible {
+  opacity: 1;
+  margin-bottom: 15px;
+}
+
+/* Ensure the panel doesn't cover navbar on mobile */
+@media (max-width: 768px) {
+  .bulk-action-panel.sticky {
+    padding: 8px;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .bulk-action-placeholder.visible {
+    height: 80px !important;
+  }
+  
+  .has-sticky-panel {
+    padding-top: 100px !important;
+  }
+}
+
+.selected-count {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.bulk-action-button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 3px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: var(--sidebar-hover);
+  color: var(--text-primary);
+}
+
+.bulk-action-button:hover {
+  background-color: var(--border-color);
+}
+
+.bulk-action-button svg {
+  font-size: 14px;
+}
+
+/* Different colors for different actions */
+.bulk-action-button:nth-child(1) {
+  background-color: var(--button-primary-bg);
+  color: white;
+}
+
+.bulk-action-button:nth-child(1):hover {
+  background-color: var(--hover-color);
+}
+
+.bulk-action-button:nth-child(2) {
+  background-color: #28a745;
+  color: white;
+}
+
+.bulk-action-button:nth-child(2):hover {
+  background-color: #218838;
+}
+
+.bulk-action-button:nth-child(3) {
+  background-color: #dc3545;
+  color: white;
+}
+
+.bulk-action-button:nth-child(3):hover {
+  background-color: #c82333;
+}
+
+.bulk-action-button:nth-child(5) {
+  background-color: var(--button-secondary-bg);
+  color: white;
+}
+
+.bulk-action-button:nth-child(5):hover {
+  background-color: var(--button-secondary-bg);
+  opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+  .bulk-action-panel {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+  
+  .bulk-actions {
+    justify-content: space-between;
+  }
+}
+
+/* View toggle styles are defined in AdminHierarchySettings.css */
+
+.admin-rga-role {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+}
+
+

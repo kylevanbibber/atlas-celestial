@@ -1,0 +1,475 @@
+/* Activity Snapshot Summary Styles */
+
+.activity-snapshot-summary {
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+.activity-snapshot-summary.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  gap: 1rem;
+  color: var(--text-secondary, #6c757d);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color, #e0e0e0);
+  border-top-color: var(--button-primary-bg, #00558c);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Summary Cards Grid - uses Card component from ui/card.jsx */
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.summary-cards:last-child {
+  margin-bottom: 0;
+}
+
+/* Bottom row with Agent Metrics - 5 column grid */
+.summary-cards-bottom {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.summary-cards-bottom:last-child {
+  margin-bottom: 0;
+}
+
+/* Agent Metrics takes 2/5 of width */
+.agent-metrics-card {
+  grid-column: span 2;
+}
+
+/* Responsive: stack on smaller screens */
+@media (max-width: 1200px) {
+  .summary-cards-bottom {
+    grid-template-columns: 1fr;
+  }
+  
+  .agent-metrics-card {
+    grid-column: span 1;
+  }
+}
+
+/* Reporting Card */
+.reporting-stat {
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--text-primary, #333);
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6c757d);
+}
+
+.reporting-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--border-color, #e9ecef);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 0.5rem 0;
+}
+
+.reporting-progress {
+  height: 100%;
+  background: linear-gradient(90deg, #27ae60, #2ecc71);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.reporting-percentage {
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary, #6c757d);
+}
+
+/* Time Card */
+.time-stat {
+  text-align: center;
+}
+
+/* Totals Card */
+.totals-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.total-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.total-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--primary, #00558c);
+  margin-bottom: 0.25rem;
+}
+
+.total-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary, hsl(var(--muted-foreground)));
+  font-weight: 600;
+}
+
+.total-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary, hsl(var(--foreground)));
+}
+
+/* Quick Actions Buttons - reuse existing button styles */
+.action-button {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.action-button:first-child {
+  margin-top: 0;
+}
+
+/* ============================================
+   Activity Pipeline / Funnel
+   ============================================ */
+
+.pipeline-funnel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  padding: 0.75rem 0.5rem;
+  background: var(--accent, rgba(0, 85, 140, 0.04));
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e0e0e0);
+}
+
+.pipeline-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.pipeline-stage-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--primary, #00558c);
+  flex-shrink: 0;
+}
+
+.pipeline-stage-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--foreground, #333);
+  line-height: 1.1;
+}
+
+.pipeline-stage-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  color: var(--muted-foreground, #888);
+}
+
+.pipeline-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  flex-shrink: 0;
+  cursor: help;
+}
+
+.pipeline-arrow-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--muted-foreground, #aaa);
+}
+
+.pipeline-arrow-rate {
+  font-size: 0.65rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ============================================
+   Pipeline Insight Cards
+   ============================================ */
+
+.pipeline-insights {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pipeline-insight-item {
+  flex: 1 1 0;
+  min-width: 70px;
+  padding: 0.5rem;
+  background: var(--accent, rgba(0, 85, 140, 0.04));
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #e0e0e0);
+  text-align: center;
+  cursor: help;
+}
+
+.pipeline-insight-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 600;
+  color: var(--muted-foreground, #888);
+  margin-bottom: 0.25rem;
+}
+
+.pipeline-insight-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--foreground, #333);
+}
+
+/* ============================================
+   Pipeline Coaching Context Menu (reuses .context-menu from ContextMenu.css)
+   Appears below the insight card on hover.
+   ============================================ */
+
+.pipeline-insight-item {
+  position: relative;
+}
+
+.pipeline-context-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  min-width: 220px;
+  max-width: 280px;
+  pointer-events: none;
+}
+
+/* Arrow pointing up */
+.pipeline-context-menu::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 7px solid transparent;
+  border-bottom-color: var(--border-color, #e0e0e0);
+}
+
+.pipeline-context-menu::after {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-bottom-color: var(--card-bg, #fff);
+}
+
+.pipeline-insight-item:hover .pipeline-context-menu {
+  display: block;
+}
+
+/* Inner content padding (the .context-menu class handles bg/border/shadow) */
+.pipeline-context-menu .context-menu {
+  position: static;
+  min-width: unset;
+  padding: 0.5rem 0;
+}
+
+.pipeline-context-menu .menu-item.pipeline-tip-title {
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--destructive, #ef4444);
+  cursor: default;
+  padding: 6px 15px;
+}
+
+.pipeline-context-menu .menu-item.pipeline-tip-title:hover {
+  background-color: transparent;
+}
+
+.pipeline-context-menu .menu-item.pipeline-tip-item {
+  font-size: 0.75rem;
+  cursor: default;
+  padding: 6px 15px;
+  line-height: 1.4;
+}
+
+.pipeline-context-menu .menu-item.pipeline-tip-item .menu-icon {
+  color: var(--destructive, #ef4444);
+  font-size: 10px;
+  min-width: 14px;
+}
+
+.pipeline-context-menu .menu-item.pipeline-alp-item {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--success, #10b981);
+  cursor: default;
+  border-top: 1px solid var(--border-color, #e0e0e0);
+  padding: 8px 15px 6px;
+}
+
+.pipeline-context-menu .menu-item.pipeline-alp-item:hover {
+  background-color: transparent;
+}
+
+/* ============================================
+   Pipeline Bottom Summary
+   ============================================ */
+
+.pipeline-summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--border-color, #e0e0e0);
+  margin-top: auto;
+}
+
+.pipeline-summary-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--muted-foreground, #888);
+  font-size: 0.8rem;
+}
+
+.pipeline-summary-label {
+  font-weight: 600;
+}
+
+.pipeline-summary-value {
+  font-weight: 700;
+  color: var(--foreground, #333);
+  font-size: 0.9rem;
+}
+
+.pipeline-summary-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-color, #e0e0e0);
+}
+
+/* Pipeline responsive */
+@media (max-width: 480px) {
+  .pipeline-funnel {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .pipeline-stage-value {
+    font-size: 1rem;
+  }
+
+  .pipeline-insights {
+    flex-direction: column;
+  }
+
+  .pipeline-insight-item {
+    min-width: unset;
+  }
+
+  .pipeline-summary {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .pipeline-summary-divider {
+    width: 60%;
+    height: 1px;
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .summary-cards {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+  
+  .totals-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .activity-snapshot-summary {
+    margin-bottom: 1.5rem;
+  }
+
+  .summary-cards {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .summary-card {
+    padding: 1rem;
+  }
+
+  .stat-value {
+    font-size: 2rem;
+  }
+
+  .total-value {
+    font-size: 1.25rem;
+  }
+
+  .totals-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+  }
+
+  .total-label {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .totals-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

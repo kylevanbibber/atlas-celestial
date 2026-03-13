@@ -1,0 +1,220 @@
+/* iOS-specific alert styling */
+.alert {
+  padding: 15px;
+  border-radius: 8px;
+  border-left: 4px solid;
+  background-color: #f8f9fa;
+  margin-bottom: 20px;
+}
+
+.alert-info {
+  border-left-color: #17a2b8;
+  background-color: #e8f4f8;
+}
+
+.alert-warning {
+  border-left-color: #ffc107;
+  background-color: #fff8e1;
+}
+
+.alert-error {
+  border-left-color: #dc3545;
+  background-color: #fdf2f2;
+}
+
+.alert-success {
+  border-left-color: #28a745;
+  background-color: #f0fdf4;
+}
+
+.alert-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.alert-icon {
+  font-size: 1.2em;
+  flex-shrink: 0;
+}
+
+/* Notification status styling */
+.notification-status {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+  margin-bottom: 15px;
+}
+
+.status-label {
+  font-weight: 600;
+  color: #495057;
+}
+
+.status-value {
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.status-value.enabled {
+  color: #155724;
+  background-color: #d4edda;
+}
+
+.status-value.disabled {
+  color: #721c24;
+  background-color: #f8d7da;
+}
+
+.permission-status {
+  font-style: italic;
+  color: #6c757d !important;
+}
+
+/* Setting sections */
+.setting-section {
+  margin-bottom: 30px;
+  padding: 20px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.setting-section h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #343a40;
+  font-size: 1.2em;
+}
+
+.setting-section p {
+  margin-bottom: 20px;
+  color: #6c757d;
+  font-size: 0.95em;
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 0;
+  border-bottom: 1px solid #f1f3f4;
+}
+
+.setting-item:last-child {
+  border-bottom: none;
+}
+
+.setting-info {
+  flex: 1;
+}
+
+.setting-info label {
+  display: block;
+  font-weight: 600;
+  color: #343a40;
+  margin-bottom: 4px;
+}
+
+.setting-info span {
+  font-size: 0.9em;
+  color: #6c757d;
+}
+
+.setting-control {
+  margin-left: 20px;
+}
+
+/* Button styling improvements */
+.toggle-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 80px;
+}
+
+.toggle-btn.enabled {
+  background-color: #dc3545;
+  color: white;
+}
+
+.toggle-btn.enabled:hover {
+  background-color: #c82333;
+}
+
+.toggle-btn.disabled {
+  background-color: #28a745;
+  color: white;
+}
+
+.toggle-btn.disabled:hover {
+  background-color: #218838;
+}
+
+.toggle-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.test-btn {
+  padding: 8px 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.test-btn:hover {
+  background-color: #0056b3;
+}
+
+.not-supported {
+  color: #6c757d;
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .setting-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  
+  .setting-control {
+    margin-left: 0;
+    text-align: center;
+  }
+  
+  .toggle-btn,
+  .test-btn {
+    width: 100%;
+    padding: 12px;
+  }
+  
+  .alert {
+    padding: 12px;
+  }
+  
+  .notification-status {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .permission-status {
+    margin-left: 0 !important;
+  }
+} 

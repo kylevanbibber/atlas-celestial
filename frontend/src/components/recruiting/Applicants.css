@@ -1,0 +1,201 @@
+/* Applicants Component Styles */
+
+.affiliate-link-section {
+  text-align: center;
+  padding: 20px;
+  background: var(--card-bg);
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border-color);
+}
+
+.affiliate-link-section a {
+  color: var(--hover-color);
+  text-decoration: none;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.affiliate-link-section a:hover {
+  text-decoration: underline;
+}
+
+/* Tab Content */
+.tab-content {
+  margin-top: 20px;
+}
+
+.tab-content h3 {
+  margin-bottom: 15px;
+  color: var(--text-primary);
+  font-size: 1.2rem;
+}
+
+/* Table Container */
+.table-container {
+  overflow-x: auto;
+  margin-bottom: 20px;
+}
+
+/* Clickable Table Rows */
+.clickable-row {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.clickable-row:hover {
+  background-color: var(--hover-bg, rgba(0, 123, 255, 0.1));
+}
+
+.clickable-row:hover td {
+  background-color: transparent;
+}
+
+/* Action Buttons in Table */
+.action-buttons {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.action-buttons button {
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+/* Action Icon (Three Dots) */
+.action-icon {
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  font-size: 1rem;
+}
+
+.action-icon:hover {
+  background-color: var(--hover-bg, rgba(0, 123, 255, 0.1));
+  color: var(--text-primary);
+}
+
+/* Context Menu Action Styles */
+.context-menu .menu-item.primary-action {
+  font-weight: 500;
+  color: var(--primary-color);
+}
+
+.context-menu .menu-item.secondary-action {
+  color: var(--text-secondary);
+}
+
+.context-menu .menu-item.primary-action:hover {
+  background-color: var(--primary-color-light, rgba(0, 123, 255, 0.1));
+  color: var(--primary-color);
+}
+
+.context-menu .menu-item.secondary-action:hover {
+  background-color: var(--hover-bg, rgba(0, 0, 0, 0.05));
+}
+
+/* Move Action Style */
+.context-menu .menu-item.move-action {
+  color: var(--warning-color, #f39c12);
+  border-top: 1px solid var(--border-color);
+  margin-top: 5px;
+  padding-top: 15px;
+}
+
+.context-menu .menu-item.move-action:hover {
+  background-color: var(--warning-light, rgba(243, 156, 18, 0.1));
+  color: var(--warning-color, #f39c12);
+}
+
+/* Responsive table adjustments */
+@media (max-width: 768px) {
+  .action-buttons {
+    flex-direction: column;
+    gap: 3px;
+  }
+  
+  .action-buttons button {
+    font-size: 0.7rem;
+    padding: 3px 6px;
+  }
+  
+  .settings-tabs {
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  
+  .settings-tab {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+  
+  .affiliate-link-section {
+    padding: 15px;
+  }
+  
+  .affiliate-link-section p {
+    font-size: 12px !important;
+  }
+}
+
+/* Override table styles for better mobile display */
+@media (max-width: 480px) {
+  .table {
+    font-size: 0.7rem;
+  }
+  
+  .table th,
+  .table td {
+    padding: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 80px;
+  }
+  
+  .action-buttons button {
+    font-size: 0.65rem;
+    padding: 2px 4px;
+  }
+}
+
+/* Loading and error states */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: var(--text-secondary);
+}
+
+/* Table overflow for wide content */
+.table-container {
+  background: var(--card-bg);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  padding: 10px;
+}
+
+/* Ensure proper spacing */
+.padded-content .primary-button,
+.padded-content .secondary-button {
+  margin: 0 5px;
+}
+
+/* Details in modals */
+.modal-content p {
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.modal-content strong {
+  color: var(--text-primary);
+  margin-right: 8px;
+} 

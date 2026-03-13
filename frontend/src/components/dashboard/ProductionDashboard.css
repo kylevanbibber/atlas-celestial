@@ -1,0 +1,73 @@
+/* ============================================
+   Production Dashboard — Static Grid Layout
+   ============================================ */
+
+/* Top row: 3 widgets for team view, 2 for personal */
+.prod-grid-top {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.prod-grid-top--team {
+  grid-template-columns: 1fr 2fr 1fr;
+}
+
+.prod-grid-top--personal {
+  grid-template-columns: 2fr 1fr;
+}
+
+/* Trend row: 2 equal charts side by side */
+.prod-grid-trends {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  max-height: 320px;
+}
+
+/* Bottom row: full-width */
+.prod-grid-bottom {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+/* Widgets fill their grid cell */
+.prod-widget {
+  min-width: 0; /* prevent grid blowout */
+}
+
+.prod-widget > * {
+  height: 100%;
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+
+@media (max-width: 1024px) {
+  .prod-grid-top--team {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Quick actions moves to its own row on medium screens */
+  .prod-grid-top--team .prod-widget:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 768px) {
+  .prod-grid-top--team,
+  .prod-grid-top--personal {
+    grid-template-columns: 1fr;
+  }
+
+  .prod-grid-top--team .prod-widget:nth-child(3) {
+    grid-column: auto;
+  }
+
+  .prod-grid-trends {
+    grid-template-columns: 1fr;
+  }
+}

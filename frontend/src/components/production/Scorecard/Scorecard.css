@@ -1,0 +1,209 @@
+/* Chart.js Animation Styles */
+.atlas-scorecard-graph-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.atlas-scorecard-graph-container:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.atlas-scorecard-graph-container canvas {
+  border-radius: 8px;
+}
+
+/* Chart loading animation */
+.atlas-scorecard-graph-container::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Record star point glow effect */
+.atlas-scorecard-graph-container canvas {
+  filter: drop-shadow(0 0 3px rgba(255, 215, 0, 0.3));
+}
+
+/* Optional: Add a subtle golden glow animation for record points */
+@keyframes recordGlow {
+  0%, 100% { 
+    filter: drop-shadow(0 0 3px rgba(255, 215, 0, 0.3));
+  }
+  50% { 
+    filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.6));
+  }
+}
+
+/* Star emoji styling */
+.atlas-scorecard-graph-container canvas {
+  animation: recordGlow 3s ease-in-out infinite;
+}
+
+.scorecard-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-family: Arial, sans-serif;
+    box-shadow: none;
+    border-collapse: separate; /* Removes space between borders */
+    border-spacing: 2px;
+  }
+  
+  .scorecard-table th, .scorecard-table td {
+    border: 1px solid #7a7a7a;
+    padding: 4px;
+    text-align: left;
+  }
+  
+  .scorecard-table th {
+    background-color: #00558c;
+    color: white;
+    font-weight: bold;
+    font-size: 10px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-align: center;
+    position: sticky;
+    z-index: 2;
+    text-align: center;
+    border: 1px solid transparent;
+  }
+  
+  .scorecard-table .second-column {
+    left: 50px; /* Adjust based on the width of the first column */
+    z-index: 2; /* Ensure the second sticky column is on top of the first */
+  }
+  
+  .scorecard-table .day-header {
+    position: sticky;
+    top: 0; /* Adjust based on your requirements */
+    z-index: 3; /* Ensure the day header is on top */
+  }
+  
+  .scorecard-table .first-row {
+    top: 0; /* Adjust based on your requirements */
+    z-index: 4; /* Ensure the first row is on top */
+  }
+  
+  .scorecard-table .second-row {
+    top: 20px; /* Adjust based on the height of the first row */
+    z-index: 5; /* Ensure the second row is on top of the first row */
+  }
+  
+  .scorecard-table td {
+    border: 2px solid #d1d5db;
+    padding: 3px;
+    border-radius: 0.375rem;
+    text-align: center;
+    background-color: #fff;
+    font-size: 10px;
+  }
+  
+  .scorecard-table input {
+    width: 100%;
+    border: none;
+    background-color: transparent;
+    text-align: center;
+  }
+  
+  .scorecard-table .totals-row td {
+    background-color: #f0f0f0; /* Light gray background for contrast */
+    font-weight: bold; /* Make the text bold */
+    text-align: center; /* Center the text */
+    color: #333; /* Darker font color */
+  }
+  
+  .scorecard-table .first-column {
+    position: sticky;
+    left: 0;
+    background-color: #C3D4D2;
+    color: white;
+    font-weight: bold;
+    border-radius: 0;
+    border: none;
+    z-index: 1; /* Ensure the sticky columns are on top */
+    white-space: nowrap;
+  }
+  
+  .scorecard-table button {
+    background-color: white;
+    border: none;
+    cursor: pointer;
+    margin-left: 2px;
+    border-radius: 4px;
+  }
+  
+  .scorecard-table .quarter-column {
+    background-color: #b5d0ea;
+    font-weight: bold;
+  }
+  
+  .scorecard-table .year-total-column {
+    background-color: #f4eb8c;
+  }
+  
+  .scorecard-table .growth-row td {
+    background-color: #e9f5d6;
+    font-weight: bold;
+    text-align: center;
+  }
+  .growth-positive {
+    color: green;
+    font-weight: bold;
+  }
+  
+  .growth-negative {
+    color: red;
+    font-weight: bold;
+  }
+  @media (max-width: 768px) {
+    .scorecard-table td, .scorecard-table th {
+      font-size: 10px;
+    }
+    .scorecard-table .first-column {
+      font-size: 10px;
+    }
+  }
+  
+  .tooltip {
+    position: absolute;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 8px;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+  }
+.scorecard-table td.has-data {
+  cursor: pointer;
+}
+
+.scorecard-table td.has-data:hover {
+  background-color: #e8f4fd !important;
+  transition: background-color 0.2s ease;
+}
+
+.atlas-scorecard-custom-table td.has-data {
+  cursor: pointer;
+}
+
+.atlas-scorecard-custom-table td.has-data:hover {
+  background-color: #e8f4fd !important;
+  transition: background-color 0.2s ease;
+}
+  

@@ -1,0 +1,60 @@
+/* Daily Activity Snapshot Styles */
+
+.daily-activity-snapshot {
+  width: 100%;
+  padding: 1rem 0;
+}
+
+.snapshot-header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--border-color, #e0e0e0);
+}
+
+.snapshot-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+}
+
+.snapshot-subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6c757d);
+}
+
+.loading-message {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-secondary, #6c757d);
+  font-size: 1rem;
+}
+
+.daily-activity-snapshot.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  color: var(--text-secondary, #6c757d);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .daily-activity-snapshot {
+    padding: 0.5rem 0;
+  }
+
+  .snapshot-header {
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .snapshot-title {
+    font-size: 1.25rem;
+  }
+
+  .snapshot-subtitle {
+    font-size: 0.75rem;
+  }
+}

@@ -1,0 +1,1226 @@
+[
+  {
+    "state": "AL",
+    "item": "Background Check",
+    "instructions": "Alabama requires fingerprinting for all resident producer applicants. Fingerprints must be electronically processed through Fieldprint.\n\nSchedule your appointment at: https://fieldprintalabama.com/individuals\n\nImportant: Get fingerprinted AFTER passing the state exam and one day BEFORE applying for your license. Fingerprint results only remain in the state system for 30 days.\n\nFee: $48.25\nVendor: Fieldprint",
+    "override_description": "Fingerprinting required via Fieldprint ($48.25)",
+    "override_required": 1,
+    "url": "https://fieldprintalabama.com/individuals"
+  },
+  {
+    "state": "AL",
+    "item": "Pre-Licensing",
+    "instructions": "Alabama requires 20 hours of pre-licensing education for Life insurance.\n\nYou must complete a state-approved pre-licensing course and pass the course final exam with 70% or higher to receive a certificate of completion before scheduling the state licensing exam.\n\nPopular providers include ExamFX, Kaplan, and AD Banker.",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://aldoi.gov/licensing/ExamOutlines.aspx"
+  },
+  {
+    "state": "AL",
+    "item": "Schedule Test",
+    "instructions": "Alabama insurance exams are administered by the University of Alabama in partnership with the Alabama Department of Insurance (ALDOI).\n\nSchedule your exam at: https://training.ua.edu/insurance-testing/\n\nVisit the ALDOI exam sites page and click on your preferred city to be directed to the University of Alabama registration page.\n\nExam info: https://aldoi.gov/licensing/examsites.aspx",
+    "override_description": "Schedule exam via University of Alabama testing",
+    "override_required": 1,
+    "url": "https://training.ua.edu/insurance-testing/"
+  },
+  {
+    "state": "AK",
+    "item": "Background Check",
+    "instructions": "Alaska requires fingerprinting for all first-time resident insurance exam candidates.\n\nSchedule fingerprinting through IdentoGO after scheduling your exam appointment with Pearson VUE.\n\nVendor: IdentoGO\nPhone: (866) 761-8069\nURL: https://www.identogo.com\n\nFee: ~$63.25 total ($15 IdentoGO + $48.25 Alaska Division of Insurance/FBI processing)\n\nYou may schedule fingerprinting at the same Pearson VUE exam center on the day of your exam.",
+    "override_description": "Fingerprinting required via IdentoGO (~$63.25)",
+    "override_required": 1,
+    "url": "https://www.identogo.com"
+  },
+  {
+    "state": "AK",
+    "item": "Pre-Licensing",
+    "instructions": "Alaska requires 20 hours of pre-licensing education for Life insurance.\n\nComplete a state-approved course and pass the course final exam before scheduling the state licensing exam.\n\nPopular providers include ExamFX, Kaplan, and AD Banker.",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://www.commerce.alaska.gov/web/ins/"
+  },
+  {
+    "state": "AK",
+    "item": "Schedule Test",
+    "instructions": "Alaska insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com\nPhone: (800) 274-5993\n\nRegister at least 24 hours in advance of your desired exam date. Exams are available at Pearson VUE test centers.",
+    "override_description": "Schedule exam via Pearson VUE",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com"
+  },
+  {
+    "state": "AZ",
+    "item": "Background Check",
+    "instructions": "Arizona requires fingerprinting for all first-time resident insurance exam candidates.\n\nDo NOT schedule fingerprints until AFTER passing your licensing exam. All fees are non-refundable.\n\nStep 1: Create an account with AZ Dept of Public Safety (AZDPS) at https://www.azdps.gov\n- Select 'Background Check for Employment/Licensure'\n- Use Fingerprint Code: INS-055.A\n- Fee: $23 application fee\n\nStep 2: Schedule fingerprinting with Fieldprint\n- URL: https://www.fieldprintarizona.com\n- Fee: $8.25\n\nTotal cost: ~$31.25",
+    "override_description": "Fingerprinting required via AZDPS + Fieldprint (~$31.25)",
+    "override_required": 1,
+    "url": "https://www.fieldprintarizona.com"
+  },
+  {
+    "state": "AZ",
+    "item": "Pre-Licensing",
+    "instructions": "Arizona does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional. Study materials and exam prep courses are available from providers like ExamFX, Kaplan, and AD Banker.",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://insurance.az.gov"
+  },
+  {
+    "state": "AZ",
+    "item": "Schedule Test",
+    "instructions": "Arizona insurance exams are administered by PSI (effective September 2025).\n\nSchedule online: https://test-takers.psiexams.com/anzins\n\nExams can be taken at a physical PSI testing center or remotely via PSI Bridge.\n\nArrive at least 30 minutes before your scheduled appointment. Bring valid government-issued photo ID.",
+    "override_description": "Schedule exam via PSI",
+    "override_required": 1,
+    "url": "https://test-takers.psiexams.com/anzins"
+  },
+  {
+    "state": "AR",
+    "item": "Background Check",
+    "instructions": "Arkansas requires a criminal background check for all resident insurance license applicants.\n\nSubmit your background check and fees directly to the Arkansas State Police through the Arkansas Insurance Department's Criminal Background Check online portal.\n\nFee: $25\n\nKeep the original receipt for your records and attach a copy to your license application.",
+    "override_description": "Background check required via AR State Police ($25)",
+    "override_required": 1,
+    "url": "https://insurance.arkansas.gov"
+  },
+  {
+    "state": "AR",
+    "item": "Pre-Licensing",
+    "instructions": "Arkansas does NOT require pre-licensing education for Life insurance producers.\n\nPre-licensing courses are recommended but optional to help prepare for the state exam.",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://insurance.arkansas.gov"
+  },
+  {
+    "state": "AR",
+    "item": "Schedule Test",
+    "instructions": "Arkansas insurance exams are administered by PSI.\n\nSchedule online: https://www.psiexams.com\nPhone: (855) 518-7458\n\nExams can be taken at a physical PSI testing center or remotely via online proctoring.\n\nLife Insurance exam: 110 questions (100 scored, 10 pretest), 2.5 hours, passing score 70%.",
+    "override_description": "Schedule exam via PSI",
+    "override_required": 1,
+    "url": "https://www.psiexams.com"
+  },
+  {
+    "state": "CA",
+    "item": "Background Check",
+    "instructions": "California requires fingerprinting for all resident insurance license applicants.\n\nSubmit fingerprints AFTER filing your license application with the California Department of Insurance (CDI).\n\nOption 1 - Capital Live Scan (CLS):\n- Complete Form BCIA 8016 (Request for Live Scan Service)\n- Fee: ~$59 ($17 FBI + $32 DOJ + $10 CDI contractor fee)\n\nOption 2 - At PSI Test Centers:\n- Available on exam day\n- Fee: $68.95 ($17 FBI + $32 DOJ + $19.95 contractor fee)\n\nURL: https://www.insurance.ca.gov/0200-industry/0200-prod-licensing/0100-applicant-info/0300-ca-fingerprint/",
+    "override_description": "Fingerprinting required via Live Scan or PSI (~$59-$69)",
+    "override_required": 1,
+    "url": "https://www.insurance.ca.gov/0200-industry/0200-prod-licensing/0100-applicant-info/0300-ca-fingerprint/"
+  },
+  {
+    "state": "CA",
+    "item": "Pre-Licensing",
+    "instructions": "Effective January 1, 2026, California has ELIMINATED the pre-licensing education requirement for insurance producers.\n\nOnly 12 hours of Ethics and California Insurance Code instruction is required, including 1 hour of insurance fraud education.\n\nURL: https://www.insurance.ca.gov/0200-industry/0030-seek-pre-lic/",
+    "override_description": "12 hours Ethics/Code only (pre-licensing eliminated 2026)",
+    "override_required": 1,
+    "url": "https://www.insurance.ca.gov/0200-industry/0030-seek-pre-lic/"
+  },
+  {
+    "state": "CA",
+    "item": "Schedule Test",
+    "instructions": "California insurance exams are administered by PSI Services LLC.\n\nSchedule online: https://www.psiexams.com\nPhone: (833) 518-7456\n\nPSI offers 20+ testing sites statewide. Fingerprinting can be obtained at PSI locations on exam day.\n\nExam convenience fee: $43\n\nURL: https://www.insurance.ca.gov/0200-industry/0010-producer-online-services/0200-exam-info/",
+    "override_description": "Schedule exam via PSI ($43)",
+    "override_required": 1,
+    "url": "https://www.insurance.ca.gov/0200-industry/0010-producer-online-services/0200-exam-info/"
+  },
+  {
+    "state": "CO",
+    "item": "Background Check",
+    "instructions": "Colorado requires fingerprinting PRIOR to submitting your license application.\n\nFingerprints are submitted to the Colorado Bureau of Investigation (CBI) for state and federal (FBI) background check.\n\nVendor: IdentoGO\nFee: ~$49.50\nURL: https://www.identogo.com\n\nAlternative: Colorado Fingerprinting (for in-state applicants)\n\nProcessing time: 1-2 weeks\n\nDOI info: https://doi.colorado.gov/colorado-and-national-fingerprint-based-criminal-history-background-check",
+    "override_description": "Fingerprinting required via IdentoGO ($49.50)",
+    "override_required": 1,
+    "url": "https://doi.colorado.gov/colorado-and-national-fingerprint-based-criminal-history-background-check"
+  },
+  {
+    "state": "CO",
+    "item": "Pre-Licensing",
+    "instructions": "Colorado does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional to help prepare for the state exam.",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://doi.colorado.gov"
+  },
+  {
+    "state": "CO",
+    "item": "Schedule Test",
+    "instructions": "Colorado insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com/co/insurance\nPhone: (800) 274-2616\n\nExams can be taken at a Pearson VUE test center or remotely via online proctoring (at home or office).\n\nExam fee: $48",
+    "override_description": "Schedule exam via Pearson VUE ($48)",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com/us/en/co/insurance.html"
+  },
+  {
+    "state": "CT",
+    "item": "Background Check",
+    "instructions": "Connecticut does NOT require fingerprinting for insurance license applicants.\n\nA criminal background check is conducted as part of the application process, but fingerprints are not mandatory.\n\nContact: Connecticut Insurance Department\nPhone: (860) 297-3845\nAddress: P.O. Box 816, Hartford, CT 06142-0816",
+    "override_description": "No fingerprinting required; background check via application",
+    "override_required": 0,
+    "url": "https://portal.ct.gov/cid"
+  },
+  {
+    "state": "CT",
+    "item": "Pre-Licensing",
+    "instructions": "Connecticut requires 40 hours of pre-licensing education for a combined Life, Accident & Health license, or 20 hours for Life only.\n\nComplete a state-approved course and pass the course final exam before scheduling the state licensing exam.",
+    "override_description": "20 hours Life only / 40 hours combined required",
+    "override_required": 1,
+    "url": "https://portal.ct.gov/cid"
+  },
+  {
+    "state": "CT",
+    "item": "Schedule Test",
+    "instructions": "Connecticut insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com/us/en/ct/insurance.html\nPhone: (866) 407-2057\n\nAppointments may be made up to one calendar day prior to your desired test date, subject to availability.\n\n75 questions, 120 minutes.",
+    "override_description": "Schedule exam via Pearson VUE",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com/us/en/ct/insurance.html"
+  },
+  {
+    "state": "DC",
+    "item": "Background Check",
+    "instructions": "Washington D.C. requires fingerprinting for all insurance license applicants (both resident and nonresident).\n\nVendor: Fieldprint\nPhone: (877) 614-4364\nURL: https://www.fieldprint.com\n\nFingerprinting is required AFTER passing your exam and submitting your license application.\n\nFee: ~$50",
+    "override_description": "Fingerprinting required via Fieldprint (~$50)",
+    "override_required": 1,
+    "url": "https://disb.dc.gov/publication/fingerprinting-requirements"
+  },
+  {
+    "state": "DC",
+    "item": "Pre-Licensing",
+    "instructions": "Washington D.C. does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional.",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://disb.dc.gov"
+  },
+  {
+    "state": "DC",
+    "item": "Schedule Test",
+    "instructions": "D.C. insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com/us/en/dc/insurance.html\nPhone: (800) 274-0610\n\nSchedule at least 24 hours before your desired exam date. Pay by credit card, debit card, voucher, or electronic check (5 days advance for e-check).",
+    "override_description": "Schedule exam via Pearson VUE",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com/us/en/dc/insurance.html"
+  },
+  {
+    "state": "DE",
+    "item": "Background Check",
+    "instructions": "Delaware requires a criminal history report within 90 days of application.\n\nSchedule fingerprinting with the Delaware State Police.\nPhone: (302) 739-2528\nFee: $75\n\nAfter submitting your application, fax a copy of your criminal background reports to the Delaware Department of Insurance at: (302) 736-7906.",
+    "override_description": "Fingerprinting required via DE State Police ($75)",
+    "override_required": 1,
+    "url": "https://insurance.delaware.gov"
+  },
+  {
+    "state": "DE",
+    "item": "Pre-Licensing",
+    "instructions": "Delaware requires 40 hours of pre-licensing education for a combined Life, Accident & Health license, or 20 hours for Life only.\n\nComplete a state-approved course before scheduling the state licensing exam.",
+    "override_description": "20 hours Life only / 40 hours combined required",
+    "override_required": 1,
+    "url": "https://insurance.delaware.gov"
+  },
+  {
+    "state": "DE",
+    "item": "Schedule Test",
+    "instructions": "Delaware insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com\n\nExams must be taken at a Pearson VUE test center (online exams not available). Testing centers in Woodside, Dover, Seaford, Wye Mills, and Middletown.\n\nLife Producer exam: 106 questions, 2 hours 15 minutes.",
+    "override_description": "Schedule exam via Pearson VUE (in-person only)",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com"
+  },
+  {
+    "state": "FL",
+    "item": "Background Check",
+    "instructions": "Florida requires electronic fingerprinting for a criminal background check.\n\nVendor: IdentoGO\nURL: https://www.identogo.com\n\nGet fingerprinted AFTER passing your exam and BEFORE applying for your license.\n\nFingerprint records are valid for 1 year. If you hold a current license or were fingerprinted in the last 48 months, you may not need new prints (call 850-413-3134 to verify).\n\nContact FL DFS: (850) 413-3134",
+    "override_description": "Fingerprinting required via IdentoGO",
+    "override_required": 1,
+    "url": "https://www.identogo.com"
+  },
+  {
+    "state": "FL",
+    "item": "Pre-Licensing",
+    "instructions": "Florida requires 40 hours of pre-licensing education for a combined Life and Health license, or 20 hours for Life only (200-hour General Lines).\n\nComplete a state-approved 40-hour or 200-hour course and pass the course final exam.\n\nURL: https://www.myfloridacfo.com/division/agents/",
+    "override_description": "40 hours combined L&H / 200 hours General Lines required",
+    "override_required": 1,
+    "url": "https://www.myfloridacfo.com/division/agents/"
+  },
+  {
+    "state": "FL",
+    "item": "Schedule Test",
+    "instructions": "Florida insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com/us/en/fl/insurance.html\nPhone: (888) 274-2020\n\nYou can schedule before completing your pre-licensing course. Exam times available mornings, afternoons, and early evenings on weekdays.\n\nExam fee: $44. Passing score: 70%.",
+    "override_description": "Schedule exam via Pearson VUE ($44)",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com/us/en/fl/insurance.html"
+  },
+  {
+    "state": "GA",
+    "item": "Background Check",
+    "instructions": "Georgia requires fingerprinting for all first-time resident insurance exam candidates.\n\nVendor: IdentoGO\nService Code: 2TGJ6B\nURL: https://www.identogo.com\n\nYou must APPLY for a license BEFORE registering for fingerprinting. You will receive instructions after applying.\n\nFee: $51-$52.75",
+    "override_description": "Fingerprinting required via IdentoGO, code 2TGJ6B (~$52)",
+    "override_required": 1,
+    "url": "https://www.identogo.com"
+  },
+  {
+    "state": "GA",
+    "item": "Pre-Licensing",
+    "instructions": "Georgia requires 40 hours of pre-licensing education for a combined Life, Accident & Sickness license, or 20 hours for each line separately.\n\nYou must pass the course final exam with 70% or higher to receive a certificate of completion.\n\nURL: https://oci.georgia.gov/get-insurance-agent-license",
+    "override_description": "40 hours combined / 20 hours per line required",
+    "override_required": 1,
+    "url": "https://oci.georgia.gov/get-insurance-agent-license"
+  },
+  {
+    "state": "GA",
+    "item": "Schedule Test",
+    "instructions": "Georgia insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com/us/en/ga/insurance.html\n\nAppointments may be made up to one calendar day prior to your desired test date, subject to availability.\n\n2 hours to complete. Passing score: 70%.",
+    "override_description": "Schedule exam via Pearson VUE",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com/us/en/ga/insurance.html"
+  },
+  {
+    "state": "HI",
+    "item": "Background Check",
+    "instructions": "Hawaii requires fingerprinting for all insurance license applicants.\n\nVendor: Fieldprint Hawaii\nCode: HI-DCCA-INS\nURL: https://www.fieldprintfingerprintservice.com\n\nSchedule an appointment online and enter code HI-DCCA-INS to ensure the Insurance Division receives the prints.\n\nFee: $67\n\nYou must submit your license application within 60 days of fingerprinting.\n\nContact: Hawaii DCCA Insurance Division (808) 586-2788",
+    "override_description": "Fingerprinting required via Fieldprint, code HI-DCCA-INS ($67)",
+    "override_required": 1,
+    "url": "https://cca.hawaii.gov/ins/producers/instructions_insurance_license/"
+  },
+  {
+    "state": "HI",
+    "item": "Pre-Licensing",
+    "instructions": "Hawaii requires 20 hours of pre-licensing education for Life insurance.\n\nComplete a state-approved course before scheduling the state licensing exam.\n\nURL: https://cca.hawaii.gov/ins/producers/exam_info/",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://cca.hawaii.gov/ins/producers/exam_info/"
+  },
+  {
+    "state": "HI",
+    "item": "Schedule Test",
+    "instructions": "Hawaii insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com\nPhone: (800) 274-2608\n\nExams available at test centers or via OnVUE online proctoring (remote). Walk-in testing is NOT available.\n\nURL: https://cca.hawaii.gov/ins/producers/exam_info/",
+    "override_description": "Schedule exam via Pearson VUE",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com"
+  },
+  {
+    "state": "IA",
+    "item": "Background Check",
+    "instructions": "Effective June 2, 2025, Iowa requires fingerprinting for all resident insurance applicants.\n\nVendor: Fieldprint\nURL: https://www.fieldprint.com\n\nAfter applying through NIPR, you will receive an email with your Iowa Fieldprint code and instructions.\n\nFee: $34.35 (Iowa location) / $36.35 (out-of-state location)\n\nBring your appointment number and two forms of valid ID. Results reported within 3-5 business days.\n\nInfo: https://iid.iowa.gov/producer-fingerprinting-and-criminal-history-checks",
+    "override_description": "Fingerprinting required via Fieldprint ($34-$36)",
+    "override_required": 1,
+    "url": "https://iid.iowa.gov/producer-fingerprinting-and-criminal-history-checks"
+  },
+  {
+    "state": "IA",
+    "item": "Pre-Licensing",
+    "instructions": "Iowa does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional.",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://iid.iowa.gov"
+  },
+  {
+    "state": "IA",
+    "item": "Schedule Test",
+    "instructions": "Iowa insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com/ia/insurance\nPhone: (877) 540-5825\n\nSchedule at least 24 hours before your desired exam date. Exams available at test centers or remotely via online proctoring.",
+    "override_description": "Schedule exam via Pearson VUE",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com/ia/insurance"
+  },
+  {
+    "state": "ID",
+    "item": "Background Check",
+    "instructions": "Idaho requires fingerprinting for all resident insurance license applicants.\n\nYou can schedule fingerprinting at a Pearson VUE testing location on the same day as your exam. Schedule the 'InsID-FPELC' service with Pearson VUE.\n\nFee: $65\nVendor: Pearson VUE / IdentoGO\n\nProcessing time: 5-10 business days after fingerprinting, then 1-2 more days for license issuance.\n\nURL: https://doi.idaho.gov/industry/licensing-services/testing-and-fingerprints/",
+    "override_description": "Fingerprinting required via Pearson VUE ($65)",
+    "override_required": 1,
+    "url": "https://doi.idaho.gov/industry/licensing-services/testing-and-fingerprints/"
+  },
+  {
+    "state": "ID",
+    "item": "Pre-Licensing",
+    "instructions": "Idaho does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional.",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://doi.idaho.gov"
+  },
+  {
+    "state": "ID",
+    "item": "Schedule Test",
+    "instructions": "Idaho insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com/us/en/id/insurance.html\nPhone: (800) 274-2721\n\nAppointments may be made up to one calendar day prior. Life Producer exam: 101 questions, 2 hours 10 minutes.",
+    "override_description": "Schedule exam via Pearson VUE",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com/us/en/id/insurance.html"
+  },
+  {
+    "state": "IL",
+    "item": "Background Check",
+    "instructions": "Illinois requires fingerprinting within 60 days of your license application.\n\nFingerprints must be submitted through an Illinois-licensed live scan fingerprint vendor.\n\nVendor list: https://idfpr.illinois.gov/profs/fingerprint.html\n\nKeep your fingerprint receipt as you may need it during the licensing process.\n\nThe Illinois Department of Financial and Professional Regulation (IDFPR) maintains a list of licensed fingerprint vendors.",
+    "override_description": "Fingerprinting required via IL-licensed live scan vendor",
+    "override_required": 1,
+    "url": "https://idfpr.illinois.gov/profs/fingerprint.html"
+  },
+  {
+    "state": "IL",
+    "item": "Pre-Licensing",
+    "instructions": "Illinois requires 20 hours of pre-licensing education per line of authority.\n\nComplete a state-approved 20-hour Life insurance course before scheduling the state exam.\n\nURL: https://idfpr.illinois.gov",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://idfpr.illinois.gov"
+  },
+  {
+    "state": "IL",
+    "item": "Schedule Test",
+    "instructions": "Illinois insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com/us/en/il/insurance.html\nPhone: (800) 274-0402\n\nAs of January 2025, remote state exams are NO LONGER offered - in-person only.\n\nLife Producer General exam: 55 questions, 85 minutes. Life Producer State exam: 36 questions, 50 minutes.",
+    "override_description": "Schedule exam via Pearson VUE (in-person only)",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com/us/en/il/insurance.html"
+  },
+  {
+    "state": "IN",
+    "item": "Background Check",
+    "instructions": "Indiana does NOT generally require fingerprinting for Life insurance license applicants.\n\nA background check is conducted as part of the application process through NIPR/Sircon.\n\nNote: Property & Casualty applicants may have different fingerprint requirements.\n\nContact: Indiana Department of Insurance\nURL: https://www.in.gov/idoi/",
+    "override_description": "No fingerprinting required for Life; background check via application",
+    "override_required": 0,
+    "url": "https://www.in.gov/idoi/"
+  },
+  {
+    "state": "IN",
+    "item": "Pre-Licensing",
+    "instructions": "Indiana requires 40 hours of pre-licensing education for a Life and Health insurance license.\n\nComplete a state-approved course before scheduling the state exam.\n\nURL: https://www.in.gov/idoi/licensing/resident-licensing/examination-procedure-checklist/",
+    "override_description": "40 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://www.in.gov/idoi/licensing/resident-licensing/examination-procedure-checklist/"
+  },
+  {
+    "state": "IN",
+    "item": "Schedule Test",
+    "instructions": "Indiana insurance exams are administered by Pearson VUE in partnership with Ivy Tech Community College.\n\nSchedule online: https://www.pearsonvue.com/in/insurance\nPhone: (866) 895-0496\n\nURL: https://www.in.gov/idoi/licensing/resident-licensing/examination-procedure-checklist/",
+    "override_description": "Schedule exam via Pearson VUE / Ivy Tech",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com/us/en/in/insurance.html"
+  },
+  {
+    "state": "KS",
+    "item": "Background Check",
+    "instructions": "Kansas requires fingerprinting for all unlicensed insurance license applicants.\n\nFREE fingerprinting locations:\n- Kansas Insurance Department office in Topeka\n- Department of Children and Families (DCF) offices in Topeka, Overland Park, Wichita, Hutchinson, Salina, and Chanute\n- Pearson VUE test centers in Overland Park, Topeka, and Wichita\n\nFingerprint + background check fee: $60 (collected with online application)\nApplication fee: $30\n\nURL: https://insurance.ks.gov/documents/agentagency/Fingerprint-FAQ.pdf",
+    "override_description": "Fingerprinting required - FREE at KS locations ($60 bg check fee)",
+    "override_required": 1,
+    "url": "https://insurance.ks.gov/documents/agentagency/Fingerprint-FAQ.pdf"
+  },
+  {
+    "state": "KS",
+    "item": "Pre-Licensing",
+    "instructions": "Kansas does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional.",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://insurance.ks.gov"
+  },
+  {
+    "state": "KS",
+    "item": "Schedule Test",
+    "instructions": "Kansas insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com/us/en/ks/insurance.html\nPhone: (888) 204-6255\n\nCombined Life and Accident & Health exam: 156 questions (16 pretest), 2.5 hours. Passing score: 70%.",
+    "override_description": "Schedule exam via Pearson VUE",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com/us/en/ks/insurance.html"
+  },
+  {
+    "state": "KY",
+    "item": "Background Check",
+    "instructions": "Kentucky requires a Criminal Background Report through the KY Administrative Office of the Courts (AOC).\n\nThe AOC report is valid for 60 days. Requests are typically processed within 24 hours (except weekends/holidays).\n\nNote: Kentucky uses a court records check rather than fingerprint-based background check.\n\nURL: https://insurance.ky.gov",
+    "override_description": "Criminal background report via KY AOC required (no fingerprints)",
+    "override_required": 1,
+    "url": "https://insurance.ky.gov"
+  },
+  {
+    "state": "KY",
+    "item": "Pre-Licensing",
+    "instructions": "Kentucky requires 20 hours of pre-licensing education per line of authority.\n\nComplete a state-approved classroom or self-study course.\n\nURL: https://insurance.ky.gov/ppc/newstatic_info.aspx?static_id=72",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://insurance.ky.gov/ppc/newstatic_info.aspx?static_id=72"
+  },
+  {
+    "state": "KY",
+    "item": "Schedule Test",
+    "instructions": "Kentucky insurance exams are scheduled through the KY DOI eServices portal AFTER your license application is processed.\n\nURL: https://insurance.ky.gov/doieservices\n\nAll applicants must have a scheduled appointment; walk-ins are NOT accepted. Kentucky does NOT offer remote testing.\n\nExam fee: $50. Changes must be made 24 hours prior. No-shows forfeit the $50 fee.",
+    "override_description": "Schedule exam via KY DOI eServices ($50)",
+    "override_required": 1,
+    "url": "https://insurance.ky.gov/doieservices"
+  },
+  {
+    "state": "LA",
+    "item": "Background Check",
+    "instructions": "Louisiana requires fingerprinting as part of the insurance licensing process.\n\nYou can submit fingerprints electronically at a PSI test site on the day of your exam (no separate appointment needed).\n\nAlternatively, schedule through IdentoGO:\nService Code: 27N339\nURL: https://www.identogo.com\n\nContact PSI or the Louisiana Department of Insurance for current fees.",
+    "override_description": "Fingerprinting at PSI site on exam day or via IdentoGO (code 27N339)",
+    "override_required": 1,
+    "url": "https://www.identogo.com"
+  },
+  {
+    "state": "LA",
+    "item": "Pre-Licensing",
+    "instructions": "Louisiana requires 20 hours of pre-licensing education for Life insurance.\n\nComplete a state-approved course before scheduling the state exam.\n\nURL: https://www.ldi.la.gov",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://www.ldi.la.gov"
+  },
+  {
+    "state": "LA",
+    "item": "Schedule Test",
+    "instructions": "Louisiana insurance exams are administered by PSI.\n\nSchedule online: https://www.psiexams.com\nPhone: (800) 733-9267\n\nTest centers in Baton Rouge, Lafayette, Lake Charles, Metairie, Monroe, Pineville (Alexandria), and Shreveport.\n\nSeries 101 - Life Insurance exam: 100 questions, 2 hours. Passing score: 70%.",
+    "override_description": "Schedule exam via PSI",
+    "override_required": 1,
+    "url": "https://www.psiexams.com"
+  },
+  {
+    "state": "MA",
+    "item": "Background Check",
+    "instructions": "Massachusetts requires fingerprinting as part of the insurance licensing process.\n\nFingerprinting is completed at Prometric after passing the exam.\n\nVendor: Prometric\nURL: https://www.prometric.com\nPhone: (800) 741-9380\n\nComplete your license and fingerprints at the Prometric testing center.",
+    "override_description": "Fingerprinting required at Prometric test center",
+    "override_required": 1,
+    "url": "https://www.prometric.com"
+  },
+  {
+    "state": "MA",
+    "item": "Pre-Licensing",
+    "instructions": "Massachusetts does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional to help prepare for the state exam.",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://www.mass.gov/info-details/examination-individual-producer"
+  },
+  {
+    "state": "MA",
+    "item": "Schedule Test",
+    "instructions": "Massachusetts insurance exams are administered by Prometric.\n\nSchedule online: https://www.prometric.com/exams/insurance-ma\nPhone: (800) 741-9380\n\nExam times available mornings and afternoons on weekdays and certain weekends.\n\nLife Insurance (Series 16-51) exam: 100 questions, 2 hours. Passing score: 70%.\nExam fee: $39.",
+    "override_description": "Schedule exam via Prometric ($39)",
+    "override_required": 1,
+    "url": "https://www.prometric.com/exams/insurance-ma"
+  },
+  {
+    "state": "MD",
+    "item": "Background Check",
+    "instructions": "Maryland does NOT require fingerprinting for insurance license applicants.\n\nA background check is conducted as part of the application review process.\n\nYou can optionally register for fingerprinting at the same time you register for your exam, but it is not mandatory.\n\nContact: Maryland Insurance Administration",
+    "override_description": "No fingerprinting required; background check via application",
+    "override_required": 0,
+    "url": "https://insurance.maryland.gov"
+  },
+  {
+    "state": "MD",
+    "item": "Pre-Licensing",
+    "instructions": "Maryland requires 40 hours of pre-licensing education for a combined Life and Health license, or 20 hours for Life only.\n\nPre-licensing education is valid for 6 months from completion date. You must pass your state exam within this timeframe.",
+    "override_description": "20 hours Life only / 40 hours combined required",
+    "override_required": 1,
+    "url": "https://insurance.maryland.gov"
+  },
+  {
+    "state": "MD",
+    "item": "Schedule Test",
+    "instructions": "Maryland insurance exams are administered by Prometric.\n\nSchedule online: https://www.prometric.com\nPhone: (800) 610-1174\n\nExams available at physical Prometric testing centers or remotely via online proctoring.\n\nLife exam fee: $60.",
+    "override_description": "Schedule exam via Prometric ($60)",
+    "override_required": 1,
+    "url": "https://www.prometric.com"
+  },
+  {
+    "state": "ME",
+    "item": "Background Check",
+    "instructions": "Maine requires fingerprinting for all insurance license applicants.\n\nVendor: IdentoGO\nURL: https://me.ibtfingerprint.com\nPhone: (855) 667-7422\n\nRegister online, pay, and schedule a date, time, and location for your fingerprinting appointment.\n\nOut-of-state applicants may use IdentoGO's Card Scan Processing Program.",
+    "override_description": "Fingerprinting required via IdentoGO",
+    "override_required": 1,
+    "url": "https://me.ibtfingerprint.com"
+  },
+  {
+    "state": "ME",
+    "item": "Pre-Licensing",
+    "instructions": "Maine does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional.\n\nURL: https://www.maine.gov/pfr/insurance/licensees/individuals-business-entities/ce-exam-information",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://www.maine.gov/pfr/insurance/licensees/individuals-business-entities/ce-exam-information"
+  },
+  {
+    "state": "ME",
+    "item": "Schedule Test",
+    "instructions": "Maine insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com/us/en/me/insurance.html\nPhone: (800) 274-4959\n\nAs of May 2025, remote state exams are NO LONGER offered - in-person testing at Pearson VUE centers only.\n\nExam fee paid by credit/debit card, voucher, or electronic check at time of reservation.",
+    "override_description": "Schedule exam via Pearson VUE (in-person only)",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com/us/en/me/insurance.html"
+  },
+  {
+    "state": "MI",
+    "item": "Background Check",
+    "instructions": "Michigan does NOT require fingerprinting for insurance license applicants.\n\nA background check is conducted as part of the application process. You must bring two valid forms of government-issued ID on exam day (one with photo and signature).\n\nContact: Michigan DIFS\nURL: https://www.michigan.gov/difs",
+    "override_description": "No fingerprinting required; background check via application",
+    "override_required": 0,
+    "url": "https://www.michigan.gov/difs"
+  },
+  {
+    "state": "MI",
+    "item": "Pre-Licensing",
+    "instructions": "Michigan requires 20 hours of pre-licensing education for Life insurance.\n\nCertificate is valid for 12 months from completion date. You must pass the exam within this period.\n\nURL: https://www.michigan.gov/difs/industry/licensing-ins/examinations",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://www.michigan.gov/difs/industry/licensing-ins/examinations"
+  },
+  {
+    "state": "MI",
+    "item": "Schedule Test",
+    "instructions": "Michigan insurance exams are administered by PSI.\n\nSchedule online: http://candidate.psiexams.com/DIFS\nPhone: (800) 733-9267\n\nLife insurance exam: 100 questions, 120 minutes.\n\nURL: https://www.michigan.gov/difs/industry/licensing-ins/examinations",
+    "override_description": "Schedule exam via PSI",
+    "override_required": 1,
+    "url": "http://candidate.psiexams.com/DIFS"
+  },
+  {
+    "state": "MN",
+    "item": "Background Check",
+    "instructions": "Minnesota requires fingerprinting and criminal history record check for all resident insurance producer applicants.\n\nRecommended: Get fingerprinted electronically at a PSI Minnesota test site on the day of your exam.\n\nAlternative: Any local police station with manual fingerprinting capability.\n\nFee: ~$46-$65 (varies by method and location)\n\nMinnesota may issue a license before FBI background check results are returned.",
+    "override_description": "Fingerprinting required at PSI site or local police (~$46-$65)",
+    "override_required": 1,
+    "url": "https://mn.gov/commerce/licensing/list/insurance/resident-producers.jsp"
+  },
+  {
+    "state": "MN",
+    "item": "Pre-Licensing",
+    "instructions": "Minnesota requires 20 hours of pre-licensing education for Life insurance.\n\nComplete a state-approved course before scheduling the state exam.\n\nURL: https://mn.gov/commerce/licensing/list/insurance/resident-producers.jsp",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://mn.gov/commerce/licensing/list/insurance/resident-producers.jsp"
+  },
+  {
+    "state": "MN",
+    "item": "Schedule Test",
+    "instructions": "Minnesota insurance exams are administered by PSI / Pearson VUE.\n\nPSI Phone: (866) 395-1006\nPearson VUE: https://home.pearsonvue.com/mncommerce\nPearson VUE Phone: (833) 273-1946\n\nFingerprinting is available at PSI test centers on exam day.",
+    "override_description": "Schedule exam via PSI or Pearson VUE",
+    "override_required": 1,
+    "url": "https://home.pearsonvue.com/mncommerce"
+  },
+  {
+    "state": "MO",
+    "item": "Background Check",
+    "instructions": "Missouri does NOT require fingerprinting for insurance license applicants.\n\nA background check is initiated through the application process and reviewed during licensing.\n\nContact: Missouri Department of Commerce and Insurance",
+    "override_description": "No fingerprinting required; background check via application",
+    "override_required": 0,
+    "url": "https://insurance.mo.gov"
+  },
+  {
+    "state": "MO",
+    "item": "Pre-Licensing",
+    "instructions": "Missouri does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional.",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://insurance.mo.gov"
+  },
+  {
+    "state": "MO",
+    "item": "Schedule Test",
+    "instructions": "Missouri insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com\nPhone: (866) 247-4740\n\nLife Producer exam: 100 questions, 2 hours. Passing score: 70%.\n\nExam fee: $39 (single line) or $49 (combined Life, Health & Accident).",
+    "override_description": "Schedule exam via Pearson VUE ($39-$49)",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com"
+  },
+  {
+    "state": "MS",
+    "item": "Background Check",
+    "instructions": "Mississippi requires fingerprinting for insurance license applicants.\n\nFingerprints are processed by the Mississippi Insurance Department (MID). Processing may take 2-6 weeks.\n\nFee: $50 (check or money order only)\n\nRequired documents:\n- Recent headshot photo (no larger than 4x6)\n- Social security card\n- Valid driver's license\n\nContact: Mississippi Insurance Department\nPhone: (601) 359-3582\nURL: https://www.mid.ms.gov",
+    "override_description": "Fingerprinting required via MID ($50, check/money order)",
+    "override_required": 1,
+    "url": "https://www.mid.ms.gov"
+  },
+  {
+    "state": "MS",
+    "item": "Pre-Licensing",
+    "instructions": "Mississippi requires 20 hours of pre-licensing education for Life insurance.\n\nComplete a state-approved course before scheduling the state exam.\n\nURL: https://www.mid.ms.gov/mississippi-insurance-department/licensing/pre-licensing-and-continuing-education/",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://www.mid.ms.gov/mississippi-insurance-department/licensing/pre-licensing-and-continuing-education/"
+  },
+  {
+    "state": "MS",
+    "item": "Schedule Test",
+    "instructions": "Mississippi insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com/us/en/ms/insurance.html\nPhone: (888) 293-4222\n\nHours: Monday-Friday, 7:00 AM - 7:00 PM CT.\n\nURL: https://www.mid.ms.gov/mississippi-insurance-department/licensing/licensing-examinations/",
+    "override_description": "Schedule exam via Pearson VUE",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com/us/en/ms/insurance.html"
+  },
+  {
+    "state": "MT",
+    "item": "Background Check",
+    "instructions": "Montana requires fingerprinting for all first-time insurance license applicants and those adding a line of authority.\n\nVendor: IdentoGO (IDEMIA)\nURL: https://www.identogo.com\nPhone: (866) 761-8069\n\nSchedule your appointment through IdentoGO AFTER taking your exam. Fingerprints can also be scheduled through Pearson VUE's third-party vendor.\n\nFee: $54\n\nFingerprints are valid for 1 year.\n\nURL: https://csimt.gov/wp-content/uploads/2023/03/Fingerprints-for-Insurance-Licensing-Purposes.pdf",
+    "override_description": "Fingerprinting required via IdentoGO ($54)",
+    "override_required": 1,
+    "url": "https://www.identogo.com"
+  },
+  {
+    "state": "MT",
+    "item": "Pre-Licensing",
+    "instructions": "Montana requires 20 hours of pre-licensing education for Life insurance.\n\nComplete a state-approved course before scheduling the state exam.\n\nURL: https://csimt.gov/insurance/licensing/",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://csimt.gov/insurance/licensing/"
+  },
+  {
+    "state": "MT",
+    "item": "Schedule Test",
+    "instructions": "Montana insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com/mt/insurance\nPhone: (866) 274-8906\n\nSchedule at least 24 hours before your desired exam date.\n\nLife exam: 102 questions (92 scored, 10 pretest), 135 minutes. Passing score: 75%.\nExam fee: $59.",
+    "override_description": "Schedule exam via Pearson VUE ($59, 75% to pass)",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com/mt/insurance"
+  },
+  {
+    "state": "NC",
+    "item": "Background Check",
+    "instructions": "North Carolina requires fingerprinting within 30 days of applying for a license.\n\nProcess:\n1. Submit your license application through NIPR\n2. Print the Fingerprint Submission Packet from the NIPR email link\n3. Take the packet to a local law enforcement agency for digital fingerprints (Live Scan)\n4. Applicant completes pages 1 and 3; law enforcement signs page 2\n\nFingerprint cards are NOT accepted - must be electronic Live Scan.\n\nFee: $38\n\nURL: https://www.ncdoi.gov/licensees/agent-and-adjuster-licensing/become-insurance-agent-or-adjuster/resident-fingerprint-requirements",
+    "override_description": "Fingerprinting required via local law enforcement Live Scan ($38)",
+    "override_required": 1,
+    "url": "https://www.ncdoi.gov/licensees/agent-and-adjuster-licensing/become-insurance-agent-or-adjuster/resident-fingerprint-requirements"
+  },
+  {
+    "state": "NC",
+    "item": "Pre-Licensing",
+    "instructions": "North Carolina requires 20 hours of pre-licensing education for Life insurance.\n\nComplete a state-approved course and pass the final exam with 70% or higher.\n\nURL: https://www.ncdoi.gov",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://www.ncdoi.gov"
+  },
+  {
+    "state": "NC",
+    "item": "Schedule Test",
+    "instructions": "North Carolina insurance exams are administered by Pearson VUE.\n\nAfter filing your application through NIPR, you will receive an email from Pearson VUE with exam scheduling instructions (within 1 hour).\n\nSchedule at least 24 hours before your desired exam date.\n\nLife Agent exam: 60 questions, 1 hour 15 minutes.\nExam fee: $45.",
+    "override_description": "Schedule exam via Pearson VUE ($45)",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com"
+  },
+  {
+    "state": "ND",
+    "item": "Background Check",
+    "instructions": "North Dakota requires fingerprinting for all initial resident insurance producer applicants.\n\nFingerprints may be taken at PSI test centers on the day of your exam, or at other locations.\n\nFees:\n- PSI fingerprint processing: $29\n- ND Attorney General background check: $40 (check or money order)\n\nTotal: ~$69\n\nContact: ND Insurance Department Producer Licensing\nPhone: (701) 328-2440\nEmail: ndlicensing@nd.gov",
+    "override_description": "Fingerprinting required at PSI or other locations (~$69)",
+    "override_required": 1,
+    "url": "https://www.insurance.nd.gov/producers/resident-producer/apply-resident-producer-license"
+  },
+  {
+    "state": "ND",
+    "item": "Pre-Licensing",
+    "instructions": "North Dakota requires 20 hours of pre-licensing education for Life insurance.\n\nComplete a state-approved course before scheduling the state exam.\n\nURL: https://www.insurance.nd.gov/producers/resident-producer",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://www.insurance.nd.gov/producers/resident-producer"
+  },
+  {
+    "state": "ND",
+    "item": "Schedule Test",
+    "instructions": "North Dakota insurance exams are administered by PSI.\n\nSchedule online: https://www.psiexams.com\nPhone: (855) 340-3905\n\nExams available at physical PSI centers or remotely via online proctoring.",
+    "override_description": "Schedule exam via PSI",
+    "override_required": 1,
+    "url": "https://www.psiexams.com"
+  },
+  {
+    "state": "NE",
+    "item": "Background Check",
+    "instructions": "Nebraska requires fingerprinting and a background check as part of the insurance licensing process.\n\nComplete fingerprinting after passing the exam and before submitting your license application through NIPR.\n\nContact the Nebraska Department of Insurance for current vendor and fee information.\nPhone: (402) 471-2201\nURL: https://doi.nebraska.gov",
+    "override_description": "Fingerprinting required; contact NE DOI for vendor details",
+    "override_required": 1,
+    "url": "https://doi.nebraska.gov"
+  },
+  {
+    "state": "NE",
+    "item": "Pre-Licensing",
+    "instructions": "Nebraska does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional.\n\nURL: https://doi.nebraska.gov/education-licensees",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://doi.nebraska.gov/education-licensees"
+  },
+  {
+    "state": "NE",
+    "item": "Schedule Test",
+    "instructions": "Nebraska insurance exams are administered by PSI.\n\nSchedule online: https://www.psiexams.com\nPhone: (833) 333-4754\n\nTest centers in Omaha, Lincoln, Norfolk, Grand Island, North Platte, Sidney, and Scottsbluff. Remote testing also available.\n\nLife and Health exam: 100 questions, 2 hours. Passing score: 70%.",
+    "override_description": "Schedule exam via PSI",
+    "override_required": 1,
+    "url": "https://www.psiexams.com"
+  },
+  {
+    "state": "NH",
+    "item": "Background Check",
+    "instructions": "New Hampshire requires a criminal history check for insurance license applicants.\n\nSchedule through New Hampshire's Office of Professional Licensure & Certification.\n\nFee: $25 (payable online by credit or debit card)\n\nContact: NH Insurance Department License Division\nPhone: (603) 271-0203",
+    "override_description": "Criminal history check required ($25)",
+    "override_required": 1,
+    "url": "https://www.oplc.nh.gov"
+  },
+  {
+    "state": "NH",
+    "item": "Pre-Licensing",
+    "instructions": "New Hampshire does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional.",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://www.insurance.nh.gov"
+  },
+  {
+    "state": "NH",
+    "item": "Schedule Test",
+    "instructions": "New Hampshire insurance exams are administered by PSI (effective June 2025, replacing Prometric).\n\nSchedule online: https://www.psiexams.com\n\nNote: Prometric ceased scheduling NH exams after June 23, 2025. PSI began accepting registrations June 30, 2025.\n\nLife exam: 100 questions, 120 minutes.",
+    "override_description": "Schedule exam via PSI (replaced Prometric June 2025)",
+    "override_required": 1,
+    "url": "https://www.psiexams.com"
+  },
+  {
+    "state": "NJ",
+    "item": "Background Check",
+    "instructions": "New Jersey requires fingerprinting for all insurance license applicants.\n\nVendor: IdentoGO\nService Code: 2F16Y3\nURL: https://www.identogo.com\nPhone: (877) 503-5981\n\nFee: $66.05\n\nSubmit your license application within 1 year of passing the exam.",
+    "override_description": "Fingerprinting required via IdentoGO, code 2F16Y3 ($66.05)",
+    "override_required": 1,
+    "url": "https://www.nj.gov/dobi/insliced/livescan.htm"
+  },
+  {
+    "state": "NJ",
+    "item": "Pre-Licensing",
+    "instructions": "New Jersey does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional.",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://www.nj.gov/dobi"
+  },
+  {
+    "state": "NJ",
+    "item": "Schedule Test",
+    "instructions": "New Jersey insurance exams are administered by PSI.\n\nSchedule online: https://www.psiexams.com\nPhone: (855) 579-4634\n\nSchedule at least 2 days in advance. Cancel/reschedule at least 48 hours before appointment.\n\nLife exam: 88 questions, 3.5 hours. Passing score: 70%.",
+    "override_description": "Schedule exam via PSI",
+    "override_required": 1,
+    "url": "https://www.psiexams.com"
+  },
+  {
+    "state": "NM",
+    "item": "Background Check",
+    "instructions": "New Mexico requires fingerprinting BEFORE submitting your license application.\n\nVendor: IdentoGO (via NM Dept of Public Safety)\nURL: https://www.identogo.com\n\nAll applicants must register online prior to being fingerprinted. Fingerprints are run through NM DPS and FBI.\n\nFee: $59\n\nWait 3-5 days after fingerprinting before submitting your application.",
+    "override_description": "Fingerprinting required via IdentoGO BEFORE applying ($59)",
+    "override_required": 1,
+    "url": "https://www.identogo.com"
+  },
+  {
+    "state": "NM",
+    "item": "Pre-Licensing",
+    "instructions": "New Mexico does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional.\n\nURL: https://www.osi.state.nm.us",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://www.osi.state.nm.us"
+  },
+  {
+    "state": "NM",
+    "item": "Schedule Test",
+    "instructions": "New Mexico insurance exams are administered by PSI.\n\nSchedule online: https://www.psiexams.com\nPhone: (855) 560-3714\n\nExams available in-person or remotely.\n\nLife Insurance exam: 100 questions, 2 hours. Passing score: 70%.",
+    "override_description": "Schedule exam via PSI",
+    "override_required": 1,
+    "url": "https://www.psiexams.com"
+  },
+  {
+    "state": "NV",
+    "item": "Background Check",
+    "instructions": "Nevada requires fingerprinting for all insurance license applicants.\n\nVendor: IdentoGO\nURL: https://www.identogo.com\nPhone: (866) 761-8069\n\nFee: $60\n\nKeep the original receipt and attach a copy to your license application along with the Fingerprint Background Waiver.\n\nSubmit your license application within 1 year of passing the exam.\n\nURL: https://doi.nv.gov/Licensing/License_Types/Producer/Individuals/",
+    "override_description": "Fingerprinting required via IdentoGO ($60)",
+    "override_required": 1,
+    "url": "https://doi.nv.gov/Licensing/License_Types/Producer/Individuals/"
+  },
+  {
+    "state": "NV",
+    "item": "Pre-Licensing",
+    "instructions": "Nevada requires 20 hours of pre-licensing education for Life insurance.\n\nComplete a state-approved course before scheduling the state exam.\n\nURL: https://doi.nv.gov",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://doi.nv.gov"
+  },
+  {
+    "state": "NV",
+    "item": "Schedule Test",
+    "instructions": "Nevada insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com\nPhone: (800) 274-2609\n\nTest centers in Las Vegas, Reno, and Elko.\n\nLife exam: 97 questions. Passing score: 80% (higher than most states).\nExam fee: $39.",
+    "override_description": "Schedule exam via Pearson VUE ($39, 80% to pass)",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com"
+  },
+  {
+    "state": "NY",
+    "item": "Background Check",
+    "instructions": "New York requires fingerprinting for insurance license applicants.\n\nVendor: IdentoGO\nURL: https://www.identogo.com\nPhone: (877) 472-6915\n\nIMPORTANT: DFS must receive your application within 10 days of fingerprint scans, or scans will be discarded and you must restart (including repaying the fee).\n\nRequired documents to submit to DFS:\n- Two completed fingerprint cards\n- Signed IdentoGO pre-enrollment confirmation/receipt\n- Fingerprint Certification Form\n- Request for Fingerprint Card Scan Services form\n\nContact: NY DFS (800) 342-3736\nURL: https://www.dfs.ny.gov/apps_and_licensing/fingerprinting_procedure",
+    "override_description": "Fingerprinting required via IdentoGO (apply within 10 days)",
+    "override_required": 1,
+    "url": "https://www.dfs.ny.gov/apps_and_licensing/fingerprinting_procedure"
+  },
+  {
+    "state": "NY",
+    "item": "Pre-Licensing",
+    "instructions": "New York requires 40 hours of pre-licensing education for Life, Accident & Health combined.\n\nComplete a state-approved course with an approved provider.\n\nURL: https://www.dfs.ny.gov/apps_and_licensing/agents_and_brokers/home",
+    "override_description": "40 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://www.dfs.ny.gov/apps_and_licensing/agents_and_brokers/home"
+  },
+  {
+    "state": "NY",
+    "item": "Schedule Test",
+    "instructions": "New York insurance exams are administered by PSI Services LLC.\n\nSchedule online: https://www.psiexams.com\nPhone: (855) 579-4637\n\nExams available at physical PSI centers or remotely via online proctoring.\n\nLife exam: 100 questions, 120 minutes.",
+    "override_description": "Schedule exam via PSI",
+    "override_required": 1,
+    "url": "https://www.psiexams.com"
+  },
+  {
+    "state": "OH",
+    "item": "Background Check",
+    "instructions": "Ohio requires fingerprinting per Ohio Revised Code 3905.051 for all resident insurance license applicants.\n\nSchedule through any vendor on the Ohio Attorney General Webcheck Portal.\n\nFee: $72.25\n\nFingerprints are processed by the Ohio Bureau of Criminal Investigation (BCI) and FBI.\n\nBackground check results valid for 1 year. Submit your license application within 1 year of passing the exam.\n\nURL: https://www.ohioattorneygeneral.gov/Business/Services-for-Business/WebCheck",
+    "override_description": "Fingerprinting required via OH AG Webcheck ($72.25)",
+    "override_required": 1,
+    "url": "https://www.ohioattorneygeneral.gov/Business/Services-for-Business/WebCheck"
+  },
+  {
+    "state": "OH",
+    "item": "Pre-Licensing",
+    "instructions": "Ohio requires 20 hours of pre-licensing education for Life insurance.\n\nComplete a state-approved course before scheduling the state exam.",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://insurance.ohio.gov"
+  },
+  {
+    "state": "OH",
+    "item": "Schedule Test",
+    "instructions": "Ohio insurance exams are administered by PSI.\n\nSchedule online: https://home.psiexams.com (select OH Insurance)\nPhone: Check PSI website\n\nRetakes available as soon as 24 hours after first attempt.\n\nLife exam: 100 questions, 120 minutes. Passing score: 70%.\nExam fee: $42.",
+    "override_description": "Schedule exam via PSI ($42)",
+    "override_required": 1,
+    "url": "https://home.psiexams.com"
+  },
+  {
+    "state": "OK",
+    "item": "Background Check",
+    "instructions": "Oklahoma requires a background check as part of the insurance licensing process. Fingerprinting requirements may apply.\n\nComplete the background check after passing your exam.\n\nAllow 3 business days for PSI to send exam results to the Oklahoma Insurance Department, then 5 business days for OID to review your application.\n\nContact: Oklahoma Insurance Department\nPhone: (405) 521-3916\nURL: https://www.oid.ok.gov",
+    "override_description": "Background check required; contact OID for current fingerprint requirements",
+    "override_required": 1,
+    "url": "https://www.oid.ok.gov"
+  },
+  {
+    "state": "OK",
+    "item": "Pre-Licensing",
+    "instructions": "Oklahoma does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional.",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://www.oid.ok.gov"
+  },
+  {
+    "state": "OK",
+    "item": "Schedule Test",
+    "instructions": "Oklahoma insurance exams are administered by PSI.\n\nSchedule online: https://www.psiexams.com\nPhone: (833) 333-4754\n\nExams available at physical PSI centers or remotely via online proctoring.\n\nURL: https://www.oid.ok.gov/oklahoma-insurance-licensing-exam/",
+    "override_description": "Schedule exam via PSI",
+    "override_required": 1,
+    "url": "https://www.oid.ok.gov/oklahoma-insurance-licensing-exam/"
+  },
+  {
+    "state": "OR",
+    "item": "Background Check",
+    "instructions": "Oregon requires fingerprinting for all resident insurance license applicants.\n\nOption 1 - PSI Oregon sites (walk-in, no appointment needed):\n- Available during regular testing hours on exam day\n- Fee: $61.25\n- Locations: https://dfr.oregon.gov/business/licensing/insurance/Documents/psi-fingerprint-locations.pdf\n\nOption 2 - Fieldprint (appointment required):\n- URL: https://www.fieldprintoregon.com\n\nBoth vendors digitally capture and transmit prints to Oregon State Police and FBI.\n\nURL: https://dfr.oregon.gov/business/licensing/insurance/pages/fingerprint.aspx",
+    "override_description": "Fingerprinting required via PSI walk-in ($61.25) or Fieldprint",
+    "override_required": 1,
+    "url": "https://dfr.oregon.gov/business/licensing/insurance/pages/fingerprint.aspx"
+  },
+  {
+    "state": "OR",
+    "item": "Pre-Licensing",
+    "instructions": "Oregon requires 20 hours of pre-licensing education for Life insurance.\n\nComplete a state-approved course before scheduling the state exam.\n\nURL: https://dfr.oregon.gov/business/licensing/insurance/pages/producer-licensing.aspx",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://dfr.oregon.gov/business/licensing/insurance/pages/producer-licensing.aspx"
+  },
+  {
+    "state": "OR",
+    "item": "Schedule Test",
+    "instructions": "Oregon insurance exams are administered by PSI.\n\nSchedule online: https://www.psiexams.com\nPhone: (800) 733-9267\n\nBoth test center and online remote-proctored testing available. Complete pre-licensing education first and have your Certificate of Completion ready.\n\nContact: Producer Licensing (503) 947-7981 or web.insagent@oregon.gov",
+    "override_description": "Schedule exam via PSI",
+    "override_required": 1,
+    "url": "https://www.psiexams.com"
+  },
+  {
+    "state": "PA",
+    "item": "Background Check",
+    "instructions": "Pennsylvania requires fingerprinting for all insurance license applicants.\n\nVendor: IdentoGO\nService Code: 1KGBGJ\nURL: https://www.identogo.com\nPhone: (844) 321-2101\n\nDo NOT register for fingerprinting until AFTER you have passed the exam and applied for licensure.\n\nPayment at IdentoGO center after fingerprints are submitted. Credit card, debit card, certified check, or money order only (no cash or personal checks).",
+    "override_description": "Fingerprinting required via IdentoGO, code 1KGBGJ",
+    "override_required": 1,
+    "url": "https://www.identogo.com"
+  },
+  {
+    "state": "PA",
+    "item": "Pre-Licensing",
+    "instructions": "Pennsylvania requires 24 hours of pre-licensing education for Life insurance.\n\nComplete a state-approved course before scheduling the state exam.\n\nURL: https://www.pa.gov/agencies/insurance/licensing/licensees/initial-insurance-producer-licensing-process",
+    "override_description": "24 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://www.pa.gov/agencies/insurance/licensing/licensees/initial-insurance-producer-licensing-process"
+  },
+  {
+    "state": "PA",
+    "item": "Schedule Test",
+    "instructions": "Pennsylvania insurance exams are administered by PSI.\n\nSchedule online: https://www.psiexams.com\nPhone: (888) 818-5822\n\nRemote exams available via PSI Bridge, or in-person at PSI testing sites.\n\nLife exam: 100 questions, 2 hours. Passing score: 70%.",
+    "override_description": "Schedule exam via PSI",
+    "override_required": 1,
+    "url": "https://www.psiexams.com"
+  },
+  {
+    "state": "RI",
+    "item": "Background Check",
+    "instructions": "Rhode Island requires fingerprinting for insurance license applicants.\n\nLocation: Attorney General Customer Service Center\nAddress: 4 Howard Avenue, Cranston, RI 02920\n\nNo appointments - register when you arrive (walk-in only).\n\nFee: $5\n\nBackground reports valid for 30 days.\n\nQuestions: bcifingerprints@riag.ri.gov (fingerprinting) or BCIstate@riag.ri.gov (background checks)",
+    "override_description": "Fingerprinting required at RI AG office, walk-in ($5)",
+    "override_required": 1,
+    "url": "https://riag.ri.gov"
+  },
+  {
+    "state": "RI",
+    "item": "Pre-Licensing",
+    "instructions": "Rhode Island requires 20 hours of pre-licensing education for Life insurance.\n\nComplete a state-approved course before scheduling the state exam.",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://dbr.ri.gov/insurance"
+  },
+  {
+    "state": "RI",
+    "item": "Schedule Test",
+    "instructions": "Rhode Island insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com\nPhone: (800) 274-3739\n\nExams available at Pearson VUE test centers or via remote online proctored exam.\n\nReschedule at least 48 hours prior or forfeit exam fee. Bring two valid forms of government-issued ID.",
+    "override_description": "Schedule exam via Pearson VUE",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com"
+  },
+  {
+    "state": "SC",
+    "item": "Background Check",
+    "instructions": "South Carolina requires fingerprinting for all resident insurance license applicants.\n\nVendor: IdentoGO\nURL: https://www.identogo.com\n\nAfter applying for a resident producer license, you will receive an email with directions to schedule a fingerprint appointment through IdentoGO.\n\nFee: $50.50\n\nFingerprints are compared against SLED (statewide) and FBI (national) criminal history records.\n\nURL: https://doi.sc.gov/879/Fingerprinting",
+    "override_description": "Fingerprinting required via IdentoGO ($50.50)",
+    "override_required": 1,
+    "url": "https://doi.sc.gov/879/Fingerprinting"
+  },
+  {
+    "state": "SC",
+    "item": "Pre-Licensing",
+    "instructions": "South Carolina requires 20 hours of pre-licensing education for Life insurance.\n\nComplete a state-approved course before scheduling the state exam.\n\nURL: https://doi.sc.gov/481/Producer",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://doi.sc.gov/481/Producer"
+  },
+  {
+    "state": "SC",
+    "item": "Schedule Test",
+    "instructions": "South Carolina insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com\nPhone: (877) 759-5226\n\nURL: https://doi.sc.gov/481/Producer",
+    "override_description": "Schedule exam via Pearson VUE",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com"
+  },
+  {
+    "state": "SD",
+    "item": "Background Check",
+    "instructions": "South Dakota requires fingerprinting for certain insurance license types. The requirement may vary by license type.\n\nFingerprints are submitted through a Livescan machine at a South Dakota location. You must print a receipt and present it at the Livescan location.\n\nFee: $50 (State and FBI check) or $30 (State only)\n\nProcessed by: SD Division of Criminal Investigation Identification Section (DCI ID)\n\nContact: South Dakota Division of Insurance\nPhone: (605) 773-3513\nURL: https://dlr.sd.gov/insurance",
+    "override_description": "Fingerprinting may be required via Livescan ($50)",
+    "override_required": 1,
+    "url": "https://dlr.sd.gov/insurance"
+  },
+  {
+    "state": "SD",
+    "item": "Pre-Licensing",
+    "instructions": "South Dakota does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional.",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://dlr.sd.gov/insurance"
+  },
+  {
+    "state": "SD",
+    "item": "Schedule Test",
+    "instructions": "South Dakota insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com\nPhone: (800) 274-5993\n\nRemote exams available via OnVUE. Exam scores valid for 180 days.\n\n120 minutes to complete. Exam fee: $85.",
+    "override_description": "Schedule exam via Pearson VUE ($85)",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com"
+  },
+  {
+    "state": "TN",
+    "item": "Background Check",
+    "instructions": "Tennessee requires fingerprinting for all resident producer applicants.\n\nVendor: IdentoGO\nORI: TN920680Z\nTransaction Type: IP (TN Insurance Producer)\nURL: https://www.identogo.com\n\nEnter: Name, Agency (Department of Commerce and Insurance), ORI # TN920680Z, Transaction Type IP.\n\nFee: $42\n\nSubmit fingerprints at least 2 business days BEFORE submitting your license application.",
+    "override_description": "Fingerprinting required via IdentoGO, ORI TN920680Z ($42)",
+    "override_required": 1,
+    "url": "https://www.identogo.com"
+  },
+  {
+    "state": "TN",
+    "item": "Pre-Licensing",
+    "instructions": "Tennessee does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional.",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://www.tn.gov/commerce/insurance"
+  },
+  {
+    "state": "TN",
+    "item": "Schedule Test",
+    "instructions": "Tennessee insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com\nPhone: (800) 274-4957\n\n10-day waiting period to reschedule. After subsequent attempts, must wait 30 days before retaking.",
+    "override_description": "Schedule exam via Pearson VUE",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com"
+  },
+  {
+    "state": "TX",
+    "item": "Background Check",
+    "instructions": "Texas requires fingerprinting for most insurance license applicants.\n\nVendor: IdentoGO\nScheduling Code: 11G6QF\nURL: https://www.identogo.com\nPhone: (888) 467-2080\n\nFee: $39.70\n\nSend a copy of the IdentoGO receipt (showing prints sent to TX DPS) with your application.\n\nFingerprint results valid for 1 year. Exemption: active TX licensees who already submitted prints.\n\nURL: https://www.tdi.texas.gov/agent/fingerprint-instructions.html",
+    "override_description": "Fingerprinting required via IdentoGO, code 11G6QF ($39.70)",
+    "override_required": 1,
+    "url": "https://www.tdi.texas.gov/agent/fingerprint-instructions.html"
+  },
+  {
+    "state": "TX",
+    "item": "Pre-Licensing",
+    "instructions": "Texas does NOT require pre-licensing education for Life insurance producers.\n\nPre-licensing courses are recommended but optional.\n\nURL: https://www.tdi.texas.gov/agent/life-agent-apply.html",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://www.tdi.texas.gov/agent/life-agent-apply.html"
+  },
+  {
+    "state": "TX",
+    "item": "Schedule Test",
+    "instructions": "Texas insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com/us/en/tx/insurance.html\nPhone: (888) 754-7667\n\nRegister at least 24 hours in advance. Submit your application within 1 year of passing the exam.\n\nApplication fee: $50.",
+    "override_description": "Schedule exam via Pearson VUE",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com/us/en/tx/insurance.html"
+  },
+  {
+    "state": "UT",
+    "item": "Background Check",
+    "instructions": "Utah requires fingerprinting for all resident insurance license applicants.\n\nFingerprinting is done at a Prometric test center AFTER passing the exam. The license application (completed at a kiosk at the test center) includes the fingerprint fee.\n\nFee: $38 total ($12 FBI + $20 BCI + $6 Prometric processing)\n\nPay by credit card during the online application process.\n\nProcessing time: 5-10 business days (allow 30 days for BCI/FBI to process).\n\nURL: https://insurance.utah.gov/licensees/producers/exam/",
+    "override_description": "Fingerprinting at Prometric test center ($38)",
+    "override_required": 1,
+    "url": "https://insurance.utah.gov/licensees/producers/exam/"
+  },
+  {
+    "state": "UT",
+    "item": "Pre-Licensing",
+    "instructions": "Utah does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional.",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://insurance.utah.gov"
+  },
+  {
+    "state": "UT",
+    "item": "Schedule Test",
+    "instructions": "Utah insurance exams are administered by Prometric.\n\nSchedule online: https://www.prometric.com\nPhone: (888) 226-8740\n\nExams taken at Prometric test centers. After passing, apply at a kiosk at the test center.\n\nURL: https://insurance.utah.gov/licensees/producers/exam/",
+    "override_description": "Schedule exam via Prometric",
+    "override_required": 1,
+    "url": "https://www.prometric.com"
+  },
+  {
+    "state": "VA",
+    "item": "Background Check",
+    "instructions": "Virginia requires electronic fingerprinting for a criminal background check.\n\nVendor: Fieldprint\nFieldprint Code: FPVABOICHRR\nURL: https://www.fieldprint.com\nPhone: (877) 614-4364\n\nFee: $34.95\n\nFingerprints must be no older than 90 days when used with an application. Submit your application within 90 days of fingerprinting.\n\nURL: https://www.scc.virginia.gov/regulated-industries/bureau-of-insurance/licensed-agent/applying-for-a-individual-va-insurance-license/",
+    "override_description": "Fingerprinting required via Fieldprint, code FPVABOICHRR ($34.95)",
+    "override_required": 1,
+    "url": "https://www.scc.virginia.gov/regulated-industries/bureau-of-insurance/licensed-agent/applying-for-a-individual-va-insurance-license/"
+  },
+  {
+    "state": "VA",
+    "item": "Pre-Licensing",
+    "instructions": "Virginia requires 20 hours of pre-licensing education for Life insurance.\n\nComplete a state-approved course before scheduling the state exam.",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://www.scc.virginia.gov"
+  },
+  {
+    "state": "VA",
+    "item": "Schedule Test",
+    "instructions": "Virginia insurance exams are administered by Prometric.\n\nSchedule online: https://www.prometric.com\n\nExams available at Prometric physical testing locations or remotely via ProProctor application.\n\nExam fee: $35. Prometric registration valid for 90 days (must pass within that window).",
+    "override_description": "Schedule exam via Prometric ($35)",
+    "override_required": 1,
+    "url": "https://www.prometric.com"
+  },
+  {
+    "state": "VT",
+    "item": "Background Check",
+    "instructions": "Vermont has minimal fingerprinting/background check requirements for insurance licenses.\n\nVermont is one of the states that may not require fingerprinting or a formal background check for insurance licensing. However, you may be asked to submit fingerprints at Prometric after passing the exam.\n\nContact the Vermont Department of Financial Regulation for current requirements.\n\nURL: https://dfr.vermont.gov",
+    "override_description": "Minimal requirements; contact VT DFR for current details",
+    "override_required": null,
+    "url": "https://dfr.vermont.gov"
+  },
+  {
+    "state": "VT",
+    "item": "Pre-Licensing",
+    "instructions": "Vermont does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional.",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://dfr.vermont.gov"
+  },
+  {
+    "state": "VT",
+    "item": "Schedule Test",
+    "instructions": "Vermont insurance exams are administered by Prometric.\n\nSchedule online: https://www.prometric.com/exams/insurance-vt\n\nExams can be taken online or in person at a Prometric test center.\n\nLife and Accident, Health, and HMO exams are both 2 hours long.\n\nWait 48 hours after passing before applying. Application fee: $60.",
+    "override_description": "Schedule exam via Prometric",
+    "override_required": 1,
+    "url": "https://www.prometric.com/exams/insurance-vt"
+  },
+  {
+    "state": "WA",
+    "item": "Background Check",
+    "instructions": "Washington requires fingerprinting for all insurance license applicants.\n\nVendor: IdentoGO (IDEMIA)\nURL: https://www.identogo.com\nPhone: (888) 771-5097\n\nYou cannot schedule fingerprinting until the OIC has received your license application. You may schedule fingerprinting for the day of your exam at the exam site.\n\nFee: $49\n\nFingerprints sent to Washington State Patrol, which forwards results to the insurance commissioner.\n\nURL: https://www.insurance.wa.gov/producers-adjusters/licensing/get-licensed/fingerprint-requirements",
+    "override_description": "Fingerprinting required via IdentoGO ($49)",
+    "override_required": 1,
+    "url": "https://www.insurance.wa.gov/producers-adjusters/licensing/get-licensed/fingerprint-requirements"
+  },
+  {
+    "state": "WA",
+    "item": "Pre-Licensing",
+    "instructions": "Washington requires 20 hours of pre-licensing education for Life insurance.\n\nComplete a state-approved course before scheduling the state exam.\n\nURL: https://www.insurance.wa.gov",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://www.insurance.wa.gov"
+  },
+  {
+    "state": "WA",
+    "item": "Schedule Test",
+    "instructions": "Washington insurance exams are administered by PSI.\n\nSchedule online: https://www.psiexams.com\nPhone: (855) 205-5825\n\n10 PSI test centers throughout Washington state. Remote testing also available.\n\nPassing score: 70%.\n\nURL: https://www.insurance.wa.gov/producers-adjusters/education/first-time-license/how-schedule-insurance-license-exam",
+    "override_description": "Schedule exam via PSI",
+    "override_required": 1,
+    "url": "https://www.insurance.wa.gov/producers-adjusters/education/first-time-license/how-schedule-insurance-license-exam"
+  },
+  {
+    "state": "WI",
+    "item": "Background Check",
+    "instructions": "Wisconsin requires fingerprinting for all unlicensed insurance license applicants.\n\nVendor: Fieldprint Wisconsin\nFieldprint Code: FPWIOCIInsurance (not case sensitive)\nURL: https://www.fieldprint.com\n\nFee: $36\n\nFingerprint information is valid for 180 days.\n\nThe Wisconsin OCI requires fingerprinting to ensure applicants do not have a disqualifying criminal or social services background.",
+    "override_description": "Fingerprinting required via Fieldprint, code FPWIOCIInsurance ($36)",
+    "override_required": 1,
+    "url": "https://www.fieldprint.com"
+  },
+  {
+    "state": "WI",
+    "item": "Pre-Licensing",
+    "instructions": "Wisconsin does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional.\n\nURL: https://oci.wi.gov/Pages/Agents/ExamRequirements.aspx",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://oci.wi.gov/Pages/Agents/ExamRequirements.aspx"
+  },
+  {
+    "state": "WI",
+    "item": "Schedule Test",
+    "instructions": "Wisconsin insurance exams are administered by PSI.\n\nSchedule online: https://www.psiexams.com\nPhone: (888) 818-5805\n\nRemote exams available via PSI Bridge. Also in-person at PSI testing sites.\n\nLife, General and State Specific exam: 100 questions, 2 hours.\nExam fee: $75.",
+    "override_description": "Schedule exam via PSI ($75)",
+    "override_required": 1,
+    "url": "https://www.psiexams.com"
+  },
+  {
+    "state": "WV",
+    "item": "Background Check",
+    "instructions": "West Virginia requires fingerprinting for all initial resident insurance license applicants.\n\nVendor: IdentoGO\nService Code: 228NS5\nURL: https://www.identogo.com\nPhone: (855) 766-7746\n\nSchedule AFTER passing the state exam.\n\nFee: $45.75\n\nFingerprints transmitted to WV State Police and FBI. Results valid for 30 days only - act quickly on next steps.\n\nURL: https://www.wvinsurance.gov",
+    "override_description": "Fingerprinting required via IdentoGO, code 228NS5 ($45.75)",
+    "override_required": 1,
+    "url": "https://www.wvinsurance.gov"
+  },
+  {
+    "state": "WV",
+    "item": "Pre-Licensing",
+    "instructions": "West Virginia requires 20 hours of pre-licensing education per line of authority (Life, Accident & Sickness, Property, Casualty, Personal Lines).\n\nComplete a state-approved course before scheduling the state exam.",
+    "override_description": "20 hours of pre-licensing education required",
+    "override_required": 1,
+    "url": "https://www.wvinsurance.gov"
+  },
+  {
+    "state": "WV",
+    "item": "Schedule Test",
+    "instructions": "West Virginia insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com\nPhone: (800) 274-2614\n\nSchedule at least 24 hours in advance. Cancel/reschedule up to 48 hours before.\n\nRemote exams available via OnVUE. Also available at Pearson VUE test centers.",
+    "override_description": "Schedule exam via Pearson VUE",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com"
+  },
+  {
+    "state": "WY",
+    "item": "Background Check",
+    "instructions": "Wyoming requires fingerprinting for all first-time resident insurance license applicants.\n\nAfter your license application is received, you will be MAILED a fingerprinting packet. Do NOT submit fingerprints before applying.\n\nMake arrangements with your local law enforcement to obtain fingerprints. There may be a fee charged by law enforcement.\n\nFee: $39 (applies to all initial resident producer applications)\n\nProcessing time: 2-3 weeks from when the department receives your fingerprints.\n\nURL: https://doi.wyo.gov/licensing/producers",
+    "override_description": "Fingerprinting via local law enforcement after mailed packet ($39)",
+    "override_required": 1,
+    "url": "https://doi.wyo.gov/licensing/producers"
+  },
+  {
+    "state": "WY",
+    "item": "Pre-Licensing",
+    "instructions": "Wyoming does NOT require pre-licensing education for insurance producers.\n\nPre-licensing courses are recommended but optional.\n\nURL: https://doi.wyo.gov/licensing/producers",
+    "override_description": "Pre-licensing education not required (recommended)",
+    "override_required": 0,
+    "url": "https://doi.wyo.gov/licensing/producers"
+  },
+  {
+    "state": "WY",
+    "item": "Schedule Test",
+    "instructions": "Wyoming insurance exams are administered by Pearson VUE.\n\nSchedule online: https://www.pearsonvue.com/wy/insurance\nPhone: (866) 936-7786\n\nRemote exams available via OnVUE. Also in-person at Pearson VUE test centers.\n\nLife exam: 100 questions, 2 hours. Passing score: 70%.",
+    "override_description": "Schedule exam via Pearson VUE",
+    "override_required": 1,
+    "url": "https://www.pearsonvue.com/wy/insurance"
+  }
+]

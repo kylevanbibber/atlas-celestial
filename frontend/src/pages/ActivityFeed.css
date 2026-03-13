@@ -1,0 +1,125 @@
+.activity-feed-page {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 20px 16px;
+  transition: max-width 0.2s ease;
+}
+
+.activity-feed-page.expanded {
+  max-width: 100%;
+}
+
+.activity-feed-page-header {
+  margin-bottom: 20px;
+}
+
+.activity-feed-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.activity-feed-title-row h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0;
+}
+
+/* Header row: tabs + add button */
+.activity-feed-header-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Scope tabs */
+.activity-feed-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-secondary, #f3f4f6);
+  border-radius: 10px;
+  padding: 3px;
+  flex: 1;
+}
+
+.activity-feed-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.activity-feed-tab:hover:not(.active) {
+  color: var(--text-primary, #374151);
+}
+
+.activity-feed-tab.active {
+  background: var(--card-bg, #fff);
+  color: var(--text-primary, #111827);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  font-weight: 600;
+}
+
+/* Expand/collapse button */
+.activity-feed-expand-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  background: var(--bg-secondary, #f3f4f6);
+  color: var(--text-secondary, #6b7280);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.activity-feed-expand-btn:hover {
+  background: var(--border-color, #e5e7eb);
+  color: var(--text-primary, #111827);
+}
+
+.activity-feed-expand-btn:active {
+  opacity: 0.8;
+}
+
+/* Add sale button */
+.activity-feed-add-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: #3b82f6;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, transform 0.1s ease;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+}
+
+.activity-feed-add-btn:hover {
+  background: #2563eb;
+  transform: scale(1.05);
+}
+
+.activity-feed-add-btn:active {
+  transform: scale(0.95);
+}

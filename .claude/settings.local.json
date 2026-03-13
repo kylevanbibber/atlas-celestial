@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep:*)",
+      "Bash(curl -s -X POST https://peaceful-badlands-42414-7b2e5f9acb76.herokuapp.com/test/process -H \"Content-Type: application/json\" -d '{\"\"subject\"\": \"\"Pending Number has been Issued\"\"}')",
+      "Bash(cd:*)",
+      "WebSearch"
+    ]
+  }
+}

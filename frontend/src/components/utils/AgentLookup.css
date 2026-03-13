@@ -1,0 +1,310 @@
+/* ── Chip in header ── */
+.agent-lookup-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px 5px 5px;
+  border-radius: 40px;
+  background: var(--bg-secondary, #f3f4f6);
+  border: 1px solid var(--border-color, #e5e7eb);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  max-width: 220px;
+  user-select: none;
+}
+
+.agent-lookup-chip:hover {
+  background: var(--hover-bg, #e9eaed);
+  border-color: var(--text-secondary, #9ca3af);
+}
+
+.agent-lookup-chip.has-selection {
+  background: var(--primary-color, #3b82f6);
+  border-color: var(--primary-color, #3b82f6);
+}
+
+.agent-lookup-chip.has-selection .agent-lookup-chip-name,
+.agent-lookup-chip.has-selection .agent-lookup-chip-role {
+  color: #fff;
+}
+
+.agent-lookup-chip.has-selection .agent-lookup-chip-role {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.agent-lookup-chip.has-selection .agent-lookup-chip-action {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.agent-lookup-chip.has-selection .agent-lookup-chip-action:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.agent-lookup-chip.has-selection:hover {
+  background: var(--primary-hover, #2563eb);
+  border-color: var(--primary-hover, #2563eb);
+}
+
+.agent-lookup-chip-pic {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card-bg, #fff);
+  color: var(--text-secondary, #6b7280);
+  flex-shrink: 0;
+}
+
+.agent-lookup-chip-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.agent-lookup-chip-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+  line-height: 1.2;
+}
+
+.agent-lookup-chip-role {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-secondary, #6b7280);
+  background: var(--card-bg, #fff);
+  padding: 1px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.agent-lookup-chip-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.agent-lookup-chip-action:hover {
+  background: var(--hover-bg, #e5e7eb);
+  color: var(--text-primary, #111);
+}
+
+/* ── Search dropdown ── */
+.agent-lookup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1150;
+  background: rgba(0, 0, 0, 0.25);
+  display: flex;
+  justify-content: center;
+  padding-top: 80px;
+}
+
+.agent-lookup-dropdown {
+  width: 400px;
+  max-height: 520px;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: agentLookupIn 0.2s ease;
+  align-self: flex-start;
+}
+
+@keyframes agentLookupIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.agent-lookup-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.agent-lookup-search-icon {
+  color: var(--text-secondary, #6b7280);
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+.agent-lookup-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--text-primary, #111);
+  font-family: inherit;
+}
+
+.agent-lookup-input::placeholder {
+  color: var(--text-secondary, #9ca3af);
+}
+
+.agent-lookup-filters {
+  display: flex;
+  gap: 6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  flex-wrap: wrap;
+}
+
+.agent-lookup-filter-pill {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border-color, #e5e7eb);
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.agent-lookup-filter-pill:hover {
+  border-color: var(--text-secondary, #9ca3af);
+  color: var(--text-primary, #111);
+}
+
+.agent-lookup-filter-pill.active {
+  background: var(--primary-color, #3b82f6);
+  border-color: var(--primary-color, #3b82f6);
+  color: #fff;
+}
+
+.agent-lookup-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.agent-lookup-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.agent-lookup-item:hover,
+.agent-lookup-item.highlighted {
+  background: var(--hover-bg, #f3f4f6);
+}
+
+.agent-lookup-item-pic {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary, #f3f4f6);
+  color: var(--text-secondary, #6b7280);
+  flex-shrink: 0;
+}
+
+.agent-lookup-item-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.agent-lookup-item-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.agent-lookup-item-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #111);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-lookup-item-role {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+  background: var(--bg-secondary, #f3f4f6);
+  padding: 2px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.agent-lookup-empty {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.agent-lookup-hint {
+  padding: 10px 16px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-secondary, #9ca3af);
+}
+
+@media (max-width: 768px) {
+  .agent-lookup-chip-name,
+  .agent-lookup-chip-role {
+    display: none;
+  }
+
+  .agent-lookup-chip {
+    padding: 4px;
+    gap: 4px;
+  }
+
+  .agent-lookup-backdrop {
+    padding-top: 0;
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  .agent-lookup-dropdown {
+    width: 100%;
+    max-height: 100%;
+    height: 100%;
+    border-radius: 0;
+    animation: none;
+  }
+}

@@ -1,0 +1,110 @@
+/* Secondary Header - Sits between main header and page content */
+.secondary-header {
+  position: fixed;
+  top: var(--header-height, 70px);
+  left: 0;
+  right: 0;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  z-index: 10;
+  transition: all 0.3s ease;
+}
+
+.secondary-header-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  gap: 1rem;
+  min-height: 50px;
+}
+
+.secondary-header-left {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.secondary-header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.secondary-header-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Adjust breadcrumb styles when inside secondary header */
+.secondary-header .breadcrumb-nav {
+  position: static;
+  background: transparent;
+  border-bottom: none;
+  padding: 0;
+}
+
+/* Filter and action buttons in secondary header */
+.secondary-header-action {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.secondary-header-action:hover {
+  background: var(--hover-background);
+  border-color: var(--primary-color);
+}
+
+.secondary-header-action.active {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+/* Filters container */
+.secondary-header-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.secondary-header-filter-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .secondary-header-container {
+    padding: 0.5rem 1rem;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .secondary-header-left,
+  .secondary-header-right {
+    flex: 1 1 100%;
+  }
+
+  .secondary-header-filters {
+    gap: 0.5rem;
+  }
+
+  .secondary-header-action {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+}

@@ -1,0 +1,766 @@
+/* PnP Component Styles - Matching app patterns */
+.pnp-container {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  padding: 0;
+}
+
+/* Header Section - Date navigation, search bar, and controls */
+.pnp-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+  gap: 15px;
+}
+
+/* Date Navigation - Following app button patterns */
+.date-navigation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  position: relative; /* For dropdown positioning */
+}
+
+/* Date selector button */
+.date-selector-btn {
+  transition: all 0.2s ease;
+}
+
+.date-selector-btn:hover {
+  background: var(--hover-bg) !important;
+  border-color: var(--primary-color) !important;
+}
+
+/* Date picker dropdown */
+.date-picker-dropdown {
+  animation: fadeIn 0.15s ease;
+}
+
+.date-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.date-nav-btn:hover:not(:disabled) {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.date-nav-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: var(--bg-tertiary);
+  color: var(--text-muted);
+}
+
+.current-date {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: var(--text-primary);
+  min-width: 120px;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.current-date svg {
+  color: var(--button-primary-bg);
+  font-size: 16px;
+}
+
+/* Header Controls - View mode toggle only */
+.pnp-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Spinning animation for export button (now in ActionBar) */
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+/* P&P Filter Menu Styles */
+.pnp-filter-menu {
+  position: relative;
+}
+
+.filter-dropdown {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 16px;
+  min-width: 300px;
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.filter-section {
+  margin-bottom: 16px;
+}
+
+.filter-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-row input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 12px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+}
+
+.filter-row span {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.filter-section label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.filter-actions button {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.filter-actions button:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.filter-actions button:first-child {
+  background: var(--button-secondary-bg);
+}
+
+.filter-actions button:last-child {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.filter-actions button:last-child:hover {
+  background: var(--primary-hover);
+}
+
+/* Search Section - Flexible width in header */
+.pnp-search-section {
+  flex-grow: 1;
+  display: flex;
+  justify-content: center;
+  min-width: 200px;
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 18px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.clear-search-btn:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+
+
+/* Error and Loading States - Following app patterns */
+.error-message {
+  text-align: center;
+  padding: 40px 20px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.error-message h3 {
+  color: #ef4444;
+  margin: 0 0 12px 0;
+  font-size: 20px;
+}
+
+.error-message p {
+  color: var(--text-secondary);
+  margin: 0 0 20px 0;
+  font-size: 14px;
+}
+
+.retry-button {
+  background-color: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  border: none;
+  border-radius: 4px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retry-button:hover {
+  background-color: var(--button-primary-hover);
+}
+
+.no-data-message {
+  text-align: center;
+  padding: 40px 20px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* DataTable Integration - Following app table patterns */
+.pnp-container .data-table-container {
+  background: transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.pnp-container .table {
+  margin-bottom: 0;
+}
+
+.pnp-container .table th {
+  background: var(--bg-secondary);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-bottom: 2px solid var(--border-color);
+  padding: 12px 8px;
+  color: var(--text-primary);
+}
+
+.pnp-container .table td {
+  padding: 8px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pnp-container .table tbody tr:nth-child(even) {
+  background-color: var(--bg-primary);
+}
+
+.pnp-container .table tbody tr:nth-child(odd) {
+  background-color: var(--bg-secondary);
+}
+
+.pnp-container .table tbody tr:hover {
+  background-color: var(--sidebar-hover) !important;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+/* Group header styling for multi-level columns */
+.pnp-container .table th[colspan] {
+  text-align: center;
+  font-weight: 700;
+  background: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  font-size: 14px;
+  padding: 12px 8px;
+}
+
+/* Text alignment for numeric columns */
+.pnp-container .text-right {
+  text-align: right !important;
+}
+
+.pnp-container .text-right input,
+.pnp-container .text-right select {
+  text-align: right;
+}
+
+.pnp-container .text-center {
+  text-align: center !important;
+}
+
+.pnp-container .text-center input,
+.pnp-container .text-center select {
+  text-align: center;
+}
+
+/* Responsive design - Following app mobile patterns */
+@media (max-width: 768px) {
+  .pnp-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  
+  .pnp-title-section {
+    text-align: center;
+  }
+  
+  .pnp-title-section h2 {
+    font-size: 20px;
+  }
+  
+  .pnp-header-controls {
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+  }
+  
+  .date-navigation {
+    justify-content: center;
+    align-self: center;
+    width: fit-content;
+  }
+
+  .export-btn {
+    width: fit-content;
+    align-self: center;
+    font-size: 13px;
+    padding: 6px 12px;
+    min-width: auto;
+  }
+
+  .pnp-container .table th {
+    padding: 8px 4px;
+    font-size: 11px;
+  }
+
+  .pnp-container .table td {
+    padding: 6px 4px;
+    font-size: 11px;
+  }
+
+  .pnp-container .table th[colspan] {
+    font-size: 12px;
+    padding: 10px 4px;
+  }
+
+  .search-input-wrapper {
+    max-width: none;
+    margin: 0;
+  }
+
+  .search-input {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  .search-results-info {
+    font-size: 13px;
+  }
+
+  .pnp-tabs {
+    margin-bottom: 16px;
+  }
+
+  .tab-button {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .tab-count {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pnp-title-section h2 {
+    font-size: 18px;
+  }
+  
+  .pnp-subtitle {
+    font-size: 12px;
+  }
+
+  .current-date {
+    min-width: 100px;
+    font-size: 12px;
+  }
+
+  .date-nav-btn {
+    width: 28px;
+    height: 28px;
+  }
+
+  .pnp-container .table th {
+    padding: 6px 3px;
+    font-size: 10px;
+  }
+
+  .pnp-container .table td {
+    padding: 5px 3px;
+    font-size: 10px;
+  }
+
+
+  /* Header responsive layout */
+  .pnp-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .date-navigation {
+    order: 1;
+    align-self: center;
+  }
+  
+  .pnp-search-section {
+    order: 2;
+    min-width: auto;
+  }
+  
+  .pnp-header-controls {
+    order: 3;
+    justify-content: center;
+  }
+}
+
+/* View Mode Toggle - Following app button patterns */
+.pnp-container .view-mode-toggle {
+  display: flex;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.pnp-container .view-mode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--text-secondary);
+  font-size: 16px;
+  min-width: 40px;
+}
+
+.pnp-container .view-mode-btn:hover {
+  background-color: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.pnp-container .view-mode-btn.active {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.pnp-container .view-mode-btn:not(:last-child) {
+  border-right: 1px solid var(--border-color);
+}
+
+/* Sticky Name Column Styles */
+.pnp-container .table th:first-child,
+.pnp-container .table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  background-color: var(--card-bg) !important;
+  border-right: 2px solid var(--border-color);
+  min-width: 200px; /* Ensure minimum width */
+  max-width: 300px; /* Prevent excessive width */
+}
+
+/* Ensure table cell text has proper color */
+.pnp-container .table td:first-child {
+  color: var(--text-primary) !important;
+}
+
+.pnp-container .table thead th:first-child {
+  z-index: 11;
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  font-weight: 600 !important;
+  text-align: left !important;
+  border-bottom: 2px solid var(--border-color) !important;
+}
+
+.sticky-name-cell {
+  background-color: inherit;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 4px; /* Reduced horizontal padding */
+  box-sizing: border-box;
+}
+
+.sticky-role-cell {
+  background-color: inherit;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start; /* Align role badges to the left to show indentation */
+  width: 100%;
+  padding: 8px 4px; /* Reduced horizontal padding */
+  box-sizing: border-box;
+}
+
+/* Role column sticky (when in hierarchy mode) - only for hierarchy view */
+.pnp-container.hierarchy-mode .table th:nth-child(2),
+.pnp-container.hierarchy-mode .table td:nth-child(2) {
+  position: sticky;
+  left: 200px; /* Match name column min-width */
+  z-index: 9;
+  background-color: var(--card-bg) !important;
+  border-right: 1px solid var(--border-color);
+  width: 80px; /* Fixed width for role column */
+  min-width: 80px;
+  max-width: 80px;
+}
+
+/* Ensure role column table cell text has proper color */
+.pnp-container.hierarchy-mode .table td:nth-child(2) {
+  color: var(--text-primary) !important;
+}
+
+.pnp-container.hierarchy-mode .table thead th:nth-child(2) {
+  z-index: 10;
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  font-weight: 600 !important;
+  text-align: left !important;
+  border-bottom: 2px solid var(--border-color) !important;
+}
+
+/* Role badges now show hierarchy indentation in sticky column */
+
+/* Add shadow for role column too */
+.pnp-container.hierarchy-mode .table th:nth-child(2)::after,
+.pnp-container.hierarchy-mode .table td:nth-child(2)::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -8px;
+  bottom: 0;
+  width: 8px;
+  background: linear-gradient(to right, 
+    rgba(0, 0, 0, 0.08) 0%, 
+    rgba(0, 0, 0, 0.04) 50%, 
+    transparent 100%);
+  pointer-events: none;
+}
+
+/* Shadow effect for sticky columns */
+.pnp-container .table th:first-child::after,
+.pnp-container .table td:first-child::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -8px;
+  bottom: 0;
+  width: 8px;
+  background: linear-gradient(to right, 
+    rgba(0, 0, 0, 0.08) 0%, 
+    rgba(0, 0, 0, 0.04) 50%, 
+    transparent 100%);
+  pointer-events: none;
+}
+
+/* Dark mode adjustments - Following app patterns */
+[data-theme="dark"] .pnp-container .table tbody tr:hover {
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .pnp-container .table th:first-child,
+[data-theme="dark"] .pnp-container .table td:first-child {
+  background-color: var(--card-bg) !important;
+  color: var(--text-primary) !important;
+  border-right: 2px solid var(--border-color);
+}
+
+[data-theme="dark"] .pnp-container .table thead th:first-child {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-bottom: 2px solid var(--border-color) !important;
+}
+
+[data-theme="dark"] .pnp-container .table th:first-child::after,
+[data-theme="dark"] .pnp-container .table td:first-child::after {
+  background: linear-gradient(to right, 
+    rgba(255, 255, 255, 0.08) 0%, 
+    rgba(255, 255, 255, 0.04) 50%, 
+    transparent 100%);
+}
+
+[data-theme="dark"] .pnp-container.hierarchy-mode .table th:nth-child(2),
+[data-theme="dark"] .pnp-container.hierarchy-mode .table td:nth-child(2) {
+  background-color: var(--card-bg) !important;
+  color: var(--text-primary) !important;
+  border-right: 1px solid var(--border-color);
+  width: 80px;
+  min-width: 80px;
+  max-width: 80px;
+}
+
+[data-theme="dark"] .pnp-container.hierarchy-mode .table thead th:nth-child(2) {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-bottom: 2px solid var(--border-color) !important;
+  text-align: left !important;
+}
+
+[data-theme="dark"] .pnp-container.hierarchy-mode .table th:nth-child(2)::after,
+[data-theme="dark"] .pnp-container.hierarchy-mode .table td:nth-child(2)::after {
+  background: linear-gradient(to right, 
+    rgba(255, 255, 255, 0.08) 0%, 
+    rgba(255, 255, 255, 0.04) 50%, 
+    transparent 100%);
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 768px) {
+  .pnp-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .date-navigation {
+    order: 1;
+    align-self: center;
+  }
+  
+  .pnp-search-section {
+    order: 2;
+    min-width: auto;
+  }
+  
+  .pnp-header-controls {
+    order: 3;
+    justify-content: center;
+  }
+
+  /* Mobile filter dropdown positioning */
+  .pnp-filter-menu .filter-dropdown {
+    right: -100px;
+    left: -100px;
+    max-width: calc(100vw - 40px);
+    margin: 0 auto;
+  }
+}
+
+/* Recap Tab Styles */
+.pnp-recap-container {
+  margin-top: 8px;
+}
+
+.pnp-recap-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.pnp-recap-subtabs {
+  display: flex;
+  gap: 4px;
+  padding-bottom: 0;
+}
+
+.pnp-recap-subtab {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, #666);
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pnp-recap-subtab:hover {
+  color: var(--text-primary);
+  background: var(--hover-bg, rgba(0,0,0,0.04));
+}
+
+.pnp-recap-subtab.active {
+  color: #00558c;
+  border-bottom-color: #00558c;
+  font-weight: 600;
+}
+
+.pnp-recap-subtab-count {
+  font-size: 11px;
+  opacity: 0.7;
+}

@@ -1,0 +1,97 @@
+.client-info-group {
+  margin-bottom: 20px;
+}
+
+.client-info-group h4 {
+  color: var(--hover-color);
+  margin-bottom: 15px;
+  font-weight: bold;
+  font-family: 'Avenir Next LT Pro', sans-serif;
+}
+
+.client-info-group hr {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 20px 0;
+}
+
+.client-info-group .input-row {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 15px;
+}
+
+.client-info-group .input-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.client-info-group .input-group label {
+  margin-bottom: 5px;
+  font-family: 'Calibri', sans-serif;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.client-name-input {
+  border-top-left-radius: 5px;
+  border-bottom-left-radius: 5px;
+}
+
+.agent-readonly-input,
+.agent-input {
+  padding: 8px;
+  font-size: 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 5px;
+  width: 100%;
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  font-family: 'Calibri', sans-serif;
+}
+
+.agent-readonly-input {
+  background-color: var(--bg-tertiary);
+  cursor: not-allowed;
+}
+
+.agent-readonly-input:focus,
+.agent-input:focus {
+  outline: none;
+  border-color: var(--hover-color);
+}
+
+.agent-select {
+  padding: 8px;
+  font-size: 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 5px;
+  width: 100%;
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  font-family: 'Calibri', sans-serif;
+}
+
+.agent-select:focus {
+  outline: none;
+  border-color: var(--hover-color);
+}
+
+.agent-select option {
+  background-color: var(--input-bg);
+  color: var(--input-text);
+}
+
+.client-info-group p {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-top: 10px;
+}
+
+@media (max-width: 600px) {
+  .client-info-group .input-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+} 

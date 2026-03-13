@@ -1,0 +1,155 @@
+.agent-lookup-overlay-backdrop {
+  position: fixed;
+  top: var(--header-height, 70px);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  z-index: 1099;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.agent-lookup-overlay-backdrop.visible {
+  opacity: 1;
+}
+
+/* Positioned wrapper */
+.agent-lookup-overlay-wrapper {
+  --mouse-x: 50%;
+  --mouse-y: 50%;
+  position: absolute;
+  top: .3rem;
+  left: .5rem;
+  right: 1rem;
+  bottom: .5rem;
+  z-index: 1100;
+  border-radius: 18px;
+  opacity: 0;
+  transform: translateY(12px) scale(0.98);
+  transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.agent-lookup-overlay-wrapper.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Border layer — shows the cursor-following glow through the border edge */
+.agent-lookup-overlay-border {
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  background: radial-gradient(
+    350px circle at var(--mouse-x) var(--mouse-y),
+    rgba(59, 130, 246, 0.45),
+    transparent 60%
+  );
+  z-index: 0;
+}
+
+/* Inner card — covers everything except the 2px border edge */
+.agent-lookup-overlay-border::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: var(--card-bg, #fff);
+  border-radius: 16px;
+}
+
+/* Outer glow — softer, larger, follows cursor */
+.agent-lookup-overlay-border::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 22px;
+  background: radial-gradient(
+    400px circle at var(--mouse-x) var(--mouse-y),
+    rgba(59, 130, 246, 0.12),
+    transparent 60%
+  );
+  filter: blur(8px);
+  z-index: -1;
+}
+
+/* Inner content wrapper */
+.agent-lookup-overlay-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 16px;
+  margin: 2px;
+}
+
+.agent-lookup-overlay-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg-secondary, #f3f4f6);
+  color: var(--text-primary, #111);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.agent-lookup-overlay-close:hover {
+  background: var(--hover-bg, #e5e7eb);
+  transform: scale(1.08);
+}
+
+.agent-lookup-overlay-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+  background: var(--card-bg, #fff);
+  border-radius: 16px;
+}
+
+/* AgentProfile inside overlay — hide its own topbar since overlay has its own close */
+.agent-lookup-overlay-content .agent-profile-topbar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .agent-lookup-overlay-backdrop {
+    top: var(--header-height, 60px);
+  }
+
+  .agent-lookup-overlay-wrapper {
+    top: 0.25rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    border-radius: 14px;
+  }
+
+  .agent-lookup-overlay-border {
+    border-radius: 14px;
+  }
+
+  .agent-lookup-overlay-border::after {
+    border-radius: 12px;
+  }
+
+  .agent-lookup-overlay-border::before {
+    border-radius: 18px;
+  }
+
+  .agent-lookup-overlay-inner {
+    border-radius: 12px;
+  }
+
+  .agent-lookup-overlay-content {
+    border-radius: 12px;
+  }
+}

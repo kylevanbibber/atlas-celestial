@@ -1,0 +1,11 @@
+To enable AIL Appointments Sync feature, run these commands in the backend directory:
+
+cd backend
+npm install puppeteer ws
+
+This will install:
+- puppeteer: For browser automation
+- ws: For WebSocket real-time updates
+
+After installation, restart your backend server.
+

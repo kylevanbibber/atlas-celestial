@@ -1,0 +1,201 @@
+@import '../auth/Login.css';
+
+/* Fix for auth-background rendering on mobile */
+.auth-background.onboarding-auth-background {
+  position: relative !important;
+  z-index: 0 !important;
+  min-height: 100vh !important;
+  height: auto !important;
+  background-color: var(--bg-primary) !important;
+  background-image: url('../../img/globe_bg_watermark_blue.png') !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-attachment: scroll !important;
+  background-size: cover !important;
+}
+
+/* Ensure login container works with relative positioning */
+.onboarding-auth-background .login-container.onboarding-login-container {
+  position: relative !important;
+  z-index: 1 !important;
+  min-height: 100vh !important;
+}
+
+/* Override Login.css two-column layout for register page */
+.login-card.onboarding-login-card.single-column {
+  display: block !important;
+  flex-direction: column !important;
+  max-width: 600px !important;
+  width: 100% !important;
+  background: var(--bg-primary) !important;
+  border-radius: 16px !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+.login-card.onboarding-login-card.single-column > * {
+  flex: none !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Onboarding-specific form group to avoid conflicts with global .form-group */
+.onboarding-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.onboarding-form-group label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.onboarding-form-group input,
+.onboarding-form-group select {
+  padding: 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  font-size: 0.95rem;
+}
+
+/* Two-column row layout for name/phone fields */
+.onboarding-two-col-row {
+  flex-direction: row !important;
+  gap: 8px;
+}
+
+.onboarding-two-col-row .onboarding-two-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.onboarding-two-col-row .onboarding-middle-col {
+  width: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.onboarding-two-col-row .onboarding-middle-col input {
+  text-align: center;
+}
+
+.onboarding-two-col-row .onboarding-suffix-col {
+  width: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.onboarding-two-col-row .onboarding-state-col {
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Checkbox styling aligned with onboarding/register form */
+.onboarding-checkbox-row {
+  flex-direction: column !important;
+  margin-top: 0;
+}
+
+.onboarding-checkbox-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.onboarding-checkbox-text {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.onboarding-checkbox-label .onboarding-checkbox {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #00558c;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.onboarding-checkbox-help {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  margin-left: 0;
+}
+
+/* Review Screen Styles */
+.review-screen {
+  animation: fadeIn 0.3s ease-in;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  background: transparent;
+}
+
+.review-item {
+  padding: 10px 0;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.review-item:last-child {
+  border-bottom: none;
+}
+
+.review-item strong {
+  display: inline-block;
+  min-width: 140px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Mobile-specific fixes */
+@media (max-width: 600px) {
+  .auth-background.onboarding-auth-background {
+    background-attachment: scroll !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .onboarding-auth-background .login-container {
+    min-height: 100vh;
+    padding-top: 20px;
+    padding-bottom: 20px;
+  }
+  
+  .login-card.onboarding-login-card.single-column {
+    margin: 0 16px;
+    width: calc(100% - 32px) !important;
+  }
+  
+  .review-screen {
+    /* Force hardware acceleration for smoother rendering */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  
+  .review-item strong {
+    min-width: 100px;
+    display: block;
+    margin-bottom: 4px;
+  }
+}
+
+

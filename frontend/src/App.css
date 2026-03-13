@@ -1,0 +1,1002 @@
+/* App.css */
+
+/* Design tokens — single source of truth for all theme values */
+@import url('./css/tokens.css');
+
+/* Import fonts */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap');
+
+* {
+  font-family: 'Avenir Next LT Pro', sans-serif;
+  font-weight: 400; 
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  /* Ensure body respects safe areas */
+  padding-left: var(--safe-area-inset-left);
+  padding-right: var(--safe-area-inset-right);
+  
+  /* Prevent all zoom behaviors including triple-tap */
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  
+  /* PWA Optimizations */
+  overscroll-behavior-y: contain; /* Prevent pull-to-refresh in PWA */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+}
+
+/* PWA Standalone Mode Optimizations */
+@media (display-mode: standalone) {
+  body {
+    /* Ensure proper spacing for PWA status bar */
+    padding-top: var(--safe-area-inset-top);
+    overscroll-behavior: none; /* Prevent bounce effect in standalone */
+  }
+  
+  /* Prevent header from being hidden by status bar */
+  .modern-header {
+    padding-top: var(--safe-area-inset-top);
+  }
+}
+
+/* iOS Standalone Mode Specific Adjustments */
+@supports (-webkit-touch-callout: none) {
+  @media (display-mode: standalone) {
+    body {
+      /* Additional iOS PWA adjustments */
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+    }
+    
+    html {
+      height: -webkit-fill-available;
+    }
+  }
+}
+
+/* Comprehensive zoom prevention */
+html {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* Re-enable text selection where needed */
+input,
+textarea,
+.selectable-text {
+  -webkit-user-select: text;
+  user-select: text;
+  touch-action: manipulation;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6, .bold {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Global links */
+a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+a:hover {
+  color: var(--hover-color);
+}
+
+/* App Background */
+.app-background {
+  background: var(--bg-secondary);
+  background-size: cover;
+  background-position: center;
+  height: 100vh;
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1; /* Ensures it stays behind the content */
+}
+
+/* Special Background for Login */
+.auth-background {
+  background: url('./img/globe_bg_watermark_blue.png') no-repeat center center fixed;
+  background-position: center; /* Center the image */
+  background-repeat: no-repeat; /* Prevent the image from repeating */
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  overflow-y: auto;
+}
+
+/* Other pages can have their background color or styles here */
+.page-background {
+  background-color: var(--bg-primary);
+}
+
+/* Route loading state styling */
+.route-loading {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100%;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+}
+
+.route-loading .spinner {
+  margin-bottom: 1rem;
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-color);
+  border-top: 3px solid var(--button-primary-bg);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+/* App container and layout - Modern Header Only */
+.app-container {
+  background: url('./img/globe_bg_watermark_blue.png') no-repeat center center fixed;
+  background-size: 155%;
+  background-position-x: top;
+  width: 100%;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+[data-theme="dark"] .app-container {
+  background-image: url('./img/globe_bg_watermark_dark.png');
+}
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  margin-top: 0;
+  background-color: transparent;
+  transition: background-color 0.3s ease;
+}
+
+.page-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 60px 0 0 0;
+  background-color: transparent;
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+/* Fade-in when a new page route mounts */
+@keyframes pageRouteIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.page-content > * {
+  animation: pageRouteIn 0.18s ease-out both;
+}
+
+/* Buttons (global) ─ low-specificity defaults via :where() so that
+   class-based styles (shadcn, Tailwind, .primary-button, etc.) always win. */
+:where(button) {
+  background-color: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+:where(button):hover {
+  opacity: 0.9;
+}
+
+.primary-button {
+  background-color: var(--button-primary-bg);
+  border: 2px solid var(--button-primary-bg);
+  color: var(--button-primary-text);
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.primary-button:hover {
+  opacity: 0.9;
+}
+
+.secondary-button {
+  background-color: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+}
+
+.secondary-button:hover {
+  opacity: 0.9;
+}
+
+/* Responsive logo styles */
+.responsive-logo {
+  width: 100%;
+  max-width: 200px;
+  height: auto;
+}
+
+@media (min-width: 768px) {
+  .responsive-logo {
+    max-width: 250px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .responsive-logo {
+    max-width: 300px;
+  }
+}
+
+.logo-xs {
+  width: 25px;
+  height: auto;
+  border-radius: 5px;
+}
+
+.logo-small {
+  width: 35px;
+  height: auto;
+  border-radius: 5px;
+}
+
+.logo-medium {
+  width: 150px;
+  height: auto;
+}
+
+.logo-large {
+  width: 300px;
+  height: auto;
+}
+
+/* ---------------------------
+   Default Form Style Classes
+   --------------------------- */
+
+/* Form container */
+form {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Form row as a flex container */
+.form-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+/* Form group container */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  margin-bottom: 15px;
+  width: 100%;
+}
+
+/* Form group label */
+.form-group label {
+  margin-bottom: 5px;
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+}
+
+/* Input and select fields */
+.form-group input,
+.form-group select {
+  padding: 6px 8px;
+  border: 2px solid var(--input-border);
+  border-radius: 4px;
+  font-size: .65rem;
+  transition: border-color 0.2s ease-in-out;
+  width: 100%;
+  background-color: var(--input-bg);
+  color: var(--input-text);
+}
+
+/* Focus styles */
+.form-group input:focus,
+.form-group select:focus {
+  border-color: var(--hover-color);
+  outline: none;
+  box-shadow: 0 0 5px var(--shadow-color);
+  transition: box-shadow 0.1s ease-in-out;
+}
+
+/* Field size classes */
+.form-group.small-field {
+  flex: 1;
+}
+
+.form-group.medium-field {
+  flex: 1.5;
+}
+
+.form-group.large-field {
+  flex: 2;
+}
+/* Half-width fields */
+.half-width {
+  flex: 1;
+}
+
+/* Form actions (button container) */
+.form-actions {
+  margin-top: 20px;
+}
+
+.form-actions button {
+  margin-right: 10px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.form-actions button[type="button"] {
+  background-color: #ccc;
+  color: #333;
+}
+
+/* Error and message texts */
+.error {
+  color: #d9534f;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.message {
+  color: #5cb85c;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+/* Default card container rules (for unexpanded state) */
+.card-container {
+  display: grid;
+  grid-gap: 10px;
+  width: 100%;
+  grid-template-columns: 1fr; /* Mobile: one card per row */
+}
+
+@media (min-width: 501px) {
+  .card-container {
+    grid-template-columns: repeat(2, 1fr); /* Medium screens: two cards per row */
+  }
+}
+
+@media (min-width: 1200px) {
+  .card-container {
+    grid-template-columns: repeat(4, 1fr); /* Large screens: four cards per row */
+  }
+}
+
+/* Card container responsive layout - no sidebar adjustments needed */
+
+@media (max-width: 768px) {
+  .app-container {
+    margin-bottom: 0;
+    padding-left: 0;
+    padding-right: 0;
+    padding-bottom: calc(49px + env(safe-area-inset-bottom, 0px));
+  }
+
+  body {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .main-content {
+    width: 100%;
+    margin-top: 0;
+    padding-top: 48px; /* Mobile header height */
+  }
+
+  .modern-header {
+    left: 0;
+    right: 0;
+    width: 100%;
+  }
+
+  /* Remove side margins/padding on mobile */
+  .page-content {
+    padding: 0.5rem 0 0 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  /* Reduce padding for content areas on mobile */
+  .padded-content {
+    padding: 10px;
+  }
+  
+  /* Remove padding completely for settings page on mobile */
+  .settings-content .padded-content {
+    padding: 0;
+  }
+  
+  .padded-content-sm {
+    padding: 5px;
+  }
+  
+  .padded-content-lg {
+    padding: 15px;
+  }
+
+  /* Mobile-specific comprehensive zoom prevention */
+  html, body {
+    touch-action: manipulation !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    overflow-x: hidden;
+  }
+  
+  /* Prevent zoom on all containers */
+  .app-container,
+  .main-content,
+  .page-content,
+  .login-container,
+  .login-card {
+    touch-action: manipulation !important;
+    -webkit-touch-callout: none !important;
+  }
+  
+  /* Disable text selection on mobile except inputs */
+  * {
+    -webkit-user-select: none !important;
+    user-select: none !important;
+  }
+  
+  /* Re-enable for inputs */
+  input, textarea {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+  }
+
+  /* Prevent zoom on input focus by ensuring font-size is at least 16px */
+  .form-group input,
+  .form-group select,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  textarea {
+    font-size: 16px !important;
+  }
+  
+  /* Adjust padding to compensate for larger font */
+  .form-group input,
+  .form-group select {
+    padding: 12px 8px;
+  }
+}
+
+/* Utility class for adding padding to page content */
+.padded-content {
+  padding: 20px;
+}
+
+.padded-content-sm {
+  padding: 10px;
+}
+
+.padded-content-lg {
+  padding: 30px;
+}
+
+/* Ensure font is consistently applied throughout the app */
+.app-container,
+.app-container * {
+  font-family: inherit;
+}
+
+/* Dashboard styles */
+.dashboard-container {
+  width: 100%;
+  overflow-x: hidden;
+  max-width: 100vw; /* Ensure dashboard doesn't exceed viewport */
+  box-sizing: border-box;
+}
+
+.dashboard-cards-wrapper {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.dashboard-card {
+  transition: all 0.3s ease;
+}
+
+/* Mobile styles for dashboard and header */
+@media (max-width: 768px) {
+  /* Prevent global card-container styles from affecting dashboard - remove conflicting rules */
+  .card-container:not(.dashboard-section .card-container) {
+    justify-items: stretch !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    grid-gap: 4px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Card adjustments for mobile - exclude dashboard cards */
+  .dashboard-card:not(.dashboard-section .dashboard-card) {
+    margin-bottom: 10px !important;
+  }
+  
+  /* Make card contents more compact on mobile */
+  .card-title {
+    font-size: 12px !important; /* Reduced from 14px for better fit */
+    margin-bottom: 4px !important; /* Reduced margin */
+  }
+  
+  .card-value {
+    font-size: 16px !important; /* Reduced from 18px for better fit */
+  }
+  
+  .card-subtext {
+    font-size: 10px !important; /* Reduced from 12px for better fit */
+  }
+  
+  /* Header logo for mobile */
+  .modern-header .header-left {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    position: relative;
+    width: 100%;
+  }
+  
+  .modern-header .header-logo {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+  }
+  
+  .header-title {
+    left: 50% !important;
+    width: 60%;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+}
+
+/* Fix card grid on very small screens */
+@media (max-width: 350px) {
+  .dashboard-section .card-container {
+    grid-gap: 2px !important; /* Minimal spacing for very small screens */
+  }
+}
+
+.user-count-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  font-size: 0.75rem;
+  padding: 2px;
+  border: 1px solid var(--border-color-secondary);
+}
+
+.role-badge.role-RGA {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 0.85rem;
+  color: white;
+}
+
+/* ==============================================
+   Global Status Badge Styles - Consolidated
+   ============================================== */
+
+/* Status badges container */
+.status-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  min-width: 80px;
+}
+
+/* Base status badge styles */
+.status-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+/* Hierarchy status badges (tree view) */
+.hierarchy-status-badge {
+  font-size: 0.7rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background-color: var(--sidebar-hover);
+  color: var(--text-secondary);
+}
+
+/* Status badge variants - Standard states */
+.status-badge.active,
+.hierarchy-status-badge.active {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-badge.inactive,
+.hierarchy-status-badge.inactive {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.status-badge.redeemed,
+.hierarchy-status-badge.redeemed {
+  background-color: #cce5ff;
+  color: #004085;
+}
+
+.status-badge.released,
+.hierarchy-status-badge.released {
+  background-color: #d1ecf1;
+  color: #0c5460;
+}
+
+.status-badge.f6,
+.hierarchy-status-badge.f6 {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-badge.vip-eligible,
+.hierarchy-status-badge.vip-eligible {
+  background-color: #d6d8db;
+  color: #383d41;
+}
+
+.status-badge.rfc,
+.hierarchy-status-badge.rfc {
+  background-color: #8a2be2;
+  color: white;
+}
+
+.status-badge.account-inactive,
+.hierarchy-status-badge.account-inactive {
+  background-color: #f5c6cb;
+  color: #721c24;
+  border: 1px dashed #dc3545;
+}
+
+.status-badge.coded,
+.hierarchy-status-badge.coded {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+/* Status badge variants - Progress states */
+.status-badge.passed {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-badge.pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+/* Status badge variants - Visibility states */
+.status-badge.visible {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.status-badge.hidden {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+/* Status badge tooltip support */
+.status-badge-tooltip,
+.license-badge-tooltip {
+  cursor: pointer;
+}
+
+/* Dynamic tooltip for status badges */
+.dynamic-tooltip {
+  position: fixed;
+  background-color: #333;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  z-index: 10000;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+/* =========================================
+   SHARED GLOBAL STYLES
+   Consolidated from 40+ component CSS files
+   ========================================= */
+
+/* --- Keyframes --- */
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* --- Buttons --- */
+.btn-primary {
+  background-color: var(--button-primary-bg, #007bff);
+  color: var(--button-primary-text, white);
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background-color: var(--button-secondary-bg, #6c757d);
+  color: var(--button-secondary-text, white);
+  border: 1px solid var(--border-color, #dee2e6);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.btn-secondary:hover {
+  opacity: 0.9;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  background-color: var(--danger-color, #dc3545);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.btn-danger:hover {
+  opacity: 0.9;
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- Modal --- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+[data-theme="dark"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.modal-content {
+  background: var(--card-bg, white);
+  border-radius: 12px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color, #e9ecef);
+  animation: fadeIn 0.2s ease-out;
+}
+
+[data-theme="dark"] .modal-content {
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-color, #e9ecef);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+}
+
+.modal-body {
+  padding: 1.5rem;
+  color: var(--text-primary, #495057);
+  line-height: 1.6;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  color: var(--text-secondary, #6c757d);
+  cursor: pointer;
+  padding: 4px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.modal-close-btn:hover {
+  background-color: var(--bg-tertiary, #f5f5f5);
+  color: var(--text-primary, #333);
+}
+
+/* --- Close Button (shared by modals/panels) --- */
+.close-button {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #6c757d);
+  cursor: pointer;
+  padding: 4px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.close-button:hover {
+  background-color: var(--bg-tertiary, #f0f0f0);
+  color: var(--text-primary, #333);
+}
+
+/* --- Empty State --- */
+.empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: var(--text-secondary, #6c757d);
+}
+
+.empty-state h3 {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary, #333);
+  font-size: 1.1rem;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+/* --- Error Message --- */
+.error-message {
+  text-align: center;
+  padding: 2rem;
+  color: var(--danger-color, #dc3545);
+  font-size: 0.9rem;
+}
+
+/* --- Search Input --- */
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input-wrapper .search-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--text-secondary, #999);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 12px 8px 36px;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: var(--input-bg, white);
+  color: var(--input-text, #333);
+  transition: border-color 0.2s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary-color, #007bff);
+}
+
+.search-input::placeholder {
+  color: var(--text-secondary, #999);
+}
+

@@ -1,0 +1,229 @@
+/* ── Agent Viewer — layout-only styles, reuses existing app classes ── */
+.agent-viewer {
+  height: 100%;
+  overflow-y: auto;
+  padding: 20px 24px 32px;
+  background: var(--card-bg, #fff);
+}
+
+/* Header */
+.agent-viewer-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.agent-viewer-header-pic {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary, #f3f4f6);
+  color: var(--text-secondary, #6b7280);
+  flex-shrink: 0;
+}
+
+.agent-viewer-header-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.agent-viewer-header-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-viewer-header-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary, #111);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Section containers */
+.agent-viewer-section {
+  margin-bottom: 20px;
+}
+
+.agent-viewer-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary, #6b7280);
+  margin-bottom: 10px;
+}
+
+/* Lead allotment 3-column grid */
+.agent-viewer-lead-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.agent-viewer-lead-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.agent-viewer-lead-card-row span:first-child {
+  color: var(--text-secondary, #6b7280);
+}
+
+.agent-viewer-lead-card-row span:last-child {
+  font-weight: 600;
+  color: var(--text-primary, #111);
+}
+
+/* MTD Production grid */
+.agent-viewer-mtd-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.agent-viewer-mtd-grid .activity-alp-card {
+  flex: 1 1 calc(25% - 10px);
+  min-width: 120px;
+}
+
+/* ALP bar chart */
+.agent-viewer-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-viewer-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.agent-viewer-bar-label {
+  width: 60px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, #6b7280);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.agent-viewer-bar-track {
+  flex: 1;
+  height: 24px;
+  background: var(--bg-secondary, #f3f4f6);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.agent-viewer-bar-fill {
+  height: 100%;
+  background: var(--primary-color, #3b82f6);
+  border-radius: 6px;
+  min-width: 2px;
+  transition: width 0.4s ease;
+}
+
+.agent-viewer-bar-amount {
+  width: 70px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111);
+  flex-shrink: 0;
+}
+
+/* Table — compact, uses border-color vars */
+.agent-viewer-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 10px;
+}
+
+.agent-viewer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.agent-viewer-table th {
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-secondary, #6b7280);
+  background: var(--bg-secondary, #f9fafb);
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  white-space: nowrap;
+}
+
+.agent-viewer-table td {
+  padding: 7px 12px;
+  color: var(--text-primary, #111);
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  white-space: nowrap;
+}
+
+.agent-viewer-table tr:last-child td {
+  border-bottom: none;
+}
+
+.agent-viewer-table tr:hover td {
+  background: var(--hover-bg, rgba(128, 128, 128, 0.1));
+}
+
+.agent-viewer-table .text-right {
+  text-align: right;
+}
+
+/* Empty state */
+.agent-viewer-empty {
+  text-align: center;
+  padding: 16px;
+  font-size: 13px;
+  color: var(--text-secondary, #9ca3af);
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .agent-viewer {
+    padding: 16px;
+  }
+
+  .agent-viewer-header-name {
+    font-size: 17px;
+  }
+
+  .agent-viewer-lead-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-viewer-mtd-grid .activity-alp-card {
+    flex: 1 1 calc(50% - 10px);
+  }
+
+  .agent-viewer-bar-label {
+    width: 48px;
+    font-size: 11px;
+  }
+
+  .agent-viewer-bar-amount {
+    width: 56px;
+    font-size: 12px;
+  }
+}

@@ -1,0 +1,240 @@
+/* Base Tabs Styles */
+.tabs-wrapper {
+  width: 100%;
+}
+
+.tabs-container {
+  display: flex;
+  margin-bottom: 0;
+}
+
+.tab-button {
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tab-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.tab-icon {
+  font-size: 16px;
+}
+
+.tab-badge {
+  background-color: #dc3545;
+  color: white;
+  border-radius: 12px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* Default Style Set (Original AgentProgressTable style) */
+.tabs-default {
+  background-color: var(--sidebar-bg);
+  border-radius: 8px 8px 0 0;
+  border: 1px solid var(--border-color);
+  border-bottom: none;
+  overflow: hidden;
+}
+
+.tab-button-default {
+  flex: 1;
+  padding: 12px 20px;
+  background-color: transparent;
+  border-right: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.tab-button-default:last-child {
+  border-right: none;
+}
+
+.tab-button-default:hover {
+  background-color: var(--sidebar-hover);
+  color: var(--text-primary);
+}
+
+.tab-button-default.active {
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--hover-color);
+  font-weight: 600;
+}
+
+.tab-button-default.active:hover {
+  background-color: var(--card-bg);
+}
+
+.tab-content-default {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 0 0 8px 8px;
+  padding: 20px;
+  min-height: 400px;
+}
+
+/* Modern Style Set */
+.tabs-modern {
+  background-color: transparent;
+  border-bottom: 1px solid var(--border-color);
+  gap: 2px;
+}
+
+.tab-button-modern {
+  padding: 12px 24px;
+  background-color: transparent;
+  border-radius: 8px 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: -1px;
+}
+
+.tab-button-modern:hover {
+  background-color: var(--sidebar-hover);
+  color: var(--text-primary);
+}
+
+.tab-button-modern.active {
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--card-bg);
+  font-weight: 600;
+}
+
+.tab-content-modern {
+  background-color: var(--card-bg);
+  padding: 24px;
+  border-radius: 0 0 8px 8px;
+  min-height: 300px;
+}
+
+/* Minimal Style Set */
+.tabs-minimal {
+  background-color: transparent;
+  border-bottom: 2px solid var(--border-color);
+  gap: 0;
+}
+
+.tab-button-minimal {
+  padding: 12px 16px;
+  background-color: transparent;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: -2px;
+}
+
+.tab-button-minimal:hover {
+  color: var(--text-primary);
+  border-bottom-color: var(--border-color);
+}
+
+.tab-button-minimal.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--hover-color);
+  font-weight: 600;
+}
+
+.tab-content-minimal {
+  background-color: transparent;
+  padding: 20px 0;
+  min-height: 200px;
+}
+
+/* Pills Style Set */
+.tabs-pills {
+  background-color: var(--sidebar-bg);
+  border-radius: 8px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.tab-button-pills {
+  padding: 10px 20px;
+  background-color: transparent;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.tab-button-pills:hover {
+  background-color: var(--sidebar-hover);
+  color: var(--text-primary);
+}
+
+.tab-button-pills.active {
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  font-weight: 600;
+}
+
+.tab-content-pills {
+  background-color: transparent;
+  padding: 20px 0;
+  min-height: 200px;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+  .tabs-default {
+    flex-wrap: wrap;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+  }
+
+  .tab-button-default {
+    flex: none;
+    min-width: 120px;
+    padding: 10px 15px;
+    font-size: 12px;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .tab-button-default:last-child {
+    border-bottom: none;
+  }
+
+  .tab-button-default.active {
+    border-bottom: 2px solid var(--hover-color);
+  }
+
+  .tab-content-default {
+    min-height: 300px;
+    padding: 16px;
+  }
+
+  .tab-button-modern,
+  .tab-button-minimal,
+  .tab-button-pills {
+    padding: 10px 16px;
+    font-size: 12px;
+  }
+
+  .tab-content-modern,
+  .tab-content-minimal,
+  .tab-content-pills {
+    padding: 16px 0;
+    min-height: 250px;
+  }
+}
+  

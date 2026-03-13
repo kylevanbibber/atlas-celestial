@@ -1,0 +1,1982 @@
+.production-goals {
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+/* When rendered in summary-only mode above DailyActivityForm */
+.production-goals.summary-only {
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.production-goals.summary-only .goals-content {
+  padding-bottom: 0;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .production-goals {
+    padding: 0 0px;
+    margin: 0;
+    max-width: 100%;
+  }
+  
+  .btn-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 0.9rem;
+  }
+}
+
+/* Mobile header layout */
+@media (max-width: 768px) {
+  .goals-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+  }
+  
+  .goals-header .header-left {
+    text-align: center;
+  }
+  
+  .header-center {
+    order: 2;
+    gap: 12px;
+  }
+  
+  .nav-and-actions {
+    gap: 12px;
+    align-items: center;
+  }
+  
+  .header-actions {
+    order: 3;
+    justify-content: center;
+  }
+}
+
+.header-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  gap: 8px;
+}
+
+.nav-and-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.month-year-navigation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--background-secondary);
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+/* Mobile navigation styles */
+@media (max-width: 768px) {
+  .month-year-navigation {
+    padding: 6px 12px;
+    gap: 8px;
+    max-width: 100%;
+    justify-content: center;
+  }
+  
+  .current-month-year {
+    min-width: 120px;
+    font-size: 0.9rem;
+  }
+  
+  .date-nav-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+}
+
+.date-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-color);
+  background: var(--background-primary);
+  color: var(--text-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.date-nav-btn:hover:not(:disabled) {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.date-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.current-month-year {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 0.95rem;
+  min-width: 140px;
+  justify-content: center;
+}
+
+.current-month-year svg {
+  color: var(--primary-color);
+}
+
+.goals-header .header-left h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px 0;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.goals-header .header-icon {
+  color: var(--primary-color);
+}
+
+.goals-header .header-left p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.edit-section {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.past-month-notice {
+  color: var(--text-secondary);
+  font-style: italic;
+  margin-top: 2px;
+}
+
+.past-month-notice small {
+  font-size: 0.8rem;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 0.8rem;
+}
+
+.btn-disabled {
+  background: var(--background-secondary) !important;
+  color: var(--text-secondary) !important;
+  border-color: var(--border-color) !important;
+  cursor: not-allowed !important;
+  opacity: 0.6;
+}
+
+.btn-disabled:hover {
+  background: var(--background-secondary) !important;
+  color: var(--text-secondary) !important;
+  border-color: var(--border-color) !important;
+}
+
+.btn-success {
+  background-color: var(--success-color, #27ae60);
+  border-color: var(--success-color, #27ae60);
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  filter: brightness(0.9);
+}
+
+.goals-content {
+  position: relative;
+}
+
+.goal-config-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+/* Goal Cards Section */
+.goal-cards-section {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 32px;
+  align-items: stretch;
+}
+
+/* Compact card sizing within goal-cards-section */
+.goal-cards-section .custom-card-body {
+  margin-top: 8px;
+}
+.goal-cards-section .custom-card-header h5 {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.goal-cards-section .custom-value {
+  font-size: 1.4rem;
+  margin: 2px 0;
+}
+.goal-cards-section .custom-subtext {
+  font-size: 0.72rem;
+}
+
+/* Ensure all three cards fill the same grid cell height */
+.goal-cards-section .custom-card,
+.goal-cards-section .goal-breakdown-section,
+.goal-cards-section .calendar-legend {
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* Remove top margin on legend when it's a peer grid cell, not below the calendar */
+.goal-cards-section .calendar-legend {
+  margin-top: 0;
+}
+
+/* Single-column layout: combined goal + breakdown card (non-editing) */
+.goal-cards-section--combined {
+  grid-template-columns: 1fr;
+}
+
+/* Week + Month comparison grid inside the weekly targets section */
+.targets-comparison-grid {
+  display: grid;
+  grid-template-columns: 3rem repeat(5, 1fr);
+  gap: 3px 6px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.targets-col-header {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  text-align: center;
+  padding-bottom: 2px;
+}
+
+.targets-row-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  padding-right: 4px;
+}
+
+.targets-cell {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.targets-cell--alp {
+  font-size: 0.85rem;
+}
+
+/* Goal value displayed at top of combined breakdown card */
+.breakdown-goal-display {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.breakdown-goal-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.breakdown-goal-amount {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Card input styling */
+.card-input {
+  background: transparent !important;
+  border: 2px solid var(--primary-color) !important;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--text-primary);
+  text-align: center;
+  width: 100%;
+  max-width: 200px;
+}
+
+.card-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.2);
+}
+
+.card-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+/* Set Goal button inside Card value */
+.set-goal-btn {
+  font-size: 1rem;
+  padding: 10px 20px;
+  gap: 8px;
+}
+
+/* Rate Configuration Section */
+.rate-config-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+/* When rate config is inside the editing row beside the ALP card */
+.goal-cards-section--editing {
+  grid-template-columns: minmax(280px, 1fr) 1.5fr;
+  align-items: stretch;
+}
+
+.goal-cards-section--editing .rate-config-section {
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rate-config-section h3 {
+  margin: 0 0 12px 0;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Working Days Action Bar - now using ActionBar component */
+
+.btn-outline {
+  background: transparent;
+  border: 2px solid var(--primary-color);
+  color: var(--primary-color);
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-outline:hover {
+  background: var(--primary-color);
+  color: white;
+}
+
+.btn-icon {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+
+.btn-icon:hover {
+  transform: scale(1.05);
+  transition: transform 0.15s ease;
+}
+
+.btn-outline:active {
+  transform: translateY(1px);
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  .goal-cards-section {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin: 0 -12px 24px;
+  }
+  
+  .card-input {
+    font-size: 1.25rem;
+    padding: 6px 10px;
+    max-width: 180px;
+  }
+  
+  .rate-config-section {
+    padding: 16px;
+    margin: 0 -12px 20px;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+  }
+  
+  /* ActionBar component handles its own mobile styling */
+  
+  .btn-outline {
+    flex: 1;
+    max-width: 150px;
+    font-size: 0.8rem;
+    padding: 8px 12px;
+  }
+  
+  .goal-config-section {
+    padding: 16px;
+    margin: 0 -12px 20px;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+  }
+  
+  .goal-config-section h3 {
+    font-size: 1rem;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  
+  .config-row {
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  
+  .config-group {
+    width: 100%;
+  }
+  
+  .goal-input {
+    font-size: 16px;
+    padding: 12px;
+    border-radius: 6px;
+  }
+  
+  .btn {
+    padding: 12px 16px;
+    font-size: 0.9rem;
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+  
+  .edit-actions {
+    gap: 8px;
+    width: 100%;
+  }
+  
+  .edit-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .past-month-notice {
+    text-align: center;
+    margin-top: 8px;
+  }
+}
+
+.goal-config-section h3 {
+  margin: 0 0 16px 0;
+  color: var(--text-primary);
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.config-row {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.config-group {
+  flex: 1;
+}
+
+.config-group label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.month-year-selector {
+  display: flex;
+  gap: 8px;
+}
+
+.month-year-selector select {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.goal-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.goal-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+}
+
+.rate-source-section {
+  margin-top: 20px;
+}
+
+.rate-source-section > label {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.rate-source-options {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  flex: 1;
+  align-items: stretch;
+}
+
+.radio-option {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+  flex: 1;
+}
+
+.radio-option:hover:not(:has(input:checked)) {
+  border-color: var(--primary-color);
+  background-color: rgba(0, 85, 140, 0.04);
+}
+
+.radio-option:has(input:checked) {
+  border-color: var(--primary-color);
+  background-color: rgba(0, 85, 140, 0.06);
+}
+
+.radio-option:has(input:checked) span {
+  color: var(--primary-color);
+}
+
+.radio-option input[type="radio"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.radio-option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.radio-option span {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.rate-preview {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* Inline custom rate inputs inside the radio option card */
+.rate-inputs-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.rate-input-inline-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.rate-input-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.rate-input-sm {
+  width: 68px;
+  padding: 4px 7px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  transition: border-color 0.15s ease;
+}
+
+.rate-input-sm:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.data-coverage {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  font-style: italic;
+}
+
+.text-muted {
+  color: var(--text-muted, #999);
+}
+
+.custom-rates-section {
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.custom-rates-section h4 {
+  margin: 0 0 16px 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.custom-rates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+
+
+.calendar-section > label {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.calendar-container {
+  overflow: visible;
+}
+
+/* =====================================================
+   Goals Calendar - react-big-calendar overrides
+   ===================================================== */
+
+.goals-rbc-wrap {
+  background: var(--card-bg, #fff);
+  border-radius: 12px;
+  border: 1px solid var(--border-color, #e0e0e0);
+  padding: 16px;
+}
+
+[data-theme="dark"] .goals-rbc-wrap {
+  background: var(--card-bg);
+  border-color: var(--border-color);
+}
+
+@media (max-width: 768px) {
+  .goals-rbc-wrap {
+    border-radius: 8px;
+    padding: 8px;
+  }
+}
+
+/* Toolbar inside goals calendar */
+.goals-cal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.calendar-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.calendar-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.goals-cal-working-badge {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-secondary, #f0f0f0);
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+}
+
+.goals-cal-toolbar-hint {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.goals-rbc-wrap .rbc-calendar {
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+}
+
+.goals-rbc-wrap .rbc-month-view {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+/* Day name headers */
+.goals-rbc-wrap .rbc-header {
+  padding: 8px 4px;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.goals-rbc-wrap .rbc-header + .rbc-header {
+  border-left: 1px solid var(--border-color);
+}
+
+/* Day cells */
+.goals-rbc-wrap .rbc-day-bg {
+  background: var(--bg-primary);
+}
+
+.goals-rbc-wrap .rbc-day-bg + .rbc-day-bg {
+  border-left: 1px solid var(--border-color);
+}
+
+.goals-rbc-wrap .rbc-month-row + .rbc-month-row {
+  border-top: 1px solid var(--border-color);
+}
+
+.goals-rbc-wrap .rbc-off-range-bg {
+  background: var(--bg-secondary);
+}
+
+.goals-rbc-wrap .rbc-today {
+  background: rgba(0, 85, 140, 0.04);
+}
+
+/* Working day backgrounds */
+.goals-rbc-wrap .rbc-day-bg.goals-day-working {
+  background: rgba(76, 175, 80, 0.08);
+}
+
+[data-theme="dark"] .goals-rbc-wrap .rbc-day-bg.goals-day-working {
+  background: rgba(76, 175, 80, 0.12);
+}
+
+.goals-rbc-wrap .rbc-day-bg.goals-day-past {
+  background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .goals-rbc-wrap .rbc-day-bg.goals-day-past {
+  background: var(--bg-secondary);
+}
+
+/* Editable hover states */
+.goals-rbc-wrap.is-editing .rbc-day-bg.goals-day-editable:hover {
+  background: rgba(0, 85, 140, 0.06);
+  cursor: pointer;
+}
+
+.goals-rbc-wrap.is-editing .rbc-day-bg.goals-day-working:hover {
+  background: rgba(76, 175, 80, 0.15);
+  cursor: pointer;
+}
+
+[data-theme="dark"] .goals-rbc-wrap.is-editing .rbc-day-bg.goals-day-working:hover {
+  background: rgba(76, 175, 80, 0.2);
+}
+
+/* Date number */
+.goals-rbc-wrap .rbc-date-cell {
+  padding: 4px 6px 2px;
+  text-align: right;
+}
+
+.goals-rbc-wrap .rbc-date-cell a {
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  pointer-events: none;
+}
+
+.goals-rbc-wrap .rbc-date-cell.rbc-off-range a {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.goals-rbc-wrap .rbc-date-cell.rbc-now a {
+  background: var(--primary-color);
+  color: white;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+}
+
+/* Event items — transparent so day background color shows */
+.goals-rbc-event-item {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 2px !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  cursor: pointer !important;
+}
+
+.goals-rbc-event-item:focus {
+  outline: none !important;
+}
+
+.goals-rbc-wrap .rbc-row-content {
+  z-index: 1;
+}
+
+.goals-rbc-wrap .rbc-show-more {
+  font-size: 0.7rem;
+  color: var(--primary-color);
+}
+
+/* Event content — shows metrics inside each working day */
+.goals-rbc-event-content {
+  padding: 2px 3px;
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.grbc-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.grbc-v {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.72rem;
+}
+
+.grbc-l {
+  color: var(--text-secondary);
+  font-size: 0.62rem;
+}
+
+.grbc-row.grbc-calls .grbc-v {
+  color: var(--primary-color);
+}
+
+.grbc-row.grbc-alp .grbc-v {
+  color: var(--success-color, #27ae60);
+  font-size: 0.68rem;
+}
+
+.goals-rbc-event-content.past .grbc-v {
+  color: var(--text-secondary);
+}
+
+.grbc-dash {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  display: block;
+  text-align: center;
+  opacity: 0.5;
+  padding: 2px 0;
+}
+
+/* Day details popup */
+.goals-day-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.goals-day-popup {
+  background: var(--bg-primary);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  animation: gdpSlideUp 0.2s ease-out;
+  overflow: hidden;
+}
+
+@keyframes gdpSlideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+  .goals-day-overlay {
+    align-items: flex-end;
+    padding: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .goals-day-popup {
+    max-width: none;
+    border-radius: 12px 12px 0 0;
+    margin-bottom: max(60px, env(safe-area-inset-bottom, 60px));
+  }
+}
+
+.goals-day-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.goals-day-popup-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.goals-day-popup-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+}
+
+.goals-day-popup-close:hover {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.goals-day-popup-body {
+  padding: 16px 20px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.goals-day-empty {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  text-align: center;
+  padding: 8px 0;
+  margin: 0;
+}
+
+/* Planned vs actual comparison grid */
+.goals-compare-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 0 6px 0;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 4px;
+}
+
+.goals-compare-col {
+  text-align: center;
+}
+
+.goals-compare-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.875rem;
+}
+
+.goals-compare-row:last-child {
+  border-bottom: none;
+}
+
+.goals-compare-label {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.goals-compare-planned {
+  text-align: center;
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.goals-compare-actual {
+  text-align: center;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.goals-compare-actual.met {
+  color: var(--success-color, #27ae60);
+}
+
+.goals-compare-actual.zero {
+  color: var(--text-secondary);
+}
+
+/* Single metrics list */
+.goals-metrics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.goals-metric-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.875rem;
+}
+
+.goals-metric-item:last-child {
+  border-bottom: none;
+}
+
+.goals-metric-item.alp .gmi-value {
+  color: var(--success-color, #27ae60);
+  font-weight: 600;
+}
+
+.gmi-label {
+  color: var(--text-secondary);
+}
+
+.gmi-value {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.current-day-number {
+  background: var(--primary-color);
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.calendar-legend {
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-top: 12px;
+}
+
+.conversion-rates h5 {
+  margin: 0 0 6px 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+/* Weekly View Styles — DataTable layout */
+.weekly-view {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+}
+
+.weekly-dt {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.weekly-dt-head th {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 10px 14px;
+  text-align: right;
+  border-bottom: 2px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.weekly-dt-head th:first-child,
+.weekly-dt-head th:nth-child(2) {
+  text-align: left;
+}
+
+.weekly-dt-week-cell {
+  text-align: center;
+  padding: 0 12px;
+  border-right: 1px solid var(--border-color);
+  vertical-align: middle;
+  background: var(--bg-secondary);
+  min-width: 58px;
+}
+
+.weekly-dt-week-cell.current-week {
+  background: rgba(0, 85, 140, 0.06);
+}
+
+.weekly-dt-week-num {
+  display: block;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.weekly-dt-week-dates {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.weekly-dt-type {
+  padding: 5px 12px 5px 14px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-style: italic;
+  white-space: nowrap;
+  border-right: 1px solid var(--border-color);
+  text-transform: capitalize;
+}
+
+.weekly-dt-val {
+  padding: 5px 14px;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.weekly-dt-row {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .weekly-dt-row {
+  border-bottom-color: rgba(255, 255, 255, 0.04);
+}
+
+.weekly-dt-row.week-end {
+  border-bottom: 2px solid var(--border-color);
+}
+
+/* First row of each week — slightly more top padding to breathe */
+.weekly-dt-planned .weekly-dt-val,
+.weekly-dt-planned .weekly-dt-type {
+  padding-top: 9px;
+}
+
+/* Last row of each week — slightly more bottom padding */
+.weekly-dt-remaining .weekly-dt-type {
+  padding-bottom: 9px;
+}
+
+/* Alternating week stripe */
+.weekly-dt-row.week-even .weekly-dt-val,
+.weekly-dt-row.week-even .weekly-dt-type {
+  background: rgba(0, 0, 0, 0.025);
+}
+
+[data-theme="dark"] .weekly-dt-row.week-even .weekly-dt-val,
+[data-theme="dark"] .weekly-dt-row.week-even .weekly-dt-type {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.weekly-dt-week-cell.week-even {
+  background: rgba(0, 85, 140, 0.04);
+}
+
+/* Planned row — primary color */
+.weekly-dt-planned .weekly-dt-val {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+/* Reported row — success color */
+.weekly-dt-reported .weekly-dt-val {
+  color: var(--success-color, #27ae60);
+  font-weight: 600;
+}
+
+/* Remaining row — muted */
+.weekly-dt-remaining .weekly-dt-val {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.weekly-dt-row:hover .weekly-dt-val,
+.weekly-dt-row:hover .weekly-dt-type {
+  background: var(--bg-secondary);
+}
+
+.weekly-dt-row.current-week .weekly-dt-type {
+  color: var(--primary-color);
+  font-weight: 600;
+  font-style: normal;
+}
+
+/* View Toggle Button */
+.view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  padding: 8px 12px;
+  transition: all 0.2s ease;
+}
+
+.view-toggle.active {
+  background: var(--primary-color);
+  color: white;
+}
+
+.view-toggle:hover {
+  background: var(--primary-color);
+  color: white;
+}
+
+
+@media (max-width: 768px) {
+  .weekly-dt-val,
+  .weekly-dt-type {
+    padding: 5px 8px;
+    font-size: 0.8rem;
+  }
+
+  .weekly-dt-head th {
+    padding: 8px;
+    font-size: 0.65rem;
+  }
+
+  .weekly-dt-week-cell {
+    min-width: 44px;
+    padding: 0 8px;
+  }
+}
+
+/* Mobile legend and breakdown styles */
+@media (max-width: 768px) {
+  .calendar-legend {
+    padding: 16px 12px;
+    margin: 0 -12px;
+    border-left: none;
+    border-right: none;
+  }
+  
+  .calendar-legend h4,
+  .calendar-legend h5 {
+    text-align: center;
+    margin-bottom: 12px;
+  }
+  
+  .legend-items {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  
+  .legend-item {
+    justify-content: center;
+    padding: 8px;
+    background: var(--bg-primary);
+    border-radius: 4px;
+    font-size: 0.85rem;
+  }
+  
+  .rates-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  
+  .rate-item {
+    text-align: center;
+    padding: 12px;
+    background: var(--bg-primary);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+  }
+  
+  .goal-breakdown-section {
+    padding: 16px !important;
+    margin: 0 -12px 20px !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-radius: 0 !important;
+  }
+
+  .breakdown-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .rate-source-section {
+    padding: 16px;
+    margin: 0 -12px 16px;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+  }
+  
+  .goal-cards-section--editing {
+    grid-template-columns: 1fr;
+  }
+
+  .goal-cards-section--editing .rate-config-section {
+    margin-bottom: 0;
+  }
+
+  .rate-source-options {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .radio-option {
+    padding: 12px;
+  }
+  
+  .custom-rates-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  
+  .rate-input-group {
+    text-align: center;
+  }
+  
+  .rate-input-group input {
+    font-size: 16px;
+    padding: 12px;
+    text-align: center;
+  }
+}
+
+/* Desktop calendar day metrics */
+  .desktop-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  
+  /* Mobile calendar day metrics */
+  .mobile-metrics {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 2px;
+  }
+    
+  .mobile-primary-metric {
+    text-align: center;
+  }
+  
+  .mobile-value {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    line-height: 1.1;
+  }
+  
+  .mobile-label {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    line-height: 1;
+    margin-top: 1px;
+  }
+  
+  .mobile-secondary-metric {
+    margin-top: 2px;
+  }
+  
+  .mobile-alp {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--success-color, #28a745);
+  }
+
+.calendar-legend h4 {
+  margin: 0 0 12px 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.calendar-legend h5 {
+  margin: 16px 0 8px 0;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.legend-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+}
+
+.legend-color.calls {
+  background: var(--primary-color);
+}
+
+.legend-color.appts {
+  background: #ff9800;
+}
+
+.legend-color.sits {
+  background: #2196f3;
+}
+
+.legend-color.sales {
+  background: #9c27b0;
+}
+
+.legend-color.alp {
+  background: #4caf50;
+}
+
+.rates-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.rate-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.rate-item span {
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+}
+
+.rate-item strong {
+  color: var(--primary-color);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.rate-item small {
+  color: var(--text-muted, #999);
+  font-size: 0.65rem;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--primary-color);
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 0.875rem;
+  padding: 0;
+  margin: 0;
+}
+
+.btn-link:hover:not(:disabled) {
+  color: var(--primary-color-dark, #1976d2);
+}
+
+.btn-link:disabled {
+  color: var(--text-muted, #999);
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.rate-input-group label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 0.8rem;
+}
+
+.rate-input-group input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.goal-breakdown-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.breakdown-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.breakdown-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.breakdown-status {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 3px 10px;
+}
+
+.breakdown-status.adjusted {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  background: rgba(0, 85, 140, 0.05);
+}
+
+.breakdown-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.breakdown-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 8px 6px;
+  gap: 2px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-top: 3px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.breakdown-stat--primary {
+  border-top-color: var(--primary-color);
+}
+
+.breakdown-stat--primary .breakdown-stat-value {
+  color: var(--primary-color);
+}
+
+.breakdown-stat--alp {
+  border-top-color: var(--success-color, #27ae60);
+}
+
+.breakdown-stat--alp .breakdown-stat-value {
+  color: var(--success-color, #27ae60);
+  font-size: 1.1rem;
+}
+
+.breakdown-stat-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.breakdown-stat-label {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+
+.breakdown-adjustment-note {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.prev-month-note {
+  color: var(--text-secondary);
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+
+
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--loading-overlay-bg, rgba(255, 255, 255, 0.8));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+  color: var(--primary-color);
+  font-size: 1.5rem;
+}
+
+.loading-spinner.small {
+  font-size: 0.875rem;
+}
+
+
+/* Supporting data loading indicator - small, non-blocking */
+.supporting-data-loading {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark theme adjustments */
+[data-theme="dark"] .loading-overlay {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+[data-theme="dark"] .supporting-data-loading {
+  background: var(--card-background);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .radio-option:hover:not(:has(input:checked)) {
+  background-color: rgba(33, 150, 243, 0.1);
+}
+
+[data-theme="dark"] .radio-option:has(input:checked) {
+  background-color: rgba(33, 150, 243, 0.15);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .goal-cards-section {
+    grid-template-columns: 1fr;
+  }
+
+  .goals-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  .config-row {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .breakdown-tables {
+    grid-template-columns: 1fr;
+  }
+
+  .custom-rates-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .legend-items {
+    grid-template-columns: 1fr;
+  }
+
+  .rates-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .breakdown-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .breakdown-stat-value {
+    font-size: 1.2rem;
+  }
+
+  .rate-source-options {
+    gap: 8px;
+  }
+
+ 
+}
+
+/* Extra small screens (phones) */
+@media (max-width: 480px) {
+  .breakdown-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+}
+
+/* Context menu styles for team table */
+.context-menu-danger {
+  color: #dc3545 !important;
+}
+
+.context-menu-danger:hover {
+  background-color: #dc3545 !important;
+  color: white !important;
+}
+
+.context-menu-success {
+  color: #28a745 !important;
+}
+
+.context-menu-success:hover {
+  background-color: #28a745 !important;
+  color: white !important;
+}
+
+/* Inactive agents integrated into main table */
+.data-table tr[data-is-inactive-header="true"] {
+  background-color: #fafafa !important;
+  border-top: 2px solid #e0e0e0;
+  border-bottom: 1px solid #e0e0e0;
+  cursor: pointer;
+}
+
+.data-table tr[data-is-inactive-header="true"]:hover {
+  background-color: #f0f0f0 !important;
+}
+
+.data-table tr[data-is-inactive-header="true"] td {
+  cursor: pointer !important;
+}
+
+.data-table tr[data-is-inactive-header="true"]:hover td {
+  background-color: #f0f0f0 !important;
+}
+
+.data-table tr[data-is-inactive-agent="true"] {
+  opacity: 0.7;
+  background-color: #f9f9f9 !important;
+}
+
+.data-table tr[data-is-inactive-agent="true"]:hover {
+  background-color: #f5f5f5 !important;
+}
+
+/* Style for inactive badge */
+.inactive-badge {
+  opacity: 0.6 !important;
+  filter: grayscale(0.3);
+}
+
+/* Inactive header clickable styling */
+.inactive-header-cell {
+  cursor: pointer !important;
+  user-select: none;
+}
+
+.inactive-header-cell:hover {
+  background-color: #eeeeee !important;
+}
+
+/* Team goal cards styling */
+.team-goal-cards {
+  margin-bottom: 24px;
+}
+
+.team-goal-cards .card {
+  min-height: 120px;
+}
+
+.team-goals-info {
+  margin-top: 20px !important;
+}
+
+/* Responsive grid for team goal cards */
+@media (max-width: 768px) {
+  .team-goal-cards > div[style*="grid"] {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+}
+
+/* Team view edit button styling */
+.btn-icon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+
+/* End of file */

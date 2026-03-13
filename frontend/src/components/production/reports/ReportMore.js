@@ -1,0 +1,1095 @@
+import React, { useState, useEffect } from 'react';
+import api from '../../../api';
+import './MoreReport.css';
+
+const ReportMore = ({ user, onDataUpdate }) => {
+  const [mgaData, setMgaData] = useState({});
+  const [error, setError] = useState(null);
+  const [currentWeek, setCurrentWeek] = useState(0); // Tracks the week offset
+  const [dateRange, setDateRange] = useState(""); // To display "Saturday - Friday"
+  const [showNoDataBar, setShowNoDataBar] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true); // Track if the component is collapsed
+  const [countdown, setCountdown] = useState("");
+  const [loading, setLoading] = useState(false); // Track loading state
+  const [pendingUpdates, setPendingUpdates] = useState({}); // Track pending updates
+  const [mgaHierarchy, setMgaHierarchy] = useState({ rga: null, legacy: null, tree: null }); // Store MGA hierarchy data
+  
+  const [formData, setFormData] = useState({
+    MGA: user?.agnname || user?.lagnname || "",
+    MORE_Date: "",
+    External_Sets: 0,
+    External_Shows: 0,
+    Internal_Sets: 0,
+    Internal_Shows: 0,
+    Personal_Sets: 0,
+    Personal_Shows: 0,
+    Total_Set: 0,
+    Total_Show: 0,
+    Group_Invite: 0,
+    Finals_Set: 0,
+    Finals_Show: 0,
+    // New recruiting breakdown fields
+    PR_Final_Set: 0,
+    PR_Final_Show: 0,
+    Happenstance_PR_Hires: 0,
+    PPR_Hires: 0,
+    Social_Media_Hires: 0,
+    Webinar_Sets_Purchased: 0,
+    Webinar_Finals_Set: 0,
+    Webinar_Final_Show: 0,
+    Webinar_Hires: 0,
+    Surveys_Purchased: 0,
+    Survey_Finals_Set: 0,
+    Survey_Finals_Show: 0,
+    Survey_Hires: 0,
+    Vendor_Finals_Purchased: 0,
+    Vendor_Final_Show: 0,
+    Vendor_Final_Hires: 0,
+    Vendor_Hires_Purchased: 0,
+    Total_Vendor_Hires: 0,
+    Internal_Webinar_Sets: 0,
+    Internal_Finals_Set: 0,
+    Internal_Final_Show: 0,
+    Total_Internal_Hires: 0,
+    Non_PR_Hires: 0,
+    PR_Hires: 0,
+    Total_Hires: 0,
+  });
+
+  const toggleCollapse = () => {
+    setIsCollapsed((prev) => !prev);
+  };
+
+  // Fetch MGA hierarchy data (rga, legacy, tree) from the backend
+  const fetchMgaHierarchy = async (mgaName) => {
+    try {
+      if (!mgaName) return;
+      
+      const response = await api.get(`/more/mga-hierarchy/${encodeURIComponent(mgaName)}`);
+      
+      if (response.data.success && response.data.data) {
+        setMgaHierarchy(response.data.data);
+        console.log('✅ MGA Hierarchy fetched:', response.data.data);
+      } else {
+        console.warn('MGA hierarchy not found, using fallback values');
+        // Fallback to using the MGA name itself
+        setMgaHierarchy({
+          rga: mgaName,
+          legacy: mgaName,
+          tree: mgaName
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching MGA hierarchy:', error);
+      // Fallback to using the MGA name itself
+      setMgaHierarchy({
+        rga: mgaName,
+        legacy: mgaName,
+        tree: mgaName
+      });
+    }
+  };
+
+  const calculateCountdown = (weekOffset = 0) => {
+    const now = new Date();
+    
+    // Convert current time to EST
+    const currentEST = new Date(
+      now.toLocaleString("en-US", { timeZone: "America/New_York" })
+    );
+    
+    // Calculate the Friday of the selected week
+    const startOfWeek = new Date(currentEST);
+    startOfWeek.setDate(
+      startOfWeek.getDate() + weekOffset * 7 - startOfWeek.getDay() + 5
+    ); // Move to the correct Friday
+    startOfWeek.setHours(15, 15, 0, 0); // Set deadline time to 3:15 PM EST
+    
+    // Calculate the difference in milliseconds
+    const diff = startOfWeek - currentEST;
+    
+    if (diff <= 0) {
+      setCountdown("Deadline passed");
+      return;
+    }
+    
+    // Convert to days, hours, minutes, seconds
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    
+    // Dynamically build the countdown string, omitting zero values except seconds
+    const countdownArray = [];
+    if (days > 0) countdownArray.push(`${days}d`);
+    if (hours > 0 || days > 0) countdownArray.push(`${hours}h`);
+    if (minutes > 0 || hours > 0 || days > 0) countdownArray.push(`${minutes}m`);
+    countdownArray.push(`${seconds}s`); // Always show seconds
+    
+    setCountdown(countdownArray.join(" "));
+  };
+
+  const fetchFormData = async (MGA, MORE_Date) => {
+    try {
+      // Fetch data for the specific week and all weeks
+      const [currentWeekResponse, allDataResponse] = await Promise.all([
+        api.get(`/more/fetch-more-data/${MGA}/${MORE_Date}`),
+        api.get('/more/all-amore-data'),
+      ]);
+
+      if (currentWeekResponse.data.success && currentWeekResponse.data.data) {
+        const fetchedData = currentWeekResponse.data.data;
+
+        const updatedData = Object.keys(fetchedData).reduce((acc, key) => {
+          acc[key] = fetchedData[key] === 0 ? 0 : fetchedData[key];
+          return acc;
+        }, {});
+
+        setFormData((prev) => ({
+          ...prev,
+          ...updatedData,
+          MGA: MGA, // Ensure MGA is preserved
+          MORE_Date: MORE_Date, // Keep backend format yyyy-mm-dd
+        }));
+        setShowNoDataBar(false); // Hide the no data bar if data is fetched
+      } else {
+        // Clear the form and show the no data bar
+        setFormData((prev) => ({
+          ...prev,
+          MGA: MGA, // Ensure MGA is preserved
+          MORE_Date: MORE_Date,
+          External_Sets: null,
+          External_Shows: null,
+          Internal_Sets: null,
+          Internal_Shows: null,
+          Personal_Sets: null,
+          Personal_Shows: null,
+          Total_Set: null,
+          Total_Show: null,
+          Group_Invite: null,
+          Finals_Set: null,
+          Finals_Show: null,
+          // New recruiting breakdown fields
+          PR_Final_Set: null,
+          PR_Final_Show: null,
+          Happenstance_PR_Hires: null,
+          PPR_Hires: null,
+          Social_Media_Hires: null,
+          Webinar_Sets_Purchased: null,
+          Webinar_Finals_Set: null,
+          Webinar_Final_Show: null,
+          Webinar_Hires: null,
+          Surveys_Purchased: null,
+          Survey_Finals_Set: null,
+          Survey_Finals_Show: null,
+          Survey_Hires: null,
+          Vendor_Finals_Purchased: null,
+          Vendor_Final_Show: null,
+          Vendor_Final_Hires: null,
+          Vendor_Hires_Purchased: null,
+          Total_Vendor_Hires: null,
+          Internal_Webinar_Sets: null,
+          Internal_Finals_Set: null,
+          Internal_Final_Show: null,
+          Total_Internal_Hires: null,
+          Non_PR_Hires: null,
+          PR_Hires: null,
+          Total_Hires: null,
+        }));
+        setShowNoDataBar(true); // Show the no data bar
+      }
+
+      // Calculate the reporting streak from all weeks' data
+      if (allDataResponse.data.success && allDataResponse.data.data) {
+        calculateReportingStreak(allDataResponse.data.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch data for the selected week:", err);
+      setError("Failed to fetch data for the selected week.");
+      setShowNoDataBar(true); // Show the no data bar on error
+    }
+  };
+
+  const handleNoRecruit = async () => {
+    const currentMGA = formData.MGA || user?.agnname || user?.lagnname;
+    
+    const zeroData = {
+      External_Sets: 0,
+      External_Shows: 0,
+      Internal_Sets: 0,
+      Internal_Shows: 0,
+      Personal_Sets: 0,
+      Personal_Shows: 0,
+      Total_Set: 0,
+      Total_Show: 0,
+      Group_Invite: 0,
+      Finals_Set: 0,
+      Finals_Show: 0,
+      // New recruiting breakdown fields
+      PR_Final_Set: 0,
+      PR_Final_Show: 0,
+      Happenstance_PR_Hires: 0,
+      PPR_Hires: 0,
+      Social_Media_Hires: 0,
+      Webinar_Sets_Purchased: 0,
+      Webinar_Finals_Set: 0,
+      Webinar_Final_Show: 0,
+      Webinar_Hires: 0,
+      Surveys_Purchased: 0,
+      Survey_Finals_Set: 0,
+      Survey_Finals_Show: 0,
+      Survey_Hires: 0,
+      Vendor_Finals_Purchased: 0,
+      Vendor_Final_Show: 0,
+      Vendor_Final_Hires: 0,
+      Vendor_Hires_Purchased: 0,
+      Total_Vendor_Hires: 0,
+      Internal_Webinar_Sets: 0,
+      Internal_Finals_Set: 0,
+      Internal_Final_Show: 0,
+      Total_Internal_Hires: 0,
+      Non_PR_Hires: 0,
+      PR_Hires: 0,
+      Total_Hires: 0,
+      RGA: mgaHierarchy.rga || currentMGA,
+      Legacy: mgaHierarchy.legacy || currentMGA,
+      Tree: mgaHierarchy.tree || currentMGA,
+    };
+
+    const isOnTime = currentWeek === 0 && countdown !== "Deadline passed";
+
+    // Update the local formData state
+    setFormData((prev) => ({
+      ...prev,
+      ...zeroData,
+    }));
+
+    // Send the data to the backend
+    try {
+      if (formData.MGA && formData.MORE_Date) {
+        await updateData(formData.MGA, formData.MORE_Date, zeroData, isOnTime);
+        alert(`Recruiting numbers have been recorded as 0${isOnTime ? ' on time.' : '.'}`);
+        onDataUpdate && onDataUpdate(); // Refresh parent data
+      } else {
+        alert("MGA or recruiting date is missing. Unable to record data.");
+      }
+    } catch (error) {
+      console.error("Error recording recruiting numbers as 0:", error.message);
+      alert("Failed to record recruiting numbers as 0. Please try again.");
+    }
+  };
+
+  const updateData = async (MGA, MORE_Date, updates, onTime = false) => {
+    setLoading(true);
+    try {
+      const currentMGA = MGA || user?.agnname || user?.lagnname;
+      const userRole = user?.clname || 'MGA';
+
+      const payload = {
+        MGA: currentMGA,
+        MORE_Date,
+        updates,
+        userRole,
+        on_time: onTime,
+        rga: mgaHierarchy.rga || currentMGA,
+        legacy: mgaHierarchy.legacy || currentMGA,
+        tree: mgaHierarchy.tree || currentMGA,
+      };
+
+      console.log("Payload being sent:", payload);
+      await api.post('/more/update-more-data', payload);
+
+    } catch (error) {
+      console.error("Error updating data:", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    let parsedValue = parseInt(value || 0, 10);
+
+    setFormData((prev) => {
+      let updatedFormData = {
+        ...prev,
+        [name]: parsedValue,
+      };
+
+      // VALIDATION RULES - Apply before other calculations
+      
+      // Personal Recruiting Validations
+      if (name === 'PR_Final_Show') {
+        // Finals Show cannot exceed Finals Set
+        const finalsSet = parseInt(updatedFormData.PR_Final_Set || 0, 10);
+        if (parsedValue > finalsSet) {
+          parsedValue = finalsSet;
+          updatedFormData[name] = parsedValue;
+        }
+      }
+      
+      if (name === 'PR_Final_Set') {
+        // If Finals Set is reduced below Finals Show, reduce Finals Show to match
+        const finalsShow = parseInt(updatedFormData.PR_Final_Show || 0, 10);
+        if (finalsShow > parsedValue) {
+          updatedFormData.PR_Final_Show = parsedValue;
+        }
+      }
+      
+      if (['Happenstance_PR_Hires', 'PPR_Hires', 'Social_Media_Hires'].includes(name)) {
+        // Sum of PR hires cannot exceed Finals Show in Personal Recruiting
+        const finalsShow = parseInt(updatedFormData.PR_Final_Show || 0, 10);
+        const happenstance = name === 'Happenstance_PR_Hires' ? parsedValue : parseInt(updatedFormData.Happenstance_PR_Hires || 0, 10);
+        const ppr = name === 'PPR_Hires' ? parsedValue : parseInt(updatedFormData.PPR_Hires || 0, 10);
+        const socialMedia = name === 'Social_Media_Hires' ? parsedValue : parseInt(updatedFormData.Social_Media_Hires || 0, 10);
+        const totalPRHires = happenstance + ppr + socialMedia;
+        
+        if (totalPRHires > finalsShow) {
+          // Reduce the current field being edited to make the sum equal to Finals Show
+          const otherHires = totalPRHires - parsedValue;
+          parsedValue = Math.max(0, finalsShow - otherHires);
+          updatedFormData[name] = parsedValue;
+        }
+      }
+      
+      // Internal Recruiting Validations
+      if (name === 'Internal_Final_Show') {
+        // Finals Show cannot exceed Finals Set
+        const finalsSet = parseInt(updatedFormData.Internal_Finals_Set || 0, 10);
+        if (parsedValue > finalsSet) {
+          parsedValue = finalsSet;
+          updatedFormData[name] = parsedValue;
+        }
+        
+        // Internal Hires cannot exceed Finals Show
+        const internalHires = parseInt(updatedFormData.Total_Internal_Hires || 0, 10);
+        if (internalHires > parsedValue) {
+          updatedFormData.Total_Internal_Hires = parsedValue;
+        }
+      }
+      
+      if (name === 'Internal_Finals_Set') {
+        // If Finals Set is reduced below Finals Show, reduce Finals Show to match
+        const finalsShow = parseInt(updatedFormData.Internal_Final_Show || 0, 10);
+        if (finalsShow > parsedValue) {
+          updatedFormData.Internal_Final_Show = parsedValue;
+          // Also ensure Internal Hires doesn't exceed new Finals Show
+          const internalHires = parseInt(updatedFormData.Total_Internal_Hires || 0, 10);
+          if (internalHires > parsedValue) {
+            updatedFormData.Total_Internal_Hires = parsedValue;
+          }
+        }
+      }
+      
+      if (name === 'Total_Internal_Hires') {
+        // Internal Hires cannot exceed Finals Show
+        const finalsShow = parseInt(updatedFormData.Internal_Final_Show || 0, 10);
+        if (parsedValue > finalsShow) {
+          parsedValue = finalsShow;
+          updatedFormData[name] = parsedValue;
+        }
+      }
+      
+      // Webinar Validations
+      if (name === 'Webinar_Final_Show') {
+        // Finals Show cannot exceed Finals Set
+        const finalsSet = parseInt(updatedFormData.Webinar_Finals_Set || 0, 10);
+        if (parsedValue > finalsSet) {
+          parsedValue = finalsSet;
+          updatedFormData[name] = parsedValue;
+        }
+        
+        // Webinar Hires cannot exceed Finals Show
+        const webinarHires = parseInt(updatedFormData.Webinar_Hires || 0, 10);
+        if (webinarHires > parsedValue) {
+          updatedFormData.Webinar_Hires = parsedValue;
+        }
+      }
+      
+      if (name === 'Webinar_Finals_Set') {
+        // If Finals Set is reduced below Finals Show, reduce Finals Show to match
+        const finalsShow = parseInt(updatedFormData.Webinar_Final_Show || 0, 10);
+        if (finalsShow > parsedValue) {
+          updatedFormData.Webinar_Final_Show = parsedValue;
+          // Also ensure Webinar Hires doesn't exceed new Finals Show
+          const webinarHires = parseInt(updatedFormData.Webinar_Hires || 0, 10);
+          if (webinarHires > parsedValue) {
+            updatedFormData.Webinar_Hires = parsedValue;
+          }
+        }
+      }
+      
+      if (name === 'Webinar_Hires') {
+        // Webinar Hires cannot exceed Finals Show
+        const finalsShow = parseInt(updatedFormData.Webinar_Final_Show || 0, 10);
+        if (parsedValue > finalsShow) {
+          parsedValue = finalsShow;
+          updatedFormData[name] = parsedValue;
+        }
+      }
+      
+      // Survey Validations
+      if (name === 'Survey_Finals_Show') {
+        // Finals Show cannot exceed Finals Set
+        const finalsSet = parseInt(updatedFormData.Survey_Finals_Set || 0, 10);
+        if (parsedValue > finalsSet) {
+          parsedValue = finalsSet;
+          updatedFormData[name] = parsedValue;
+        }
+        
+        // Survey Hires cannot exceed Finals Show
+        const surveyHires = parseInt(updatedFormData.Survey_Hires || 0, 10);
+        if (surveyHires > parsedValue) {
+          updatedFormData.Survey_Hires = parsedValue;
+        }
+      }
+      
+      if (name === 'Survey_Finals_Set') {
+        // If Finals Set is reduced below Finals Show, reduce Finals Show to match
+        const finalsShow = parseInt(updatedFormData.Survey_Finals_Show || 0, 10);
+        if (finalsShow > parsedValue) {
+          updatedFormData.Survey_Finals_Show = parsedValue;
+          // Also ensure Survey Hires doesn't exceed new Finals Show
+          const surveyHires = parseInt(updatedFormData.Survey_Hires || 0, 10);
+          if (surveyHires > parsedValue) {
+            updatedFormData.Survey_Hires = parsedValue;
+          }
+        }
+      }
+      
+      if (name === 'Survey_Hires') {
+        // Survey Hires cannot exceed Finals Show
+        const finalsShow = parseInt(updatedFormData.Survey_Finals_Show || 0, 10);
+        if (parsedValue > finalsShow) {
+          parsedValue = finalsShow;
+          updatedFormData[name] = parsedValue;
+        }
+      }
+      
+      // Vendor Finals Purchased Validations
+      if (name === 'Vendor_Final_Show') {
+        // Final Show cannot exceed Finals Purchased
+        const finalsPurchased = parseInt(updatedFormData.Vendor_Finals_Purchased || 0, 10);
+        if (parsedValue > finalsPurchased) {
+          parsedValue = finalsPurchased;
+          updatedFormData[name] = parsedValue;
+        }
+        
+        // Vendor Final Hires cannot exceed Final Show
+        const vendorHires = parseInt(updatedFormData.Vendor_Final_Hires || 0, 10);
+        if (vendorHires > parsedValue) {
+          updatedFormData.Vendor_Final_Hires = parsedValue;
+        }
+      }
+      
+      if (name === 'Vendor_Finals_Purchased') {
+        // If Finals Purchased is reduced below Final Show, reduce Final Show to match
+        const finalShow = parseInt(updatedFormData.Vendor_Final_Show || 0, 10);
+        if (finalShow > parsedValue) {
+          updatedFormData.Vendor_Final_Show = parsedValue;
+          // Also ensure Vendor Hires doesn't exceed new Final Show
+          const vendorHires = parseInt(updatedFormData.Vendor_Final_Hires || 0, 10);
+          if (vendorHires > parsedValue) {
+            updatedFormData.Vendor_Final_Hires = parsedValue;
+          }
+        }
+      }
+      
+      if (name === 'Vendor_Final_Hires') {
+        // Vendor Hires cannot exceed Final Show
+        const finalShow = parseInt(updatedFormData.Vendor_Final_Show || 0, 10);
+        if (parsedValue > finalShow) {
+          parsedValue = finalShow;
+          updatedFormData[name] = parsedValue;
+        }
+      }
+
+      // Continue with existing auto-calculations
+      const updatedFormDataWithValidation = {
+        ...prev,
+        ...updatedFormData
+      };
+
+      // Auto-calculate Final Interview totals from section-level finals fields
+      // (Personal + Internal + Vendor sub-sections)
+      const calcFinalsSetTotal = () =>
+        (parseInt(updatedFormDataWithValidation.PR_Final_Set || 0, 10) +
+          parseInt(updatedFormDataWithValidation.Webinar_Finals_Set || 0, 10) +
+          parseInt(updatedFormDataWithValidation.Survey_Finals_Set || 0, 10) +
+          parseInt(updatedFormDataWithValidation.Internal_Finals_Set || 0, 10) +
+          // "Vendor_Finals_Purchased" acts as the finals-set count for the finals-purchased vendor stream
+          parseInt(updatedFormDataWithValidation.Vendor_Finals_Purchased || 0, 10)) || 0;
+
+      const calcFinalsShowTotal = () =>
+        (parseInt(updatedFormDataWithValidation.PR_Final_Show || 0, 10) +
+          parseInt(updatedFormDataWithValidation.Webinar_Final_Show || 0, 10) +
+          parseInt(updatedFormDataWithValidation.Survey_Finals_Show || 0, 10) +
+          parseInt(updatedFormDataWithValidation.Internal_Final_Show || 0, 10) +
+          parseInt(updatedFormDataWithValidation.Vendor_Final_Show || 0, 10)) || 0;
+
+      const finalsSetTotal = calcFinalsSetTotal();
+      const finalsShowTotal = calcFinalsShowTotal();
+
+      updatedFormDataWithValidation.Finals_Set = finalsSetTotal;
+      updatedFormDataWithValidation.Finals_Show = finalsShowTotal;
+
+      // Auto-calculate Total Hiring breakdown:
+      // - PR Hires: from Personal Recruiting section
+      // - Non-PR Hires: from Internal + Vendors sections
+      const prHiresTotal =
+        (parseInt(updatedFormDataWithValidation.Happenstance_PR_Hires || 0, 10) +
+          parseInt(updatedFormDataWithValidation.PPR_Hires || 0, 10) +
+          parseInt(updatedFormDataWithValidation.Social_Media_Hires || 0, 10)) || 0;
+
+      const vendorHiresTotal =
+        (parseInt(updatedFormDataWithValidation.Webinar_Hires || 0, 10) +
+          parseInt(updatedFormDataWithValidation.Survey_Hires || 0, 10) +
+          parseInt(updatedFormDataWithValidation.Vendor_Final_Hires || 0, 10) +
+          parseInt(updatedFormDataWithValidation.Vendor_Hires_Purchased || 0, 10)) || 0;
+
+      // Keep Total Vendor Hires synced (no direct entry needed)
+      updatedFormDataWithValidation.Total_Vendor_Hires = vendorHiresTotal;
+
+      const nonPrHiresTotal =
+        (parseInt(updatedFormDataWithValidation.Total_Internal_Hires || 0, 10) + vendorHiresTotal) || 0;
+
+      updatedFormDataWithValidation.PR_Hires = prHiresTotal;
+      updatedFormDataWithValidation.Non_PR_Hires = nonPrHiresTotal;
+
+      const computedTotalHires = prHiresTotal + nonPrHiresTotal;
+
+      // Total Hires is now auto-calculated only, not user-editable
+      updatedFormDataWithValidation.Total_Hires = computedTotalHires;
+
+      // Only auto-calculate totals when editing the legacy source fields.
+      // This prevents overwriting totals when using the newer recruiting fields.
+      if (["External_Sets", "Internal_Sets", "Personal_Sets"].includes(name)) {
+        updatedFormDataWithValidation.Total_Set =
+          (parseInt(updatedFormDataWithValidation.External_Sets || 0, 10) +
+            parseInt(updatedFormDataWithValidation.Internal_Sets || 0, 10) +
+            parseInt(updatedFormDataWithValidation.Personal_Sets || 0, 10)) || 0;
+      }
+
+      if (["External_Shows", "Internal_Shows", "Personal_Shows"].includes(name)) {
+        updatedFormDataWithValidation.Total_Show =
+          (parseInt(updatedFormDataWithValidation.External_Shows || 0, 10) +
+            parseInt(updatedFormDataWithValidation.Internal_Shows || 0, 10) +
+            parseInt(updatedFormDataWithValidation.Personal_Shows || 0, 10)) || 0;
+      }
+
+      setPendingUpdates((prevUpdates) => ({
+        ...prevUpdates,
+        [name]: parsedValue,
+        // Keep finals totals synced in the backend whenever any field changes
+        Finals_Set: finalsSetTotal,
+        Finals_Show: finalsShowTotal,
+        // Keep hiring totals synced in the backend whenever any field changes
+        PR_Hires: updatedFormDataWithValidation.PR_Hires,
+        Non_PR_Hires: updatedFormDataWithValidation.Non_PR_Hires,
+        Total_Hires: updatedFormDataWithValidation.Total_Hires,
+        Total_Vendor_Hires: updatedFormDataWithValidation.Total_Vendor_Hires,
+      }));
+
+      return updatedFormDataWithValidation;
+    });
+  };
+
+  const handleSubmit = async () => {
+    if (!formData.MGA || !formData.MORE_Date) {
+      alert("MGA or MORE_Date is missing; cannot submit.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const isOnTime = currentWeek === 0 && countdown !== "Deadline passed";
+      const currentMGA = formData.MGA || user?.agnname || user?.lagnname;
+      await api.post('/more/update-more-data', {
+        MGA: currentMGA,
+        MORE_Date: formData.MORE_Date,
+        updates: pendingUpdates,
+        userRole: user?.clname,
+        on_time: isOnTime,
+        rga: mgaHierarchy.rga || currentMGA,
+        legacy: mgaHierarchy.legacy || currentMGA,
+        tree: mgaHierarchy.tree || currentMGA,
+      });
+
+      setPendingUpdates({});
+      setShowNoDataBar(false);
+      alert("Recruiting numbers updated successfully.");
+      onDataUpdate && onDataUpdate(); // Refresh parent data
+    } catch (error) {
+      console.error("Error submitting data:", error.message);
+      alert("Failed to update recruiting numbers.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateReportingStreak = (allWeeksData) => {
+    // Use the correct user identifier (MGA field from formData)
+    const currentMGA = formData.MGA || user?.agnname || user?.lagnname;
+    const filteredData = allWeeksData.filter((week) => week.MGA === currentMGA);
+    const sortedWeeks = filteredData.sort((a, b) => new Date(b.MORE_Date) - new Date(a.MORE_Date));
+
+    let streak = 0;
+    for (const week of sortedWeeks) {
+      if (week.on_time === 1 || week.on_time === true) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
+    setMgaData((prev) => ({ ...prev, streak }));
+  };
+
+  const calculateDateRange = (weekOffset = 0) => {
+    const now = new Date();
+    const currentDay = now.getDay();
+    
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - currentDay - 1 + weekOffset * 7);
+    
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    
+    const formatToMMDDYY = (date) => {
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const dd = String(date.getDate()).padStart(2, "0");
+      const yy = String(date.getFullYear()).slice(-2);
+      return `${mm}/${dd}/${yy}`;
+    };
+    
+    const formatToYYYYMMDD = (date) => {
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const dd = String(date.getDate()).padStart(2, "0");
+      const yyyy = date.getFullYear();
+      return `${yyyy}-${mm}-${dd}`;
+    };
+    
+    const formattedRange = `${formatToMMDDYY(startOfWeek)} - ${formatToMMDDYY(endOfWeek)}`;
+    const formattedFriday = formatToYYYYMMDD(endOfWeek);
+    
+    return { formattedRange, formattedFriday };
+  };
+
+  const updateWeek = (offsetChange) => {
+    setCurrentWeek((prev) => prev + offsetChange);
+  };
+
+  const handleFocus = (e) => {
+    e.target.select();
+  };
+
+  // Effects
+  useEffect(() => {
+    const updateCountdown = () => {
+      calculateCountdown(currentWeek);
+    };
+    
+    const interval = setInterval(updateCountdown, 1000);
+    updateCountdown();
+    
+    return () => clearInterval(interval);
+  }, [currentWeek]);
+
+  useEffect(() => {
+    const updateDateRange = async () => {
+      const { formattedRange, formattedFriday } = calculateDateRange(currentWeek);
+      setDateRange(formattedRange);
+      setFormData((prev) => ({
+        ...prev,
+        MORE_Date: formattedFriday,
+      }));
+      
+      const currentMGA = formData.MGA || user?.agnname || user?.lagnname;
+      if (currentMGA) {
+        await fetchFormData(currentMGA, formattedFriday);
+      }
+    };
+    
+    updateDateRange();
+  }, [currentWeek, formData.MGA]);
+
+  useEffect(() => {
+    const fetchMgaData = async () => {
+      try {
+        const userMGA = user?.agnname || user?.lagnname;
+        if (userMGA) {
+          setFormData((prevFormData) => ({
+            ...prevFormData,
+            MGA: userMGA,
+          }));
+
+          // Fetch proper hierarchy data from MGAs table
+          await fetchMgaHierarchy(userMGA);
+
+          setMgaData({
+            lagnname: userMGA,
+            rga: user?.rga || userMGA,
+            legacy: user?.legacy || userMGA,
+            tree: user?.tree || "",
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch MGA data:", err.message);
+        setError(err.message || "Unexpected error occurred.");
+      }
+    };
+
+    fetchMgaData();
+  }, [user]);
+
+  return (
+    <div >
+      
+      <div className="more-form-container">
+        {showNoDataBar ? (
+          <div className="warning-message-container">
+            <div className="warning-icon">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                className="warning-icon-svg"
+              >
+                <circle cx="12" cy="12" r="12" fill="#ffe4a1" />
+                <circle cx="12" cy="12" r="9" fill="#ffffff" />
+                <text
+                  x="12"
+                  y="16"
+                  textAnchor="middle"
+                  fontSize="14"
+                  fill="#ffb300"
+                  fontWeight="bold"
+                >
+                  !
+                </text>
+              </svg>
+            </div>
+            <div className="warning-message-content">
+              <h5>Notice</h5>
+              <p>
+                {countdown === "Deadline passed"
+                  ? "The deadline has passed to report recruiting numbers on time this week. You can still report your numbers now for your own records."
+                  : <>
+                      You have <strong>{countdown}</strong> to report recruiting numbers on time this week{" "}
+                      {mgaData.streak > 0
+                        ? `and keep your ${mgaData.streak} ${mgaData.streak === 1 ? "week" : "weeks"} streak.`
+                        : "and start a new streak."}
+                    </>}
+              </p>
+
+              <div className="more-button-group">
+                <button className="more-toggle-collapse-button" onClick={toggleCollapse}>
+                  {isCollapsed ? "Report MORE Numbers" : "Hide Report MORE"}
+                </button>
+                <button
+                  className="no-recruit-notice-button"
+                  onClick={() => handleNoRecruit()}
+                >
+                  I Didn't Recruit
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="success-message-container">
+            <div className="success-icon">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                className="success-icon-svg"
+              >
+                <circle cx="12" cy="12" r="12" fill="#d4edda" />
+                <circle cx="12" cy="12" r="9" fill="#ffffff" />
+                <text
+                  x="12"
+                  y="16"
+                  textAnchor="middle"
+                  fontSize="14"
+                  fill="#28a745"
+                  fontWeight="bold"
+                >
+                  🔥
+                </text>
+              </svg>
+            </div>
+            <div className="success-message-content">
+              <h5>
+                Keep up the consistency{" "}
+                <strong>
+                  {(() => {
+                    const fullName = user?.agnname || user?.lagnname || "";
+                    const firstName = fullName.split(" ")[0]; // Get first name (first part)
+                    return firstName?.toLowerCase()?.replace(/^./, (char) => char.toUpperCase()) || "Agent";
+                  })()}
+                </strong>
+              </h5>
+              {mgaData.streak > 0 && (
+                <p>
+                  Your current reporting streak is{" "}
+                  <strong>
+                    {mgaData.streak} {mgaData.streak === 1 ? "week" : "weeks"}
+                  </strong>
+                  . Report before 3:15 PM EST on Fridays to maintain your streak.
+                </p>
+              )}
+              <div className="more-button-group">
+                <button
+                  className="success-more-toggle-collapse-button"
+                  onClick={toggleCollapse}
+                >
+                  {isCollapsed ? "Review MORE" : "Hide MORE"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!isCollapsed && (
+          <>
+            {/*
+              Helper renderer: turns a list of fields into a compact, consistent input table.
+              We keep the existing `.horizontal-table` / `.morebonus-table` styling for consistency.
+            */}
+            <div className="more-date-navigation">
+              <div className="date-range-container">
+                <span className="recruiting-week-label">Recruiting Week:</span>
+                <div className="week-selector-row">
+                  <button className="more-week-button" onClick={() => updateWeek(-1)}>
+                    &lt;
+                  </button>
+                  <select
+                    className="week-selector"
+                    value={currentWeek}
+                    onChange={(e) => setCurrentWeek(parseInt(e.target.value, 10))}
+                  >
+                    {[...Array(100)]
+                      .map((_, index) => -index)
+                      .concat(0, 1)
+                      .map((offset) => {
+                        const { formattedRange } = calculateDateRange(offset);
+                        return (
+                          <option key={offset} value={offset}>
+                            {formattedRange}
+                          </option>
+                        );
+                      })}
+                  </select>
+                  <button className="more-week-button" onClick={() => updateWeek(1)}>
+                    &gt;
+                  </button>
+                </div>
+
+                <div className="week-indicator-wrapper">
+                  <span className="week-indicator">
+                    {currentWeek === 0 && "This Week"}
+                    {currentWeek === -1 && "Last Week"}
+                    {currentWeek === 1 && "Next Week"}
+                  </span>
+                  <div className={`more-spinner ${loading ? "visible" : ""}`}></div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "center", marginTop: "10px", marginBottom: "10px" }}>
+              <button
+                style={{
+                  padding: "10px 20px",
+                  fontSize: "12px",
+                  fontWeight: "bold",
+                  backgroundColor: "#00548c",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "5px",
+                  cursor: "pointer",
+                  transition: "background 0.3s",
+                }}
+                onClick={handleSubmit}
+                disabled={loading}
+              >
+                {loading ? "Submitting..." : "Submit MORE"}
+              </button>
+            </div>
+
+            {(() => {
+              const renderSectionTable = ({ title, titleParts, headerColor, columns }) => (
+                <div className="horizontal-table more-input-section">
+                  <table className="morebonus-table">
+                    <thead>
+                      {Array.isArray(titleParts) && titleParts.length > 0 ? (
+                        <tr>
+                          {titleParts.map((part, idx) => (
+                            <th
+                              key={`${part.label || "title"}-${idx}`}
+                              colSpan={part.span}
+                              className="more-table-header"
+                              style={{ backgroundColor: part.backgroundColor || headerColor, color: "white" }}
+                            >
+                              {part.label}
+                            </th>
+                          ))}
+                        </tr>
+                      ) : (
+                        <tr>
+                          <th
+                            style={{ backgroundColor: headerColor }}
+                            colSpan={columns.length}
+                            className="more-table-header"
+                          >
+                            {title}
+                          </th>
+                        </tr>
+                      )}
+                      <tr>
+                        {columns.map((col) => (
+                          <th
+                            key={col.field}
+                            className={`more-table-header more-table-subheader${col.headerClassName ? ` ${col.headerClassName}` : ""}`}
+                            title={col.tooltip || undefined}
+                          >
+                            {col.label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        {columns.map((col) => (
+                          <td key={col.field}>
+                            <input
+                              className={`more-form-input${col.readOnly ? " more-form-input--readonly" : ""}`}
+                              type="number"
+                              name={col.field}
+                              value={
+                                col.getValue
+                                  ? col.getValue(formData)
+                                  : formData[col.field] === null
+                                    ? ""
+                                    : formData[col.field]
+                              }
+                              onChange={handleChange}
+                              onFocus={handleFocus}
+                              readOnly={!!col.readOnly}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              );
+
+              return (
+                <>
+                  {/* 1) Total Hiring Data first */}
+                  {renderSectionTable({
+                    title: "Total Hiring Data",
+                    headerColor: "#00548c", // legacy Hires Data color
+                    columns: [
+                      { field: "Non_PR_Hires", label: "Non-PR Hires", readOnly: true },
+                      { field: "PR_Hires", label: "PR Hires", readOnly: true },
+                      { field: "Total_Hires", label: "Total Hires", readOnly: true }, // Auto-calculated, not user editable
+                    ],
+                  })}
+
+                  {/* 2) Personal */}
+                  {renderSectionTable({
+                    title: "Personal Recruiting",
+                    headerColor: "#B25271", // legacy Personal Data color
+                    columns: [
+                      { field: "PR_Final_Set", label: "Finals Set" },
+                      { field: "PR_Final_Show", label: "Final Show" },
+                      { 
+                        field: "Happenstance_PR_Hires", 
+                        label: "Happenstance PR Hires",
+                        tooltip: "A personal recruit you meet on random introduction. this would be someone at the gym, your waiter at a restaurant, or a personal friend"
+                      },
+                      { 
+                        field: "PPR_Hires", 
+                        label: "Presentation PR",
+                        tooltip: "Someone recruited through a sales presentation"
+                      },
+                      { field: "Social_Media_Hires", label: "Social Media Hires" },
+                    ],
+                  })}
+
+                  {/* 3) Internal */}
+                  {renderSectionTable({
+                    title: "Internal Recruiting",
+                    headerColor: "#ED722F", // legacy Resume Data color
+                    columns: [
+                      { field: "Internal_Webinar_Sets", label: "Webinar Sets" },
+                      { field: "Internal_Finals_Set", label: "Finals Set" },
+                      { field: "Internal_Final_Show", label: "Final Show" },
+                      { field: "Total_Internal_Hires", label: "Total Internal Hires" },
+                    ],
+                  })}
+
+                  {/* 4) Vendors broken up */}
+                  {renderSectionTable({
+                    title: "Vendors — Webinar",
+                    headerColor: "#319b43bb", // green
+                    columns: [
+                      { field: "Webinar_Sets_Purchased", label: "Sets Purchased" },
+                      { field: "Webinar_Finals_Set", label: "Finals Set" },
+                      { field: "Webinar_Final_Show", label: "Final Show" },
+                      { field: "Webinar_Hires", label: "Hires" },
+                    ],
+                  })}
+
+                  {renderSectionTable({
+                    title: "Vendors — Surveys",
+                    headerColor: "#319b43bb", // green
+                    columns: [
+                      { field: "Surveys_Purchased", label: "Purchased" },
+                      { field: "Survey_Finals_Set", label: "Finals Set" },
+                      { field: "Survey_Finals_Show", label: "Final Show" },
+                      { field: "Survey_Hires", label: "Hires" },
+                    ],
+                  })}
+
+                  {renderSectionTable({
+                    titleParts: [
+                      { label: "Vendors — Finals Purchased", span: 3, backgroundColor: "#319b43bb" },
+                      { label: "Vendor Totals", span: 2, backgroundColor: "#00548c" },
+                    ],
+                    headerColor: "#319b43bb", // green
+                    columns: [
+                      { field: "Vendor_Finals_Purchased", label: "Finals Purchased" },
+                      { field: "Vendor_Final_Show", label: "Final Show" },
+                      { field: "Vendor_Final_Hires", label: "Hires" },
+                      { 
+                        field: "Vendor_Hires_Purchased", 
+                        label: "Hires Purchased", 
+                        headerClassName: "more-table-subheader--accent",
+                        tooltip: "A recruit that is already enrolled in a pre licensing course, or already licensed."
+                      },
+                      { field: "Total_Vendor_Hires", label: "Total Vendor Hires", readOnly: true },
+                    ],
+                  })}
+
+                  {/* Final Interview Data at the end (auto-totals) */}
+                  {renderSectionTable({
+                    title: "Final Interview Data",
+                    headerColor: "#00548c", // match Total Hiring Data color
+                    columns: [
+                      { field: "Finals_Set", label: "Total Finals Set", readOnly: true },
+                      { field: "Finals_Show", label: "Total Final Show", readOnly: true },
+                    ],
+                  })}
+                </>
+              );
+            })()}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ReportMore; 

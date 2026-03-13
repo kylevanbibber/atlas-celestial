@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    
+    <!-- Cache control headers to prevent stale JS bundles -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <link
+    href="https://fonts.googleapis.com/icon?family=Material+Icons"
+    rel="stylesheet"
+  />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="Join our team and build a rewarding career in life insurance sales. Flexible schedule, unlimited earning potential, and comprehensive training provided."
+    />
+    
+    <!-- Open Graph / Social Media Preview Tags -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Arias Agencies" />
+    <meta property="og:title" content="Career Opportunities | Arias Agencies" />
+    <meta property="og:description" content="Join our team and build a rewarding career in life insurance sales. Flexible schedule, unlimited earning potential, and comprehensive training provided." />
+    <meta property="og:image" content="https://ariaslife.com/uploads/uploads/pipeline/careers-preview.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:url" content="https://atlas.ariaslife.com/careers" />
+    
+    <!-- Twitter Card Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Career Opportunities | Arias Agencies" />
+    <meta name="twitter:description" content="Join our team and build a rewarding career in life insurance sales. Flexible schedule, unlimited earning potential, and comprehensive training provided." />
+    <meta name="twitter:image" content="https://ariaslife.com/uploads/uploads/pipeline/careers-preview.png" />
+    
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    
+    <!-- iOS specific meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Atlas" />
+    
+    <!-- Additional mobile optimizations -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+    
+    <!-- iOS splash screens -->
+    <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/splash/apple-splash-2048-2732.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/splash/apple-splash-1668-2388.png" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/splash/apple-splash-1536-2048.png" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/splash/apple-splash-1125-2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/splash/apple-splash-1242-2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/splash/apple-splash-828-1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/splash/apple-splash-750-1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/splash/apple-splash-640-1136.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+    
+    <!--
+      manifest.json provides metadata used when your web app is installed on a
+      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
+    -->
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <!--
+      Notice the use of %PUBLIC_URL% in the tags above.
+      It will be replaced with the URL of the `public` folder during the build.
+      Only files inside the `public` folder can be referenced from the HTML.
+
+      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
+      work correctly both with client-side routing and a non-root public URL.
+      Learn how to configure a non-root public URL by running `npm run build`.
+    -->
+    
+    <!-- Removed OneSignal Web Push (not used) -->
+    <script>
+      // Cleanup any previously registered OneSignal service workers
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then((regs) => {
+          regs.forEach((reg) => {
+            const url = (reg.active && reg.active.scriptURL) || '';
+            if (url.includes('OneSignalSDKWorker')) {
+              reg.unregister().catch(() => {});
+            }
+          });
+        });
+      }
+
+      // Handle chunk loading failures - auto-reload once if we get a syntax error
+      window.addEventListener('error', function(event) {
+        const isChunkError = event.message && (
+          event.message.includes('Unexpected token') ||
+          event.message.includes('Loading chunk') ||
+          event.message.includes('Failed to fetch')
+        );
+        
+        if (isChunkError) {
+          const hasReloaded = sessionStorage.getItem('chunk-error-reload');
+          
+          if (!hasReloaded) {
+            console.log('🔄 Detected chunk loading error, attempting reload...');
+            sessionStorage.setItem('chunk-error-reload', 'true');
+            
+            // Clear caches before reload
+            if ('caches' in window) {
+              caches.keys().then(function(names) {
+                names.forEach(function(name) {
+                  caches.delete(name);
+                });
+              }).then(function() {
+                window.location.reload(true);
+              });
+            } else {
+              window.location.reload(true);
+            }
+          } else {
+            // Already tried reloading, show user-friendly error
+            console.error('❌ Chunk loading error persists after reload');
+            document.body.innerHTML = `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 100px auto; padding: 20px; text-align: center;">
+                <h1 style="color: #e53e3e;">⚠️ Loading Error</h1>
+                <p style="color: #4a5568; margin: 20px 0;">
+                  We're having trouble loading the application. This usually happens when there's a cached version mismatch.
+                </p>
+                <p style="color: #4a5568; margin: 20px 0;">
+                  <strong>Please try:</strong>
+                </p>
+                <ol style="text-align: left; color: #4a5568; margin: 20px auto; max-width: 400px;">
+                  <li>Press <kbd>Ctrl+Shift+R</kbd> (Windows) or <kbd>Cmd+Shift+R</kbd> (Mac) to hard refresh</li>
+                  <li>Clear your browser cache</li>
+                  <li>Try an incognito/private window</li>
+                </ol>
+                <button onclick="sessionStorage.clear(); window.location.reload(true);" 
+                  style="background: #3182ce; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; margin-top: 20px;">
+                  Try Again
+                </button>
+              </div>
+            `;
+            sessionStorage.removeItem('chunk-error-reload');
+          }
+        }
+      }, true);
+
+      // Clear the reload flag on successful load
+      window.addEventListener('load', function() {
+        sessionStorage.removeItem('chunk-error-reload');
+      });
+
+      // Prevent all zoom behaviors with JavaScript
+      document.addEventListener('gesturestart', function (e) {
+        e.preventDefault();
+      });
+
+      document.addEventListener('gesturechange', function (e) {
+        e.preventDefault();
+      });
+
+      document.addEventListener('gestureend', function (e) {
+        e.preventDefault();
+      });
+
+      // Prevent triple-tap zoom
+      let lastTouchEnd = 0;
+      document.addEventListener('touchend', function (event) {
+        const now = (new Date()).getTime();
+        if (now - lastTouchEnd <= 300) {
+          event.preventDefault();
+        }
+        lastTouchEnd = now;
+      }, false);
+
+      // Prevent double-tap zoom
+      let lastTouchTime = 0;
+      document.addEventListener('touchstart', function(event) {
+        const now = Date.now();
+        if (now - lastTouchTime <= 300) {
+          event.preventDefault();
+        }
+        lastTouchTime = now;
+      }, { passive: false });
+    </script>
+    
+    <title>Career Opportunities | Arias Agencies</title>
+
+    <!-- Apply saved theme before React mounts to prevent flash -->
+    <script>
+      try {
+        var t = localStorage.getItem('atlasTheme') || 'light';
+        document.body.setAttribute('data-theme', t);
+        if (t === 'dark') document.documentElement.classList.add('dark');
+      } catch(e) {}
+    </script>
+
+    <style>
+      #app-shell-loader {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        background: #f5f7fa;
+      }
+      [data-theme="dark"] #app-shell-loader {
+        background: #1a1a1a;
+      }
+      #app-shell-loader .shell-spinner {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #app-shell-loader .shell-spinner::after {
+        content: '';
+        width: 36px;
+        height: 36px;
+        border: 3px solid #d0d0d0;
+        border-top-color: #00558c;
+        border-radius: 50%;
+        animation: shell-spin 0.7s linear infinite;
+      }
+      [data-theme="dark"] #app-shell-loader .shell-spinner::after {
+        border-color: #333;
+        border-top-color: #0077cc;
+      }
+      @keyframes shell-spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root">
+      <!-- Shown while React JS bundle loads — React replaces this on mount -->
+      <div id="app-shell-loader">
+        <div class="shell-spinner"></div>
+      </div>
+    </div>
+    <!--
+      This HTML file is a template.
+      If you open it directly in the browser, you will see an empty page.
+
+      You can add webfonts, meta tags, or analytics to this file.
+      The build step will place the bundled scripts into the <body> tag.
+
+      To begin the development, run `npm start` or `yarn start`.
+      To create a production bundle, use `npm run build` or `yarn build`.
+    -->
+  </body>
+</html>

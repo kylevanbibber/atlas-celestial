@@ -1,0 +1,49 @@
+.insured-suffix-select {
+  padding: 8px;
+  font-size: 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 5px;
+  width: 100%;
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  font-family: 'Calibri', sans-serif;
+}
+
+.insured-suffix-select:focus {
+  outline: none;
+  border-color: var(--hover-color);
+}
+
+.insured-suffix-select option {
+  background-color: var(--input-bg);
+  color: var(--input-text);
+}
+
+/* Additional styling for better dark mode support */
+.insured-suffix-select:hover {
+  border-color: var(--hover-color);
+}
+
+/* Ensure consistent styling with other form elements */
+.agent-info-group h5 {
+  color: var(--text-primary);
+  font-family: 'Avenir Next LT Pro', sans-serif;
+}
+
+.agent-info-group hr {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 20px 0;
+}
+
+.agent-info-group label {
+  color: var(--text-primary);
+  font-family: 'Calibri', sans-serif;
+  font-size: 12px;
+}
+
+/* Style the checkbox labels */
+.agent-info-group label[style] {
+  color: var(--text-primary) !important;
+  font-size: 12px !important;
+} 

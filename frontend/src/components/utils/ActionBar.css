@@ -1,0 +1,45 @@
+.action-bar {
+  margin-top: 5px;
+  background-color: var(--card-bg);
+  padding: 2px 10px;
+  border: 1px solid var(--border-color);
+  border-bottom: none;
+  display: flex;
+  align-items: center;
+  border-radius: 5px 5px 0 0;
+  justify-content: space-between;
+  overflow-x: auto; 
+  -ms-overflow-style: none; 
+  scrollbar-width: none;
+  touch-action: pan-x; 
+  user-select: none; 
+}
+
+.action-bar::-webkit-scrollbar {
+  display: none; 
+}
+
+.selected-count {
+  font-size: 12px;
+  color: var(--text-primary);
+  min-width: 16ch; 
+  user-select: none; 
+}
+
+.action-controls {
+  display: flex;
+  gap: 4px;
+  white-space: nowrap;
+  user-select: none; 
+}
+
+.action-controls button {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border: none;
+}
+
+.action-controls button:hover {
+  color: var(--text-primary);
+  background-color: transparent;
+} 

@@ -1,0 +1,390 @@
+.close-card {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  background: var(--card-bg, #fff);
+  border-radius: 10px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  transition: box-shadow 0.15s ease;
+}
+
+.close-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.close-card-avatar {
+  flex-shrink: 0;
+  position: relative;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+}
+
+.close-card-avatar:hover {
+  opacity: 0.85;
+}
+
+.close-card-avatar-img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.close-card-avatar-fallback {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--primary-color, #4f46e5);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+/* Online status ring */
+.close-card-avatar.online .close-card-avatar-img,
+.close-card-avatar.online .close-card-avatar-fallback {
+  box-shadow: 0 0 0 2.5px var(--card-bg, #fff), 0 0 0 4.5px #22c55e;
+}
+
+.close-card-avatar.online::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  background: #22c55e;
+  border: 2px solid var(--card-bg, #fff);
+  border-radius: 50%;
+}
+
+/* First Blood banner */
+.close-card-first-blood {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  border: 1px solid #f87171;
+  width: fit-content;
+}
+
+.close-card-first-blood .close-card-milestone-name {
+  color: #991b1b;
+}
+
+/* Milestone banner */
+.close-card-milestone {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border: 1px solid #f59e0b;
+  width: fit-content;
+}
+
+.close-card-milestone-emoji {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.close-card-milestone-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #92400e;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Daily ALP total */
+.close-card-daily-alp {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6366f1;
+  padding: 1px 8px;
+  border-radius: 12px;
+  background: #eef2ff;
+}
+
+.close-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.close-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.close-card-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary, #111827);
+}
+
+.close-card-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--primary-color, #4f46e5);
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.close-card-time {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  margin-left: auto;
+}
+
+.close-card-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.close-card-action {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.close-card-lead-type {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: var(--bg-secondary, #f3f4f6);
+  color: var(--text-secondary, #6b7280);
+  font-weight: 500;
+}
+
+.close-card-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.close-card-alp {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #10b981;
+}
+
+.close-card-alp svg {
+  width: 14px;
+  height: 14px;
+}
+
+.close-card-refs {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  font-weight: 500;
+}
+
+/* Image */
+.close-card-image-wrapper {
+  margin-top: 10px;
+}
+
+.close-card-image {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  object-fit: cover;
+  cursor: pointer;
+  transition: max-height 0.25s ease;
+}
+
+.close-card-image.expanded {
+  max-height: none;
+}
+
+/* Reactions */
+.close-card-reactions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+/* Heart button */
+.close-card-heart-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 20px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.close-card-heart-btn:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+.close-card-heart-btn.active {
+  background: #fef2f2;
+  border-color: #f87171;
+}
+
+.close-card-heart-btn.active:active {
+  transform: scale(0.92);
+}
+
+.heart-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary, #9ca3af);
+  transition: color 0.15s ease;
+}
+
+.close-card-heart-btn:hover .heart-icon {
+  color: #f87171;
+}
+
+.heart-icon.filled {
+  color: #ef4444;
+}
+
+/* Emoji reaction pills (shown when they have counts) */
+.close-card-reaction-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 20px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.close-card-reaction-btn:hover {
+  background: var(--bg-secondary, #f3f4f6);
+}
+
+.close-card-reaction-btn.active {
+  background: var(--primary-color-light, #eef2ff);
+  border-color: var(--primary-color, #4f46e5);
+}
+
+.reaction-emoji {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.reaction-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+}
+
+.close-card-heart-btn.active .reaction-count {
+  color: #ef4444;
+}
+
+.close-card-reaction-btn.active .reaction-count {
+  color: var(--primary-color, #4f46e5);
+}
+
+/* Plus button & picker */
+.close-card-picker-wrapper {
+  position: relative;
+}
+
+.close-card-plus-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-secondary, #9ca3af);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.close-card-plus-btn:hover {
+  background: var(--bg-secondary, #f3f4f6);
+  color: var(--text-primary, #111827);
+  border-color: var(--text-secondary, #9ca3af);
+}
+
+.close-card-plus-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.close-card-picker {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 10;
+  white-space: nowrap;
+}
+
+.close-card-picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  font-size: 20px;
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+
+.close-card-picker-item:hover {
+  background: var(--bg-secondary, #f3f4f6);
+  transform: scale(1.2);
+}
+
+.close-card-picker-item.active {
+  background: var(--primary-color-light, #eef2ff);
+}
+
+/* Footer with full date */
+.close-card-footer {
+  margin-top: 8px;
+}
+
+.close-card-full-date {
+  font-size: 11px;
+  color: var(--text-secondary, #9ca3af);
+}

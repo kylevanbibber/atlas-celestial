@@ -1,0 +1,30 @@
+-- Recruiting objectives are calculated dynamically based on MGA tenure and prior year codes/VIPs.
+-- No table is needed for the core feature.
+--
+-- Tenure rules (for target year Y):
+--   1st year (started after Oct 1, Y-1): objective = 2
+--   2nd year (started Oct 2, Y-2 through Oct 1, Y-1): objective = 3
+--   3rd year (started Oct 1, Y-3 through Oct 1, Y-2): ceil(1.2 * total_codes_and_vips / 5)
+--   4th+ year (started on or before Oct 1, Y-3): ceil(1.2 * total_codes_and_vips / 5)
+--
+-- Calculation window for 3rd/4th year personal objectives (10-month window):
+--   4th year all quarters: Jan Y-1 thru Oct Y-1
+--   3rd year Q1: Jan Y-1 thru Oct Y-1
+--   3rd year Q2: Apr Y-1 thru Jan Y
+--   3rd year Q3: Jul Y-1 thru Apr Y
+--   3rd year Q4: Oct Y-1 thru Jul Y
+--
+-- Qualifying months for each bonus month: M-2 and M-3
+--   e.g., Jan bonus uses Oct + Nov of prior year
+--
+-- Optional: Create this table if admin overrides are needed in the future.
+-- CREATE TABLE IF NOT EXISTS recruiting_objectives (
+--   id INT AUTO_INCREMENT PRIMARY KEY,
+--   org VARCHAR(100) NOT NULL,
+--   year INT NOT NULL,
+--   month INT NOT NULL,
+--   objective_override INT NOT NULL,
+--   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+--   UNIQUE KEY unique_org_year_month (org, year, month)
+-- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

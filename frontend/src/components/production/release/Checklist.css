@@ -1,0 +1,258 @@
+/* Checklist-specific styles that extend the app's design system */
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+/* Checklist Container */
+.checklist-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Agent Selection */
+.agent-selection {
+  margin-bottom: 20px;
+  padding: 20px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.agent-selection label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.agent-selection select {
+  width: 100%;
+  max-width: 400px;
+  padding: 6px 8px;
+  border: 2px solid var(--input-border);
+  border-radius: 4px;
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  font-size: 0.875rem;
+  transition: border-color 0.2s ease-in-out;
+}
+
+.agent-selection select:focus {
+  border-color: var(--hover-color);
+  outline: none;
+  box-shadow: 0 0 5px var(--shadow-color);
+}
+
+/* Release Schedule Info */
+.release-schedule-info {
+  margin-bottom: 20px;
+  padding: 20px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.scheduled-info {
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+.scheduled-info p {
+  margin: 8px 0;
+}
+
+.scheduled-info a {
+  color: var(--hover-color);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.scheduled-info a:hover {
+  text-decoration: underline;
+}
+
+/* Buttons - using app's button system */
+.unlocked-link, .locked-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 2px solid var(--button-primary-bg);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  outline: none;
+}
+
+.unlocked-link {
+  background-color: var(--button-primary-bg);
+  color: var(--button-primary-text);
+}
+
+.unlocked-link:hover {
+  opacity: 0.9;
+}
+
+.locked-link {
+  background-color: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.full-release-message {
+  color: var(--text-primary);
+  font-style: italic;
+  margin: 0;
+  padding: 15px;
+  background-color: #fff3cd;
+  border-radius: 4px;
+  border-left: 4px solid #ffc107;
+}
+
+/* Progress Bar - matching app's style */
+.release-progress-bar-container {
+  margin-bottom: 20px;
+  padding: 20px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px var(--shadow-color);
+  text-align: center;
+}
+
+.progress-percentage {
+  margin-bottom: 15px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.checklist-progress-bar {
+  width: 100%;
+  height: 20px;
+  background-color: var(--bg-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  box-shadow: inset 0 1px 2px var(--shadow-color);
+}
+
+.checklist-progress-bar-fill {
+  height: 100%;
+  background-color: var(--button-primary-bg);
+  transition: width 0.3s ease;
+  border-radius: 4px;
+}
+
+/* Loading State */
+.loading-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 30px;
+  background-color: var(--card-bg);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.loading-state p {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+/* Custom range slider controls */
+.progress-visualization {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.increment-button {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  transition: background-color 0.2s ease;
+  color: var(--text-primary);
+}
+
+.increment-button:hover {
+  background: var(--bg-secondary);
+}
+
+.increment-button:active {
+  background: var(--bg-tertiary);
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .checklist-container {
+    padding: 10px;
+  }
+
+  .agent-selection,
+  .release-schedule-info,
+  .progress-bar-container {
+    padding: 15px;
+    margin-bottom: 15px;
+  }
+
+  .progress-percentage {
+    font-size: 1.25rem;
+  }
+
+  .checklist-progress-bar {
+    height: 16px;
+  }
+
+  .agent-selection select {
+    max-width: 100%;
+  }
+
+  .progress-visualization {
+    gap: 6px;
+  }
+
+  .increment-button {
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .checklist-container {
+    padding: 5px;
+  }
+
+  .agent-selection,
+  .release-schedule-info,
+  .progress-bar-container {
+    padding: 10px;
+  }
+
+  .progress-percentage {
+    font-size: 1.125rem;
+  }
+
+  .checklist-progress-bar {
+    height: 14px;
+  }
+} 

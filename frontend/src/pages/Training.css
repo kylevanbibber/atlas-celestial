@@ -1,0 +1,43 @@
+/* Training page styles */
+.training-container {
+  display: flex;
+  min-height: calc(100vh - var(--header-height, 60px));
+  background-color: var(--bg-primary);
+}
+
+.training-content {
+  flex: 1;
+  overflow-y: auto;
+  background-color: var(--bg-primary);
+}
+
+.padded-content {
+  padding: 2rem;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  /* Hide secondary sidebar on mobile - handled by returning null in component */
+  .training-container {
+    flex-direction: column;
+  }
+  
+  .training-content {
+    width: 100%;
+    padding: 15px;
+    box-sizing: border-box;
+  }
+  
+  .padded-content {
+    padding: 0;
+  }
+}
+
+/* Dark mode support */
+[data-theme="dark"] .training-container {
+  background-color: var(--bg-primary);
+}
+
+[data-theme="dark"] .training-content {
+  background-color: var(--bg-primary);
+} 

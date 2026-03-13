@@ -1,0 +1,23 @@
+.btn-primary {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  /* ... existing code ... */
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-color-hover, darkblue);
+  /* ... existing code ... */
+}
+
+.btn-secondary {
+  background-color: var(--secondary-color);
+  color: white;
+  /* ... existing code ... */
+}
+
+.btn-accent {
+  background-color: var(--accent-color);
+  color: white;
+  /* ... existing code ... */
+} 

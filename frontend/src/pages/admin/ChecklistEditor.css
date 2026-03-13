@@ -1,0 +1,453 @@
+.checklist-editor {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.checklist-editor .page-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.checklist-editor .page-header h2 {
+  margin: 0;
+  font-size: 22px;
+  color: var(--text-primary, #1a1a2e);
+}
+
+.checklist-editor .page-header p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary, #666);
+}
+
+/* Stage accordion */
+.ce-stage {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.ce-stage-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s;
+}
+
+.ce-stage-header:hover {
+  background: var(--bg-secondary, #f5f7fa);
+}
+
+.ce-stage-header .stage-color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ce-stage-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  flex: 1;
+  color: var(--text-primary, #1a1a2e);
+}
+
+.ce-stage-header .stage-count {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+  background: var(--bg-secondary, #f0f2f5);
+  padding: 2px 10px;
+  border-radius: 12px;
+}
+
+.ce-stage-header .chevron {
+  color: var(--text-secondary, #888);
+  transition: transform 0.2s;
+}
+
+.ce-stage-header .chevron.open {
+  transform: rotate(90deg);
+}
+
+/* Items list */
+.ce-items {
+  border-top: 1px solid var(--border-color, #e0e0e0);
+  padding: 8px 0;
+}
+
+.ce-item {
+  border-bottom: 1px solid var(--border-color, #eee);
+  padding: 0 18px;
+}
+
+.ce-item:last-child {
+  border-bottom: none;
+}
+
+.ce-item-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  cursor: pointer;
+}
+
+.ce-item-header .item-order {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary, #888);
+  background: var(--bg-secondary, #f0f2f5);
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.ce-item-header .item-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #333);
+}
+
+.ce-item-header .item-badges {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.ce-item-header .item-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.ce-item-header .item-badge.type {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.ce-item-header .item-badge.required {
+  background: #fce4ec;
+  color: #c62828;
+}
+
+.ce-item-header .item-badge.optional {
+  background: #f3f3f3;
+  color: #888;
+}
+
+.ce-item-header .item-badge.variants {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.ce-item-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.ce-item-actions button {
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  cursor: pointer;
+  color: var(--text-secondary, #888);
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.ce-item-actions button:hover {
+  background: var(--bg-secondary, #f0f2f5);
+  color: var(--text-primary, #333);
+}
+
+.ce-item-actions button.delete:hover {
+  background: #fce4ec;
+  color: #c62828;
+}
+
+/* Expanded item details */
+.ce-item-details {
+  padding: 0 0 14px 34px;
+}
+
+.ce-detail-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.ce-detail-row .label {
+  color: var(--text-secondary, #888);
+  min-width: 90px;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+.ce-detail-row .value {
+  color: var(--text-primary, #333);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ce-detail-row .value.empty {
+  color: var(--text-secondary, #aaa);
+  font-style: italic;
+}
+
+/* State variants */
+.ce-variants {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-color, #ddd);
+}
+
+.ce-variants-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.ce-variants-header h4 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ce-variant-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  background: #fffbf0;
+  border: 1px solid #ffe0b2;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.ce-variant-row .variant-state {
+  font-weight: 700;
+  color: #e65100;
+  min-width: 28px;
+}
+
+.ce-variant-row .variant-action {
+  background: #fff3e0;
+  color: #bf360c;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.ce-variant-row .variant-detail {
+  flex: 1;
+  color: #555;
+}
+
+.ce-variant-row .variant-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.ce-variant-row .variant-actions button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  padding: 2px;
+  border-radius: 3px;
+}
+
+.ce-variant-row .variant-actions button:hover {
+  color: #333;
+  background: rgba(0,0,0,0.05);
+}
+
+/* Edit form (inline) */
+.ce-edit-form {
+  padding: 14px 18px 14px 34px;
+  background: var(--bg-secondary, #f8f9fb);
+  border-top: 1px solid var(--border-color, #e0e0e0);
+}
+
+.ce-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.ce-form-grid .full-width {
+  grid-column: 1 / -1;
+}
+
+.ce-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ce-form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #666);
+}
+
+.ce-form-group input,
+.ce-form-group select,
+.ce-form-group textarea {
+  padding: 8px 10px;
+  border: 1.5px solid var(--border-color, #d0d7de);
+  border-radius: 6px;
+  font-size: 13px;
+  background: var(--card-bg, #fff);
+  color: var(--text-primary, #333);
+  font-family: inherit;
+}
+
+.ce-form-group textarea {
+  min-height: 70px;
+  resize: vertical;
+}
+
+.ce-form-group input:focus,
+.ce-form-group select:focus,
+.ce-form-group textarea:focus {
+  outline: none;
+  border-color: #4a90d9;
+  box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.15);
+}
+
+.ce-form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.ce-form-actions button {
+  padding: 7px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
+}
+
+.ce-form-actions .btn-save {
+  background: #00558c;
+  color: #fff;
+}
+
+.ce-form-actions .btn-save:hover {
+  background: #003d66;
+}
+
+.ce-form-actions .btn-cancel {
+  background: var(--bg-secondary, #e8eaed);
+  color: var(--text-primary, #333);
+}
+
+.ce-form-actions .btn-cancel:hover {
+  background: #d0d3d8;
+}
+
+/* Add item / variant buttons */
+.ce-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #00558c;
+  background: none;
+  border: 1.5px dashed #00558c;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ce-add-btn:hover {
+  background: #e8f4fd;
+}
+
+.ce-add-item-row {
+  padding: 10px 18px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Variant edit form */
+.ce-variant-form {
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  background: #fffdf5;
+  border: 1.5px solid #ffe082;
+  border-radius: 8px;
+}
+
+.ce-variant-form .ce-form-grid {
+  grid-template-columns: 100px 120px 1fr;
+  gap: 10px;
+}
+
+/* Loading */
+.ce-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--text-secondary, #888);
+  font-size: 14px;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .checklist-editor {
+    padding: 12px;
+  }
+
+  .ce-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ce-variant-form .ce-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ce-item-header .item-badges {
+    display: none;
+  }
+
+  .ce-detail-row {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .ce-detail-row .label {
+    min-width: unset;
+  }
+}

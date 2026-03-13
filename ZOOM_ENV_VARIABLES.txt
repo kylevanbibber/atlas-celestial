@@ -1,0 +1,10 @@
+# Zoom OAuth Environment Variables
+# Add these to your backend/.env file
+
+ZOOM_CLIENT_ID=your_client_id_here
+ZOOM_CLIENT_SECRET=your_client_secret_here
+ZOOM_REDIRECT_URI=http://localhost:3000/auth/zoom/callback
+
+# For Production, use:
+# ZOOM_REDIRECT_URI=https://your-production-domain.com/auth/zoom/callback
+

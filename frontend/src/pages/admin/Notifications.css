@@ -1,0 +1,55 @@
+.notifications-admin-container {
+  padding: 1.5rem 0;
+}
+
+.notification-badge {
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 0.35em 0.65em;
+  border-radius: 50rem;
+  display: inline-block;
+  font-weight: 700;
+}
+
+/* Tab styles */
+.admin-tabs .btn {
+  border-radius: 0.5rem 0.5rem 0 0;
+  padding: 0.6rem 1.25rem;
+  font-weight: 600;
+}
+
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Modal styles */
+.modal-body {
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .notifications-admin-container {
+    padding: 1rem 0;
+  }
+  
+  .btn-responsive {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+  
+  .modal-dialog {
+    margin: 0.5rem;
+  }
+  
+  .modal-content {
+    border-radius: 0.5rem;
+  }
+  
+  .admin-tabs .btn {
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+  }
+}

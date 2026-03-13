@@ -1,0 +1,712 @@
+.expanded-parent-row {
+	background-color: rgba(0, 123, 255, 0.06); /* subtle highlight */
+}
+.data-table {
+    width: 100%;
+    display: block;
+  }
+  
+  .data-table-container {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .scroll-container {
+    flex: 1;             
+    overflow-y: auto;  
+    overflow-x: auto;
+    max-width: 100%;
+  }
+  
+  .scroll-container.page-scroll-mode {
+    overflow-y: visible;
+    max-height: none;
+  }
+  
+  .scroll-container.table-scroll-mode {
+    max-height: 70vh;
+  }
+  
+  /* These styles are meant for the table in your original custom table.
+     They will apply if you target the AG Grid elements appropriately,
+     for instance by wrapping the grid in your container classes. */
+  
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: max(800px, fit-content);
+    table-layout: fixed;
+  }
+
+  /* Allow table to be wider than container for horizontal scrolling */
+  .table.table-overflow {
+    width: max-content;
+    table-layout: auto;
+  }
+
+  /* On desktop screens, allow overflow but try to utilize available width */
+  @media (min-width: 1024px) {
+    .table.table-overflow {
+      width: max-content; /* Allow table to be wider than container if needed */
+      min-width: 100%; /* Try to fill container width when possible */
+      table-layout: auto; /* Auto-sizing allows natural column distribution */
+    }
+    
+    /* On desktop, auto-width columns get reasonable space without dominating */
+    .table.table-overflow th.auto-width-column,
+    .table.table-overflow td.auto-width-column {
+      width: auto; /* Natural sizing based on content */
+      min-width: 150px; /* Minimum for readability */
+      max-width: 250px; /* Cap to prevent dominance */
+    }
+  }
+  th, td {
+    border: 1px solid var(--border-color);
+    padding: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Allow name columns to auto-size to content */
+  th.auto-width-column, 
+  td.auto-width-column {
+    width: max-content;
+    min-width: 120px; /* Minimum width for readability */
+    max-width: 300px; /* Maximum width to prevent excessive expansion */
+  }
+
+  /* For overflow tables, auto-width columns work naturally with table-layout: auto */
+  .table.table-overflow th.auto-width-column,
+  .table.table-overflow td.auto-width-column {
+    width: auto; /* Let table-layout: auto handle the sizing */
+  }
+
+  .table th:first-child, .table td:first-child {
+    border-left: none;
+    border-right: none;
+  }
+  
+  .table th:nth-child(2), .table td:nth-child(2) {
+    border-left: none;
+  }
+  
+  th {
+    cursor: pointer;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--border-color);
+  }
+  
+  .table-scroll-mode th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  
+  .page-scroll-mode th {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+  }
+  
+  .table td {
+    position: relative;
+  }
+  
+  .table td:hover {
+    background-color: var(--sidebar-hover); 
+    cursor: pointer;          
+    box-shadow: inset 0 0 0 1px var(--border-color); 
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  
+  }
+  .table tr:hover {
+    transition: background-color 0.2s ease;
+  }
+  
+  .table .editing-row {
+    background-color: rgba(255, 240, 180, 0.5);
+  }
+
+  .table .dialer-active-row {
+    background-color: rgba(0, 85, 140, 0.08) !important;
+    box-shadow: inset 3px 0 0 #00558c;
+  }
+  
+  .table .row-stale-esid {
+    background-color: rgba(255, 0, 0, 0.08) !important;
+  }
+  
+  .table input {
+    width: 100%;
+    font-size: inherit;
+    font-family: inherit;
+    border: none;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    outline: none;
+    color: var(--text-primary);
+  }
+  
+  
+  .table input:focus {
+    border: none;
+    outline: none;
+    box-shadow: none;
+  }
+  
+  .table select {
+    width: 100%;
+    font-size: 12px;
+    font-family: inherit;
+    padding: 4px 8px;
+    border-radius: 4px;
+    box-sizing: border-box;
+    cursor: pointer;
+    -webkit-appearance: menulist;
+    -moz-appearance: menulist;
+    appearance: menulist;
+  }
+  
+  .table select:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 85, 140, 0.3);
+  }
+  
+  .table select option {
+    padding: 8px;
+    font-size: 13px;
+  }
+  
+  /* Ensure td with select doesn't clip the dropdown */
+  .table td select {
+    position: relative;
+    z-index: 1;
+  }
+  .chip-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 2px 0;
+  }
+  
+  .chip {
+    background-color: var(--button-secondary-bg);
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 12px;
+    white-space: nowrap;
+    color: var(--button-secondary-text);
+  }
+  
+  /* replace inline wrappers */
+  .chip-wrapper {
+    position: relative;
+    display: inline-block;
+  }
+  
+  /* replace inline cursor styles */
+  .editable-cell {
+    cursor: text;
+  }
+  
+  /* Hide the native dropdown arrow on inputs that use a datalist in Chromium browsers */
+  input::-webkit-datalist-button {
+    display: none;
+  }
+  /* Container that holds the cell text + hover button */
+  .button-on-hover-cell {
+    position: relative;
+    padding-right: 30px; /* space on the right for the button */
+  }
+  
+  /* The hover button, initially hidden */
+  .button-on-hover {
+    position: absolute;
+    right: 1px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none; /* hidden by default */
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    border-radius: 2px;
+    color: var(--text-primary);
+  }
+  
+  /* Show the button when hovering over the cell container */
+  .button-on-hover-cell:hover .button-on-hover {
+    display: inline-block;
+    background-color: var(--sidebar-hover);
+  }
+  
+  .context-menu {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    box-shadow: 0 2px 5px var(--shadow-color);
+    min-width: 150px;
+    z-index: 1000;
+  }
+  
+  .context-menu-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-primary);
+    transition: background-color 0.2s;
+  }
+  
+  .context-menu-item:hover {
+    background-color: var(--sidebar-hover);
+  }
+  
+  .context-menu-item:not(:last-child) {
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  /* Sticky row styling */
+  .table .sticky-row {
+    position: sticky;
+    z-index: 15;
+    background-color: var(--bg-primary) !important;
+  }
+
+  /* Totals row styling */
+  .table .totals-row {
+    background-color: var(--bg-tertiary) !important;
+    font-weight: 600;
+    position: sticky;
+    z-index: 15;
+  }
+
+  .table .totals-row:hover {
+    background-color: var(--bg-tertiary) !important;
+    cursor: default !important;
+  }
+
+  .table .totals-cell {
+    background-color: var(--bg-tertiary) !important;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .table .totals-cell:hover {
+    background-color: var(--bg-tertiary) !important;
+    cursor: default !important;
+    box-shadow: none !important;
+  }
+  
+  /* Pagination Styles */
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  padding: 1rem 0;
+  margin-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.pagination-btn {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.375rem 0.75rem;
+  min-width: 40px;
+  height: 36px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background-color: var(--sidebar-hover);
+  border-color: var(--accent-color);
+  color: var(--text-primary);
+}
+
+.pagination-btn:disabled {
+  background-color: var(--bg-tertiary);
+  color: var(--text-muted);
+  border-color: var(--border-color);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.pagination-info {
+  margin: 0 1rem;
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Banded Row Styles (Zebra Striping) */
+/* Enables alternating row colors for better readability in wide tables */
+.banded-row-even {
+  background-color: var(--bg-primary, #ffffff);
+}
+
+.banded-row-odd {
+  background-color: var(--bg-secondary, #f8f9fa);
+}
+
+/* Hover states for banded rows */
+.banded-row-even:hover,
+.banded-row-odd:hover {
+  background-color: var(--bg-hover, #e9ecef) !important;
+}
+
+/* Column Group Visual Separation */
+/* Creates visual separation between daily/weekly column groups */
+.group-first-column {
+  border-left: 3px solid var(--border-secondary, #dee2e6) !important;
+}
+
+.day-separator {
+  border-left: 2px solid var(--border-accent, #6c757d) !important;
+}
+
+/* Header styling for column groups */
+.column-group-weekly {
+  background-color: var(--header-bg-weekly, #e3f2fd) !important;
+}
+
+.column-group-daily {
+  background-color: var(--header-bg-daily, #f3e5f5) !important;
+}
+
+.column-group-period {
+  background-color: var(--header-bg-period, #e8f5e8) !important;
+}
+
+/* Weekly column groups for monthly view */
+.column-group-week {
+  background-color: var(--header-bg-week, #fff3e0) !important;
+}
+
+.column-group-week1 {
+  background-color: var(--header-bg-week1, #fff8e1) !important;
+}
+
+.column-group-week2 {
+  background-color: var(--header-bg-week2, #f1f8e9) !important;
+}
+
+.column-group-week3 {
+  background-color: var(--header-bg-week3, #e8f5e8) !important;
+}
+
+.column-group-week4 {
+  background-color: var(--header-bg-week4, #e0f2f1) !important;
+}
+
+.column-group-week5 {
+  background-color: var(--header-bg-week5, #e1f5fe) !important;
+}
+
+/* Individual day group header colors for better distinction */
+th.column-group-monday { background-color: var(--day-monday, #fff3e0) !important; }
+th.column-group-tuesday { background-color: var(--day-tuesday, #f1f8e9) !important; }
+th.column-group-wednesday { background-color: var(--day-wednesday, #e8f5e8) !important; }
+th.column-group-thursday { background-color: var(--day-thursday, #e0f2f1) !important; }
+th.column-group-friday { background-color: var(--day-friday, #e1f5fe) !important; }
+th.column-group-saturday { background-color: var(--day-saturday, #fce4ec) !important; }
+th.column-group-sunday { background-color: var(--day-sunday, #fff8e1) !important; }
+
+/* Column separations within table body */
+td.group-first-column {
+  border-left: 3px solid var(--border-secondary, #dee2e6) !important;
+}
+
+td.day-separator {
+  border-left: 2px solid var(--border-accent, #6c757d) !important;
+}
+
+/* No Data Styles */
+.no-data-row {
+  background-color: transparent !important;
+}
+
+.no-data-row:hover {
+  background-color: transparent !important;
+  cursor: default !important;
+}
+
+.no-data-cell {
+  background-color: transparent !important;
+  border: none !important;
+  padding: 2.5rem 1rem !important;
+  text-align: center;
+}
+
+.no-data-cell:hover {
+  background-color: transparent !important;
+  cursor: default !important;
+  box-shadow: none !important;
+}
+
+.no-data-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: var(--bg-secondary, #f3f4f6);
+  color: var(--text-secondary, #6b7280);
+}
+
+.no-data-icon {
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  opacity: 0.7;
+}
+
+.no-data-message span {
+  font-size: 13px;
+  font-weight: 500;
+}
+  
+  /* Expandable rows styles */
+.expand-button {
+  margin-right: 8px !important;
+  background: none !important;
+  border: none !important;
+  cursor: pointer !important;
+  font-size: 12px !important;
+  color: #666 !important;
+  padding: 2px 4px !important;
+  border-radius: 2px !important;
+  transition: background-color 0.2s ease;
+}
+
+.expand-button:hover {
+  background-color: #f0f0f0 !important;
+  color: #333 !important;
+}
+
+.expanded-row {
+  background-color: #f9f9f9;
+}
+
+.expanded-cell {
+  padding: 12px !important;
+  border-top: none !important;
+  background-color: #f9f9f9;
+}
+
+.expanded-content {
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 16px;
+  margin: 8px 0;
+}
+
+.discord-sales-container {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.discord-sales-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.discord-sales-title {
+  font-weight: bold;
+  color: #333;
+  margin: 0;
+}
+
+.discord-sales-count {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.discord-sale-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  background-color: white;
+  transition: box-shadow 0.2s ease;
+}
+
+.discord-sale-item:hover {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.discord-sale-info {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.discord-sale-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.discord-sale-label {
+  font-size: 10px;
+  color: #666;
+  font-weight: bold;
+  margin-bottom: 2px;
+  text-transform: uppercase;
+}
+
+.discord-sale-value {
+  font-size: 12px;
+  color: #333;
+  font-weight: bold;
+}
+
+.discord-sale-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: 12px;
+}
+
+.discord-sale-edit-btn,
+.discord-sale-delete-btn {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: bold;
+  transition: background-color 0.2s ease;
+}
+
+.discord-sale-edit-btn {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.discord-sale-edit-btn:hover {
+  background-color: #bbdefb;
+}
+
+.discord-sale-delete-btn {
+  background-color: #ffebee;
+  color: #d32f2f;
+}
+
+.discord-sale-delete-btn:hover {
+  background-color: #ffcdd2;
+}
+
+.discord-sale-timestamp {
+  font-size: 10px;
+  color: #888;
+  margin-top: 4px;
+}
+
+.discord-sale-image-link {
+  color: #1976d2;
+  text-decoration: none;
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.discord-sale-image-link:hover {
+  text-decoration: underline;
+}
+
+.no-discord-sales {
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  padding: 16px;
+}
+
+.discord-sales-total {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  font-weight: bold;
+  color: #333;
+}
+
+.lead-type-badge {
+  background-color: #f5f5f5;
+  color: #666;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+  
+  /* Manual Addition Row Styles */
+.manual-addition-item {
+  background-color: #f8f9fa;
+  border: 2px dashed #007bff;
+  border-radius: 8px;
+  margin-top: 10px;
+}
+
+.manual-addition-header {
+  text-align: center;
+  margin-bottom: 8px;
+  padding: 4px;
+  background-color: #e3f2fd;
+  border-radius: 4px;
+}
+
+.manual-addition-header h5 {
+  margin: 0;
+  color: #1976d2;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.manual-addition-item .discord-sale-info {
+  background-color: transparent;
+}
+
+.manual-addition-item .discord-sale-field .discord-sale-label {
+  color: #f57c00;
+  font-weight: bold;
+}
+
+.manual-addition-item .discord-sale-field .discord-sale-value {
+  color: #f57c00;
+  font-weight: bold;
+}
+
+/* Mobile responsiveness */
+  
+  

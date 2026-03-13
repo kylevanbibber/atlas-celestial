@@ -1,0 +1,38 @@
+/* Dashboard competitions styling */
+.dashboard-competitions {
+  margin-bottom: 24px;
+}
+
+.dashboard-competitions .competition-banner {
+  margin-bottom: 12px;
+}
+
+.dashboard-competitions .competitions-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.dashboard-competitions .loading-spinner {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.dashboard-competitions .competitions-error {
+  padding: 16px;
+  background: var(--error-background, #fef2f2);
+  border: 1px solid var(--error-color, #dc2626);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.dashboard-competitions .error-message {
+  color: var(--error-color, #dc2626);
+  font-size: 14px;
+  margin: 0;
+}

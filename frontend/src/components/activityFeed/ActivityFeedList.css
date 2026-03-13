@@ -1,0 +1,112 @@
+.activity-feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.activity-feed-list.is-pulling {
+  user-select: none;
+}
+
+.activity-feed-loading,
+.activity-feed-error,
+.activity-feed-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary, #6b7280);
+  font-size: 14px;
+}
+
+.activity-feed-error {
+  color: #ef4444;
+}
+
+.activity-feed-load-more {
+  align-self: center;
+  margin-top: 8px;
+  padding: 10px 24px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  background: var(--card-bg, #fff);
+  color: var(--text-primary, #111827);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.activity-feed-load-more:hover:not(:disabled) {
+  background: var(--bg-secondary, #f3f4f6);
+  border-color: var(--text-secondary, #9ca3af);
+}
+
+.activity-feed-load-more:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Pull-to-refresh */
+.pull-to-refresh-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  overflow: hidden;
+  transition: height 0.2s ease, opacity 0.2s ease;
+}
+
+.pull-to-refresh-indicator.refreshing {
+  height: 48px !important;
+  opacity: 1 !important;
+}
+
+.pull-to-refresh-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary, #6b7280);
+  transition: transform 0.1s linear;
+}
+
+.pull-to-refresh-icon.spinning {
+  animation: ptr-spin 0.8s linear infinite;
+}
+
+@keyframes ptr-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.pull-to-refresh-text {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  font-weight: 500;
+}
+
+.pull-to-refresh-indicator.ready .pull-to-refresh-icon,
+.pull-to-refresh-indicator.ready .pull-to-refresh-text {
+  color: var(--primary-color, #4f46e5);
+}
+
+/* Date separators */
+.activity-feed-date-separator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+  margin: 4px 0;
+}
+
+.activity-feed-date-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-color, #e5e7eb);
+}
+
+.activity-feed-date-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}

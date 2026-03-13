@@ -1,0 +1,97 @@
+/* Container for the overlaid menu; does not block interactions on the rest of the screen */
+.menu-overlay {
+    position: absolute;
+    top: calc(100% + 2px); /* Adjust offset as needed; positions the menu so its top right aligns with the bottom right of the button */
+    right: 0;
+    pointer-events: none; /* Allow interactions outside */
+    z-index: 1000;
+  }
+  
+  .mass-reassign-menu {
+    pointer-events: auto; /* Enable interactions on the menu */
+    background-color: #fff;
+    border: 1px solid #ccc;
+    padding: 1rem;
+    border-radius: 4px;
+    width: auto; /* Fit content */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    z-index: 1001;
+  }
+  
+  .mass-reassign-menu h3 {
+    margin-top: 0;
+    font-size: 1.2rem;
+  }
+  
+  .mass-reassign-menu .summary h4,
+  .mass-reassign-menu .user-breakdown h4 {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+  }
+  
+  .mass-reassign-menu table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 0.5rem;
+  }
+  
+  .mass-reassign-menu table th,
+  .mass-reassign-menu table td {
+    border: 1px solid #ddd;
+    padding: 0.3rem;
+    text-align: center;
+    font-size: 0.9rem;
+  }
+  
+  .mass-reassign-menu table th {
+    background-color: #f2f2f2;
+  }
+  
+  .mass-reassign-menu .total-row td {
+    font-weight: bold;
+  }
+  
+  .mass-reassign-menu .reassign-control {
+    margin: 1rem 0;
+    display: flex;
+    align-items: center;
+  }
+  
+  .mass-reassign-menu .reassign-control label {
+    margin-right: 0.5rem;
+    font-weight: 500;
+  }
+  
+  .mass-reassign-menu .reassign-control select {
+    flex: 1;
+    padding: 0.25rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  
+  .mass-reassign-menu .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+  
+  .mass-reassign-menu .actions button {
+    padding: 0.5rem 1rem;
+    border: none;
+    background-color: #3498db;
+    color: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s ease;
+  }
+  
+  .mass-reassign-menu .actions button:hover:not(:disabled) {
+    background-color: #2980b9;
+  }
+  
+  .mass-reassign-menu .actions button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+  

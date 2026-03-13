@@ -1,0 +1,39 @@
+/* Production.css */
+/* Only production-specific styles, using settings classes for layout */
+
+/* Remove the DailyActivityForm's own padding when inside production page */
+.settings-content .daily-activity-report {
+  min-height: auto;
+}
+
+.settings-content .daily-activity-report .padded-content {
+  padding: 20px;
+}
+
+/* Placeholder sections styling */
+.settings-content h2 {
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  font-weight: 700;
+}
+
+.settings-content p {
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* Mobile responsiveness for production content */
+@media (max-width: 768px) {
+  .settings-content .daily-activity-report .padded-content {
+    padding: 15px;
+  }
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .production-container {
+  background-color: var(--bg-primary);
+}
+
+[data-theme="dark"] .production-content {
+  background-color: var(--bg-primary);
+} 

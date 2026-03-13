@@ -1,0 +1,501 @@
+.date-range-selector-wrapper {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+/* Add margin when rendered in page content (mobile) */
+@media (max-width: 768px) {
+  .date-range-selector-wrapper {
+    margin-bottom: 1rem;
+  }
+}
+
+.date-range-selector {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.375rem 0.5rem;
+  width: fit-content;
+  max-width: 100%;
+  flex-shrink: 1;
+}
+
+/* ── Mobile (< 640px) ── */
+@media (max-width: 639px) {
+  .date-range-selector {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.375rem;
+  }
+}
+
+/* Super compact mode for smaller screens */
+@media (min-width: 640px) and (max-width: 1100px) {
+  .date-range-selector {
+    gap: 0.25rem;
+    padding: 0.25rem 0.375rem;
+    font-size: 0.7rem;
+  }
+}
+
+/* Compact mode for medium screens (tablets/small desktops) */
+@media (min-width: 1101px) and (max-width: 1300px) {
+  .date-range-selector {
+    gap: 0.375rem;
+    padding: 0.375rem 0.5rem;
+    font-size: 0.75rem;
+  }
+}
+
+@media (min-width: 1301px) {
+  .date-range-selector {
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+}
+
+.view-mode-buttons {
+  display: flex;
+  gap: 0.125rem;
+}
+
+/* Super compact mode for smaller screens */
+@media (min-width: 640px) and (max-width: 1100px) {
+  .view-mode-buttons {
+    gap: 0.125rem;
+  }
+}
+
+/* Compact mode for medium screens */
+@media (min-width: 1101px) and (max-width: 1300px) {
+  .view-mode-buttons {
+    gap: 0.125rem;
+  }
+}
+
+@media (min-width: 1301px) {
+  .view-mode-buttons {
+    gap: 0.25rem;
+  }
+}
+
+.view-scope-buttons {
+  display: flex;
+  gap: 0.125rem;
+}
+
+/* Super compact mode for smaller screens */
+@media (min-width: 640px) and (max-width: 1100px) {
+  .view-scope-buttons {
+    gap: 0.125rem;
+  }
+}
+
+/* Compact mode for medium screens */
+@media (min-width: 1101px) and (max-width: 1300px) {
+  .view-scope-buttons {
+    gap: 0.125rem;
+  }
+}
+
+@media (min-width: 1301px) {
+  .view-scope-buttons {
+    gap: 0.25rem;
+  }
+}
+
+
+.view-mode-label-full {
+  display: none;
+}
+
+.view-mode-label-short {
+  display: inline;
+}
+
+/* Compact mode for medium screens - show short labels */
+@media (min-width: 640px) and (max-width: 1300px) {
+  .view-mode-label-full {
+    display: none;
+  }
+  
+  .view-mode-label-short {
+    display: inline;
+  }
+}
+
+/* Large screens - show full labels */
+@media (min-width: 1301px) {
+  .view-mode-label-full {
+    display: inline;
+  }
+  
+  .view-mode-label-short {
+    display: none;
+  }
+}
+
+.date-range-divider {
+  height: 1.25rem;
+  width: 1px;
+  background-color: var(--border-color);
+}
+
+/* Hide dividers on mobile */
+@media (max-width: 639px) {
+  .date-range-divider {
+    display: none;
+  }
+}
+
+/* Super compact mode for smaller screens - hide dividers */
+@media (min-width: 640px) and (max-width: 1100px) {
+  .date-range-divider {
+    display: none;
+  }
+}
+
+/* Compact mode for medium screens */
+@media (min-width: 1101px) and (max-width: 1300px) {
+  .date-range-divider {
+    height: 1.25rem;
+  }
+}
+
+@media (min-width: 1301px) {
+  .date-range-divider {
+    height: 1.5rem;
+  }
+}
+
+/* ── shadcn Button sizing overrides for DateRangeSelector ── */
+
+/* Compact sizing for view-mode / scope toggle buttons */
+.drs-btn {
+  height: 1.75rem;
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 0.375rem;
+}
+
+/* Icon-only buttons (calendar, filter) */
+.drs-icon-btn {
+  height: 1.75rem;
+  width: 1.75rem;
+  padding: 0;
+}
+
+/* Navigation (prev/next) ghost icon buttons */
+.drs-nav-btn {
+  height: 1.75rem;
+  width: 1.75rem;
+  padding: 0;
+}
+
+.drs-nav-btn:hover {
+  color: hsl(var(--primary));
+}
+
+/* ── Responsive: mobile (< 640px) ── */
+@media (max-width: 639px) {
+  .drs-btn {
+    height: 1.5rem;
+    padding: 0 0.375rem;
+    font-size: 0.65rem;
+    border-radius: 0.25rem;
+  }
+
+  .drs-icon-btn {
+    height: 1.5rem;
+    width: 1.5rem;
+  }
+
+  .drs-nav-btn {
+    height: 1.5rem;
+    width: 1.5rem;
+  }
+}
+
+/* ── Responsive: super compact (640-1100px) ── */
+@media (min-width: 640px) and (max-width: 1100px) {
+  .drs-btn {
+    height: 1.5rem;
+    padding: 0 0.375rem;
+    font-size: 0.65rem;
+  }
+
+  .drs-icon-btn {
+    height: 1.5rem;
+    width: 1.5rem;
+  }
+
+  .drs-nav-btn {
+    height: 1.5rem;
+    width: 1.5rem;
+  }
+}
+
+/* ── Responsive: compact (1101-1300px) ── */
+@media (min-width: 1101px) and (max-width: 1300px) {
+  .drs-btn {
+    height: 1.75rem;
+    padding: 0 0.5rem;
+    font-size: 0.7rem;
+  }
+
+  .drs-icon-btn {
+    height: 1.75rem;
+    width: 1.75rem;
+  }
+
+  .drs-nav-btn {
+    height: 1.75rem;
+    width: 1.75rem;
+  }
+}
+
+/* ── Responsive: large (1301px+) ── */
+@media (min-width: 1301px) {
+  .drs-btn {
+    height: 2rem;
+    padding: 0 0.75rem;
+  }
+
+  .drs-icon-btn {
+    height: 2rem;
+    width: 2rem;
+  }
+
+  .drs-nav-btn {
+    height: 2rem;
+    width: 2rem;
+  }
+}
+
+/* Mobile nav icons */
+@media (max-width: 639px) {
+  .nav-icon {
+    height: 0.75rem;
+    width: 0.75rem;
+  }
+}
+
+/* Super compact mode for smaller screens */
+@media (min-width: 640px) and (max-width: 1100px) {
+  .nav-icon {
+    height: 0.75rem;
+    width: 0.75rem;
+  }
+}
+
+/* Compact mode for medium screens */
+@media (min-width: 1101px) and (max-width: 1300px) {
+  .nav-icon {
+    height: 0.875rem;
+    width: 0.875rem;
+  }
+}
+
+.nav-icon {
+  height: 1rem;
+  width: 1rem;
+}
+
+.date-display {
+  padding: 0.25rem 0.5rem;
+  background-color: var(--bg-primary);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  min-width: 120px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.date-display-clickable {
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  border-radius: 6px;
+}
+
+.date-display-clickable:hover {
+  background-color: var(--bg-secondary, #f0f0f0);
+  color: hsl(var(--primary));
+}
+
+/* Mobile date display */
+@media (max-width: 639px) {
+  .date-display {
+    padding: 0.125rem 0.25rem;
+    font-size: 0.7rem;
+    min-width: 90px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* Super compact mode for smaller screens - very short date display */
+@media (min-width: 640px) and (max-width: 1100px) {
+  .date-display {
+    padding: 0.25rem 0.375rem;
+    font-size: 0.65rem;
+    min-width: 100px;
+    max-width: 120px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* Compact mode for medium screens - shorter date display */
+@media (min-width: 1101px) and (max-width: 1300px) {
+  .date-display {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    min-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (min-width: 1301px) {
+  .date-display {
+    padding: 0.25rem 1rem;
+    font-size: 0.875rem;
+    min-width: 200px;
+  }
+}
+
+
+/* Super compact mode for smaller screens */
+@media (min-width: 640px) and (max-width: 1100px) {
+  .calendar-icon {
+    height: 0.75rem;
+    width: 0.75rem;
+  }
+}
+
+/* Compact mode for medium screens */
+@media (min-width: 1101px) and (max-width: 1300px) {
+  .calendar-icon {
+    height: 0.875rem;
+    width: 0.875rem;
+  }
+}
+
+.calendar-icon {
+  height: 0.75rem;
+  width: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .calendar-icon {
+    height: 1rem;
+    width: 1rem;
+  }
+}
+
+.date-range-backdrop {
+  position: fixed;
+  inset: 0;
+  /* Above header (Header z-index is ~1100) */
+  z-index: 1390;
+}
+
+.date-range-dropdown {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20rem;
+  max-width: 90vw;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  /* Above header */
+  z-index: 1400;
+  padding: 1rem;
+}
+
+.dropdown-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.dropdown-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.input-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+/* In-place goals editor (ActivityGoalsCombinedPage) */
+.goals-editor-nav {
+  padding: 8px 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.goals-editor-back-btn {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.15s;
+}
+
+.goals-editor-back-btn:hover {
+  color: var(--primary-color);
+}
+
+.goals-editor-save-btn {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.goals-editor-save-btn:hover {
+  opacity: 0.85;
+}
+
+

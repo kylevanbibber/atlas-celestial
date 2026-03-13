@@ -1,0 +1,366 @@
+.competition-banner {
+  background: var(--background-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 16px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.competition-banner:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.competition-banner.active {
+  border-left: 4px solid var(--success-color);
+}
+
+.competition-banner.upcoming {
+  border-left: 4px solid var(--warning-color);
+}
+
+.competition-banner.ended {
+  border-left: 4px solid var(--error-color);
+  opacity: 0.8;
+}
+
+/* Header Section */
+.competition-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  padding-right: 48px;
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.competition-header:hover {
+  background: var(--background-secondary);
+}
+
+.competition-title-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.competition-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  border-radius: 12px;
+  color: #8b6914;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.competition-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.competition-title {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.competition-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.competition-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(var(--text-secondary-rgb), 0.1);
+}
+
+.competition-dates,
+.competition-participants {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Quick Progress Display */
+.quick-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  text-align: right;
+}
+
+.progress-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.rank-display {
+  font-size: 14px;
+  color: var(--primary-color);
+  font-weight: 500;
+}
+
+.expand-icon {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: 20px;
+}
+
+/* Details Section */
+.competition-details {
+  border-top: 1px solid var(--border-color);
+  background: var(--background-secondary);
+}
+
+.competition-section {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color-light);
+}
+
+.competition-section:last-child {
+  border-bottom: none;
+}
+
+.competition-description {
+  margin: 0;
+  color: var(--text-primary);
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.prize-display {
+  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  color: #8b6914;
+  padding: 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 16px;
+  text-align: center;
+  border: 1px solid #e6c200;
+}
+
+/* Details Grid */
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-item label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-item span {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* Progress Section */
+.progress-section {
+  background: var(--background-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.progress-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-item label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+.progress-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--border-color);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-color), var(--success-color));
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-percentage {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 45px;
+  text-align: right;
+}
+
+/* Rules Section */
+.rules-content {
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+.rules-content p {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+}
+
+.rules-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .competition-header {
+    padding: 16px;
+  }
+  
+  .competition-title-section {
+    gap: 12px;
+  }
+  
+  .competition-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+  
+  .competition-title {
+    font-size: 16px;
+  }
+  
+  .competition-meta {
+    gap: 12px;
+    font-size: 12px;
+  }
+  
+  .quick-progress {
+    align-items: flex-end;
+  }
+  
+  .progress-value {
+    font-size: 14px;
+  }
+  
+  .competition-section {
+    padding: 16px;
+  }
+  
+  .details-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .progress-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .competition-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .expand-icon {
+    top: 16px;
+    right: 16px;
+  }
+  
+  .quick-progress {
+    align-self: flex-end;
+    align-items: flex-end;
+  }
+  
+  .competition-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .progress-stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .progress-bar-container {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .progress-percentage {
+    text-align: center;
+  }
+}

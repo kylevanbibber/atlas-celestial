@@ -1,0 +1,159 @@
+/* AllotmentTab specific styles */
+
+/* Grey row styling for inactive agents (either Active='n' or managerActive='n') */
+.inactive-agent-row {
+  background-color: var(--bg-tertiary, #f5f5f5) !important;
+  color: var(--text-secondary, #666666) !important;
+  opacity: 0.8;
+}
+
+.inactive-agent-row:hover {
+  background-color: var(--bg-secondary, #eeeeee) !important;
+}
+
+.inactive-agent-row td {
+  color: var(--text-secondary, #666666) !important;
+}
+
+/* Legacy class name for backwards compatibility */
+.inactive-manager-row {
+  background-color: var(--bg-tertiary, #f5f5f5) !important;
+  color: var(--text-secondary, #666666) !important;
+  opacity: 0.8;
+}
+
+.inactive-manager-row:hover {
+  background-color: var(--bg-secondary, #eeeeee) !important;
+}
+
+.inactive-manager-row td {
+  color: var(--text-secondary, #666666) !important;
+}
+
+/* Allotment UI chrome - theme-aware */
+.allotment-tab-bar {
+  border-bottom: 1px solid var(--border-color, #dee2e6);
+}
+
+.allotment-tab-btn {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #6c757d);
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.allotment-tab-btn:hover {
+  background-color: var(--bg-tertiary, #f1f3f5);
+  color: var(--text-primary, #495057);
+}
+
+.allotment-tab-btn.active {
+  background-color: var(--bg-secondary, #f8f9fa);
+  font-weight: bold;
+}
+
+.allotment-search-select {
+  padding: 6px 10px;
+  border: 1px solid var(--border-color, #dee2e6);
+  border-radius: 6px;
+  font-size: 13px;
+  background-color: var(--input-bg, white);
+  color: var(--input-text, #333);
+}
+
+.allotment-toolbar-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #495057);
+  white-space: nowrap;
+}
+
+.allotment-toolbar-divider {
+  font-size: 13px;
+  color: var(--text-secondary, #666);
+  padding-left: 8px;
+  border-left: 1px solid var(--border-color, #dee2e6);
+}
+
+.allotment-loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  z-index: 10;
+  background-color: var(--loading-overlay-bg, rgba(255, 255, 255, 0.95));
+}
+
+[data-theme="dark"] .allotment-loading-overlay {
+  background-color: rgba(30, 30, 35, 0.9);
+}
+
+.allotment-bulk-modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.allotment-bulk-modal {
+  background-color: var(--card-bg, white);
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 320px;
+  max-width: 500px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color, #e9ecef);
+}
+
+.allotment-f90-banner {
+  background-color: var(--bg-secondary, #d1ecf1);
+  padding: 8px 16px;
+  border: 2px solid #00558c;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.allotment-section-title {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.allotment-muted {
+  color: var(--text-secondary, #666);
+}
+
+.allotment-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.allotment-edit-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-secondary, #666);
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.allotment-edit-icon:hover {
+  background-color: var(--bg-tertiary, #f0f0f0);
+}

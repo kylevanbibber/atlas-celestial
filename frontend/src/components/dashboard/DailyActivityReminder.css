@@ -1,0 +1,299 @@
+/* Backdrop that covers the entire page with blur effect */
+.daily-activity-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 9999;
+  animation: fadeIn 0.3s ease;
+  pointer-events: all; /* Capture all clicks to prevent interaction with background */
+  cursor: not-allowed; /* Show that the backdrop is not clickable */
+}
+
+/* Modal content - centered on screen */
+.daily-activity-reminder {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+  border-radius: 8px;
+  width: 90%;
+  max-width: 1800px;
+  margin: 0 auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10000;
+  animation: modalSlideIn 0.4s ease;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes modalSlideIn {
+  from {
+    transform: translate(-50%, -60%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%);
+    opacity: 1;
+  }
+}
+
+.daily-activity-reminder:hover {
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
+.reminder-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  cursor: pointer;
+  user-select: none;
+  color: white;
+  flex-shrink: 0; /* Prevent header from shrinking */
+}
+
+.reminder-header:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.reminder-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
+}
+
+.reminder-message {
+  flex: 1;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.reminder-message strong {
+  font-weight: 600;
+}
+
+.reminder-toggle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease;
+}
+
+.reminder-form {
+  padding: 0;
+  margin: 0;
+  background: var(--bg-primary);
+  animation: slideDown 0.3s ease;
+  overflow: auto; /* Allow both vertical and horizontal scroll */
+  flex: 1; /* Take remaining space */
+  max-height: calc(90vh - 100px); /* Ensure form doesn't exceed viewport minus header */
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: calc(90vh - 100px);
+  }
+}
+
+.table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-height: min-content; /* Ensure container fits content */
+}
+
+/* Use existing DataTable styling */
+.reminder-form .table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+  table-layout: fixed;
+  margin: 0;
+}
+
+.reminder-form .table th,
+.reminder-form .table td {
+  border: 1px solid var(--border-color);
+  padding: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reminder-form .table th:first-child,
+.reminder-form .table td:first-child {
+  border-left: none;
+  border-right: none;
+}
+
+.reminder-form .table th:nth-child(2),
+.reminder-form .table td:nth-child(2) {
+  border-left: none;
+}
+
+.reminder-form .table th {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--border-color);
+  text-align: center;
+  font-weight: 600;
+}
+
+.reminder-form .table th:first-child {
+  text-align: left;
+  padding-left: 8px;
+}
+
+.reminder-form .table td {
+  background: var(--bg-primary);
+  text-align: center;
+}
+
+.reminder-form .table td.date-cell {
+  text-align: left;
+  padding-left: 8px;
+  font-weight: 600;
+}
+
+.reminder-form .table input {
+  width: 100%;
+  font-size: inherit;
+  font-family: inherit;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  outline: none;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.reminder-form .table input:focus {
+  background-color: rgba(255, 240, 180, 0.3);
+}
+
+.reminder-form .table td:hover {
+  background-color: var(--sidebar-hover);
+}
+
+.submit-cell {
+  text-align: center !important;
+  padding: 4px !important;
+}
+
+.submit-button {
+  padding: 0.35rem 0.6rem;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.3);
+  min-width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.submit-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.4);
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+.submit-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .daily-activity-reminder {
+    width: 95%;
+    max-width: 95%;
+    max-height: 95vh;
+  }
+  
+  .reminder-header {
+    padding: 0.75rem 1rem;
+  }
+  
+  .reminder-message {
+    font-size: 0.875rem;
+  }
+  
+  .reminder-form {
+    max-height: calc(95vh - 80px);
+  }
+  
+  .reminder-form .table {
+    min-width: 850px;
+  }
+  
+  .submit-button {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.9rem;
+    min-width: 28px;
+    height: 28px;
+  }
+}
+
+/* Dark mode support */
+[data-theme="dark"] .reminder-form {
+  background: var(--bg-primary);
+}
+
+[data-theme="dark"] .reminder-form .table th {
+  background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .reminder-form .table td {
+  background: var(--bg-primary);
+}
+
+[data-theme="dark"] .reminder-form .table td:hover {
+  background: var(--sidebar-hover);
+}
+
+[data-theme="dark"] .reminder-form .table input:focus {
+  background-color: rgba(255, 240, 180, 0.15);
+}

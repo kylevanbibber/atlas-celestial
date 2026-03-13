@@ -1,0 +1,933 @@
+/* When used in RightDetails sidebar */
+.right-details-content .pipeline-checklist-container {
+  height: 100%;
+  overflow: visible;
+}
+
+.right-details-content .checklist-header {
+  margin: 0;
+  border-radius: 0;
+}
+
+/* Legacy modal styles */
+.pipeline-checklist-container {
+  overflow-y: auto;
+}
+
+/* Header */
+.checklist-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px;
+  background: var(--secondary-background, #f5f7fa);
+  border-radius: 8px 8px 0 0;
+  margin: -20px -20px 20px -20px;
+}
+
+.checklist-recruit-info h3 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  color: var(--text-primary, #333);
+}
+
+.checklist-recruit-info p {
+  margin: 4px 0;
+  font-size: 14px;
+  color: var(--text-secondary, #666);
+}
+
+.checklist-progress-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-circle {
+  width: 80px;
+  height: 80px;
+}
+
+
+
+.checklist-progress-summary span {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, #666);
+}
+
+/* Stages */
+.checklist-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.right-details-content .checklist-stages {
+  gap: 12px;
+}
+
+.checklist-stage {
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.checklist-stage.current {
+  border-color: var(--primary-color, #00558c);
+  box-shadow: 0 2px 8px rgba(0, 85, 140, 0.1);
+}
+
+.checklist-stage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: var(--card-background, #fff);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.checklist-stage-header:hover {
+  background: var(--hover-background, #f8f9fa);
+}
+
+.stage-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stage-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.checklist-stage-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+}
+
+.current-badge {
+  padding: 2px 8px;
+  background: var(--primary-color, #00558c);
+  color: white;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.stage-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stage-progress-bar {
+  width: 120px;
+  height: 6px;
+  background: var(--border-color, #e0e0e0);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.stage-progress-fill {
+  height: 100%;
+  background: var(--primary-color, #00558c);
+  transition: width 0.3s ease;
+}
+
+.stage-completion {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+  min-width: 40px;
+  text-align: right;
+}
+
+/* Checklist Items */
+.checklist-items {
+  padding: 12px 16px 16px 16px; /* add a little breathing room at the top */
+  background: var(--secondary-background, #f5f7fa);
+}
+
+.checklist-item {
+  padding: 16px; /* increased spacing for readability */
+  background: var(--card-background, #fff);
+  border: 1px solid var(--border-color, #e0e0e0); /* subtle outline helps in dark mode */
+  border-radius: 8px;
+  margin-bottom: 12px; /* more space between items */
+  transition: all 0.2s ease;
+}
+
+.checklist-item:last-child {
+  margin-bottom: 0;
+}
+
+.checklist-item.completed {
+  background: var(--success-background, #f0f8f0);
+  border-left: 3px solid var(--success-color, #27ae60);
+}
+
+/* subtle hover state that works in light/dark via vars */
+.checklist-item:hover {
+  background: var(--hover-background, #f8f9fa);
+  border-color: var(--border-color, #d5d5d5);
+}
+
+.checklist-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* increase vertical rhythm inside item */
+}
+
+.checklist-item-info {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.checklist-checkbox {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  border: 2px solid var(--border-color, #ccc);
+  border-radius: 4px;
+  background: var(--card-background, #fff);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.checklist-checkbox:hover:not(.disabled) {
+  border-color: var(--primary-color, #00558c);
+}
+
+.checklist-checkbox.checked {
+  background: var(--primary-color, #00558c);
+  border-color: var(--primary-color, #00558c);
+  color: white;
+}
+
+.checklist-checkbox.checked::after {
+  content: '✓';
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.checklist-checkbox.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: var(--secondary-background, #f5f7fa);
+}
+
+.checklist-checkbox.disabled:hover {
+  border-color: var(--border-color, #ccc);
+}
+
+.checklist-item-text {
+  flex: 1;
+}
+
+.checklist-item-text label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #333);
+  display: block;
+  margin-bottom: 6px; /* slightly more space above description */
+  cursor: pointer;
+}
+
+.required-star {
+  color: var(--danger-color, #e74c3c);
+  margin-left: 4px;
+}
+
+.state-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.state-badge.state-specific {
+  background: var(--primary-color, #00558c);
+  color: white;
+}
+
+.state-badge.state-modified {
+  background: #f39c12;
+  color: white;
+}
+
+.item-description {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.checklist-input,
+.checklist-select,
+.checklist-textarea {
+  width: 100%;
+  padding: 10px 12px; /* taller inputs for easier tap */
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--input-bg, #ffffff);
+  color: var(--input-text, #333333);
+  transition: all 0.2s ease;
+}
+
+.checklist-input:focus,
+.checklist-select:focus,
+.checklist-textarea:focus {
+  outline: none;
+  border-color: var(--primary-color, #00558c);
+  box-shadow: 0 0 0 2px var(--shadow-color, rgba(0, 0, 0, 0.1));
+}
+
+.checklist-textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.checklist-item-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color, #e0e0e0);
+}
+
+.completed-by {
+  font-weight: 500;
+  color: var(--success-color, #27ae60);
+}
+
+.completed-date {
+  color: var(--text-secondary, #999);
+}
+
+/* Footer */
+.checklist-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color, #e0e0e0);
+  margin-top: 20px;
+}
+
+/* Loading */
+.checklist-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px;
+  color: var(--text-secondary, #666);
+}
+
+/* Attachments Section */
+.checklist-item-attachments {
+  margin-top: 10px;
+  padding: 12px;
+  background: var(--secondary-background, #f8f9fa);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 6px;
+}
+
+.attachments-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, #666);
+}
+
+.upload-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: var(--primary-color, #00558c);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.upload-btn:hover:not(:disabled) {
+  background: var(--primary-hover, #003d63);
+}
+
+.upload-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.attachments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.attachment-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px; /* a bit more room for touch */
+  background: var(--card-background, #fff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.attachment-item:hover {
+  border-color: var(--primary-color, #00558c);
+  box-shadow: 0 1px 3px rgba(0, 85, 140, 0.1);
+}
+
+.attachment-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.attachment-info.clickable {
+  cursor: pointer;
+}
+
+.attachment-info.clickable:hover .attachment-name {
+  text-decoration: underline;
+}
+
+.attachment-name {
+  font-size: 13px;
+  color: var(--text-primary, #333);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.attachment-size {
+  font-size: 11px;
+  color: var(--text-secondary, #999);
+  white-space: nowrap;
+}
+
+.attachment-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.attachment-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--text-secondary, #666);
+}
+
+.attachment-action-btn:hover {
+  background: var(--secondary-background, #f5f7fa);
+  color: var(--primary-color, #00558c);
+  border-color: var(--primary-color, #00558c);
+}
+
+.attachment-action-btn.delete:hover {
+  background: var(--danger-background, rgba(231, 76, 60, 0.1));
+  color: var(--danger-color, #e74c3c);
+  border-color: var(--danger-color, #e74c3c);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .checklist-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .checklist-progress-summary {
+    align-self: flex-end;
+  }
+
+  .stage-header-right {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+
+  .stage-progress-bar {
+    width: 80px;
+  }
+
+  .attachment-info {
+    gap: 4px;
+  }
+
+  .attachment-name {
+    font-size: 12px;
+  }
+
+  .attachment-size {
+    display: none;
+  }
+}
+
+/* Pipeline Detail Tabs */
+.pipeline-detail-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 0;
+}
+
+.pipeline-detail-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  margin-bottom: -2px;
+}
+
+.pipeline-detail-tab:hover {
+  color: var(--text-primary);
+  background: var(--input-bg);
+}
+
+.pipeline-detail-tab.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+  font-weight: 600;
+}
+
+.pipeline-detail-tab svg {
+  font-size: 16px;
+}
+
+.tab-badge {
+  background: var(--primary-color);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* Texts Tab Content */
+.texts-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.no-sms-history {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.no-sms-history svg {
+  color: var(--border-color);
+  margin-bottom: 16px;
+}
+
+.no-sms-history p {
+  margin: 0;
+  font-size: 16px;
+}
+
+/* SMS History Section */
+.sms-history-section {
+  padding: 20px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.sms-history-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sms-history-header svg {
+  font-size: 20px;
+  color: var(--primary-color);
+}
+
+.sms-history-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.sms-count {
+  background: var(--primary-color);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sms-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.sms-message {
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  transition: all 0.2s ease;
+}
+
+.sms-message.outbound {
+  background: var(--input-bg);
+  border-left: 3px solid var(--primary-color);
+}
+
+.sms-message.inbound {
+  background: #f0f9ff;
+  border-left: 3px solid #10b981;
+}
+
+.sms-message:hover {
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.sms-message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.sms-sender {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sms-sender-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--border-color);
+}
+
+.sms-sender-avatar-placeholder {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 16px;
+}
+
+.sms-sender-avatar-placeholder.recruit {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.sms-direction-badge {
+  background: #10b981;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.sms-sender-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.sms-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sms-timestamp {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.sms-status {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sms-status.sent {
+  color: #10b981;
+}
+
+.sms-status.delivered {
+  color: #059669;
+}
+
+.sms-status.failed {
+  color: #ef4444;
+}
+
+.sms-message-body {
+  padding: 10px;
+  background: var(--card-bg);
+  border-left: 3px solid var(--primary-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.sms-message-footer {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sms-phone {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Mobile responsive for SMS history */
+@media (max-width: 768px) {
+  .sms-history-section {
+    padding: 16px;
+  }
+
+  .sms-message-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .sms-meta {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .sms-sender-avatar,
+  .sms-sender-avatar-placeholder {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+
+  .sms-sender-name {
+    font-size: 13px;
+  }
+
+  .sms-message-body {
+    font-size: 13px;
+    padding: 8px;
+  }
+}
+
+/* Send SMS Section */
+.send-sms-section {
+  padding: 20px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.send-sms-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.send-sms-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.recipient-phone {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.send-sms-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.send-sms-form textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+}
+
+.send-sms-form textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.send-sms-form textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.send-sms-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.char-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.send-sms-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.send-sms-btn:hover:not(:disabled) {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 85, 140, 0.3);
+}
+
+.send-sms-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.send-sms-btn svg {
+  font-size: 16px;
+}
+
+/* Mobile responsive for send SMS */
+@media (max-width: 768px) {
+  .send-sms-section {
+    padding: 16px;
+  }
+
+  .send-sms-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .send-sms-footer {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .send-sms-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .pipeline-detail-tabs {
+    gap: 4px;
+  }
+
+  .pipeline-detail-tab {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+}
+
